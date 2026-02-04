@@ -5,11 +5,11 @@ import { DB_PATH } from "../../shared/constants.js";
 
 /**
  * @description Resolved absolute path to the SQLite database file.
- * Uses DB_PATH from constants ("data/portfolio60.db") resolved from the
- * project root.
+ * Uses the DB_PATH environment variable if set (e.g. for testing with
+ * isolated databases), otherwise falls back to DB_PATH from constants.
  * @type {string}
  */
-const resolvedDbPath = resolve(DB_PATH);
+const resolvedDbPath = resolve(process.env.DB_PATH || DB_PATH);
 
 /**
  * @description Singleton database instance. Null until the database is

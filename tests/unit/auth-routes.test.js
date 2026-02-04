@@ -1,65 +1,39 @@
-import { describe, test, expect, beforeAll, afterAll, beforeEach } from "bun:test";
-import { existsSync, unlinkSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { describe, test, expect, beforeAll, afterAll } from "bun:test";
+import { existsSync, unlinkSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { DB_PATH } from "../../src/shared/constants.js";
 
 /**
  * @description Port for auth-routes.test.js — unique per test file.
  * @type {number}
  */
 const TEST_PORT = 1431;
-
-/**
- * @description Base URL for the test server
- * @type {string}
- */
 const BASE_URL = `http://localhost:${TEST_PORT}`;
-
-/**
- * @description Path to the .env file
- * @type {string}
- */
 const ENV_PATH = resolve(".env");
 
 /**
- * @description Resolved path to the database file
+ * @description Isolated test database path — avoids touching the user's real database.
  * @type {string}
  */
-const DB_FULL_PATH = resolve(DB_PATH);
-
-/**
- * @description Backup of the original .env content, or null if it didn't exist
- * @type {string|null}
- */
-let envBackup = null;
-
-/**
- * @description Whether the database existed before tests started
- * @type {boolean}
- */
-let dbExistedBefore = false;
+const TEST_DB_PATH = resolve("data/test-auth-routes.db");
 
 let serverProcess;
+let envBackup = null;
 
 beforeAll(async () => {
   // Back up existing .env
   if (existsSync(ENV_PATH)) {
     envBackup = readFileSync(ENV_PATH, "utf-8");
   }
-  // Remove .env for a clean first-run state
   if (existsSync(ENV_PATH)) {
     unlinkSync(ENV_PATH);
   }
 
-  // Track whether database existed before tests
-  dbExistedBefore = existsSync(DB_FULL_PATH);
-
-  // Start the server on the test port
+  // Start the server with isolated test database
   serverProcess = Bun.spawn(["bun", "run", "src/server/index.js"], {
     cwd: process.cwd(),
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...process.env, PORT: String(TEST_PORT) },
+    env: { ...process.env, PORT: String(TEST_PORT), DB_PATH: TEST_DB_PATH },
   });
 
   // Wait for the server to be ready
@@ -76,42 +50,20 @@ beforeAll(async () => {
     }
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
-
-  if (!ready) {
-    throw new Error("Server did not start within the expected time");
-  }
+  if (!ready) throw new Error("Server did not start within the expected time");
 });
 
 afterAll(() => {
-  if (serverProcess) {
-    serverProcess.kill();
-  }
+  if (serverProcess) serverProcess.kill();
 
-  // Restore original .env
-  if (existsSync(ENV_PATH)) {
-    unlinkSync(ENV_PATH);
-  }
-  if (envBackup !== null) {
-    writeFileSync(ENV_PATH, envBackup, "utf-8");
-  }
+  // Restore .env
+  if (existsSync(ENV_PATH)) unlinkSync(ENV_PATH);
+  if (envBackup !== null) writeFileSync(ENV_PATH, envBackup, "utf-8");
 
-  // Clean up database created during tests (if it didn't exist before)
-  if (!dbExistedBefore) {
-    for (const suffix of ["", "-wal", "-shm"]) {
-      const filePath = DB_FULL_PATH + suffix;
-      if (existsSync(filePath)) {
-        unlinkSync(filePath);
-      }
-    }
-    // Remove data/ directory if empty
-    const dataDir = resolve("data");
-    if (existsSync(dataDir)) {
-      try {
-        rmSync(dataDir, { recursive: true });
-      } catch {
-        // May not be empty, that's fine
-      }
-    }
+  // Remove isolated test database
+  for (const suffix of ["", "-wal", "-shm"]) {
+    const f = TEST_DB_PATH + suffix;
+    if (existsSync(f)) unlinkSync(f);
   }
 });
 
@@ -192,18 +144,8 @@ describe("Auth Routes - verify passphrase", () => {
 });
 
 describe("Auth Routes - auth gate", () => {
-  test("GET / redirects to passphrase page when not authenticated", async () => {
-    // Start a fresh server without auth to test the redirect.
-    // Since the current server is already authenticated from the set-passphrase test,
-    // we test with the scraper route which should be accessible without auth.
-    const response = await fetch(`${BASE_URL}/api/scraper/test`, { redirect: "manual" });
-    // Scraper routes are unprotected, so should get 501 (not implemented), not 302
-    expect(response.status).toBe(501);
-  });
-
   test("scraper routes are accessible without authentication", async () => {
     const response = await fetch(`${BASE_URL}/api/scraper/anything`, { redirect: "manual" });
-    // Should NOT redirect to passphrase — should reach the 501 placeholder
     expect(response.status).toBe(501);
   });
 

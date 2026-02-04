@@ -1,9 +1,9 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
-import { existsSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
- * @description Port for server.test.js — each test file gets a unique port.
+ * @description Port for server.test.js — unique per test file.
  * @type {number}
  */
 const TEST_PORT = 1430;
@@ -27,14 +27,12 @@ const TEST_PASSPHRASE = "testpass1234";
 const ENV_PATH = resolve(".env");
 
 /**
- * @description Server subprocess handle
+ * @description Isolated test database path — avoids touching the user's real database.
+ * @type {string}
  */
-let serverProcess;
+const TEST_DB_PATH = resolve("data/test-server.db");
 
-/**
- * @description Backup of the original .env content, or null if it didn't exist
- * @type {string|null}
- */
+let serverProcess;
 let envBackup = null;
 
 beforeAll(async () => {
@@ -42,21 +40,19 @@ beforeAll(async () => {
   if (existsSync(ENV_PATH)) {
     envBackup = readFileSync(ENV_PATH, "utf-8");
   }
-
-  // Remove .env so the server starts in first-run mode
   if (existsSync(ENV_PATH)) {
     unlinkSync(ENV_PATH);
   }
 
-  // Start the server as a subprocess on the test port
+  // Start the server with isolated test database
   serverProcess = Bun.spawn(["bun", "run", "src/server/index.js"], {
     cwd: process.cwd(),
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...process.env, PORT: String(TEST_PORT) },
+    env: { ...process.env, PORT: String(TEST_PORT), DB_PATH: TEST_DB_PATH },
   });
 
-  // Wait for the server to be ready by polling
+  // Wait for the server to be ready
   let ready = false;
   for (let attempt = 0; attempt < 30; attempt++) {
     try {
@@ -66,16 +62,13 @@ beforeAll(async () => {
         break;
       }
     } catch {
-      // Server not ready yet, wait and retry
+      // Server not ready yet
     }
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
+  if (!ready) throw new Error("Server did not start within the expected time");
 
-  if (!ready) {
-    throw new Error("Server did not start within the expected time");
-  }
-
-  // Authenticate: set a passphrase then verify it so the server is unlocked
+  // Authenticate (also creates test database)
   await fetch(BASE_URL + "/api/auth/set-passphrase", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -90,15 +83,16 @@ beforeAll(async () => {
 });
 
 afterAll(() => {
-  if (serverProcess) {
-    serverProcess.kill();
-  }
+  if (serverProcess) serverProcess.kill();
 
-  // Restore original .env
-  if (envBackup !== null) {
-    writeFileSync(ENV_PATH, envBackup, "utf-8");
-  } else if (existsSync(ENV_PATH)) {
-    unlinkSync(ENV_PATH);
+  // Restore .env
+  if (existsSync(ENV_PATH)) unlinkSync(ENV_PATH);
+  if (envBackup !== null) writeFileSync(ENV_PATH, envBackup, "utf-8");
+
+  // Remove isolated test database
+  for (const suffix of ["", "-wal", "-shm"]) {
+    const f = TEST_DB_PATH + suffix;
+    if (existsSync(f)) unlinkSync(f);
   }
 });
 

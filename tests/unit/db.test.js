@@ -1,41 +1,27 @@
+// Set isolated DB path BEFORE importing connection.js (which reads it at module load)
+process.env.DB_PATH = "data/test-db.db";
+
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
-import { existsSync, unlinkSync, mkdirSync, rmSync } from "node:fs";
-import { resolve, dirname } from "node:path";
-import {
-  databaseExists,
-  createDatabase,
-  getDatabase,
-  closeDatabase,
-  getDatabasePath,
-} from "../../src/server/db/connection.js";
+import { existsSync, unlinkSync } from "node:fs";
+import { dirname } from "node:path";
+import { databaseExists, createDatabase, getDatabase, closeDatabase, getDatabasePath } from "../../src/server/db/connection.js";
 
 /**
- * @description Test database path — uses the standard path from constants
- * (data/portfolio60.db). We clean up before and after tests.
+ * @description Isolated test database path — set via env var above.
  */
 const testDbPath = getDatabasePath();
-const testDbDir = dirname(testDbPath);
 
 /**
- * @description Clean up any existing test database before/after tests.
+ * @description Clean up the isolated test database files only.
+ * Does NOT remove the data/ directory (other tests may be using it).
  */
 function cleanupDatabase() {
   closeDatabase();
 
-  // Remove database file and WAL/SHM files
   for (const suffix of ["", "-wal", "-shm"]) {
     const filePath = testDbPath + suffix;
     if (existsSync(filePath)) {
       unlinkSync(filePath);
-    }
-  }
-
-  // Remove data directory if empty
-  if (existsSync(testDbDir)) {
-    try {
-      rmSync(testDbDir, { recursive: true });
-    } catch {
-      // Directory may not be empty if other files exist, that's fine
     }
   }
 }
@@ -46,6 +32,8 @@ beforeAll(() => {
 
 afterAll(() => {
   cleanupDatabase();
+  // Unset the env var so it doesn't leak to other tests
+  delete process.env.DB_PATH;
 });
 
 describe("Database - existence check", () => {
@@ -84,23 +72,12 @@ describe("Database - foreign keys", () => {
 });
 
 describe("Database - tables exist", () => {
-  const expectedTables = [
-    "users",
-    "investment_types",
-    "currencies",
-    "investments",
-    "currency_rates",
-    "global_events",
-  ];
+  const expectedTables = ["users", "investment_types", "currencies", "investments", "currency_rates", "global_events"];
 
   for (const tableName of expectedTables) {
     test(`table '${tableName}' exists`, () => {
       const db = getDatabase();
-      const row = db
-        .query(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name=?"
-        )
-        .get(tableName);
+      const row = db.query("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(tableName);
       expect(row).not.toBeNull();
       expect(row.name).toBe(tableName);
     });
@@ -108,21 +85,12 @@ describe("Database - tables exist", () => {
 });
 
 describe("Database - indexes exist", () => {
-  const expectedIndexes = [
-    "idx_currency_rates_lookup",
-    "idx_investments_type",
-    "idx_investments_currency",
-    "idx_global_events_date",
-  ];
+  const expectedIndexes = ["idx_currency_rates_lookup", "idx_investments_type", "idx_investments_currency", "idx_global_events_date"];
 
   for (const indexName of expectedIndexes) {
     test(`index '${indexName}' exists`, () => {
       const db = getDatabase();
-      const row = db
-        .query(
-          "SELECT name FROM sqlite_master WHERE type='index' AND name=?"
-        )
-        .get(indexName);
+      const row = db.query("SELECT name FROM sqlite_master WHERE type='index' AND name=?").get(indexName);
       expect(row).not.toBeNull();
       expect(row.name).toBe(indexName);
     });
@@ -176,27 +144,21 @@ describe("Database - constraints", () => {
   test("investments requires valid currencies_id FK", () => {
     const db = getDatabase();
     expect(() => {
-      db.run(
-        "INSERT INTO investments (currencies_id, investment_type_id, description) VALUES (9999, 1, 'Bad FK')"
-      );
+      db.run("INSERT INTO investments (currencies_id, investment_type_id, description) VALUES (9999, 1, 'Bad FK')");
     }).toThrow();
   });
 
   test("investments requires valid investment_type_id FK", () => {
     const db = getDatabase();
     expect(() => {
-      db.run(
-        "INSERT INTO investments (currencies_id, investment_type_id, description) VALUES (1, 9999, 'Bad FK')"
-      );
+      db.run("INSERT INTO investments (currencies_id, investment_type_id, description) VALUES (1, 9999, 'Bad FK')");
     }).toThrow();
   });
 
   test("currency_rates requires valid currencies_id FK", () => {
     const db = getDatabase();
     expect(() => {
-      db.run(
-        "INSERT INTO currency_rates (currencies_id, rate_date, rate) VALUES (9999, '2024-01-01', 10000)"
-      );
+      db.run("INSERT INTO currency_rates (currencies_id, rate_date, rate) VALUES (9999, '2024-01-01', 10000)");
     }).toThrow();
   });
 
@@ -206,28 +168,17 @@ describe("Database - constraints", () => {
     db.run("INSERT INTO currencies (code, description) VALUES ('USD', 'US Dollar')");
     const usd = db.query("SELECT id FROM currencies WHERE code = 'USD'").get();
 
-    db.run(
-      "INSERT INTO currency_rates (currencies_id, rate_date, rate) VALUES (?, '2024-01-15', 12543)",
-      [usd.id]
-    );
+    db.run("INSERT INTO currency_rates (currencies_id, rate_date, rate) VALUES (?, '2024-01-15', 12543)", [usd.id]);
 
     // Inserting the same currency+date should fail (without OR REPLACE)
     expect(() => {
-      db.run(
-        "INSERT INTO currency_rates (currencies_id, rate_date, rate) VALUES (?, '2024-01-15', 12600)",
-        [usd.id]
-      );
+      db.run("INSERT INTO currency_rates (currencies_id, rate_date, rate) VALUES (?, '2024-01-15', 12600)", [usd.id]);
     }).toThrow();
 
     // But INSERT OR REPLACE should work
-    db.run(
-      "INSERT OR REPLACE INTO currency_rates (currencies_id, rate_date, rate) VALUES (?, '2024-01-15', 12600)",
-      [usd.id]
-    );
+    db.run("INSERT OR REPLACE INTO currency_rates (currencies_id, rate_date, rate) VALUES (?, '2024-01-15', 12600)", [usd.id]);
 
-    const row = db
-      .query("SELECT rate FROM currency_rates WHERE currencies_id = ? AND rate_date = '2024-01-15'")
-      .get(usd.id);
+    const row = db.query("SELECT rate FROM currency_rates WHERE currencies_id = ? AND rate_date = '2024-01-15'").get(usd.id);
     expect(row.rate).toBe(12600);
 
     // Clean up: remove USD and its rates so other tests are unaffected
@@ -238,9 +189,7 @@ describe("Database - constraints", () => {
   test("users.initials must be 5 chars or fewer", () => {
     const db = getDatabase();
     expect(() => {
-      db.run(
-        "INSERT INTO users (initials, first_name, last_name, provider) VALUES ('TOOLONG', 'Test', 'User', 'ii')"
-      );
+      db.run("INSERT INTO users (initials, first_name, last_name, provider) VALUES ('TOOLONG', 'Test', 'User', 'ii')");
     }).toThrow();
   });
 
@@ -248,10 +197,7 @@ describe("Database - constraints", () => {
     const db = getDatabase();
     const longDescription = "A".repeat(256);
     expect(() => {
-      db.run(
-        "INSERT INTO global_events (event_date, description) VALUES ('2024-01-01', ?)",
-        [longDescription]
-      );
+      db.run("INSERT INTO global_events (event_date, description) VALUES ('2024-01-01', ?)", [longDescription]);
     }).toThrow();
   });
 });

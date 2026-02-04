@@ -3,6 +3,8 @@ import { resolve, join } from "node:path";
 import { checkAuth } from "./middleware/auth-middleware.js";
 import { handleAuthRoute } from "./routes/auth-routes.js";
 import { handleDbRoute } from "./routes/db-routes.js";
+import { handleUsersRoute } from "./routes/users-routes.js";
+import { handleConfigRoute } from "./routes/config-routes.js";
 
 /**
  * @description The port the server listens on.
@@ -136,6 +138,22 @@ const server = Bun.serve({
       const dbResult = handleDbRoute(method, path);
       if (dbResult) {
         return dbResult;
+      }
+    }
+
+    // Config routes (providers list, etc.)
+    if (path.startsWith("/api/config/")) {
+      const configResult = handleConfigRoute(method, path);
+      if (configResult) {
+        return configResult;
+      }
+    }
+
+    // Users routes (CRUD)
+    if (path.startsWith("/api/users")) {
+      const usersResult = await handleUsersRoute(method, path, request);
+      if (usersResult) {
+        return usersResult;
       }
     }
 

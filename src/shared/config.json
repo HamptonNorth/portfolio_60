@@ -1,0 +1,6 @@
+{
+  "allowed_providers": [
+    { "code": "ii", "name": "Interactive Investor" },
+    { "code": "hl", "name": "Hargreaves Lansdown" }
+  ]
+}
