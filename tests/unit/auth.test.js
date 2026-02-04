@@ -1,15 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { existsSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, unlinkSync, writeFileSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  isFirstRun,
-  hashPassphrase,
-  verifyPassphrase,
-  loadHashFromEnv,
-  saveHashToEnv,
-  getAuthStatus,
-  setAuthStatus,
-} from "../../src/server/auth.js";
+import { isFirstRun, hashPassphrase, verifyPassphrase, loadHashFromEnv, saveHashToEnv, getAuthStatus, setAuthStatus } from "../../src/server/auth.js";
 
 /**
  * @description Path to the .env file used in tests.
@@ -18,17 +10,20 @@ import {
  * @type {string}
  */
 const ENV_PATH = resolve(".env");
-const ENV_BACKUP_PATH = resolve(".env.test-backup");
+
+/**
+ * @description Backup of the original .env content, or null if it didn't exist
+ * @type {string|null}
+ */
+let envBackup = null;
 
 beforeEach(() => {
-  // Back up the existing .env if present
+  // Back up the existing .env content if present
   if (existsSync(ENV_PATH)) {
-    const content = Bun.file(ENV_PATH);
-    Bun.write(ENV_BACKUP_PATH, content);
-  }
-  // Remove .env for a clean state
-  if (existsSync(ENV_PATH)) {
+    envBackup = readFileSync(ENV_PATH, "utf-8");
     unlinkSync(ENV_PATH);
+  } else {
+    envBackup = null;
   }
   // Reset auth status
   setAuthStatus(false);
@@ -40,10 +35,8 @@ afterEach(() => {
     unlinkSync(ENV_PATH);
   }
   // Restore original .env if it existed
-  if (existsSync(ENV_BACKUP_PATH)) {
-    const content = Bun.file(ENV_BACKUP_PATH);
-    Bun.write(ENV_PATH, content);
-    unlinkSync(ENV_BACKUP_PATH);
+  if (envBackup !== null) {
+    writeFileSync(ENV_PATH, envBackup, "utf-8");
   }
 });
 
@@ -100,9 +93,7 @@ describe("Auth - loadHashFromEnv and saveHashToEnv", () => {
     expect(loadHashFromEnv()).toBe("newhash456");
 
     // Verify other variables are preserved
-    const content = Bun.file(ENV_PATH).toString();
-    // Read the file to check OTHER_VAR is still present
-    const fileContent = require("node:fs").readFileSync(ENV_PATH, "utf-8");
+    const fileContent = readFileSync(ENV_PATH, "utf-8");
     expect(fileContent).toContain("OTHER_VAR=keepme");
   });
 });

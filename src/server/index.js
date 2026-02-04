@@ -2,6 +2,7 @@ import { SERVER_PORT } from "../shared/constants.js";
 import { resolve, join } from "node:path";
 import { checkAuth } from "./middleware/auth-middleware.js";
 import { handleAuthRoute } from "./routes/auth-routes.js";
+import { handleDbRoute } from "./routes/db-routes.js";
 
 /**
  * @description The port the server listens on.
@@ -127,6 +128,14 @@ const server = Bun.serve({
       const authResult = await handleAuthRoute(method, path, request);
       if (authResult) {
         return authResult;
+      }
+    }
+
+    // Database routes (status, create)
+    if (path.startsWith("/api/db/")) {
+      const dbResult = handleDbRoute(method, path);
+      if (dbResult) {
+        return dbResult;
       }
     }
 

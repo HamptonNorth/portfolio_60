@@ -98,7 +98,12 @@ function showSetPassphraseForm(contentDiv, messagesDiv) {
     });
 
     if (result.ok) {
-      window.location.href = "/";
+      // Show a brief confirmation before redirecting
+      const msg = result.data.databaseCreated ? "Passphrase set and database created. Redirecting..." : "Passphrase set. Redirecting...";
+      showSuccess("passphrase-messages", msg);
+      setTimeout(function () {
+        window.location.href = "/";
+      }, 1500);
     } else {
       errorsDiv.textContent = result.error + (result.detail ? " — " + result.detail : "");
     }

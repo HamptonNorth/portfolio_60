@@ -1,9 +1,10 @@
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from "bun:test";
-import { existsSync, unlinkSync } from "node:fs";
+import { existsSync, unlinkSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
+import { DB_PATH } from "../../src/shared/constants.js";
 
 /**
- * @description Port used by tests to avoid conflicts with user's app on 1420
+ * @description Port for auth-routes.test.js — unique per test file.
  * @type {number}
  */
 const TEST_PORT = 1431;
@@ -19,19 +20,39 @@ const BASE_URL = `http://localhost:${TEST_PORT}`;
  * @type {string}
  */
 const ENV_PATH = resolve(".env");
-const ENV_BACKUP_PATH = resolve(".env.test-backup");
+
+/**
+ * @description Resolved path to the database file
+ * @type {string}
+ */
+const DB_FULL_PATH = resolve(DB_PATH);
+
+/**
+ * @description Backup of the original .env content, or null if it didn't exist
+ * @type {string|null}
+ */
+let envBackup = null;
+
+/**
+ * @description Whether the database existed before tests started
+ * @type {boolean}
+ */
+let dbExistedBefore = false;
 
 let serverProcess;
 
 beforeAll(async () => {
   // Back up existing .env
   if (existsSync(ENV_PATH)) {
-    await Bun.write(ENV_BACKUP_PATH, Bun.file(ENV_PATH));
+    envBackup = readFileSync(ENV_PATH, "utf-8");
   }
   // Remove .env for a clean first-run state
   if (existsSync(ENV_PATH)) {
     unlinkSync(ENV_PATH);
   }
+
+  // Track whether database existed before tests
+  dbExistedBefore = existsSync(DB_FULL_PATH);
 
   // Start the server on the test port
   serverProcess = Bun.spawn(["bun", "run", "src/server/index.js"], {
@@ -65,15 +86,32 @@ afterAll(() => {
   if (serverProcess) {
     serverProcess.kill();
   }
-  // Clean up test .env
+
+  // Restore original .env
   if (existsSync(ENV_PATH)) {
     unlinkSync(ENV_PATH);
   }
-  // Restore original .env
-  if (existsSync(ENV_BACKUP_PATH)) {
-    const content = Bun.file(ENV_BACKUP_PATH);
-    Bun.write(ENV_PATH, content);
-    unlinkSync(ENV_BACKUP_PATH);
+  if (envBackup !== null) {
+    writeFileSync(ENV_PATH, envBackup, "utf-8");
+  }
+
+  // Clean up database created during tests (if it didn't exist before)
+  if (!dbExistedBefore) {
+    for (const suffix of ["", "-wal", "-shm"]) {
+      const filePath = DB_FULL_PATH + suffix;
+      if (existsSync(filePath)) {
+        unlinkSync(filePath);
+      }
+    }
+    // Remove data/ directory if empty
+    const dataDir = resolve("data");
+    if (existsSync(dataDir)) {
+      try {
+        rmSync(dataDir, { recursive: true });
+      } catch {
+        // May not be empty, that's fine
+      }
+    }
   }
 });
 
@@ -101,7 +139,7 @@ describe("Auth Routes - set passphrase", () => {
     expect(data.error).toBe("Validation failed");
   });
 
-  test("POST /api/auth/set-passphrase with valid passphrase succeeds", async () => {
+  test("POST /api/auth/set-passphrase with valid passphrase succeeds and creates database", async () => {
     const response = await fetch(`${BASE_URL}/api/auth/set-passphrase`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -111,6 +149,7 @@ describe("Auth Routes - set passphrase", () => {
 
     const data = await response.json();
     expect(data.success).toBe(true);
+    expect(data.databaseCreated).toBe(true);
   });
 
   test("POST /api/auth/set-passphrase rejects if passphrase already set", async () => {

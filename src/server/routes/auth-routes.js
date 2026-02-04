@@ -1,12 +1,5 @@
-import {
-  isFirstRun,
-  getAuthStatus,
-  setAuthStatus,
-  hashPassphrase,
-  verifyPassphrase,
-  loadHashFromEnv,
-  saveHashToEnv,
-} from "../auth.js";
+import { isFirstRun, getAuthStatus, setAuthStatus, hashPassphrase, verifyPassphrase, loadHashFromEnv, saveHashToEnv } from "../auth.js";
+import { databaseExists, createDatabase } from "../db/connection.js";
 
 /**
  * @description Handle authentication API routes.
@@ -28,7 +21,7 @@ export async function handleAuthRoute(method, path, request) {
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
@@ -44,7 +37,7 @@ export async function handleAuthRoute(method, path, request) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -52,10 +45,7 @@ export async function handleAuthRoute(method, path, request) {
     try {
       body = await request.json();
     } catch {
-      return new Response(
-        JSON.stringify({ error: "Invalid request", detail: "Request body must be valid JSON" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Invalid request", detail: "Request body must be valid JSON" }), { status: 400, headers: { "Content-Type": "application/json" } });
     }
 
     const passphrase = body.passphrase;
@@ -68,7 +58,7 @@ export async function handleAuthRoute(method, path, request) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -77,12 +67,36 @@ export async function handleAuthRoute(method, path, request) {
     saveHashToEnv(hash);
     setAuthStatus(true);
 
+    // On first run, also create the database if it doesn't exist yet
+    let dbCreated = false;
+    if (!databaseExists()) {
+      try {
+        createDatabase();
+        dbCreated = true;
+      } catch (dbErr) {
+        return new Response(
+          JSON.stringify({
+            error: "Passphrase set but database creation failed",
+            detail: dbErr.message,
+          }),
+          {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+    }
+
     return new Response(
-      JSON.stringify({ success: true, message: "Passphrase set successfully" }),
+      JSON.stringify({
+        success: true,
+        message: "Passphrase set successfully",
+        databaseCreated: dbCreated,
+      }),
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
@@ -92,18 +106,12 @@ export async function handleAuthRoute(method, path, request) {
     try {
       body = await request.json();
     } catch {
-      return new Response(
-        JSON.stringify({ error: "Invalid request", detail: "Request body must be valid JSON" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Invalid request", detail: "Request body must be valid JSON" }), { status: 400, headers: { "Content-Type": "application/json" } });
     }
 
     const passphrase = body.passphrase;
     if (!passphrase || typeof passphrase !== "string") {
-      return new Response(
-        JSON.stringify({ error: "Validation failed", detail: "Passphrase is required" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Validation failed", detail: "Passphrase is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
     }
 
     const storedHash = loadHashFromEnv();
@@ -113,7 +121,7 @@ export async function handleAuthRoute(method, path, request) {
           error: "No passphrase configured",
           detail: "No passphrase has been set. Use the set-passphrase endpoint first.",
         }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
+        { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
 
@@ -121,16 +129,10 @@ export async function handleAuthRoute(method, path, request) {
 
     if (isValid) {
       setAuthStatus(true);
-      return new Response(
-        JSON.stringify({ success: true, message: "Passphrase verified" }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ success: true, message: "Passphrase verified" }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
-    return new Response(
-      JSON.stringify({ success: false, error: "Incorrect passphrase" }),
-      { status: 401, headers: { "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ success: false, error: "Incorrect passphrase" }), { status: 401, headers: { "Content-Type": "application/json" } });
   }
 
   // No matching auth route
