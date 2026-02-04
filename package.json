@@ -1,0 +1,27 @@
+{
+  "name": "portfolio-60",
+  "version": "0.1.0",
+  "description": "UK Family Investment Portfolio Tracker",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"bun run dev:css\" \"bun run dev:server\"",
+    "dev:server": "bun --hot run src/server/index.js",
+    "dev:css": "bunx @tailwindcss/cli -i ./src/ui/css/input.css -o ./src/ui/css/output.css --watch",
+    "build:css": "bunx @tailwindcss/cli -i ./src/ui/css/input.css -o ./src/ui/css/output.css --minify",
+    "test": "bun test",
+    "test:e2e": "bunx playwright test",
+    "tauri:dev": "bunx tauri dev",
+    "tauri:build": "bunx tauri build"
+  },
+  "dependencies": {
+    "@tailwindcss/cli": "^4.1.18",
+    "concurrently": "^9.2.1",
+    "tailwindcss": "^4.1.18"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.1",
+    "@tauri-apps/cli": "^2.10.0",
+    "playwright": "^1.58.1"
+  }
+}
