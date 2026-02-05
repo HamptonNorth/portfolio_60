@@ -2,9 +2,9 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Portfolio 60",
   "version": "0.1.0",
-  "identifier": "uk.portfolio60.app",
+  "identifier": "uk.portfolio60.desktop",
   "build": {
-    "frontendDist": "../src/ui",
+    "frontendDist": "http://localhost:1420",
     "devUrl": "http://localhost:1420",
     "beforeDevCommand": "bun run dev",
     "beforeBuildCommand": "bun run build:css"
