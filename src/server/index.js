@@ -9,6 +9,7 @@ import { handleInvestmentsRoute } from "./routes/investments-routes.js";
 import { handleCurrenciesRoute } from "./routes/currencies-routes.js";
 import { handleGlobalEventsRoute } from "./routes/global-events-routes.js";
 import { handleScraperRoute } from "./routes/scraper-routes.js";
+import { handleBackupRoute } from "./routes/backup-routes.js";
 
 /**
  * @description The port the server listens on.
@@ -190,6 +191,14 @@ const server = Bun.serve({
       const scraperResult = await handleScraperRoute(method, path, request);
       if (scraperResult) {
         return scraperResult;
+      }
+    }
+
+    // Backup routes (backup, restore, list, delete)
+    if (path.startsWith("/api/backup")) {
+      const backupResult = await handleBackupRoute(method, path, request);
+      if (backupResult) {
+        return backupResult;
       }
     }
 
