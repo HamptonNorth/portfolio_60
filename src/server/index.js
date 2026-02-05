@@ -5,6 +5,7 @@ import { handleAuthRoute } from "./routes/auth-routes.js";
 import { handleDbRoute } from "./routes/db-routes.js";
 import { handleUsersRoute } from "./routes/users-routes.js";
 import { handleConfigRoute } from "./routes/config-routes.js";
+import { handleInvestmentsRoute } from "./routes/investments-routes.js";
 
 /**
  * @description The port the server listens on.
@@ -154,6 +155,14 @@ const server = Bun.serve({
       const usersResult = await handleUsersRoute(method, path, request);
       if (usersResult) {
         return usersResult;
+      }
+    }
+
+    // Investment routes (CRUD + investment types + currencies)
+    if (path.startsWith("/api/investments") || path.startsWith("/api/investment-types") || path.startsWith("/api/currencies")) {
+      const investmentsResult = await handleInvestmentsRoute(method, path, request);
+      if (investmentsResult) {
+        return investmentsResult;
       }
     }
 

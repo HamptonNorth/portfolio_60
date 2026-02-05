@@ -7,7 +7,7 @@
         <link rel="stylesheet" href="/css/output.css" />
         <link rel="icon" type="image/svg+xml" href="/images/favicon.svg" />
     </head>
-    <body class="bg-brand-50 text-brand-900 min-h-screen flex flex-col">
+    <body class="bg-brand-25 text-brand-900 min-h-screen flex flex-col">
         <nav class="bg-brand-800 text-white px-6 py-4 shadow-md">
             <div class="flex items-center justify-between max-w-7xl mx-auto">
                 <h1 class="text-xl font-semibold tracking-wide flex items-center gap-2">
@@ -26,13 +26,123 @@
             </div>
         </nav>
         <main class="max-w-7xl mx-auto px-6 py-8 flex-1 w-full" id="main-content">
-            <h2 class="text-2xl font-semibold mb-4 text-brand-800">Investments</h2>
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-semibold text-brand-800">Investments</h2>
+                <button id="add-investment-btn" class="bg-brand-700 hover:bg-brand-800 text-white font-medium px-5 py-2 rounded-lg transition-colors">Add Investment</button>
+            </div>
+
             <div id="page-messages"></div>
-            <div id="page-content">
-                <p class="text-brand-500">This page is under construction.</p>
+
+            <!-- Investments table -->
+            <div id="investments-table-container">
+                <p class="text-brand-500">Loading investments...</p>
+            </div>
+
+            <!-- Add/Edit form (hidden by default) -->
+            <div id="investment-form-container" class="hidden mt-6">
+                <div class="bg-white rounded-lg shadow-md p-6 max-w-2xl">
+                    <h3 id="form-title" class="text-xl font-semibold text-brand-800 mb-4">Add Investment</h3>
+                    <form id="investment-form" class="space-y-4">
+                        <input type="hidden" id="investment-id" value="" />
+
+                        <div>
+                            <label for="description" class="block text-sm font-medium text-brand-700 mb-1">Description *</label>
+                            <input type="text" id="description" name="description" maxlength="60" required class="w-full px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="e.g. Vanguard FTSE All-World ETF" />
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="investment_type_id" class="block text-sm font-medium text-brand-700 mb-1">Investment Type *</label>
+                                <select id="investment_type_id" name="investment_type_id" required class="w-full px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white">
+                                    <option value="">Select type...</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="currencies_id" class="block text-sm font-medium text-brand-700 mb-1">Currency *</label>
+                                <select id="currencies_id" name="currencies_id" required class="w-full px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white">
+                                    <option value="">Select currency...</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="investment_url" class="block text-sm font-medium text-brand-700 mb-1">Price Page URL</label>
+                            <textarea id="investment_url" name="investment_url" maxlength="255" rows="2" class="w-full px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y" placeholder="https://www.example.com/fund-page"></textarea>
+                            <p class="text-sm text-brand-400 mt-1">The public web page where the current price is displayed.</p>
+                        </div>
+
+                        <div>
+                            <label for="selector" class="block text-sm font-medium text-brand-700 mb-1">CSS Selector</label>
+                            <textarea id="selector" name="selector" maxlength="255" rows="4" class="w-full px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y font-mono" placeholder="e.g. .price-value"></textarea>
+                            <p class="text-sm text-brand-400 mt-1">To find the CSS selector: right-click the price on the web page, choose 'Inspect', then right-click the highlighted element and choose 'Copy &gt; Copy selector'.</p>
+                        </div>
+
+                        <div id="form-errors" class="text-error text-sm"></div>
+
+                        <div class="flex items-center justify-between pt-2">
+                            <div class="flex gap-3">
+                                <button type="submit" class="bg-brand-700 hover:bg-brand-800 text-white font-medium px-5 py-2 rounded-lg transition-colors">Save</button>
+                                <button type="button" id="cancel-btn" class="bg-brand-100 hover:bg-brand-200 text-brand-700 font-medium px-5 py-2 rounded-lg transition-colors">Cancel</button>
+                            </div>
+                            <button type="button" id="delete-from-form-btn" class="hidden text-sm text-brand-400 hover:text-red-600 transition-colors">Delete this investment</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Read-only view panel (hidden by default, shown on double-click) -->
+            <div id="investment-view-container" class="hidden mt-6">
+                <div class="bg-white rounded-lg shadow-md p-6 max-w-2xl">
+                    <h3 class="text-xl font-semibold text-brand-800 mb-4">Investment Details</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-brand-700 mb-1">Description</label>
+                            <p id="view-description" class="w-full px-3 py-2 bg-brand-50 border border-brand-200 rounded-md text-base"></p>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-brand-700 mb-1">Investment Type</label>
+                                <p id="view-type" class="w-full px-3 py-2 bg-brand-50 border border-brand-200 rounded-md text-base"></p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-brand-700 mb-1">Currency</label>
+                                <p id="view-currency" class="w-full px-3 py-2 bg-brand-50 border border-brand-200 rounded-md text-base"></p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-brand-700 mb-1">Price Page URL</label>
+                            <p id="view-url" class="w-full px-3 py-2 bg-brand-50 border border-brand-200 rounded-md text-base break-all min-h-[2.5rem]"></p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-brand-700 mb-1">CSS Selector</label>
+                            <p id="view-selector" class="w-full px-3 py-2 bg-brand-50 border border-brand-200 rounded-md text-base font-mono break-all min-h-[2.5rem]"></p>
+                        </div>
+
+                        <div class="flex gap-3 pt-2">
+                            <button type="button" id="view-edit-btn" class="bg-brand-700 hover:bg-brand-800 text-white font-medium px-5 py-2 rounded-lg transition-colors">Edit</button>
+                            <button type="button" id="view-close-btn" class="bg-brand-100 hover:bg-brand-200 text-brand-700 font-medium px-5 py-2 rounded-lg transition-colors">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Delete confirmation dialog (hidden by default) -->
+            <div id="delete-dialog" class="hidden fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+                <div class="bg-white rounded-lg shadow-lg p-6 max-w-sm">
+                    <h3 class="text-lg font-semibold text-brand-800 mb-3">Confirm Deletion</h3>
+                    <p class="text-base text-brand-600 mb-4">Are you sure you want to delete <strong id="delete-investment-name"></strong>?</p>
+                    <div class="flex gap-3 justify-end">
+                        <button id="delete-cancel-btn" class="bg-brand-100 hover:bg-brand-200 text-brand-700 font-medium px-4 py-2 rounded-lg transition-colors">Cancel</button>
+                        <button id="delete-confirm-btn" class="bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">Delete</button>
+                    </div>
+                </div>
             </div>
         </main>
         <footer class="text-center text-brand-400 text-sm py-4 border-t border-brand-100">Portfolio 60 v0.1.0</footer>
         <script src="/js/app.js"></script>
+        <script src="/js/investments.js"></script>
     </body>
 </html>

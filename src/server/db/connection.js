@@ -62,7 +62,51 @@ export function getDatabase() {
   db.exec("PRAGMA journal_mode = WAL");
   db.exec("PRAGMA foreign_keys = ON");
 
+  runMigrations(db);
+
   return db;
+}
+
+/**
+ * @description Run any pending schema migrations on an existing database.
+ * Each migration checks whether it has already been applied before running.
+ * @param {Database} database - The open database connection
+ */
+function runMigrations(database) {
+  // Migration 1: Increase investments.selector CHECK constraint from 120 to 255.
+  // Detect by inspecting the CREATE TABLE SQL in sqlite_master.
+  const tableInfo = database.query("SELECT sql FROM sqlite_master WHERE type='table' AND name='investments'").get();
+
+  if (tableInfo && tableInfo.sql && tableInfo.sql.includes("length(selector) <= 120")) {
+    database.exec("PRAGMA foreign_keys = OFF");
+    database.exec("BEGIN TRANSACTION");
+    try {
+      database.exec(`
+        CREATE TABLE investments_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          currencies_id INTEGER NOT NULL,
+          investment_type_id INTEGER NOT NULL,
+          description TEXT NOT NULL CHECK(length(description) <= 60),
+          investment_url TEXT CHECK(investment_url IS NULL OR length(investment_url) <= 255),
+          selector TEXT CHECK(selector IS NULL OR length(selector) <= 255),
+          FOREIGN KEY (currencies_id) REFERENCES currencies(id),
+          FOREIGN KEY (investment_type_id) REFERENCES investment_types(id)
+        )
+      `);
+      database.exec("INSERT INTO investments_new SELECT * FROM investments");
+      database.exec("DROP TABLE investments");
+      database.exec("ALTER TABLE investments_new RENAME TO investments");
+      // Recreate indexes that were on the original table
+      database.exec("CREATE INDEX IF NOT EXISTS idx_investments_type ON investments(investment_type_id)");
+      database.exec("CREATE INDEX IF NOT EXISTS idx_investments_currency ON investments(currencies_id)");
+      database.exec("COMMIT");
+    } catch (err) {
+      database.exec("ROLLBACK");
+      throw err;
+    } finally {
+      database.exec("PRAGMA foreign_keys = ON");
+    }
+  }
 }
 
 /**
