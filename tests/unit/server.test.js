@@ -30,7 +30,7 @@ const ENV_PATH = resolve(".env");
  * @description Isolated test database path — avoids touching the user's real database.
  * @type {string}
  */
-const TEST_DB_PATH = resolve("data/test-server.db");
+const TEST_DB_PATH = resolve("data/portfolio_60_test/test-server.db");
 
 let serverProcess;
 let envBackup = null;

@@ -4,12 +4,28 @@ import { resolve, dirname } from "node:path";
 import { DB_PATH } from "../../shared/constants.js";
 
 /**
- * @description Resolved absolute path to the SQLite database file.
+ * @description Cached resolved path to the database file. Set on first
+ * call to getResolvedDbPath() so that test files can override
+ * process.env.DB_PATH before any database function is called.
+ * (ES module imports are hoisted above all other code, so a module-level
+ * constant would evaluate before the test's env var assignment.)
+ * @type {string|null}
+ */
+let resolvedDbPath = null;
+
+/**
+ * @description Get the resolved absolute path to the SQLite database file.
  * Uses the DB_PATH environment variable if set (e.g. for testing with
  * isolated databases), otherwise falls back to DB_PATH from constants.
- * @type {string}
+ * The result is cached after the first call.
+ * @returns {string} The absolute path to the database file
  */
-const resolvedDbPath = resolve(process.env.DB_PATH || DB_PATH);
+function getResolvedDbPath() {
+  if (resolvedDbPath === null) {
+    resolvedDbPath = resolve(process.env.DB_PATH || DB_PATH);
+  }
+  return resolvedDbPath;
+}
 
 /**
  * @description Singleton database instance. Null until the database is
@@ -23,7 +39,7 @@ let db = null;
  * @returns {boolean} True if the database file exists
  */
 export function databaseExists() {
-  return existsSync(resolvedDbPath);
+  return existsSync(getResolvedDbPath());
 }
 
 /**
@@ -42,7 +58,7 @@ export function getDatabase() {
     throw new Error("Database does not exist. Call createDatabase() first.");
   }
 
-  db = new Database(resolvedDbPath);
+  db = new Database(getResolvedDbPath());
   db.exec("PRAGMA journal_mode = WAL");
   db.exec("PRAGMA foreign_keys = ON");
 
@@ -62,13 +78,14 @@ export function createDatabase() {
   }
 
   // Ensure the data/ directory exists
-  const dbDir = dirname(resolvedDbPath);
+  const dbPath = getResolvedDbPath();
+  const dbDir = dirname(dbPath);
   if (!existsSync(dbDir)) {
     mkdirSync(dbDir, { recursive: true });
   }
 
   // Create the database file and configure it
-  db = new Database(resolvedDbPath);
+  db = new Database(dbPath);
   db.exec("PRAGMA journal_mode = WAL");
   db.exec("PRAGMA foreign_keys = ON");
 
@@ -102,5 +119,5 @@ export function closeDatabase() {
  * @returns {string} The absolute path to the database file
  */
 export function getDatabasePath() {
-  return resolvedDbPath;
+  return getResolvedDbPath();
 }

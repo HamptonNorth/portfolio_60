@@ -1,5 +1,5 @@
 // Set isolated DB path BEFORE importing connection.js (which reads it at module load)
-process.env.DB_PATH = "data/test-users-db.db";
+process.env.DB_PATH = "data/portfolio_60_test/test-users-db.db";
 
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { existsSync, unlinkSync } from "node:fs";
