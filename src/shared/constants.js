@@ -19,3 +19,29 @@ export const BACKUP_DIR = "backups";
 
 /** @type {number} Multiplier for storing currency rates as integers (e.g. 1.2543 stored as 12543) */
 export const CURRENCY_SCALE_FACTOR = 10000;
+
+/**
+ * @description Scrape delay profiles. Each profile defines random pause ranges
+ * (in milliseconds) between requests during price scraping. The "sameDomain"
+ * range applies when consecutive requests hit the same domain; "differentDomain"
+ * applies when switching to a new domain. A random value between min and max
+ * is chosen for each pause.
+ *
+ * - interactive: short pauses for manual testing (same domain 2-5s, different 0.5-1s)
+ * - cron: longer pauses for unattended scheduled runs (same domain 5-30s, different 1-5s)
+ *
+ * @type {Object.<string, {sameDomain: {min: number, max: number}, differentDomain: {min: number, max: number}}>}
+ */
+export const SCRAPE_DELAY_PROFILES = {
+  interactive: {
+    sameDomain: { min: 2000, max: 5000 },
+    differentDomain: { min: 500, max: 1000 },
+  },
+  cron: {
+    sameDomain: { min: 5000, max: 30000 },
+    differentDomain: { min: 1000, max: 5000 },
+  },
+};
+
+/** @type {string} Default scrape delay profile. Override via SCRAPE_DELAY_PROFILE env var. */
+export const DEFAULT_SCRAPE_DELAY_PROFILE = "interactive";
