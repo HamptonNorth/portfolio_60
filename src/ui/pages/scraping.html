@@ -26,13 +26,41 @@
             </div>
         </nav>
         <main class="max-w-7xl mx-auto px-6 py-8 flex-1 w-full" id="main-content">
-            <h2 class="text-2xl font-semibold mb-4 text-brand-800">Scraping</h2>
+            <h2 class="text-2xl font-semibold mb-6 text-brand-800">Scraping</h2>
+
             <div id="page-messages"></div>
-            <div id="page-content">
-                <p class="text-brand-500">This page is under construction.</p>
-            </div>
+
+            <!-- Currency Rates Section -->
+            <section class="mb-10">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-semibold text-brand-700">Currency Exchange Rates</h3>
+                    <button id="fetch-rates-btn" class="bg-brand-700 hover:bg-brand-800 text-white font-medium px-5 py-2 rounded-lg transition-colors">Fetch Currency Rates</button>
+                </div>
+                <p class="text-sm text-brand-500 mb-4">Fetches the latest exchange rates from the European Central Bank (via Frankfurter API) for all non-GBP currencies. Rates are relative to GBP. Fetching again on the same day overwrites previous values.</p>
+
+                <div id="rates-status" class="hidden mb-4">
+                    <p class="text-brand-500">Fetching rates...</p>
+                </div>
+
+                <div id="rates-result" class="hidden mb-4"></div>
+
+                <div id="latest-rates-container">
+                    <p class="text-brand-500">Loading stored rates...</p>
+                </div>
+            </section>
+
+            <!-- Price Scraping Section (placeholder for Phase 8) -->
+            <section>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-semibold text-brand-700">Investment Price Scraping</h3>
+                </div>
+                <div class="bg-brand-50 border border-brand-200 rounded-lg px-4 py-3">
+                    <p class="text-brand-500">Price scraping will be available in a future update. It will fetch current prices for each investment using its URL and CSS selector.</p>
+                </div>
+            </section>
         </main>
         <footer class="text-center text-brand-400 text-sm py-4 border-t border-brand-100">Portfolio 60 v0.1.0</footer>
         <script src="/js/app.js"></script>
+        <script src="/js/scraping.js"></script>
     </body>
 </html>

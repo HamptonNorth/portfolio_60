@@ -8,6 +8,7 @@ import { handleConfigRoute } from "./routes/config-routes.js";
 import { handleInvestmentsRoute } from "./routes/investments-routes.js";
 import { handleCurrenciesRoute } from "./routes/currencies-routes.js";
 import { handleGlobalEventsRoute } from "./routes/global-events-routes.js";
+import { handleScraperRoute } from "./routes/scraper-routes.js";
 
 /**
  * @description The port the server listens on.
@@ -181,6 +182,14 @@ const server = Bun.serve({
       const globalEventsResult = await handleGlobalEventsRoute(method, path, request);
       if (globalEventsResult) {
         return globalEventsResult;
+      }
+    }
+
+    // Scraper routes (unprotected — no passphrase required)
+    if (path.startsWith("/api/scraper/")) {
+      const scraperResult = await handleScraperRoute(method, path, request);
+      if (scraperResult) {
+        return scraperResult;
       }
     }
 
