@@ -120,3 +120,73 @@ export function validateInvestment(data) {
 
   return errors;
 }
+
+/**
+ * @description Validate currency data for create or update operations.
+ * Returns an array of error messages (empty if all valid).
+ * @param {Object} data - The currency data to validate
+ * @returns {string[]} Array of validation error messages
+ */
+export function validateCurrency(data) {
+  const errors = [];
+
+  const requiredChecks = [validateRequired(data.code, "Code"), validateRequired(data.description, "Description")];
+
+  for (const error of requiredChecks) {
+    if (error) errors.push(error);
+  }
+
+  // Code must be exactly 3 characters
+  if (data.code !== undefined && data.code !== null && String(data.code).trim() !== "") {
+    if (String(data.code).trim().length !== 3) {
+      errors.push("Code must be exactly 3 characters");
+    }
+  }
+
+  const lengthChecks = [validateMaxLength(data.description, 30, "Description")];
+
+  for (const error of lengthChecks) {
+    if (error) errors.push(error);
+  }
+
+  return errors;
+}
+
+/**
+ * @description Validate global event data for create or update operations.
+ * Returns an array of error messages (empty if all valid).
+ * @param {Object} data - The global event data to validate
+ * @returns {string[]} Array of validation error messages
+ */
+export function validateGlobalEvent(data) {
+  const errors = [];
+
+  const requiredChecks = [validateRequired(data.event_date, "Event date"), validateRequired(data.description, "Description")];
+
+  for (const error of requiredChecks) {
+    if (error) errors.push(error);
+  }
+
+  // Date must be ISO-8601 format (YYYY-MM-DD)
+  if (data.event_date !== undefined && data.event_date !== null && String(data.event_date).trim() !== "") {
+    const dateStr = String(data.event_date).trim();
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    if (!datePattern.test(dateStr)) {
+      errors.push("Event date must be in YYYY-MM-DD format");
+    } else {
+      // Check it's a valid calendar date
+      const parsed = new Date(dateStr + "T00:00:00");
+      if (isNaN(parsed.getTime())) {
+        errors.push("Event date is not a valid date");
+      }
+    }
+  }
+
+  const lengthChecks = [validateMaxLength(data.description, 255, "Description")];
+
+  for (const error of lengthChecks) {
+    if (error) errors.push(error);
+  }
+
+  return errors;
+}

@@ -6,6 +6,8 @@ import { handleDbRoute } from "./routes/db-routes.js";
 import { handleUsersRoute } from "./routes/users-routes.js";
 import { handleConfigRoute } from "./routes/config-routes.js";
 import { handleInvestmentsRoute } from "./routes/investments-routes.js";
+import { handleCurrenciesRoute } from "./routes/currencies-routes.js";
+import { handleGlobalEventsRoute } from "./routes/global-events-routes.js";
 
 /**
  * @description The port the server listens on.
@@ -158,11 +160,27 @@ const server = Bun.serve({
       }
     }
 
-    // Investment routes (CRUD + investment types + currencies)
-    if (path.startsWith("/api/investments") || path.startsWith("/api/investment-types") || path.startsWith("/api/currencies")) {
+    // Currency routes (CRUD)
+    if (path.startsWith("/api/currencies")) {
+      const currenciesResult = await handleCurrenciesRoute(method, path, request);
+      if (currenciesResult) {
+        return currenciesResult;
+      }
+    }
+
+    // Investment routes (CRUD + investment types)
+    if (path.startsWith("/api/investments") || path.startsWith("/api/investment-types")) {
       const investmentsResult = await handleInvestmentsRoute(method, path, request);
       if (investmentsResult) {
         return investmentsResult;
+      }
+    }
+
+    // Global events routes (CRUD)
+    if (path.startsWith("/api/global-events")) {
+      const globalEventsResult = await handleGlobalEventsRoute(method, path, request);
+      if (globalEventsResult) {
+        return globalEventsResult;
       }
     }
 
