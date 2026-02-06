@@ -210,7 +210,7 @@ npx playwright test  # Run Playwright e2e/UI tests
 
 ## Key Design Decisions
 
-- **Price scraping**: End users identify the CSS selector for the price element on a public web page using browser DevTools (Inspect Element). They enter the URL and selector into the investments record. The scraper navigates to the URL and extracts the text content of the matched element.
+- **Price scraping**: End users identify the CSS selector for the price element on a public web page using browser DevTools (Inspect Element) or the SelectorGadget Chrome extension (easier). They enter the URL and selector into the investments record. The scraper navigates to the URL and extracts the text content of the matched element.
 - **Scraping coupling**: A price scrape always fetches currency rates first, so prices and exchange rates are contemporaneous (within minutes of each other). Currency rates can also be fetched independently.
 - **Currency**: GBP is the base currency. All non-GBP investments are converted using the most recent rate in currency_rates.
 - **Provider codes**: Short abbreviation codes (max 5 chars) for management companies. Common codes: `ii` (Interactive Investors), `hl` (Hargreaves Lansdown), `aj` (AJ Bell), etc.

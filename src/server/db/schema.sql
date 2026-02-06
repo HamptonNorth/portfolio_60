@@ -59,8 +59,21 @@ CREATE TABLE IF NOT EXISTS global_events (
     description TEXT NOT NULL CHECK(length(description) <= 255)
 );
 
+-- Benchmarks: indices and reference prices for performance comparison
+CREATE TABLE IF NOT EXISTS benchmarks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    currencies_id INTEGER NOT NULL,
+    benchmark_type TEXT NOT NULL CHECK(benchmark_type IN ('index', 'price')),
+    description TEXT NOT NULL CHECK(length(description) <= 60),
+    benchmark_url TEXT CHECK(benchmark_url IS NULL OR length(benchmark_url) <= 255),
+    selector TEXT CHECK(selector IS NULL OR length(selector) <= 255),
+    FOREIGN KEY (currencies_id) REFERENCES currencies(id)
+);
+
 -- Indexes for query performance
 CREATE INDEX IF NOT EXISTS idx_currency_rates_lookup ON currency_rates(currencies_id, rate_date DESC);
 CREATE INDEX IF NOT EXISTS idx_investments_type ON investments(investment_type_id);
 CREATE INDEX IF NOT EXISTS idx_investments_currency ON investments(currencies_id);
 CREATE INDEX IF NOT EXISTS idx_global_events_date ON global_events(event_date DESC);
+CREATE INDEX IF NOT EXISTS idx_benchmarks_type ON benchmarks(benchmark_type);
+CREATE INDEX IF NOT EXISTS idx_benchmarks_currency ON benchmarks(currencies_id);

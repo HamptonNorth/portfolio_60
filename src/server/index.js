@@ -10,6 +10,7 @@ import { handleCurrenciesRoute } from "./routes/currencies-routes.js";
 import { handleGlobalEventsRoute } from "./routes/global-events-routes.js";
 import { handleScraperRoute } from "./routes/scraper-routes.js";
 import { handleBackupRoute } from "./routes/backup-routes.js";
+import { handleBenchmarksRoute } from "./routes/benchmarks-routes.js";
 
 /**
  * @description The port the server listens on.
@@ -183,6 +184,14 @@ const server = Bun.serve({
       const globalEventsResult = await handleGlobalEventsRoute(method, path, request);
       if (globalEventsResult) {
         return globalEventsResult;
+      }
+    }
+
+    // Benchmarks routes (CRUD)
+    if (path.startsWith("/api/benchmarks")) {
+      const benchmarksResult = await handleBenchmarksRoute(method, path, request);
+      if (benchmarksResult) {
+        return benchmarksResult;
       }
     }
 

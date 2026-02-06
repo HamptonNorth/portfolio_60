@@ -190,3 +190,47 @@ export function validateGlobalEvent(data) {
 
   return errors;
 }
+
+/**
+ * @description Validate benchmark data for create or update operations.
+ * Returns an array of error messages (empty if all valid).
+ * Note: The check that index benchmarks must use GBP currency is done at the route
+ * level where we have access to the database to look up the GBP currency ID.
+ * @param {Object} data - The benchmark data to validate
+ * @returns {string[]} Array of validation error messages
+ */
+export function validateBenchmark(data) {
+  const errors = [];
+
+  // Required fields
+  const requiredChecks = [validateRequired(data.currencies_id, "Currency"), validateRequired(data.benchmark_type, "Benchmark type"), validateRequired(data.description, "Description")];
+
+  for (const error of requiredChecks) {
+    if (error) errors.push(error);
+  }
+
+  // currencies_id must be a positive integer
+  if (data.currencies_id !== undefined && data.currencies_id !== null) {
+    const currencyId = Number(data.currencies_id);
+    if (!Number.isInteger(currencyId) || currencyId <= 0) {
+      errors.push("Currency must be a valid selection");
+    }
+  }
+
+  // benchmark_type must be 'index' or 'price'
+  if (data.benchmark_type !== undefined && data.benchmark_type !== null) {
+    const benchmarkType = String(data.benchmark_type).trim();
+    if (benchmarkType !== "" && benchmarkType !== "index" && benchmarkType !== "price") {
+      errors.push("Benchmark type must be either 'index' or 'price'");
+    }
+  }
+
+  // Max length checks
+  const lengthChecks = [validateMaxLength(data.description, 60, "Description"), validateMaxLength(data.benchmark_url, 255, "Benchmark URL"), validateMaxLength(data.selector, 255, "CSS selector")];
+
+  for (const error of lengthChecks) {
+    if (error) errors.push(error);
+  }
+
+  return errors;
+}
