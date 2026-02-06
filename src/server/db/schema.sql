@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS currency_rates (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     currencies_id INTEGER NOT NULL,
     rate_date TEXT NOT NULL,
+    rate_time TEXT NOT NULL DEFAULT '00:00:00',
     rate INTEGER NOT NULL,
     FOREIGN KEY (currencies_id) REFERENCES currencies(id),
     UNIQUE(currencies_id, rate_date)
@@ -70,6 +71,41 @@ CREATE TABLE IF NOT EXISTS benchmarks (
     FOREIGN KEY (currencies_id) REFERENCES currencies(id)
 );
 
+-- Prices: historical investment prices, stored as integer x 10000
+CREATE TABLE IF NOT EXISTS prices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    investment_id INTEGER NOT NULL,
+    price_date TEXT NOT NULL,
+    price_time TEXT NOT NULL DEFAULT '00:00:00',
+    price INTEGER NOT NULL,
+    FOREIGN KEY (investment_id) REFERENCES investments(id),
+    UNIQUE(investment_id, price_date)
+);
+
+-- Benchmark data: historical benchmark values, stored as integer x 10000
+CREATE TABLE IF NOT EXISTS benchmark_data (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    benchmark_id INTEGER NOT NULL,
+    benchmark_date TEXT NOT NULL,
+    benchmark_time TEXT NOT NULL DEFAULT '00:00:00',
+    value INTEGER NOT NULL,
+    FOREIGN KEY (benchmark_id) REFERENCES benchmarks(id),
+    UNIQUE(benchmark_id, benchmark_date)
+);
+
+-- Scraping history: log of all scrape attempts for monitoring
+CREATE TABLE IF NOT EXISTS scraping_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scrape_type TEXT NOT NULL CHECK(scrape_type IN ('currency', 'investment', 'benchmark')),
+    reference_id INTEGER NOT NULL,
+    scrape_datetime TEXT NOT NULL,
+    started_by INTEGER NOT NULL DEFAULT 0,
+    attempt_number INTEGER NOT NULL DEFAULT 1,
+    success INTEGER NOT NULL DEFAULT 0,
+    error_code TEXT,
+    error_message TEXT
+);
+
 -- Indexes for query performance
 CREATE INDEX IF NOT EXISTS idx_currency_rates_lookup ON currency_rates(currencies_id, rate_date DESC);
 CREATE INDEX IF NOT EXISTS idx_investments_type ON investments(investment_type_id);
@@ -77,3 +113,7 @@ CREATE INDEX IF NOT EXISTS idx_investments_currency ON investments(currencies_id
 CREATE INDEX IF NOT EXISTS idx_global_events_date ON global_events(event_date DESC);
 CREATE INDEX IF NOT EXISTS idx_benchmarks_type ON benchmarks(benchmark_type);
 CREATE INDEX IF NOT EXISTS idx_benchmarks_currency ON benchmarks(currencies_id);
+CREATE INDEX IF NOT EXISTS idx_prices_lookup ON prices(investment_id, price_date DESC);
+CREATE INDEX IF NOT EXISTS idx_benchmark_data_lookup ON benchmark_data(benchmark_id, benchmark_date DESC);
+CREATE INDEX IF NOT EXISTS idx_scraping_history_datetime ON scraping_history(scrape_datetime DESC);
+CREATE INDEX IF NOT EXISTS idx_scraping_history_type_ref ON scraping_history(scrape_type, reference_id);

@@ -45,3 +45,15 @@ export const SCRAPE_DELAY_PROFILES = {
 
 /** @type {string} Default scrape delay profile. Override via SCRAPE_DELAY_PROFILE env var. */
 export const DEFAULT_SCRAPE_DELAY_PROFILE = "interactive";
+
+/**
+ * @description Retry configuration for individual scrape failures.
+ * When a single investment or benchmark fails to scrape, it will be retried
+ * up to maxAttempts times with increasing delays between attempts.
+ */
+export const SCRAPE_RETRY_CONFIG = {
+  /** @type {number} Maximum number of retry attempts per item (including initial attempt) */
+  maxAttempts: 3,
+  /** @type {number[]} Delay in ms before each retry attempt (index 0 = delay before attempt 2, etc.) */
+  retryDelays: [2000, 5000],
+};

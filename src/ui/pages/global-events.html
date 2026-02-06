@@ -39,9 +39,9 @@
                 <p class="text-brand-500">Loading global events...</p>
             </div>
 
-            <!-- Add/Edit form (hidden by default) -->
-            <div id="event-form-container" class="hidden mt-6">
-                <div class="bg-white rounded-lg shadow-md p-6 max-w-lg">
+            <!-- Add/Edit form modal (hidden by default) -->
+            <div id="event-form-container" class="hidden fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+                <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto mx-4">
                     <h3 id="form-title" class="text-xl font-semibold text-brand-800 mb-4">Add Event</h3>
                     <form id="event-form" class="space-y-4">
                         <input type="hidden" id="event-id" value="" />
@@ -82,7 +82,10 @@
                 </div>
             </div>
         </main>
-        <footer class="text-center text-brand-400 text-sm py-4 border-t border-brand-100">Portfolio 60 v0.1.0</footer>
+        <footer class="text-brand-400 text-sm py-4 border-t border-brand-100 flex justify-between px-6 max-w-7xl mx-auto w-full">
+            <span>Portfolio 60 v0.1.0</span>
+            <span id="build-time"></span>
+        </footer>
         <script src="/js/app.js"></script>
         <script src="/js/global-events.js"></script>
     </body>

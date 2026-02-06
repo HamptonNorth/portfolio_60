@@ -7,14 +7,12 @@ import { CURRENCY_SCALE_FACTOR } from "../../shared/constants.js";
  * The rate is stored as an integer scaled by CURRENCY_SCALE_FACTOR (10000).
  * @param {number} currenciesId - The currency ID (FK to currencies)
  * @param {string} rateDate - ISO-8601 date string (YYYY-MM-DD)
+ * @param {string} rateTime - Time string (HH:MM:SS)
  * @param {number} scaledRate - The exchange rate already scaled by CURRENCY_SCALE_FACTOR
  */
-export function upsertRate(currenciesId, rateDate, scaledRate) {
+export function upsertRate(currenciesId, rateDate, rateTime, scaledRate) {
   const db = getDatabase();
-  db.run(
-    "INSERT OR REPLACE INTO currency_rates (currencies_id, rate_date, rate) VALUES (?, ?, ?)",
-    [currenciesId, rateDate, scaledRate]
-  );
+  db.run("INSERT OR REPLACE INTO currency_rates (currencies_id, rate_date, rate_time, rate) VALUES (?, ?, ?, ?)", [currenciesId, rateDate, rateTime, scaledRate]);
 }
 
 /**
@@ -27,13 +25,16 @@ export function getLatestRates() {
   const db = getDatabase();
 
   // For each non-GBP currency, get the most recent rate by date
-  const rows = db.query(`
+  const rows = db
+    .query(
+      `
     SELECT
       cr.id,
       cr.currencies_id,
       c.code AS currency_code,
       c.description AS currency_description,
       cr.rate_date,
+      cr.rate_time,
       cr.rate
     FROM currency_rates cr
     JOIN currencies c ON c.id = cr.currencies_id
@@ -44,7 +45,9 @@ export function getLatestRates() {
         WHERE cr2.currencies_id = cr.currencies_id
       )
     ORDER BY c.code
-  `).all();
+  `,
+    )
+    .all();
 
   return rows;
 }
@@ -58,19 +61,24 @@ export function getLatestRates() {
 export function getRatesForDate(rateDate) {
   const db = getDatabase();
 
-  const rows = db.query(`
+  const rows = db
+    .query(
+      `
     SELECT
       cr.id,
       cr.currencies_id,
       c.code AS currency_code,
       c.description AS currency_description,
       cr.rate_date,
+      cr.rate_time,
       cr.rate
     FROM currency_rates cr
     JOIN currencies c ON c.id = cr.currencies_id
     WHERE cr.rate_date = ?
     ORDER BY c.code
-  `).all(rateDate);
+  `,
+    )
+    .all(rateDate);
 
   return rows;
 }
@@ -84,19 +92,24 @@ export function getRatesForDate(rateDate) {
 export function getRateHistory(currenciesId, limit = 30) {
   const db = getDatabase();
 
-  const rows = db.query(`
+  const rows = db
+    .query(
+      `
     SELECT
       cr.id,
       cr.currencies_id,
       c.code AS currency_code,
       cr.rate_date,
+      cr.rate_time,
       cr.rate
     FROM currency_rates cr
     JOIN currencies c ON c.id = cr.currencies_id
     WHERE cr.currencies_id = ?
     ORDER BY cr.rate_date DESC
     LIMIT ?
-  `).all(currenciesId, limit);
+  `,
+    )
+    .all(currenciesId, limit);
 
   return rows;
 }

@@ -48,11 +48,7 @@ async function loadEvents() {
   const result = await apiRequest("/api/global-events");
 
   if (!result.ok) {
-    container.innerHTML =
-      '<div class="bg-red-50 border border-red-300 text-error rounded-lg px-4 py-3">' +
-      '<p class="text-base font-semibold">Failed to load global events</p>' +
-      '<p class="text-sm mt-1">' + escapeHtml(result.detail || result.error) + "</p>" +
-      "</div>";
+    container.innerHTML = '<div class="bg-red-50 border border-red-300 text-error rounded-lg px-4 py-3">' + '<p class="text-base font-semibold">Failed to load global events</p>' + '<p class="text-sm mt-1">' + escapeHtml(result.detail || result.error) + "</p>" + "</div>";
     return;
   }
 
@@ -118,7 +114,7 @@ function clearRowHighlight() {
 }
 
 /**
- * @description Show the add event form with date defaulting to today.
+ * @description Show the add event form modal with date defaulting to today.
  */
 function showAddForm() {
   clearRowHighlight();
@@ -129,8 +125,10 @@ function showAddForm() {
   document.getElementById("form-errors").textContent = "";
   document.getElementById("delete-from-form-btn").classList.add("hidden");
   document.getElementById("event-form-container").classList.remove("hidden");
-  document.getElementById("add-event-btn").classList.add("hidden");
-  document.getElementById("event_date").focus();
+  // Focus the first field after a brief delay to ensure modal is visible
+  setTimeout(function () {
+    document.getElementById("event_date").focus();
+  }, 50);
 }
 
 /**
@@ -162,17 +160,18 @@ async function editEvent(id) {
   };
 
   document.getElementById("event-form-container").classList.remove("hidden");
-  document.getElementById("add-event-btn").classList.add("hidden");
-  document.getElementById("event_date").focus();
+  // Focus the first field after a brief delay to ensure modal is visible
+  setTimeout(function () {
+    document.getElementById("event_date").focus();
+  }, 50);
 }
 
 /**
- * @description Hide the form and show the Add Event button again.
+ * @description Hide the form modal.
  */
 function hideForm() {
   clearRowHighlight();
   document.getElementById("event-form-container").classList.add("hidden");
-  document.getElementById("add-event-btn").classList.remove("hidden");
 }
 
 /**
@@ -264,4 +263,31 @@ document.addEventListener("DOMContentLoaded", async function () {
   document.getElementById("event-form").addEventListener("submit", handleFormSubmit);
   document.getElementById("delete-cancel-btn").addEventListener("click", hideDeleteDialog);
   document.getElementById("delete-confirm-btn").addEventListener("click", executeDelete);
+
+  // Close modals when clicking on the backdrop (outside the modal content)
+  document.getElementById("event-form-container").addEventListener("click", function (event) {
+    if (event.target === this) {
+      hideForm();
+    }
+  });
+
+  document.getElementById("delete-dialog").addEventListener("click", function (event) {
+    if (event.target === this) {
+      hideDeleteDialog();
+    }
+  });
+
+  // Close modals with Escape key
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") {
+      const formContainer = document.getElementById("event-form-container");
+      const deleteDialog = document.getElementById("delete-dialog");
+
+      if (!deleteDialog.classList.contains("hidden")) {
+        hideDeleteDialog();
+      } else if (!formContainer.classList.contains("hidden")) {
+        hideForm();
+      }
+    }
+  });
 });

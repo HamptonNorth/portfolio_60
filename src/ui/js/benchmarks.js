@@ -15,6 +15,9 @@ let currencies = [];
 /** @type {number|null} The GBP currency ID (for index benchmark validation) */
 let gbpCurrencyId = null;
 
+/** @type {Object|null} Currently matched site config from URL */
+let matchedSiteConfig = null;
+
 /**
  * @description Load currencies from the API and cache them.
  */
@@ -32,6 +35,53 @@ async function loadGbpCurrencyId() {
   const result = await apiRequest("/api/benchmarks/gbp-id");
   if (result.ok) {
     gbpCurrencyId = result.data.gbp_id;
+  }
+}
+
+/**
+ * @description Check if a URL matches a known scraper site.
+ * Updates the UI to show the match status and makes selector optional for known sites.
+ * @param {string} url - The URL to check
+ */
+async function checkUrlSiteMatch(url) {
+  const statusEl = document.getElementById("url-site-status");
+  const selectorOptionalEl = document.getElementById("selector-optional");
+  const selectorHelpEl = document.getElementById("selector-help");
+
+  // Reset state
+  matchedSiteConfig = null;
+
+  if (!url || url.trim() === "") {
+    statusEl.classList.add("hidden");
+    selectorOptionalEl.classList.add("hidden");
+    selectorHelpEl.textContent = "To find the CSS selector: right-click the value on the web page, choose 'Inspect', then right-click the highlighted element and choose 'Copy > Copy selector'.";
+    return;
+  }
+
+  // Check against known sites
+  const result = await apiRequest("/api/config/scraper-sites/match", {
+    method: "POST",
+    body: { url: url.trim() },
+  });
+
+  if (result.ok && result.data.matched) {
+    matchedSiteConfig = result.data.site;
+    statusEl.className = "mt-2 px-3 py-2 rounded-md text-sm bg-green-50 border border-green-200 text-green-700";
+    statusEl.innerHTML = "<strong>Known site:</strong> " + escapeHtml(matchedSiteConfig.name) + ". Default selector filled in below.";
+    statusEl.classList.remove("hidden");
+    selectorOptionalEl.classList.add("hidden");
+    selectorHelpEl.textContent = "This selector was auto-filled for the known site. You can modify it if needed.";
+    // Auto-fill the selector field with the config value (only if currently empty)
+    const selectorField = document.getElementById("selector");
+    if (!selectorField.value.trim()) {
+      selectorField.value = matchedSiteConfig.selector;
+    }
+  } else {
+    statusEl.className = "mt-2 px-3 py-2 rounded-md text-sm bg-amber-50 border border-amber-200 text-amber-700";
+    statusEl.innerHTML = "URL does not match a known site. You will need to provide a CSS selector.";
+    statusEl.classList.remove("hidden");
+    selectorOptionalEl.classList.add("hidden");
+    selectorHelpEl.textContent = "To find the CSS selector: right-click the value on the web page, choose 'Inspect', then right-click the highlighted element and choose 'Copy > Copy selector'.";
   }
 }
 
@@ -162,8 +212,12 @@ async function loadBenchmarks() {
     html += '<td class="py-3 px-3 text-base">' + escapeHtml(typeDisplay) + "</td>";
     html += '<td class="py-3 px-3 text-sm text-brand-500">' + escapeHtml(urlDisplay) + "</td>";
     html += '<td class="py-3 px-3 text-sm text-brand-500 font-mono">' + escapeHtml(selectorDisplay) + "</td>";
-    html += '<td class="py-3 px-3 text-base">';
+    html += '<td class="py-3 px-3 text-base flex gap-2">';
     html += '<button class="bg-brand-100 hover:bg-brand-200 text-brand-700 text-sm font-medium px-3 py-1 rounded transition-colors" onclick="viewBenchmark(' + bm.id + ')">View</button>';
+    // Show Test button if URL exists (selector may come from config for known sites)
+    if (bm.benchmark_url) {
+      html += '<button id="test-btn-' + bm.id + '" class="bg-green-100 hover:bg-green-200 text-green-700 text-sm font-medium px-3 py-1 rounded transition-colors" onclick="testScrapeBenchmark(' + bm.id + ', this)">Test</button>';
+    }
     html += "</td>";
     html += "</tr>";
   }
@@ -241,15 +295,13 @@ async function viewBenchmark(id) {
   // Hide the form if it's open, show the view panel
   document.getElementById("benchmark-form-container").classList.add("hidden");
   document.getElementById("benchmark-view-container").classList.remove("hidden");
-  document.getElementById("add-benchmark-btn").classList.add("hidden");
 }
 
 /**
- * @description Hide the read-only view panel and show the Add Benchmark button.
+ * @description Hide the read-only view panel.
  */
 function hideView() {
   document.getElementById("benchmark-view-container").classList.add("hidden");
-  document.getElementById("add-benchmark-btn").classList.remove("hidden");
   clearRowHighlight();
 }
 
@@ -266,11 +318,16 @@ function showAddForm() {
   populateCurrencyDropdown();
   // Show currency field by default (user hasn't selected type yet)
   document.getElementById("currency-container").classList.remove("hidden");
+  // Reset URL site status
+  document.getElementById("url-site-status").classList.add("hidden");
+  document.getElementById("selector-optional").classList.add("hidden");
+  matchedSiteConfig = null;
   clearRowHighlight();
   document.getElementById("benchmark-view-container").classList.add("hidden");
   document.getElementById("benchmark-form-container").classList.remove("hidden");
-  document.getElementById("add-benchmark-btn").classList.add("hidden");
-  document.getElementById("description").focus();
+  setTimeout(function () {
+    document.getElementById("description").focus();
+  }, 50);
 }
 
 /**
@@ -298,6 +355,15 @@ async function editBenchmark(id) {
   // Apply type-based currency restriction
   handleTypeChange();
 
+  // Check URL against known sites
+  if (bm.benchmark_url) {
+    checkUrlSiteMatch(bm.benchmark_url);
+  } else {
+    document.getElementById("url-site-status").classList.add("hidden");
+    document.getElementById("selector-optional").classList.add("hidden");
+    matchedSiteConfig = null;
+  }
+
   // Show the delete link when editing
   const deleteBtn = document.getElementById("delete-from-form-btn");
   deleteBtn.classList.remove("hidden");
@@ -310,8 +376,9 @@ async function editBenchmark(id) {
 
   document.getElementById("benchmark-view-container").classList.add("hidden");
   document.getElementById("benchmark-form-container").classList.remove("hidden");
-  document.getElementById("add-benchmark-btn").classList.add("hidden");
-  document.getElementById("description").focus();
+  setTimeout(function () {
+    document.getElementById("description").focus();
+  }, 50);
 }
 
 /**
@@ -319,7 +386,6 @@ async function editBenchmark(id) {
  */
 function hideForm() {
   document.getElementById("benchmark-form-container").classList.add("hidden");
-  document.getElementById("add-benchmark-btn").classList.remove("hidden");
   clearRowHighlight();
 }
 
@@ -407,6 +473,49 @@ async function executeDelete() {
   }
 }
 
+/**
+ * @description Test scrape a single benchmark by ID.
+ * Shows the result in a modal dialog for quick debugging.
+ * Uses testMode=true so no database tables are updated.
+ * @param {number} id - The benchmark ID to scrape
+ * @param {HTMLElement} button - The button element that was clicked
+ */
+async function testScrapeBenchmark(id, button) {
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = "Scraping...";
+
+  try {
+    // Use 120s timeout for scraping - some sites like MSCI take a long time
+    const result = await apiRequest("/api/scraper/benchmarks/" + id + "?testMode=true", {
+      method: "POST",
+      timeout: 120000,
+    });
+
+    button.disabled = false;
+    button.textContent = originalText;
+
+    if (result.ok && result.data.benchmark) {
+      const bm = result.data.benchmark;
+      if (bm.success) {
+        showModal("Test Result (No DB Update)", "Benchmark: " + bm.description + "\nRaw value: " + bm.rawValue + "\nParsed: " + bm.parsedValue);
+      } else {
+        showModal("Scrape Failed", "Benchmark: " + bm.description + "\nError: " + bm.error);
+      }
+    } else if (result.data && result.data.benchmark) {
+      // API returned error status but has benchmark info
+      const bm = result.data.benchmark;
+      showModal("Scrape Failed", "Benchmark: " + bm.description + "\nError: " + (bm.error || result.detail || result.error));
+    } else {
+      showModal("API Error", (result.error || "Unknown error") + "\n" + (result.detail || ""));
+    }
+  } catch (err) {
+    button.disabled = false;
+    button.textContent = originalText;
+    showModal("Network Error", err.message);
+  }
+}
+
 // Initialise the page
 document.addEventListener("DOMContentLoaded", async function () {
   await loadCurrencies();
@@ -422,4 +531,46 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   // Handle type change to enforce GBP for index benchmarks
   document.getElementById("benchmark_type").addEventListener("change", handleTypeChange);
+
+  // Check URL against known sites when it changes (debounced)
+  let urlCheckTimeout = null;
+  document.getElementById("benchmark_url").addEventListener("input", function (event) {
+    if (urlCheckTimeout) {
+      clearTimeout(urlCheckTimeout);
+    }
+    urlCheckTimeout = setTimeout(function () {
+      checkUrlSiteMatch(event.target.value);
+    }, 500);
+  });
+
+  // Close modals when clicking on the backdrop (outside the modal content)
+  document.getElementById("benchmark-form-container").addEventListener("click", function (event) {
+    if (event.target === this) {
+      hideForm();
+    }
+  });
+
+  document.getElementById("benchmark-view-container").addEventListener("click", function (event) {
+    if (event.target === this) {
+      hideView();
+    }
+  });
+
+  // Close modals with Escape key
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") {
+      const deleteDialog = document.getElementById("delete-dialog");
+      const formContainer = document.getElementById("benchmark-form-container");
+      const viewContainer = document.getElementById("benchmark-view-container");
+
+      // Close in priority order: delete dialog first, then form, then view
+      if (!deleteDialog.classList.contains("hidden")) {
+        hideDeleteDialog();
+      } else if (!formContainer.classList.contains("hidden")) {
+        hideForm();
+      } else if (!viewContainer.classList.contains("hidden")) {
+        hideView();
+      }
+    }
+  });
 });

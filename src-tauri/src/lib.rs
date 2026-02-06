@@ -72,8 +72,13 @@ pub fn run() {
     //
     // In production (tauri build / installed .deb), no server is running,
     // so we spawn the Bun server ourselves as a child process.
-    let server_child = if cfg!(debug_assertions) {
-        // Dev mode: server already running via beforeDevCommand
+    //
+    // We detect if a server is already running by checking if port 1420 is in use.
+    // This works for both debug and release builds.
+    let server_already_running = std::net::TcpStream::connect("127.0.0.1:1420").is_ok();
+
+    let server_child = if server_already_running {
+        // Server already running (e.g. via beforeDevCommand in tauri dev)
         None
     } else {
         // Production mode: spawn the Bun server

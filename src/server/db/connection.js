@@ -127,6 +127,61 @@ function runMigrations(database) {
     database.exec("CREATE INDEX IF NOT EXISTS idx_benchmarks_type ON benchmarks(benchmark_type)");
     database.exec("CREATE INDEX IF NOT EXISTS idx_benchmarks_currency ON benchmarks(currencies_id)");
   }
+
+  // Migration 3: Add prices table (v0.2.0)
+  const pricesTable = database.query("SELECT name FROM sqlite_master WHERE type='table' AND name='prices'").get();
+
+  if (!pricesTable) {
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS prices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        investment_id INTEGER NOT NULL,
+        price_date TEXT NOT NULL,
+        price INTEGER NOT NULL,
+        FOREIGN KEY (investment_id) REFERENCES investments(id),
+        UNIQUE(investment_id, price_date)
+      )
+    `);
+    database.exec("CREATE INDEX IF NOT EXISTS idx_prices_lookup ON prices(investment_id, price_date DESC)");
+  }
+
+  // Migration 4: Add benchmark_data table (v0.2.0)
+  const benchmarkDataTable = database.query("SELECT name FROM sqlite_master WHERE type='table' AND name='benchmark_data'").get();
+
+  if (!benchmarkDataTable) {
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS benchmark_data (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        benchmark_id INTEGER NOT NULL,
+        benchmark_date TEXT NOT NULL,
+        value INTEGER NOT NULL,
+        FOREIGN KEY (benchmark_id) REFERENCES benchmarks(id),
+        UNIQUE(benchmark_id, benchmark_date)
+      )
+    `);
+    database.exec("CREATE INDEX IF NOT EXISTS idx_benchmark_data_lookup ON benchmark_data(benchmark_id, benchmark_date DESC)");
+  }
+
+  // Migration 5: Add scraping_history table (v0.2.0)
+  const scrapingHistoryTable = database.query("SELECT name FROM sqlite_master WHERE type='table' AND name='scraping_history'").get();
+
+  if (!scrapingHistoryTable) {
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS scraping_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        scrape_type TEXT NOT NULL CHECK(scrape_type IN ('currency', 'investment', 'benchmark')),
+        reference_id INTEGER NOT NULL,
+        scrape_datetime TEXT NOT NULL,
+        started_by INTEGER NOT NULL DEFAULT 0,
+        attempt_number INTEGER NOT NULL DEFAULT 1,
+        success INTEGER NOT NULL DEFAULT 0,
+        error_code TEXT,
+        error_message TEXT
+      )
+    `);
+    database.exec("CREATE INDEX IF NOT EXISTS idx_scraping_history_datetime ON scraping_history(scrape_datetime DESC)");
+    database.exec("CREATE INDEX IF NOT EXISTS idx_scraping_history_type_ref ON scraping_history(scrape_type, reference_id)");
+  }
 }
 
 /**

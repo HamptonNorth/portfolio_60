@@ -5,14 +5,7 @@ import { describe, test, expect, beforeAll, afterAll, mock } from "bun:test";
 import { existsSync, unlinkSync } from "node:fs";
 import { createDatabase, closeDatabase, getDatabasePath } from "../../src/server/db/connection.js";
 import { createCurrency } from "../../src/server/db/currencies-db.js";
-import {
-  upsertRate,
-  getLatestRates,
-  getRatesForDate,
-  getRateHistory,
-  scaleRate,
-  unscaleRate,
-} from "../../src/server/db/currency-rates-db.js";
+import { upsertRate, getLatestRates, getRatesForDate, getRateHistory, scaleRate, unscaleRate } from "../../src/server/db/currency-rates-db.js";
 
 const testDbPath = getDatabasePath();
 
@@ -93,7 +86,7 @@ describe("Currency rates - upsertRate", () => {
     const currencies = getAllCurrencies();
     const usd = currencies.find((c) => c.code === "USD");
 
-    upsertRate(usd.id, "2026-02-05", 12543);
+    upsertRate(usd.id, "2026-02-05", "10:30:00", 12543);
 
     const rates = getRatesForDate("2026-02-05");
     expect(rates.length).toBe(1);
@@ -108,8 +101,8 @@ describe("Currency rates - upsertRate", () => {
     const eur = currencies.find((c) => c.code === "EUR");
     const jpy = currencies.find((c) => c.code === "JPY");
 
-    upsertRate(eur.id, "2026-02-05", 11832);
-    upsertRate(jpy.id, "2026-02-05", 1895400);
+    upsertRate(eur.id, "2026-02-05", "10:30:00", 11832);
+    upsertRate(jpy.id, "2026-02-05", "10:30:00", 1895400);
 
     const rates = getRatesForDate("2026-02-05");
     expect(rates.length).toBe(3); // USD, EUR, JPY
@@ -127,7 +120,7 @@ describe("Currency rates - upsertRate", () => {
     const usd = currencies.find((c) => c.code === "USD");
 
     // Update the USD rate for the same date
-    upsertRate(usd.id, "2026-02-05", 12600);
+    upsertRate(usd.id, "2026-02-05", "10:35:00", 12600);
 
     const rates = getRatesForDate("2026-02-05");
     const usdRate = rates.find((r) => r.currency_code === "USD");
@@ -144,7 +137,7 @@ describe("Currency rates - getLatestRates", () => {
     const usd = currencies.find((c) => c.code === "USD");
 
     // Add a newer rate for USD
-    upsertRate(usd.id, "2026-02-06", 12700);
+    upsertRate(usd.id, "2026-02-06", "11:00:00", 12700);
 
     const latest = getLatestRates();
     expect(latest.length).toBe(3); // USD, EUR, JPY
@@ -227,9 +220,9 @@ describe("fetchCurrencyRates", () => {
             base: "GBP",
             date: "2026-02-05",
             rates: {
-              USD: 1.2800,
-              EUR: 1.1900,
-              JPY: 190.50,
+              USD: 1.28,
+              EUR: 1.19,
+              JPY: 190.5,
             },
           };
         },

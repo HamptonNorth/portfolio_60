@@ -72,8 +72,11 @@ async function loadCurrencies() {
       html += ' <span class="text-sm text-brand-400 font-normal">(Base currency)</span>';
     }
     html += "</td>";
-    html += '<td class="py-3 px-3 text-base">';
+    html += '<td class="py-3 px-3 text-base flex gap-2">';
     html += '<button class="bg-brand-100 hover:bg-brand-200 text-brand-700 text-sm font-medium px-3 py-1 rounded transition-colors" onclick="viewCurrency(' + cur.id + ')">View</button>';
+    if (!isGbp) {
+      html += '<button id="test-btn-' + cur.id + '" class="bg-green-100 hover:bg-green-200 text-green-700 text-sm font-medium px-3 py-1 rounded transition-colors" onclick="testScrapeCurrency(' + cur.id + ', this)">Test</button>';
+    }
     html += "</td>";
     html += "</tr>";
   }
@@ -110,23 +113,21 @@ async function viewCurrency(id) {
   // Highlight the corresponding table row
   highlightRow(cur.id);
 
-  // Hide the form if it's open, show the view panel
+  // Hide the form if it's open, show the view modal
   document.getElementById("currency-form-container").classList.add("hidden");
   document.getElementById("currency-view-container").classList.remove("hidden");
-  document.getElementById("add-currency-btn").classList.add("hidden");
 }
 
 /**
- * @description Hide the read-only view panel and show the Add Currency button.
+ * @description Hide the read-only view modal.
  */
 function hideView() {
   document.getElementById("currency-view-container").classList.add("hidden");
-  document.getElementById("add-currency-btn").classList.remove("hidden");
   clearRowHighlight();
 }
 
 /**
- * @description Show the add currency form (empty fields).
+ * @description Show the add currency form modal (empty fields).
  */
 function showAddForm() {
   clearRowHighlight();
@@ -138,8 +139,10 @@ function showAddForm() {
   document.getElementById("code").removeAttribute("readonly");
   document.getElementById("currency-view-container").classList.add("hidden");
   document.getElementById("currency-form-container").classList.remove("hidden");
-  document.getElementById("add-currency-btn").classList.add("hidden");
-  document.getElementById("code").focus();
+  // Focus the first field after a brief delay to ensure modal is visible
+  setTimeout(function () {
+    document.getElementById("code").focus();
+  }, 50);
 }
 
 /**
@@ -186,16 +189,17 @@ async function editCurrency(id) {
 
   document.getElementById("currency-view-container").classList.add("hidden");
   document.getElementById("currency-form-container").classList.remove("hidden");
-  document.getElementById("add-currency-btn").classList.add("hidden");
-  document.getElementById(isGbp ? "description" : "code").focus();
+  // Focus the appropriate field after a brief delay to ensure modal is visible
+  setTimeout(function () {
+    document.getElementById(isGbp ? "description" : "code").focus();
+  }, 50);
 }
 
 /**
- * @description Hide the form and show the Add Currency button again.
+ * @description Hide the form modal.
  */
 function hideForm() {
   document.getElementById("currency-form-container").classList.add("hidden");
-  document.getElementById("add-currency-btn").classList.remove("hidden");
   clearRowHighlight();
 }
 
@@ -279,6 +283,57 @@ async function executeDelete() {
   }
 }
 
+/**
+ * @description Test fetch the exchange rate for a single currency.
+ * Shows the result in a modal dialog for quick debugging.
+ * Uses testMode=true so no database tables are updated.
+ * @param {number} id - The currency ID to test
+ * @param {HTMLElement} button - The button element that was clicked
+ */
+async function testScrapeCurrency(id, button) {
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = "...";
+
+  try {
+    // Fetch all currency rates in test mode (no database writes)
+    // Use 60s timeout - currency API is usually fast but allow extra time
+    const result = await apiRequest("/api/scraper/currency-rates?testMode=true", {
+      method: "POST",
+      timeout: 60000,
+    });
+
+    button.disabled = false;
+    button.textContent = originalText;
+
+    if (result.ok && result.data.rates) {
+      // Find the rate for this currency
+      const rates = result.data.rates;
+      // We need to get the currency code first
+      const currencyResult = await apiRequest("/api/currencies/" + id);
+      if (currencyResult.ok) {
+        const currencyCode = currencyResult.data.code;
+        const rate = rates.find(function (r) {
+          return r.code === currencyCode;
+        });
+        if (rate) {
+          showModal("Test Result (No DB Update)", "Currency: " + rate.code + " - " + rate.description + "\nRate (per 1 GBP): " + rate.rate.toFixed(4) + "\nDate: " + rate.rateDate, { type: "success" });
+        } else {
+          showModal("Test Result", "No rate found for " + currencyCode + " in API response.\n\nThis may mean the currency is not supported by the Frankfurter API.", { type: "error" });
+        }
+      } else {
+        showModal("Error", "Failed to get currency details: " + (currencyResult.error || "Unknown error"), { type: "error" });
+      }
+    } else {
+      showModal("API Error", (result.error || "Unknown error") + "\n" + (result.detail || ""), { type: "error" });
+    }
+  } catch (err) {
+    button.disabled = false;
+    button.textContent = originalText;
+    showModal("Network Error", err.message, { type: "error" });
+  }
+}
+
 // Initialise the page
 document.addEventListener("DOMContentLoaded", async function () {
   await loadCurrencies();
@@ -289,4 +344,40 @@ document.addEventListener("DOMContentLoaded", async function () {
   document.getElementById("delete-cancel-btn").addEventListener("click", hideDeleteDialog);
   document.getElementById("delete-confirm-btn").addEventListener("click", executeDelete);
   document.getElementById("view-close-btn").addEventListener("click", hideView);
+
+  // Close modals when clicking on the backdrop (outside the modal content)
+  document.getElementById("currency-form-container").addEventListener("click", function (event) {
+    if (event.target === this) {
+      hideForm();
+    }
+  });
+
+  document.getElementById("currency-view-container").addEventListener("click", function (event) {
+    if (event.target === this) {
+      hideView();
+    }
+  });
+
+  document.getElementById("delete-dialog").addEventListener("click", function (event) {
+    if (event.target === this) {
+      hideDeleteDialog();
+    }
+  });
+
+  // Close modals with Escape key
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") {
+      const formContainer = document.getElementById("currency-form-container");
+      const viewContainer = document.getElementById("currency-view-container");
+      const deleteDialog = document.getElementById("delete-dialog");
+
+      if (!deleteDialog.classList.contains("hidden")) {
+        hideDeleteDialog();
+      } else if (!formContainer.classList.contains("hidden")) {
+        hideForm();
+      } else if (!viewContainer.classList.contains("hidden")) {
+        hideView();
+      }
+    }
+  });
 });

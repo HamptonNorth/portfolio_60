@@ -7,6 +7,12 @@ set -e  # Exit on any error
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# Kill any existing Portfolio 60 processes
+echo "Stopping any running Portfolio 60 processes..."
+pkill -f "portfolio-60" 2>/dev/null || true
+pkill -f "bun.*src/server/index.js" 2>/dev/null || true
+sleep 1
+
 # Build the CSS first
 echo "Building CSS..."
 bun run build:css
@@ -21,10 +27,10 @@ echo "Build timestamp: $BUILD_TIME"
 echo "=========================================="
 
 cd "$SCRIPT_DIR/src-tauri"
-cargo tauri build --bundles deb
+cargo tauri build --bundles deb --debug
 
-# Find the latest .deb file
-DEB_FILE=$(ls -t "$SCRIPT_DIR/src-tauri/target/release/bundle/deb/"*.deb 2>/dev/null | head -1)
+# Find the latest .deb file (debug builds go to target/debug/bundle/deb/)
+DEB_FILE=$(ls -t "$SCRIPT_DIR/src-tauri/target/debug/bundle/deb/"*.deb 2>/dev/null | head -1)
 
 if [ -z "$DEB_FILE" ]; then
     echo "Error: No .deb file found after build"

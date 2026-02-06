@@ -10,6 +10,13 @@ This is a UK-only application due to tax rule complexity.
 
 Future versions will add portfolio holdings per person, valuations, performance comparison against benchmarks, inflation adjustment, SIPP withdrawal tracking, and sold-investment shadow portfolios.
 
+## Future Enhancements (post v0.1.0)
+
+- **Scraping history viewer**: UI page to browse/filter past scrape attempts. Backend API already exists (`GET /api/scraper/history` with filtering by scrapeType, success, date range). Useful for diagnosing recurring failures and confirming scheduled scrapes ran correctly.
+- **Cron-scheduled automated scraping**: Run price/benchmark scrapes on a schedule without user interaction.
+- **YubiKey HMAC-SHA1 challenge-response**: Hardware-bound authentication.
+- **SQLCipher database encryption**: Encrypt database at rest.
+
 ## Tech Stack
 - **Runtime/Server**: Bun with Bun.serve for the backend HTTP server
 - **Frontend**: HTML, vanilla JS, TailwindCSS v4

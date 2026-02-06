@@ -137,7 +137,7 @@ async function loadUsers() {
 }
 
 /**
- * @description Show the add user form (empty fields).
+ * @description Show the add user form modal (empty fields).
  */
 function showAddForm() {
   document.getElementById("form-title").textContent = "Add User";
@@ -147,12 +147,14 @@ function showAddForm() {
   document.getElementById("delete-from-form-btn").classList.add("hidden");
   populateProviderDropdown();
   document.getElementById("user-form-container").classList.remove("hidden");
-  document.getElementById("add-user-btn").classList.add("hidden");
-  document.getElementById("initials").focus();
+  // Focus the first field after a brief delay to ensure modal is visible
+  setTimeout(function () {
+    document.getElementById("initials").focus();
+  }, 50);
 }
 
 /**
- * @description Load a user's data into the form for editing.
+ * @description Load a user's data into the form modal for editing.
  * @param {number} id - The user ID to edit
  */
 async function editUser(id) {
@@ -185,16 +187,17 @@ async function editUser(id) {
   };
 
   document.getElementById("user-form-container").classList.remove("hidden");
-  document.getElementById("add-user-btn").classList.add("hidden");
-  document.getElementById("initials").focus();
+  // Focus the first field after a brief delay to ensure modal is visible
+  setTimeout(function () {
+    document.getElementById("initials").focus();
+  }, 50);
 }
 
 /**
- * @description Hide the form and show the Add User button again.
+ * @description Hide the form modal.
  */
 function hideForm() {
   document.getElementById("user-form-container").classList.add("hidden");
-  document.getElementById("add-user-btn").classList.remove("hidden");
 }
 
 /**
@@ -307,4 +310,31 @@ document.addEventListener("DOMContentLoaded", async function () {
   document.getElementById("user-form").addEventListener("submit", handleFormSubmit);
   document.getElementById("delete-cancel-btn").addEventListener("click", hideDeleteDialog);
   document.getElementById("delete-confirm-btn").addEventListener("click", executeDelete);
+
+  // Close modals when clicking on the backdrop (outside the modal content)
+  document.getElementById("user-form-container").addEventListener("click", function (event) {
+    if (event.target === this) {
+      hideForm();
+    }
+  });
+
+  document.getElementById("delete-dialog").addEventListener("click", function (event) {
+    if (event.target === this) {
+      hideDeleteDialog();
+    }
+  });
+
+  // Close modals with Escape key
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") {
+      const formContainer = document.getElementById("user-form-container");
+      const deleteDialog = document.getElementById("delete-dialog");
+
+      if (!deleteDialog.classList.contains("hidden")) {
+        hideDeleteDialog();
+      } else if (!formContainer.classList.contains("hidden")) {
+        hideForm();
+      }
+    }
+  });
 });

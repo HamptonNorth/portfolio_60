@@ -1,5 +1,6 @@
 import { getAllCurrencies } from "../db/currencies-db.js";
 import { upsertRate, scaleRate } from "../db/currency-rates-db.js";
+import { recordScrapingAttempt } from "../db/scraping-history-db.js";
 
 /**
  * @description The Frankfurter API base URL for fetching exchange rates.
@@ -17,13 +18,22 @@ const FRANKFURTER_API_URL = "https://api.frankfurter.dev/v1/latest";
  * by CURRENCY_SCALE_FACTOR (10000) and stored as an integer using INSERT OR REPLACE,
  * so re-fetching on the same day overwrites the previous values.
  *
+ * @param {Object} [options={}] - Additional options
+ * @param {number} [options.startedBy=0] - 0 = manual/interactive, 1 = scheduled/cron
+ * @param {number} [options.attemptNumber=1] - Retry attempt counter (1-5)
+ * @param {boolean} [options.testMode=false] - If true, skip database writes (for testing)
+ * @param {string} [options.scrapeTime=null] - Time to store (HH:MM:SS). If not provided, uses current time.
  * @returns {Promise<{success: boolean, rates: Object[], message: string, error?: string}>}
  *   - success: whether the fetch and store completed without error
- *   - rates: array of {code, description, rate, scaledRate, rateDate} for each currency processed
+ *   - rates: array of {code, description, rate, scaledRate, rateDate, rateTime} for each currency processed
  *   - message: human-readable summary
  *   - error: error message if success is false
  */
-export async function fetchCurrencyRates() {
+export async function fetchCurrencyRates(options = {}) {
+  const startedBy = options.startedBy || 0;
+  const attemptNumber = options.attemptNumber || 1;
+  const testMode = options.testMode || false;
+  const scrapeTime = options.scrapeTime || new Date().toTimeString().slice(0, 8);
   // Get all non-GBP currencies from the database
   const allCurrencies = getAllCurrencies();
   const nonGbpCurrencies = allCurrencies.filter(function (c) {
@@ -39,9 +49,11 @@ export async function fetchCurrencyRates() {
   }
 
   // Build the symbols parameter (comma-separated currency codes)
-  const symbols = nonGbpCurrencies.map(function (c) {
-    return c.code;
-  }).join(",");
+  const symbols = nonGbpCurrencies
+    .map(function (c) {
+      return c.code;
+    })
+    .join(",");
 
   const url = FRANKFURTER_API_URL + "?base=GBP&symbols=" + symbols;
 
@@ -97,13 +109,39 @@ export async function fetchCurrencyRates() {
     if (decimalRate === undefined || decimalRate === null) {
       // The API did not return a rate for this currency code
       skippedCodes.push(currency.code);
+      // Record failed attempt in history (skip in test mode)
+      if (!testMode) {
+        recordScrapingAttempt({
+          scrapeType: "currency",
+          referenceId: currency.id,
+          startedBy: startedBy,
+          attemptNumber: attemptNumber,
+          success: false,
+          errorCode: "NO_RATE",
+          errorMessage: "API did not return a rate for " + currency.code,
+        });
+      }
       continue;
     }
 
     const scaledRate = scaleRate(decimalRate);
 
-    // Store in the database (INSERT OR REPLACE for same currency+date)
-    upsertRate(currency.id, rateDate, scaledRate);
+    // Store in the database (skip in test mode)
+    if (!testMode) {
+      // INSERT OR REPLACE for same currency+date
+      upsertRate(currency.id, rateDate, scrapeTime, scaledRate);
+
+      // Record successful attempt in history
+      recordScrapingAttempt({
+        scrapeType: "currency",
+        referenceId: currency.id,
+        startedBy: startedBy,
+        attemptNumber: attemptNumber,
+        success: true,
+        errorCode: null,
+        errorMessage: null,
+      });
+    }
 
     storedRates.push({
       code: currency.code,
@@ -111,6 +149,7 @@ export async function fetchCurrencyRates() {
       rate: decimalRate,
       scaledRate: scaledRate,
       rateDate: rateDate,
+      rateTime: scrapeTime,
     });
   }
 

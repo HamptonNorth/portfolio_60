@@ -4,7 +4,7 @@ import { checkAuth } from "./middleware/auth-middleware.js";
 import { handleAuthRoute } from "./routes/auth-routes.js";
 import { handleDbRoute } from "./routes/db-routes.js";
 import { handleUsersRoute } from "./routes/users-routes.js";
-import { handleConfigRoute } from "./routes/config-routes.js";
+import { handleConfigRoute, handleConfigRouteAsync } from "./routes/config-routes.js";
 import { handleInvestmentsRoute } from "./routes/investments-routes.js";
 import { handleCurrenciesRoute } from "./routes/currencies-routes.js";
 import { handleGlobalEventsRoute } from "./routes/global-events-routes.js";
@@ -147,11 +147,17 @@ const server = Bun.serve({
       }
     }
 
-    // Config routes (providers list, etc.)
+    // Config routes (providers list, scraper sites, etc.)
     if (path.startsWith("/api/config/")) {
+      // Try sync handler first
       const configResult = handleConfigRoute(method, path);
       if (configResult) {
         return configResult;
+      }
+      // Then try async handler (for POST requests with body)
+      const configResultAsync = await handleConfigRouteAsync(method, path, request);
+      if (configResultAsync) {
+        return configResultAsync;
       }
     }
 
