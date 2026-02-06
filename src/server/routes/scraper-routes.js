@@ -1,6 +1,10 @@
 import { Router } from "../router.js";
 import { fetchCurrencyRates } from "../scrapers/currency-scraper.js";
 import { getLatestRates } from "../db/currency-rates-db.js";
+import { getAllInvestments } from "../db/investments-db.js";
+import { getLatestPrice } from "../db/prices-db.js";
+import { getAllBenchmarks } from "../db/benchmarks-db.js";
+import { getLatestBenchmarkData } from "../db/benchmark-data-db.js";
 import { scrapeAllPrices, scrapePriceById, getScrapeableInvestments, scrapeSingleInvestmentPrice, extractDomain, calculateDelay } from "../scrapers/price-scraper.js";
 import { scrapeAllBenchmarks, scrapeBenchmarkById, getScrapeableBenchmarks, scrapeSingleBenchmarkValue, extractDomain as extractBenchmarkDomain, calculateDelay as calculateBenchmarkDelay } from "../scrapers/benchmark-scraper.js";
 import { getScrapingHistoryWithDescriptions, getScrapingHistoryCount, getLastSuccessfulScrapeByType } from "../db/scraping-history-db.js";
@@ -65,6 +69,66 @@ scraperRouter.get("/api/scraper/currency-rates/latest", function () {
     });
   } catch (err) {
     return new Response(JSON.stringify({ error: "Failed to get latest rates", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+  }
+});
+
+// GET /api/scraper/current-values — get latest stored currency rates, investment prices and benchmark values
+// This reads from the database only (no scraping). Used by the "Show Current" button.
+scraperRouter.get("/api/scraper/current-values", function () {
+  try {
+    // 1. Latest currency rates
+    const rates = getLatestRates();
+    const formattedRates = rates.map(function (r) {
+      return {
+        code: r.currency_code,
+        description: r.currency_description,
+        rate: r.rate / 10000,
+        rateDate: r.rate_date,
+        rateTime: r.rate_time,
+      };
+    });
+
+    // 2. Latest prices for all investments
+    const investments = getAllInvestments();
+    const prices = [];
+    for (const inv of investments) {
+      const latestPrice = getLatestPrice(inv.id);
+      prices.push({
+        investmentId: inv.id,
+        description: inv.description,
+        currency: inv.currency_code,
+        price: latestPrice ? latestPrice.price : null,
+        priceDate: latestPrice ? latestPrice.price_date : null,
+        priceTime: latestPrice ? latestPrice.price_time : null,
+      });
+    }
+
+    // 3. Latest values for all benchmarks
+    const benchmarks = getAllBenchmarks();
+    const benchmarkValues = [];
+    for (const bm of benchmarks) {
+      const latestData = getLatestBenchmarkData(bm.id);
+      benchmarkValues.push({
+        benchmarkId: bm.id,
+        description: bm.description,
+        benchmarkType: bm.benchmark_type,
+        currency: bm.currency_code,
+        value: latestData ? latestData.value : null,
+        valueDate: latestData ? latestData.benchmark_date : null,
+        valueTime: latestData ? latestData.benchmark_time : null,
+      });
+    }
+
+    return new Response(
+      JSON.stringify({
+        rates: formattedRates,
+        prices: prices,
+        benchmarks: benchmarkValues,
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  } catch (err) {
+    return new Response(JSON.stringify({ error: "Failed to get current values", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 

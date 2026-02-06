@@ -331,12 +331,14 @@ function updateBenchmarkRowRetrying(retryInfo) {
  */
 async function fetchAll() {
   const fetchBtn = document.getElementById("fetch-all-btn");
+  const showBtn = document.getElementById("show-current-btn");
   const progressDiv = document.getElementById("scrape-progress");
   const resultsContainer = document.getElementById("results-container");
 
-  // Disable button and show progress
+  // Disable both buttons and show progress
   fetchBtn.disabled = true;
   fetchBtn.textContent = "Fetching...";
+  showBtn.disabled = true;
   progressDiv.classList.remove("hidden");
   resultsContainer.innerHTML = "";
 
@@ -385,9 +387,10 @@ async function fetchAll() {
     resultsContainer.innerHTML += "</div>";
   }
 
-  // Reset button and hide progress
+  // Reset buttons and hide progress
   fetchBtn.disabled = false;
   fetchBtn.textContent = "Fetch All";
+  showBtn.disabled = false;
   progressDiv.classList.add("hidden");
 
   // Refresh last scrape times
@@ -820,9 +823,191 @@ async function retryFailedBenchmarks() {
   await loadLastScrapeTimes();
 }
 
+/**
+ * @description Build the currency rates section for Show Current display.
+ * Uses the same layout as Fetch All results but shows the date each rate was stored.
+ * @param {Object[]} rates - Array of rate objects from /api/scraper/current-values
+ * @returns {string} HTML string for the section
+ */
+function buildCurrentCurrencyRatesSection(rates) {
+  let html = '<section class="mb-8">';
+  html += '<div class="bg-white rounded-lg shadow-md p-6">';
+  html += '<h3 class="text-lg font-semibold text-brand-700 mb-4">Currency Exchange Rates</h3>';
+
+  if (rates.length === 0) {
+    html += '<p class="text-brand-500">No currency rates stored yet.</p>';
+  } else {
+    html += '<div class="overflow-x-auto">';
+    html += '<table class="w-full text-left border-collapse">';
+    html += "<thead>";
+    html += '<tr class="border-b-2 border-brand-200">';
+    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Currency</th>';
+    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Description</th>';
+    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700 text-right">Rate (per 1 GBP)</th>';
+    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Date</th>';
+    html += "</tr>";
+    html += "</thead>";
+    html += "<tbody>";
+
+    for (let i = 0; i < rates.length; i++) {
+      const rate = rates[i];
+      const rowClass = i % 2 === 0 ? "bg-white" : "bg-brand-50";
+
+      html += '<tr class="' + rowClass + ' border-b border-brand-100">';
+      html += '<td class="py-2 px-3 text-base font-semibold">' + escapeHtml(rate.code) + "</td>";
+      html += '<td class="py-2 px-3 text-base">' + escapeHtml(rate.description) + "</td>";
+      html += '<td class="py-2 px-3 text-base text-right font-mono">' + rate.rate.toFixed(4) + "</td>";
+      html += '<td class="py-2 px-3 text-sm text-brand-500">' + escapeHtml(formatDisplayDate(rate.rateDate)) + "</td>";
+      html += "</tr>";
+    }
+
+    html += "</tbody></table></div>";
+  }
+
+  html += "</div></section>";
+  return html;
+}
+
+/**
+ * @description Build the investment prices section for Show Current display.
+ * Uses the same layout as Fetch All results but shows the date each price was stored.
+ * @param {Object[]} prices - Array of price objects from /api/scraper/current-values
+ * @returns {string} HTML string for the section
+ */
+function buildCurrentPricesSection(prices) {
+  let html = '<section class="mb-8">';
+  html += '<div class="bg-white rounded-lg shadow-md p-6">';
+  html += '<h3 class="text-lg font-semibold text-brand-700 mb-4">Investment Prices</h3>';
+
+  if (prices.length === 0) {
+    html += '<p class="text-brand-500">No investments configured.</p>';
+  } else {
+    html += '<div class="overflow-x-auto">';
+    html += '<table class="w-full text-left border-collapse">';
+    html += "<thead>";
+    html += '<tr class="border-b-2 border-brand-200">';
+    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Investment</th>';
+    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Currency</th>';
+    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700 text-right">Price</th>';
+    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Date</th>';
+    html += "</tr>";
+    html += "</thead>";
+    html += "<tbody>";
+
+    for (let i = 0; i < prices.length; i++) {
+      const p = prices[i];
+      const rowClass = i % 2 === 0 ? "bg-white" : "bg-brand-50";
+
+      html += '<tr class="' + rowClass + ' border-b border-brand-100">';
+      html += '<td class="py-2 px-3 text-base">' + escapeHtml(p.description) + "</td>";
+      html += '<td class="py-2 px-3 text-base">' + escapeHtml(p.currency) + "</td>";
+      html += '<td class="py-2 px-3 text-base text-right font-mono">' + formatPrice(p.price) + "</td>";
+      html += '<td class="py-2 px-3 text-sm text-brand-500">' + (p.priceDate ? escapeHtml(formatDisplayDate(p.priceDate)) : "No data") + "</td>";
+      html += "</tr>";
+    }
+
+    html += "</tbody></table></div>";
+  }
+
+  html += "</div></section>";
+  return html;
+}
+
+/**
+ * @description Build the benchmark values section for Show Current display.
+ * Uses the same layout as Fetch All results but shows the date each value was stored.
+ * @param {Object[]} benchmarks - Array of benchmark objects from /api/scraper/current-values
+ * @returns {string} HTML string for the section
+ */
+function buildCurrentBenchmarksSection(benchmarks) {
+  let html = '<section class="mb-8">';
+  html += '<div class="bg-white rounded-lg shadow-md p-6">';
+  html += '<h3 class="text-lg font-semibold text-brand-700 mb-4">Benchmark Values</h3>';
+
+  if (benchmarks.length === 0) {
+    html += '<p class="text-brand-500">No benchmarks configured.</p>';
+  } else {
+    html += '<div class="overflow-x-auto">';
+    html += '<table class="w-full text-left border-collapse">';
+    html += "<thead>";
+    html += '<tr class="border-b-2 border-brand-200">';
+    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Benchmark</th>';
+    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Type</th>';
+    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700 text-right">Value</th>';
+    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Date</th>';
+    html += "</tr>";
+    html += "</thead>";
+    html += "<tbody>";
+
+    for (let i = 0; i < benchmarks.length; i++) {
+      const bm = benchmarks[i];
+      const rowClass = i % 2 === 0 ? "bg-white" : "bg-brand-50";
+
+      html += '<tr class="' + rowClass + ' border-b border-brand-100">';
+      html += '<td class="py-2 px-3 text-base">' + escapeHtml(bm.description) + "</td>";
+      html += '<td class="py-2 px-3 text-base">' + escapeHtml(bm.benchmarkType === "index" ? "Index" : "Price") + "</td>";
+      html += '<td class="py-2 px-3 text-base text-right font-mono">' + formatBenchmarkValue(bm.value) + "</td>";
+      html += '<td class="py-2 px-3 text-sm text-brand-500">' + (bm.valueDate ? escapeHtml(formatDisplayDate(bm.valueDate)) : "No data") + "</td>";
+      html += "</tr>";
+    }
+
+    html += "</tbody></table></div>";
+  }
+
+  html += "</div></section>";
+  return html;
+}
+
+/**
+ * @description Show the latest stored currency rates, investment prices and benchmark values.
+ * Fetches data from the database (no scraping) and displays using similar layout to Fetch All.
+ */
+async function showCurrent() {
+  const showBtn = document.getElementById("show-current-btn");
+  const fetchBtn = document.getElementById("fetch-all-btn");
+  const resultsContainer = document.getElementById("results-container");
+
+  // Disable both buttons while loading
+  showBtn.disabled = true;
+  showBtn.textContent = "Loading...";
+  fetchBtn.disabled = true;
+  resultsContainer.innerHTML = "";
+
+  try {
+    const result = await apiRequest("/api/scraper/current-values");
+
+    if (!result.ok) {
+      resultsContainer.innerHTML = '<div class="bg-red-50 border border-red-300 text-error rounded-lg px-4 py-3">';
+      resultsContainer.innerHTML += '<p class="font-semibold">Failed to load current values</p>';
+      resultsContainer.innerHTML += '<p class="text-sm mt-1">' + escapeHtml(result.detail || result.error || "Unknown error") + "</p>";
+      resultsContainer.innerHTML += "</div>";
+      return;
+    }
+
+    const data = result.data;
+
+    let html = "";
+    html += buildCurrentCurrencyRatesSection(data.rates);
+    html += buildCurrentPricesSection(data.prices);
+    html += buildCurrentBenchmarksSection(data.benchmarks);
+    resultsContainer.innerHTML = html;
+  } catch (err) {
+    resultsContainer.innerHTML = '<div class="bg-red-50 border border-red-300 text-error rounded-lg px-4 py-3">';
+    resultsContainer.innerHTML += '<p class="font-semibold">Error loading current values</p>';
+    resultsContainer.innerHTML += '<p class="text-sm mt-1">' + escapeHtml(err.message) + "</p>";
+    resultsContainer.innerHTML += "</div>";
+  } finally {
+    // Re-enable buttons
+    showBtn.disabled = false;
+    showBtn.textContent = "Show Current";
+    fetchBtn.disabled = false;
+  }
+}
+
 // Initialise the page
 document.addEventListener("DOMContentLoaded", async function () {
   await loadLastScrapeTimes();
 
+  document.getElementById("show-current-btn").addEventListener("click", showCurrent);
   document.getElementById("fetch-all-btn").addEventListener("click", fetchAll);
 });
