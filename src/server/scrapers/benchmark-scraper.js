@@ -3,7 +3,7 @@ import { upsertBenchmarkData } from "../db/benchmark-data-db.js";
 import { recordScrapingAttempt } from "../db/scraping-history-db.js";
 import { SCRAPE_DELAY_PROFILES, DEFAULT_SCRAPE_DELAY_PROFILE } from "../../shared/constants.js";
 import { launchBrowser, createStealthContext, createStealthPage, navigateTo } from "./browser-utils.js";
-import { getSelector } from "../../shared/scraper-sites.js";
+import { getSelector } from "../config.js";
 
 /**
  * @description Parse a benchmark value string extracted from a web page into a numeric value.

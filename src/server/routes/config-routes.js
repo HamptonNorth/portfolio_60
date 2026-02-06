@@ -1,40 +1,24 @@
-import { readFileSync, existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { getAllSiteConfigs, findSiteConfig } from "../../shared/scraper-sites.js";
+import { getAllSiteConfigs, findSiteConfig, loadConfig, getAllowedProviders, getSchedulingConfig } from "../config.js";
 
 /**
- * @description Cached config data, loaded once from disk.
- * @type {Object|null}
+ * @description Get the list of allowed provider codes.
+ * Delegates to the central config loader.
+ * @returns {string[]} Array of lowercase provider codes
  */
-let configCache = null;
+export function getAllowedProviderCodes() {
+  const providers = getAllowedProviders();
+  return providers.map(function (p) {
+    return p.code.toLowerCase();
+  });
+}
 
 /**
  * @description Cached build time, loaded once from disk.
  * @type {string|null}
  */
 let buildTimeCache = null;
-
-/**
- * @description Load and cache the application config from config.json.
- * @returns {Object} The parsed config object
- */
-function getConfig() {
-  if (!configCache) {
-    const configPath = resolve("src/shared/config.json");
-    const raw = readFileSync(configPath, "utf-8");
-    configCache = JSON.parse(raw);
-  }
-  return configCache;
-}
-
-/**
- * @description Get the list of allowed provider codes.
- * @returns {string[]} Array of lowercase provider codes
- */
-export function getAllowedProviderCodes() {
-  const config = getConfig();
-  return config.allowed_providers.map((p) => p.code.toLowerCase());
-}
 
 /**
  * @description Get the build time from the build-time.txt file.
@@ -61,8 +45,8 @@ function getBuildTime() {
  */
 export function handleConfigRoute(method, path) {
   if (method === "GET" && path === "/api/config/providers") {
-    const config = getConfig();
-    return new Response(JSON.stringify(config.allowed_providers), {
+    const providers = getAllowedProviders();
+    return new Response(JSON.stringify(providers), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
@@ -80,6 +64,15 @@ export function handleConfigRoute(method, path) {
   if (method === "GET" && path === "/api/config/scraper-sites") {
     const sites = getAllSiteConfigs();
     return new Response(JSON.stringify(sites), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // GET /api/config/scheduling — get scheduling configuration
+  if (method === "GET" && path === "/api/config/scheduling") {
+    const scheduling = getSchedulingConfig();
+    return new Response(JSON.stringify(scheduling), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });

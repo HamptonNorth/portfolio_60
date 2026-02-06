@@ -10,6 +10,7 @@ import { scrapeAllBenchmarks, scrapeBenchmarkById, getScrapeableBenchmarks, scra
 import { getScrapingHistoryWithDescriptions, getScrapingHistoryCount, getLastSuccessfulScrapeByType } from "../db/scraping-history-db.js";
 import { launchBrowser } from "../scrapers/browser-utils.js";
 import { SCRAPE_RETRY_CONFIG } from "../../shared/constants.js";
+import { getSchedulerStatus } from "../services/scheduled-scraper.js";
 
 /**
  * @description Sleep for a given number of milliseconds.
@@ -700,6 +701,19 @@ scraperRouter.get("/api/scraper/last-scrape", function () {
     );
   } catch (err) {
     return new Response(JSON.stringify({ error: "Failed to get last scrape times", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+  }
+});
+
+// GET /api/scraper/scheduler-status — get the current status of the scheduled scraper
+scraperRouter.get("/api/scraper/scheduler-status", function () {
+  try {
+    const status = getSchedulerStatus();
+    return new Response(JSON.stringify(status), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: "Failed to get scheduler status", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 

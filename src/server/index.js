@@ -11,6 +11,7 @@ import { handleGlobalEventsRoute } from "./routes/global-events-routes.js";
 import { handleScraperRoute } from "./routes/scraper-routes.js";
 import { handleBackupRoute } from "./routes/backup-routes.js";
 import { handleBenchmarksRoute } from "./routes/benchmarks-routes.js";
+import { initScheduledScraper, stopScheduledScraper } from "./services/scheduled-scraper.js";
 
 /**
  * @description The port the server listens on.
@@ -231,3 +232,12 @@ const server = Bun.serve({
 });
 
 console.log(`Portfolio 60 server running on http://localhost:${server.port}`);
+
+// Initialise scheduled scraping (after server is ready)
+initScheduledScraper();
+
+// Graceful shutdown: stop the scheduler before exiting
+process.on("SIGINT", function () {
+  stopScheduledScraper();
+  process.exit(0);
+});

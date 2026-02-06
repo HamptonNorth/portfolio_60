@@ -4,7 +4,7 @@ import { SCRAPE_DELAY_PROFILES, DEFAULT_SCRAPE_DELAY_PROFILE } from "../../share
 import { upsertPrice } from "../db/prices-db.js";
 import { recordScrapingAttempt } from "../db/scraping-history-db.js";
 import { launchBrowser, createStealthContext, createStealthPage, navigateTo } from "./browser-utils.js";
-import { getSelector } from "../../shared/scraper-sites.js";
+import { getSelector } from "../config.js";
 
 /**
  * @description Parse a price string extracted from a web page into a numeric value.
