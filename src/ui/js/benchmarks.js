@@ -21,6 +21,9 @@ let gbpCurrencyId = null;
 /** @type {Object|null} Currently matched site config from URL */
 let matchedSiteConfig = null;
 
+/** @type {Array<{pattern: string, name: string, selector: string, waitStrategy: string, notes: string}>} Cached scraper site configs */
+let scraperSites = [];
+
 /**
  * @description Load currencies from the API and cache them.
  */
@@ -39,6 +42,87 @@ async function loadGbpCurrencyId() {
   if (result.ok) {
     gbpCurrencyId = result.data.gbp_id;
   }
+}
+
+/**
+ * @description Load scraper site configurations from the API and cache them.
+ */
+async function loadScraperSites() {
+  const result = await apiRequest("/api/config/scraper-sites");
+  if (result.ok) {
+    scraperSites = result.data;
+    populateSiteDropdown();
+  }
+}
+
+/**
+ * @description Populate the known site <select> element with options from cached sites.
+ */
+function populateSiteDropdown() {
+  const select = document.getElementById("site-select");
+  select.innerHTML = '<option value="">— Select a known site (optional) —</option>';
+
+  for (let i = 0; i < scraperSites.length; i++) {
+    const option = document.createElement("option");
+    option.value = i;
+    option.textContent = scraperSites[i].name;
+    select.appendChild(option);
+  }
+}
+
+/**
+ * @description Handle site dropdown selection. Auto-fills the selector and shows
+ * usage notes when a known site is selected.
+ */
+function handleSiteSelect() {
+  const select = document.getElementById("site-select");
+  const statusEl = document.getElementById("url-site-status");
+  const selectorHelpEl = document.getElementById("selector-help");
+  const selectorField = document.getElementById("selector");
+
+  const idx = select.value;
+
+  if (idx === "") {
+    matchedSiteConfig = null;
+    statusEl.classList.add("hidden");
+    selectorHelpEl.textContent = "To find the CSS selector: right-click the value on the web page, choose 'Inspect', then right-click the highlighted element and choose 'Copy > Copy selector'.";
+    return;
+  }
+
+  const site = scraperSites[Number(idx)];
+  matchedSiteConfig = site;
+
+  let statusHtml = "<strong>Known site:</strong> " + escapeHtml(site.name) + ".";
+  if (site.notes) {
+    statusHtml += " " + escapeHtml(site.notes);
+  }
+  statusEl.className = "mt-2 px-3 py-2 rounded-md text-sm bg-green-50 border border-green-200 text-green-700";
+  statusEl.innerHTML = statusHtml;
+  statusEl.classList.remove("hidden");
+
+  if (!selectorField.value.trim()) {
+    selectorField.value = site.selector;
+  }
+  selectorHelpEl.textContent = "This selector was auto-filled for the known site. You can modify it if needed.";
+}
+
+/**
+ * @description Sync the site dropdown to match a site config object.
+ * @param {Object|null} site - The matched site config, or null to reset
+ */
+function syncSiteDropdown(site) {
+  const select = document.getElementById("site-select");
+  if (!site) {
+    select.value = "";
+    return;
+  }
+  for (let i = 0; i < scraperSites.length; i++) {
+    if (scraperSites[i].name === site.name) {
+      select.value = i;
+      return;
+    }
+  }
+  select.value = "";
 }
 
 /**
@@ -69,8 +153,13 @@ async function checkUrlSiteMatch(url) {
 
   if (result.ok && result.data.matched) {
     matchedSiteConfig = result.data.site;
+    syncSiteDropdown(matchedSiteConfig);
+    let statusHtml = "<strong>Known site:</strong> " + escapeHtml(matchedSiteConfig.name) + ".";
+    if (matchedSiteConfig.notes) {
+      statusHtml += " " + escapeHtml(matchedSiteConfig.notes);
+    }
     statusEl.className = "mt-2 px-3 py-2 rounded-md text-sm bg-green-50 border border-green-200 text-green-700";
-    statusEl.innerHTML = "<strong>Known site:</strong> " + escapeHtml(matchedSiteConfig.name) + ". Default selector filled in below.";
+    statusEl.innerHTML = statusHtml;
     statusEl.classList.remove("hidden");
     selectorOptionalEl.classList.add("hidden");
     selectorHelpEl.textContent = "This selector was auto-filled for the known site. You can modify it if needed.";
@@ -80,6 +169,7 @@ async function checkUrlSiteMatch(url) {
       selectorField.value = matchedSiteConfig.selector;
     }
   } else {
+    syncSiteDropdown(null);
     statusEl.className = "mt-2 px-3 py-2 rounded-md text-sm bg-amber-50 border border-amber-200 text-amber-700";
     statusEl.innerHTML = "URL does not match a known site. You will need to provide a CSS selector.";
     statusEl.classList.remove("hidden");
@@ -331,9 +421,10 @@ function showAddForm() {
   populateCurrencyDropdown();
   // Show currency field by default (user hasn't selected type yet)
   document.getElementById("currency-container").classList.remove("hidden");
-  // Reset URL site status
+  // Reset URL site status and site dropdown
   document.getElementById("url-site-status").classList.add("hidden");
   document.getElementById("selector-optional").classList.add("hidden");
+  document.getElementById("site-select").value = "";
   matchedSiteConfig = null;
   clearRowHighlight();
   document.getElementById("benchmark-view-container").classList.add("hidden");
@@ -674,6 +765,7 @@ function updateLoadBadge(id) {
 document.addEventListener("DOMContentLoaded", async function () {
   await loadCurrencies();
   await loadGbpCurrencyId();
+  await loadScraperSites();
   await loadBenchmarks();
 
   document.getElementById("add-benchmark-btn").addEventListener("click", showAddForm);
@@ -696,6 +788,9 @@ document.addEventListener("DOMContentLoaded", async function () {
       checkUrlSiteMatch(event.target.value);
     }, 500);
   });
+
+  // Handle known site dropdown selection
+  document.getElementById("site-select").addEventListener("change", handleSiteSelect);
 
   // Close modals when clicking on the backdrop (outside the modal content)
   document.getElementById("benchmark-form-container").addEventListener("click", function (event) {
