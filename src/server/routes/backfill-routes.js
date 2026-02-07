@@ -5,7 +5,7 @@
  */
 
 import { Router } from "../router.js";
-import { backfillCurrencyRates } from "../services/historic-backfill.js";
+import { backfillCurrencyRates, backfillInvestmentPrices } from "../services/historic-backfill.js";
 
 const backfillRouter = new Router();
 
@@ -59,6 +59,11 @@ function createBackfillStream(backfillFn, errorLabel) {
 // GET /api/backfill/historic/currencies/stream — backfill currency rates from BoE
 backfillRouter.get("/api/backfill/historic/currencies/stream", async function () {
   return createBackfillStream(backfillCurrencyRates, "currency rate backfill");
+});
+
+// GET /api/backfill/historic/prices/stream — backfill investment prices from Morningstar
+backfillRouter.get("/api/backfill/historic/prices/stream", async function () {
+  return createBackfillStream(backfillInvestmentPrices, "investment price backfill");
 });
 
 /**

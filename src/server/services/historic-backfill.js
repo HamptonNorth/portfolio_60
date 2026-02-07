@@ -11,6 +11,7 @@
 
 import { getDatabase } from "../db/connection.js";
 import { upsertRate, scaleRate } from "../db/currency-rates-db.js";
+import { upsertPrice } from "../db/prices-db.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -82,14 +83,7 @@ function parseBoeDate(boeDateStr) {
  * @returns {string} Full URL for CSV download
  */
 function buildBoeUrl(fromDate, toDate, seriesCodes) {
-  return (
-    "https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp" +
-    "?csv.x=yes" +
-    "&Datefrom=" + encodeURIComponent(fromDate) +
-    "&Dateto=" + encodeURIComponent(toDate) +
-    "&SeriesCodes=" + encodeURIComponent(seriesCodes) +
-    "&CSVF=TN&UsingCodes=Y&VPD=Y&VFD=N"
-  );
+  return "https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp" + "?csv.x=yes" + "&Datefrom=" + encodeURIComponent(fromDate) + "&Dateto=" + encodeURIComponent(toDate) + "&SeriesCodes=" + encodeURIComponent(seriesCodes) + "&CSVF=TN&UsingCodes=Y&VPD=Y&VFD=N";
 }
 
 /**
@@ -225,9 +219,7 @@ export async function backfillCurrencyRates(progressCallback) {
   const db = getDatabase();
 
   // Look up currency IDs for each non-GBP currency that has a BoE series
-  const currencies = db
-    .query("SELECT id, code FROM currencies WHERE code != 'GBP' ORDER BY code")
-    .all();
+  const currencies = db.query("SELECT id, code FROM currencies WHERE code != 'GBP' ORDER BY code").all();
 
   // Filter to only currencies we have BoE series for
   const supportedCurrencies = currencies.filter(function (c) {
@@ -299,4 +291,372 @@ export async function backfillCurrencyRates(progressCallback) {
   });
 
   return { totalRates: totalRates, currenciesUpdated: currenciesUpdated };
+}
+
+// ---------------------------------------------------------------------------
+// Morningstar investment price backfill (Phase 2)
+// ---------------------------------------------------------------------------
+
+/**
+ * @description Base URL for the Morningstar UK screener API.
+ * Used to look up a Morningstar SecId from an ISIN.
+ * @type {string}
+ */
+const MORNINGSTAR_SCREENER_URL = "https://tools.morningstar.co.uk/api/rest.svc/9vehuxllxs/security/screener";
+
+/**
+ * @description Base URL for the Morningstar UK timeseries price API.
+ * Used to fetch weekly historic prices for a given Morningstar SecId.
+ * @type {string}
+ */
+const MORNINGSTAR_TIMESERIES_URL = "https://tools.morningstar.co.uk/api/rest.svc/timeseries_price/t92wz0sj7c";
+
+/**
+ * @description Extract an ISIN from a Fidelity-style investment URL.
+ * Handles two Fidelity URL formats:
+ *   - /factsheet/GB00B41YBW71/...   (funds — ISIN after /factsheet/)
+ *   - /factsheet-data/factsheet/IE00B1TXK627-ishares/...  (ETFs — ISIN before hyphen)
+ * @param {string} url - The investment URL
+ * @returns {string|null} The extracted ISIN, or null if not found
+ */
+export function extractIsinFromUrl(url) {
+  if (!url) return null;
+  // Fidelity URL formats after /factsheet/:
+  //   GB00B41YBW71-fundsmith...        (GBP fund — ISIN then hyphen)
+  //   US67066G1040USD-nvidia-corp      (USD share — ISIN then currency code then hyphen)
+  //   IE0005042456-ishares             (ETF — ISIN then hyphen)
+  // ISINs are exactly 12 characters: 2-letter country + 9 alphanumeric + 1 check digit.
+  // For USD-priced shares, Fidelity appends the currency code (e.g. "USD") after the ISIN.
+  // Match exactly 12 chars after /factsheet/, followed by either a hyphen, a 3-letter
+  // currency code + hyphen, a slash, or end of string.
+  const match = url.match(/factsheet\/([A-Z]{2}[A-Z0-9]{10})(?=[A-Z]{3}-|[-/]|$)/);
+  return match ? match[1] : null;
+}
+
+/**
+ * @description Extract a stock ticker from an LSE-style URL.
+ * Looks for a short uppercase code after "/stock/" in the URL.
+ * Example: "https://www.londonstockexchange.com/stock/PCT/..." → "PCT"
+ * @param {string} url - The investment URL
+ * @returns {string|null} The extracted ticker, or null if not found
+ */
+export function extractLseTickerFromUrl(url) {
+  if (!url) return null;
+  const match = url.match(/stock\/([A-Z]{2,5})\//);
+  return match ? match[1] : null;
+}
+
+/**
+ * @description Look up a Morningstar SecId by ISIN using the screener API.
+ * Searches without a universe filter so it finds funds, equities, ETFs,
+ * and investment trusts across all Morningstar universes.
+ * @param {string} isin - The ISIN to look up
+ * @returns {Promise<{secId: string, universe: string, name: string}|null>}
+ *   The Morningstar SecId, universe, and name, or null if not found
+ */
+export async function lookupMorningstarIdByIsin(isin) {
+  const params = new URLSearchParams({
+    outputType: "json",
+    version: "1",
+    languageId: "en-GB",
+    currencyId: "GBP",
+    securityDataPoints: "SecId,Name,ISIN,Universe",
+    filters: "ISIN:IN:" + isin,
+    rows: "1",
+  });
+
+  const url = MORNINGSTAR_SCREENER_URL + "?" + params.toString();
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error("Morningstar screener returned HTTP " + response.status);
+  }
+
+  const data = await response.json();
+  const rows = data && data.rows;
+
+  if (!rows || rows.length === 0) return null;
+
+  const row = rows[0];
+
+  return {
+    secId: row.SecId,
+    universe: row.Universe || "",
+    name: row.Name,
+  };
+}
+
+/**
+ * @description Look up a Morningstar SecId by investment name using the screener API.
+ * Used for LSE stocks/trusts where we have a ticker but no ISIN in the URL.
+ * Searches without a universe filter to find across all security types.
+ * @param {string} description - The investment description to search for
+ * @returns {Promise<{secId: string, universe: string, name: string}|null>}
+ *   The Morningstar SecId, universe, and name, or null if not found
+ */
+export async function lookupMorningstarIdByName(description) {
+  const params = new URLSearchParams({
+    outputType: "json",
+    version: "1",
+    languageId: "en-GB",
+    currencyId: "GBP",
+    securityDataPoints: "SecId,Name,ISIN,Universe",
+    term: description,
+    rows: "1",
+  });
+
+  const url = MORNINGSTAR_SCREENER_URL + "?" + params.toString();
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error("Morningstar screener returned HTTP " + response.status);
+  }
+
+  const data = await response.json();
+  const rows = data && data.rows;
+
+  if (!rows || rows.length === 0) return null;
+
+  const row = rows[0];
+
+  return {
+    secId: row.SecId,
+    universe: row.Universe || "",
+    name: row.Name,
+  };
+}
+
+/**
+ * @description Fetch weekly historic prices from Morningstar's timeseries API.
+ * Requests prices in the investment's own currency (not GBP-converted) so the
+ * app can apply its own currency conversion at valuation time.
+ * @param {string} morningstarId - The Morningstar SecId
+ * @param {string} universe - The Morningstar universe (e.g. "FOGBR$$ALL")
+ * @param {string} currencyCode - The investment's currency (e.g. "GBP", "USD")
+ * @param {string} startDate - ISO-8601 start date (YYYY-MM-DD)
+ * @param {string} endDate - ISO-8601 end date (YYYY-MM-DD)
+ * @returns {Promise<{date: string, price: number}[]>} Array of {date, price} where
+ *   price is in major units (pounds, dollars) of the investment's currency
+ */
+export async function fetchMorningstarHistory(morningstarId, universe, currencyCode, startDate, endDate) {
+  // Morningstar API uses a specific ID format that includes universe info
+  // Format: {secId}]2]0]{universe} (with | replaced by ] in the id param)
+  const idParam = morningstarId + "]2]0]" + universe;
+
+  const params = new URLSearchParams({
+    currencyId: currencyCode,
+    idtype: "Morningstar",
+    frequency: "weekly",
+    outputType: "JSON",
+    startDate: startDate,
+    endDate: endDate,
+    id: idParam,
+  });
+
+  const url = MORNINGSTAR_TIMESERIES_URL + "?" + params.toString();
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error("Morningstar timeseries returned HTTP " + response.status);
+  }
+
+  const data = await response.json();
+
+  // Response structure: {TimeSeries: {Security: [{HistoryDetail: [{EndDate, Value}], Id}]}}
+  // The Security array usually has one element per requested security.
+  // Each HistoryDetail entry has EndDate (YYYY-MM-DD) and Value (string number).
+  if (!data || !data.TimeSeries) return [];
+
+  const security = data.TimeSeries.Security;
+  if (!Array.isArray(security) || security.length === 0) return [];
+
+  const historyDetail = security[0].HistoryDetail;
+  if (!Array.isArray(historyDetail)) return [];
+
+  const results = [];
+
+  for (const entry of historyDetail) {
+    const dateStr = entry.EndDate;
+    const value = parseFloat(entry.Value);
+
+    if (!dateStr || isNaN(value)) continue;
+
+    results.push({
+      date: dateStr.substring(0, 10),
+      price: value,
+    });
+  }
+
+  return results;
+}
+
+/**
+ * @description Run the investment price backfill. For each investment:
+ * 1. Extract ISIN from URL (or LSE ticker)
+ * 2. Look up Morningstar SecId (caching in investments.morningstar_id)
+ * 3. Fetch ~3 years of weekly prices
+ * 4. Insert into the prices table
+ * @param {Function} progressCallback - Called with {type, message, count} updates
+ * @returns {Promise<{totalPrices: number, investmentsUpdated: number, skipped: string[]}>}
+ */
+export async function backfillInvestmentPrices(progressCallback) {
+  const db = getDatabase();
+
+  // Fetch all investments with their currency code and morningstar_id
+  const investments = db
+    .query(
+      `SELECT i.id, i.description, i.investment_url, i.morningstar_id,
+              c.code AS currency_code
+       FROM investments i
+       JOIN currencies c ON i.currencies_id = c.id
+       ORDER BY i.description`,
+    )
+    .all();
+
+  if (investments.length === 0) {
+    progressCallback({ type: "info", message: "No investments found" });
+    return { totalPrices: 0, investmentsUpdated: 0, skipped: [] };
+  }
+
+  // Calculate date range: ~3 years back from today
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setFullYear(startDate.getFullYear() - 3);
+
+  const startStr = startDate.toISOString().split("T")[0];
+  const endStr = endDate.toISOString().split("T")[0];
+
+  progressCallback({
+    type: "progress",
+    message: "Backfilling prices for " + investments.length + " investments (" + startStr + " to " + endStr + ")",
+  });
+
+  let totalPrices = 0;
+  let investmentsUpdated = 0;
+  const skipped = [];
+
+  for (const inv of investments) {
+    let morningstarId = inv.morningstar_id;
+    let universe = null;
+
+    // Step 1: If we don't have a cached Morningstar ID, look it up
+    if (!morningstarId) {
+      let lookupResult = null;
+
+      // Try ISIN extraction first (Fidelity URLs)
+      const isin = extractIsinFromUrl(inv.investment_url);
+
+      if (isin) {
+        progressCallback({
+          type: "progress",
+          message: inv.description + ": looking up ISIN " + isin + "...",
+        });
+        lookupResult = await lookupMorningstarIdByIsin(isin);
+      } else {
+        // Try LSE ticker extraction
+        const ticker = extractLseTickerFromUrl(inv.investment_url);
+
+        if (ticker) {
+          progressCallback({
+            type: "progress",
+            message: inv.description + ": looking up LSE ticker " + ticker + "...",
+          });
+          // Search by the investment description since Morningstar doesn't search by ticker directly
+          lookupResult = await lookupMorningstarIdByName(inv.description);
+        } else {
+          progressCallback({
+            type: "progress",
+            message: inv.description + ": no ISIN or ticker found in URL, skipping",
+          });
+          skipped.push(inv.description);
+          continue;
+        }
+      }
+
+      if (!lookupResult) {
+        progressCallback({
+          type: "progress",
+          message: inv.description + ": Morningstar lookup returned no results, skipping",
+        });
+        skipped.push(inv.description);
+        continue;
+      }
+
+      morningstarId = lookupResult.secId;
+      universe = lookupResult.universe;
+
+      // Cache the Morningstar ID and universe in the database for future runs
+      // Store as "secId|universe" so we can split later
+      const cachedValue = morningstarId + "|" + universe;
+      db.run("UPDATE investments SET morningstar_id = ? WHERE id = ?", [cachedValue, inv.id]);
+
+      progressCallback({
+        type: "progress",
+        message: inv.description + ": found Morningstar ID " + morningstarId + " (" + lookupResult.name + ")",
+      });
+    } else {
+      // Parse cached value: "secId|universe"
+      const parts = morningstarId.split("|");
+      morningstarId = parts[0];
+      universe = parts[1] || "FOGBR$$ALL";
+    }
+
+    // Step 2: Fetch weekly price history
+    progressCallback({
+      type: "progress",
+      message: inv.description + ": fetching price history...",
+    });
+
+    let priceHistory;
+    try {
+      priceHistory = await fetchMorningstarHistory(morningstarId, universe, inv.currency_code, startStr, endStr);
+    } catch (err) {
+      progressCallback({
+        type: "progress",
+        message: inv.description + ": price fetch failed — " + err.message,
+      });
+      skipped.push(inv.description);
+      continue;
+    }
+
+    if (priceHistory.length === 0) {
+      progressCallback({
+        type: "progress",
+        message: inv.description + ": no price data returned",
+      });
+      skipped.push(inv.description);
+      continue;
+    }
+
+    // Step 3: Insert prices into the database
+    // Morningstar returns prices in major units (pounds, dollars).
+    // upsertPrice() expects minor units (pence, cents), so multiply by 100.
+    let countForInvestment = 0;
+
+    for (const entry of priceHistory) {
+      const priceInMinorUnits = entry.price * 100;
+      upsertPrice(inv.id, entry.date, "00:00:00", priceInMinorUnits);
+      countForInvestment++;
+    }
+
+    totalPrices += countForInvestment;
+    investmentsUpdated++;
+
+    progressCallback({
+      type: "progress",
+      message: inv.description + ": " + countForInvestment + " weekly prices inserted",
+    });
+
+    // Small delay between investments to be polite to Morningstar's API
+    await new Promise(function (resolve) {
+      setTimeout(resolve, 500);
+    });
+  }
+
+  progressCallback({
+    type: "complete",
+    message: "Investment prices complete: " + totalPrices + " prices for " + investmentsUpdated + " investments" + (skipped.length > 0 ? ". Skipped: " + skipped.join(", ") : ""),
+  });
+
+  return { totalPrices: totalPrices, investmentsUpdated: investmentsUpdated, skipped: skipped };
 }
