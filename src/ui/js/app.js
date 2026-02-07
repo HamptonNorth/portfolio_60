@@ -11,14 +11,34 @@ function highlightActiveNav() {
   const currentPath = window.location.pathname;
   const navLinks = document.querySelectorAll("nav a[data-nav]");
 
+  // Reset all sub-links and parent triggers
   navLinks.forEach(function (link) {
-    link.classList.remove("text-white", "border-b-2", "border-white", "font-semibold");
+    link.classList.remove("text-white", "border-b-2", "border-white", "font-semibold", "bg-brand-100", "font-semibold");
+  });
+  document.querySelectorAll("nav [data-nav-parent]").forEach(function (parent) {
+    parent.classList.remove("text-white", "border-b-2", "border-white", "font-semibold");
+  });
 
+  navLinks.forEach(function (link) {
     const href = link.getAttribute("href");
     const isActive = (currentPath === "/" && href === "/") || (currentPath !== "/" && href !== "/" && currentPath.startsWith(href));
 
     if (isActive) {
-      link.classList.add("text-white", "border-b-2", "border-white", "font-semibold");
+      const isInDropdown = link.closest("li.relative");
+
+      if (isInDropdown) {
+        // Highlight the sub-link in the dropdown (bold + subtle background)
+        link.classList.add("font-semibold", "bg-brand-100");
+
+        // Also highlight the top-level parent trigger in the nav bar
+        const parentTrigger = isInDropdown.querySelector("[data-nav-parent]");
+        if (parentTrigger) {
+          parentTrigger.classList.add("text-white", "border-b-2", "border-white", "font-semibold");
+        }
+      } else {
+        // For top-level links (Home), highlight directly
+        link.classList.add("text-white", "border-b-2", "border-white", "font-semibold");
+      }
     }
   });
 }
