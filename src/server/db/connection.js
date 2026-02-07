@@ -182,6 +182,30 @@ function runMigrations(database) {
     database.exec("CREATE INDEX IF NOT EXISTS idx_scraping_history_datetime ON scraping_history(scrape_datetime DESC)");
     database.exec("CREATE INDEX IF NOT EXISTS idx_scraping_history_type_ref ON scraping_history(scrape_type, reference_id)");
   }
+
+  // Migration 6: Add morningstar_id column to investments (v0.3.0)
+  // Stores the Morningstar SecId for historic price lookups (e.g. "F00000LK2Q").
+  // Populated automatically during historic data backfill.
+  const investmentsCols = database.query("PRAGMA table_info(investments)").all();
+  const hasMorningstarId = investmentsCols.some(function (col) {
+    return col.name === "morningstar_id";
+  });
+
+  if (!hasMorningstarId) {
+    database.exec("ALTER TABLE investments ADD COLUMN morningstar_id TEXT");
+  }
+
+  // Migration 7: Add yahoo_ticker column to benchmarks (v0.3.0)
+  // Stores the Yahoo Finance symbol for historic benchmark lookups (e.g. "^FTSE").
+  // Populated automatically during historic data backfill.
+  const benchmarksCols = database.query("PRAGMA table_info(benchmarks)").all();
+  const hasYahooTicker = benchmarksCols.some(function (col) {
+    return col.name === "yahoo_ticker";
+  });
+
+  if (!hasYahooTicker) {
+    database.exec("ALTER TABLE benchmarks ADD COLUMN yahoo_ticker TEXT");
+  }
 }
 
 /**

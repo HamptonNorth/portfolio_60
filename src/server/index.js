@@ -11,6 +11,7 @@ import { handleGlobalEventsRoute } from "./routes/global-events-routes.js";
 import { handleScraperRoute } from "./routes/scraper-routes.js";
 import { handleBackupRoute } from "./routes/backup-routes.js";
 import { handleBenchmarksRoute } from "./routes/benchmarks-routes.js";
+import { handleBackfillRoute } from "./routes/backfill-routes.js";
 import { initScheduledScraper, stopScheduledScraper } from "./services/scheduled-scraper.js";
 
 /**
@@ -207,6 +208,14 @@ const server = Bun.serve({
       const scraperResult = await handleScraperRoute(method, path, request);
       if (scraperResult) {
         return scraperResult;
+      }
+    }
+
+    // Backfill routes (unprotected — no passphrase required)
+    if (path.startsWith("/api/backfill/")) {
+      const backfillResult = await handleBackfillRoute(method, path, request);
+      if (backfillResult) {
+        return backfillResult;
       }
     }
 
