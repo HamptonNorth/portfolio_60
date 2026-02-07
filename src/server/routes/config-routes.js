@@ -1,6 +1,6 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { getAllSiteConfigs, findSiteConfig, loadConfig, getAllowedProviders, getSchedulingConfig } from "../config.js";
+import { getAllSiteConfigs, findSiteConfig, loadConfig, getAllowedProviders, getSchedulingConfig, reloadConfig } from "../config.js";
 
 /**
  * @description Get the list of allowed provider codes.
@@ -38,6 +38,24 @@ function getBuildTime() {
 }
 
 /**
+ * @description Get a human-readable OS description by reading /etc/os-release.
+ * Falls back to process.platform if the file is unavailable.
+ * @returns {string} OS description string
+ */
+function getOsDescription() {
+  try {
+    const osRelease = readFileSync("/etc/os-release", "utf-8");
+    const match = osRelease.match(/^PRETTY_NAME="?([^"\n]+)"?/m);
+    if (match) {
+      return match[1];
+    }
+  } catch {
+    // Not on Linux or file not available
+  }
+  return process.platform;
+}
+
+/**
  * @description Handle config API routes.
  * @param {string} method - HTTP method
  * @param {string} path - URL pathname
@@ -55,6 +73,45 @@ export function handleConfigRoute(method, path) {
   if (method === "GET" && path === "/api/config/build-time") {
     const buildTime = getBuildTime();
     return new Response(JSON.stringify({ buildTime: buildTime }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // GET /api/config/raw — return the raw config.json content as a string for editing
+  if (method === "GET" && path === "/api/config/raw") {
+    try {
+      const configPath = resolve("src/shared/config.json");
+      const raw = readFileSync(configPath, "utf-8");
+      return new Response(JSON.stringify({ content: raw, path: configPath }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: "Failed to read config", detail: err.message }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  }
+
+  // GET /api/config/system-info — return system information for the About modal
+  if (method === "GET" && path === "/api/config/system-info") {
+    const buildTime = getBuildTime();
+    const runtime = typeof Bun !== "undefined" ? "Bun v" + Bun.version : "Node.js " + process.version;
+    const info = {
+      appName: "Portfolio 60",
+      version: "0.1.0",
+      buildTime: buildTime,
+      runtime: runtime,
+      platform: process.platform,
+      arch: process.arch,
+      os: getOsDescription(),
+      configPath: resolve("src/shared/config.json"),
+      dbPath: resolve("data/portfolio60.db"),
+      backupPath: resolve("backups"),
+    };
+    return new Response(JSON.stringify(info), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
@@ -95,6 +152,47 @@ export function handleConfigRoute(method, path) {
  * @returns {Promise<Response|null>} Response if matched, null otherwise
  */
 export async function handleConfigRouteAsync(method, path, request) {
+  // PUT /api/config/raw — save edited config.json content
+  if (method === "PUT" && path === "/api/config/raw") {
+    try {
+      const body = await request.json();
+      const content = body.content;
+
+      if (typeof content !== "string" || content.trim().length === 0) {
+        return new Response(JSON.stringify({ error: "Content is required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      // Validate that the content is valid JSON
+      try {
+        JSON.parse(content);
+      } catch (parseErr) {
+        return new Response(JSON.stringify({ error: "Invalid JSON", detail: parseErr.message }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const configPath = resolve("src/shared/config.json");
+      writeFileSync(configPath, content, "utf-8");
+
+      // Reload the cached config so changes take effect immediately
+      reloadConfig();
+
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: "Failed to save config", detail: err.message }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  }
+
   // POST /api/config/scraper-sites/match — check if a URL matches a known site
   if (method === "POST" && path === "/api/config/scraper-sites/match") {
     try {

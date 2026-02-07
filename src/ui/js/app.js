@@ -324,6 +324,247 @@ function showModalHtml(title, htmlContent) {
   closeBtn.focus();
 }
 
+/**
+ * @description Show the Edit Settings modal. Loads the raw config.json into
+ * a textarea for editing, with Save and Cancel buttons.
+ */
+async function showEditSettingsModal() {
+  // Remove any existing modal
+  const existingModal = document.getElementById("app-modal");
+  if (existingModal) {
+    existingModal.remove();
+  }
+
+  // Show loading modal while fetching config
+  const loadingHtml = `
+    <div id="app-modal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 overflow-hidden">
+        <div class="bg-brand-800 text-white px-4 py-3">
+          <h3 class="text-lg font-semibold">Edit Settings</h3>
+        </div>
+        <div class="p-6 text-center text-brand-500">Loading configuration...</div>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML("beforeend", loadingHtml);
+
+  // Fetch the raw config
+  const result = await apiRequest("/api/config/raw");
+  const modal = document.getElementById("app-modal");
+
+  if (!result.ok) {
+    modal.remove();
+    showModal("Error", "Failed to load configuration: " + (result.error || "Unknown error"));
+    return;
+  }
+
+  const configContent = result.data.content;
+  const configPath = result.data.path;
+
+  // Replace loading content with the editor
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 overflow-hidden">
+      <div class="bg-brand-800 text-white px-4 py-3">
+        <h3 class="text-lg font-semibold">Edit Settings</h3>
+      </div>
+      <div class="p-4">
+        <p class="text-sm text-brand-600 mb-2">Edit config.json configuration. Changes take effect immediately on save.</p>
+        <p class="text-xs text-brand-400 mb-3">Save location: ${escapeHtml(configPath)}</p>
+        <div id="settings-error" class="hidden mb-3 bg-red-50 border border-red-300 text-error rounded-lg px-3 py-2 text-sm"></div>
+        <textarea id="settings-editor" class="w-full font-mono text-sm border-2 border-brand-300 rounded-lg p-3 focus:outline-none focus:border-brand-500 bg-brand-25 text-brand-800" rows="20" spellcheck="false">${escapeHtml(configContent)}</textarea>
+      </div>
+      <div class="px-4 py-3 bg-brand-50 flex justify-between">
+        <button id="settings-reset-btn" class="bg-brand-200 hover:bg-brand-300 text-brand-700 font-medium px-4 py-2 rounded transition-colors">Reset to Defaults</button>
+        <div class="flex gap-3">
+          <button id="settings-cancel-btn" class="bg-brand-200 hover:bg-brand-300 text-brand-700 font-medium px-4 py-2 rounded transition-colors">Cancel</button>
+          <button id="settings-save-btn" class="bg-brand-700 hover:bg-brand-800 text-white font-medium px-4 py-2 rounded transition-colors">Save</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const editor = document.getElementById("settings-editor");
+  const errorDiv = document.getElementById("settings-error");
+  const saveBtn = document.getElementById("settings-save-btn");
+  const cancelBtn = document.getElementById("settings-cancel-btn");
+  const resetBtn = document.getElementById("settings-reset-btn");
+
+  function closeSettingsModal() {
+    modal.remove();
+  }
+
+  cancelBtn.addEventListener("click", closeSettingsModal);
+
+  modal.addEventListener("click", function (event) {
+    if (event.target === modal) {
+      closeSettingsModal();
+    }
+  });
+
+  function handleEscape(event) {
+    if (event.key === "Escape") {
+      closeSettingsModal();
+      document.removeEventListener("keydown", handleEscape);
+    }
+  }
+  document.addEventListener("keydown", handleEscape);
+
+  // Save handler — validate JSON and send to server
+  saveBtn.addEventListener("click", async function () {
+    errorDiv.classList.add("hidden");
+    const content = editor.value;
+
+    // Client-side JSON validation
+    try {
+      JSON.parse(content);
+    } catch (parseErr) {
+      errorDiv.textContent = "Invalid JSON: " + parseErr.message;
+      errorDiv.classList.remove("hidden");
+      return;
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
+
+    const saveResult = await apiRequest("/api/config/raw", {
+      method: "PUT",
+      body: { content: content },
+    });
+
+    if (saveResult.ok) {
+      closeSettingsModal();
+      document.removeEventListener("keydown", handleEscape);
+    } else {
+      errorDiv.textContent = "Save failed: " + (saveResult.error || "Unknown error") + (saveResult.detail ? " — " + saveResult.detail : "");
+      errorDiv.classList.remove("hidden");
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Save";
+    }
+  });
+
+  // Reset to defaults — loads the DEFAULTS object shape
+  resetBtn.addEventListener("click", function () {
+    const defaults = {
+      allowed_providers: [],
+      scheduling: {
+        enabled: false,
+        cron: "0 8 * * 6",
+        runOnStartupIfMissed: true,
+        startupDelayMinutes: 10,
+      },
+      retry: {
+        delayMinutes: 5,
+        maxAttempts: 5,
+      },
+      scrapeDelayProfile: "cron",
+      scraperSites: {
+        _readme: "Known website patterns for price/benchmark scraping.",
+        _format: {},
+        sites: [],
+      },
+    };
+    editor.value = JSON.stringify(defaults, null, 2);
+    errorDiv.classList.add("hidden");
+  });
+
+  editor.focus();
+}
+
+/**
+ * @description Show the About modal with system information useful for
+ * first-line support.
+ */
+async function showAboutModal() {
+  // Remove any existing modal
+  const existingModal = document.getElementById("app-modal");
+  if (existingModal) {
+    existingModal.remove();
+  }
+
+  // Show loading modal
+  const loadingHtml = `
+    <div id="app-modal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-xl max-w-xl w-full mx-4 overflow-hidden">
+        <div class="bg-brand-800 text-white px-4 py-3">
+          <h3 class="text-lg font-semibold">About Portfolio 60</h3>
+        </div>
+        <div class="p-6 text-center text-brand-500">Loading system information...</div>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML("beforeend", loadingHtml);
+
+  const result = await apiRequest("/api/config/system-info");
+  const modal = document.getElementById("app-modal");
+
+  if (!result.ok) {
+    modal.remove();
+    showModal("Error", "Failed to load system information: " + (result.error || "Unknown error"));
+    return;
+  }
+
+  const info = result.data;
+
+  // Build the info text block (same format as the screenshot reference)
+  const infoLines = [info.appName + " v" + info.version, "Built: " + info.buildTime, "", "--- System ---", "Platform:   " + info.platform, "Arch:       " + info.arch, "OS:         " + info.os, "Runtime:    " + info.runtime, "", "--- Paths ---", "Config:     " + info.configPath, "Database:   " + info.dbPath, "Backups:    " + info.backupPath].join("\n");
+
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg shadow-xl max-w-xl w-full mx-4 overflow-hidden">
+      <div class="bg-brand-800 text-white px-4 py-3">
+        <h3 class="text-lg font-semibold">About Portfolio 60</h3>
+      </div>
+      <div class="p-4">
+        <pre id="about-info-text" class="bg-brand-25 border border-brand-200 rounded-lg p-4 text-sm font-mono text-brand-700 whitespace-pre overflow-x-auto">${escapeHtml(infoLines)}</pre>
+      </div>
+      <div class="px-4 py-3 bg-brand-50 flex justify-between">
+        <button id="about-copy-btn" class="bg-brand-200 hover:bg-brand-300 text-brand-700 font-medium px-4 py-2 rounded transition-colors">Copy to Clipboard</button>
+        <button id="about-ok-btn" class="bg-brand-700 hover:bg-brand-800 text-white font-medium px-4 py-2 rounded transition-colors">OK</button>
+      </div>
+    </div>
+  `;
+
+  const okBtn = document.getElementById("about-ok-btn");
+  const copyBtn = document.getElementById("about-copy-btn");
+
+  function closeAboutModal() {
+    modal.remove();
+  }
+
+  okBtn.addEventListener("click", closeAboutModal);
+
+  modal.addEventListener("click", function (event) {
+    if (event.target === modal) {
+      closeAboutModal();
+    }
+  });
+
+  function handleEscape(event) {
+    if (event.key === "Escape") {
+      closeAboutModal();
+      document.removeEventListener("keydown", handleEscape);
+    }
+  }
+  document.addEventListener("keydown", handleEscape);
+
+  copyBtn.addEventListener("click", async function () {
+    try {
+      await navigator.clipboard.writeText(infoLines);
+      copyBtn.textContent = "Copied!";
+      setTimeout(function () {
+        copyBtn.textContent = "Copy to Clipboard";
+      }, 2000);
+    } catch {
+      // Fallback for environments without clipboard API
+      copyBtn.textContent = "Copy failed";
+      setTimeout(function () {
+        copyBtn.textContent = "Copy to Clipboard";
+      }, 2000);
+    }
+  });
+
+  okBtn.focus();
+}
+
 // Initialise on page load
 document.addEventListener("DOMContentLoaded", function () {
   highlightActiveNav();
