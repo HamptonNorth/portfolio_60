@@ -2,7 +2,7 @@ import { getAllBenchmarks, getBenchmarkById } from "../db/benchmarks-db.js";
 import { upsertBenchmarkData } from "../db/benchmark-data-db.js";
 import { recordScrapingAttempt } from "../db/scraping-history-db.js";
 import { SCRAPE_DELAY_PROFILES, DEFAULT_SCRAPE_DELAY_PROFILE } from "../../shared/constants.js";
-import { launchBrowser, createStealthContext, createStealthPage, navigateTo } from "./browser-utils.js";
+import { launchBrowser, createStealthContext, createStealthPage, navigateTo, isBrowserAlive } from "./browser-utils.js";
 import { getSelector } from "../config.js";
 
 /**
@@ -338,6 +338,17 @@ export async function scrapeAllBenchmarks(onProgress = null, options = {}) {
     let previousDomain = "";
 
     for (const benchmark of scrapeable) {
+      // If the browser has crashed, relaunch before continuing
+      if (!isBrowserAlive(browser)) {
+        try {
+          await browser.close();
+        } catch {
+          // Already dead — ignore
+        }
+        browser = await launchBrowser();
+        previousDomain = ""; // Reset domain tracking after relaunch
+      }
+
       // Random delay between requests to avoid rate-limiting/blocking
       const currentDomain = extractDomain(benchmark.benchmark_url);
       const delayMs = calculateDelay(previousDomain, currentDomain);

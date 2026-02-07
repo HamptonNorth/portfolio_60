@@ -5,7 +5,7 @@
  */
 
 import { Router } from "../router.js";
-import { backfillCurrencyRates, backfillInvestmentPrices, backfillBenchmarkValues } from "../services/historic-backfill.js";
+import { backfillCurrencyRates, backfillInvestmentPrices, backfillBenchmarkValues, testBackfillInvestment, loadBackfillInvestment, testBackfillCurrency, loadBackfillCurrency, testBackfillBenchmark, loadBackfillBenchmark } from "../services/historic-backfill.js";
 
 const backfillRouter = new Router();
 
@@ -69,6 +69,70 @@ backfillRouter.get("/api/backfill/historic/prices/stream", async function () {
 // GET /api/backfill/historic/benchmarks/stream — backfill benchmark values from Yahoo Finance
 backfillRouter.get("/api/backfill/historic/benchmarks/stream", async function () {
   return createBackfillStream(backfillBenchmarkValues, "benchmark value backfill");
+});
+
+// ---------------------------------------------------------------------------
+// Per-record test and load endpoints (Phase 4b)
+// ---------------------------------------------------------------------------
+
+// GET /api/backfill/test/investment/:id — preview 10 most recent weekly prices
+backfillRouter.get("/api/backfill/test/investment/:id", async function (request, params) {
+  try {
+    const result = await testBackfillInvestment(Number(params.id));
+    return Response.json(result);
+  } catch (err) {
+    return Response.json({ success: false, error: err.message }, { status: 500 });
+  }
+});
+
+// POST /api/backfill/load/investment/:id — load 3 years of weekly prices for one investment
+backfillRouter.post("/api/backfill/load/investment/:id", async function (request, params) {
+  try {
+    const result = await loadBackfillInvestment(Number(params.id));
+    return Response.json(result);
+  } catch (err) {
+    return Response.json({ success: false, error: err.message }, { status: 500 });
+  }
+});
+
+// GET /api/backfill/test/currency/:id — preview 10 most recent weekly rates
+backfillRouter.get("/api/backfill/test/currency/:id", async function (request, params) {
+  try {
+    const result = await testBackfillCurrency(Number(params.id));
+    return Response.json(result);
+  } catch (err) {
+    return Response.json({ success: false, error: err.message }, { status: 500 });
+  }
+});
+
+// POST /api/backfill/load/currency/:id — load 3 years of weekly rates for one currency
+backfillRouter.post("/api/backfill/load/currency/:id", async function (request, params) {
+  try {
+    const result = await loadBackfillCurrency(Number(params.id));
+    return Response.json(result);
+  } catch (err) {
+    return Response.json({ success: false, error: err.message }, { status: 500 });
+  }
+});
+
+// GET /api/backfill/test/benchmark/:id — preview 10 most recent weekly values
+backfillRouter.get("/api/backfill/test/benchmark/:id", async function (request, params) {
+  try {
+    const result = await testBackfillBenchmark(Number(params.id));
+    return Response.json(result);
+  } catch (err) {
+    return Response.json({ success: false, error: err.message }, { status: 500 });
+  }
+});
+
+// POST /api/backfill/load/benchmark/:id — load 3 years of weekly values for one benchmark
+backfillRouter.post("/api/backfill/load/benchmark/:id", async function (request, params) {
+  try {
+    const result = await loadBackfillBenchmark(Number(params.id));
+    return Response.json(result);
+  } catch (err) {
+    return Response.json({ success: false, error: err.message }, { status: 500 });
+  }
 });
 
 /**

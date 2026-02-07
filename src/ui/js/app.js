@@ -247,6 +247,63 @@ function showModal(title, message, options = {}) {
   closeBtn.focus();
 }
 
+/**
+ * @description Show a modal dialog with HTML content (for rich layouts like tables).
+ * The caller is responsible for escaping any user-supplied values before building the HTML.
+ * @param {string} title - The modal title (will be escaped)
+ * @param {string} htmlContent - Pre-built HTML content to display in the modal body
+ */
+function showModalHtml(title, htmlContent) {
+  // Remove any existing modal
+  const existingModal = document.getElementById("app-modal");
+  if (existingModal) {
+    existingModal.remove();
+  }
+
+  const modalHtml = `
+    <div id="app-modal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 overflow-hidden">
+        <div class="bg-brand-800 text-white px-4 py-3">
+          <h3 class="text-lg font-semibold">${escapeHtml(title)}</h3>
+        </div>
+        <div class="p-4">
+          ${htmlContent}
+        </div>
+        <div class="px-4 py-3 bg-brand-50 flex justify-end">
+          <button id="app-modal-close" class="bg-brand-700 hover:bg-brand-800 text-white font-medium px-4 py-2 rounded transition-colors">OK</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.insertAdjacentHTML("beforeend", modalHtml);
+
+  const modal = document.getElementById("app-modal");
+  const closeBtn = document.getElementById("app-modal-close");
+
+  function closeModal() {
+    modal.remove();
+  }
+
+  closeBtn.addEventListener("click", closeModal);
+
+  modal.addEventListener("click", function (event) {
+    if (event.target === modal) {
+      closeModal();
+    }
+  });
+
+  function handleEscape(event) {
+    if (event.key === "Escape") {
+      closeModal();
+      document.removeEventListener("keydown", handleEscape);
+    }
+  }
+  document.addEventListener("keydown", handleEscape);
+
+  closeBtn.focus();
+}
+
 // Initialise on page load
 document.addEventListener("DOMContentLoaded", function () {
   highlightActiveNav();

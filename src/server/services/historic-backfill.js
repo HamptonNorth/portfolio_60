@@ -212,8 +212,61 @@ export async function fetchBoeRateHistory(startDate, endDate) {
 }
 
 /**
+ * @description Filter daily rate rows to weekly (Fridays only).
+ * For each Friday in the date range, picks the rate from that Friday.
+ * If a Friday has no data (bank holiday), falls back to the nearest
+ * preceding weekday (Thursday, then Wednesday, etc.).
+ * @param {{ date: string, rates: Object.<string, number> }[]} dailyRows - Daily rate rows sorted by date ascending
+ * @returns {{ date: string, rates: Object.<string, number> }[]} Weekly rate rows (one per week)
+ */
+function filterToWeeklyFridays(dailyRows) {
+  if (dailyRows.length === 0) return [];
+
+  // Build a lookup: date string → row
+  const dateMap = {};
+  for (const row of dailyRows) {
+    dateMap[row.date] = row;
+  }
+
+  // Find all Fridays in the date range
+  const firstDate = new Date(dailyRows[0].date + "T12:00:00Z");
+  const lastDate = new Date(dailyRows[dailyRows.length - 1].date + "T12:00:00Z");
+  const weeklyRows = [];
+
+  // Advance to the first Friday on or after the start date
+  const current = new Date(firstDate);
+  const dayOfWeek = current.getUTCDay(); // 0=Sun, 5=Fri
+  const daysUntilFriday = dayOfWeek <= 5 ? 5 - dayOfWeek : 5 + 7 - dayOfWeek;
+  current.setUTCDate(current.getUTCDate() + daysUntilFriday);
+
+  while (current <= lastDate) {
+    const fridayStr = current.toISOString().split("T")[0];
+
+    // Try Friday first, then fall back to preceding weekdays
+    let found = false;
+    for (let offset = 0; offset < 5; offset++) {
+      const tryDate = new Date(current);
+      tryDate.setUTCDate(tryDate.getUTCDate() - offset);
+      const tryStr = tryDate.toISOString().split("T")[0];
+
+      if (dateMap[tryStr]) {
+        weeklyRows.push(dateMap[tryStr]);
+        found = true;
+        break;
+      }
+    }
+
+    // Move to next Friday
+    current.setUTCDate(current.getUTCDate() + 7);
+  }
+
+  return weeklyRows;
+}
+
+/**
  * @description Run the currency rate backfill. Fetches ~3 years of daily rates
- * from the Bank of England and inserts them into the currency_rates table.
+ * from the Bank of England, filters to weekly (Fridays), and inserts into
+ * the currency_rates table.
  * @param {Function} progressCallback - Called with {type, message, count} updates
  * @returns {Promise<{totalRates: number, currenciesUpdated: string[]}>} Summary of what was inserted
  */
@@ -246,21 +299,16 @@ export async function backfillCurrencyRates(progressCallback) {
     message: "Fetching currency rates from Bank of England (" + startStr + " to " + endStr + ")...",
   });
 
-  // Fetch all rates from BoE
-  const rateRows = await fetchBoeRateHistory(startStr, endStr);
+  // Fetch all daily rates from BoE, then filter to weekly (Fridays)
+  const dailyRows = await fetchBoeRateHistory(startStr, endStr);
+  const rateRows = filterToWeeklyFridays(dailyRows);
 
   progressCallback({
     type: "progress",
-    message: "Received " + rateRows.length + " days of rate data. Inserting into database...",
+    message: "Received " + dailyRows.length + " daily rates, filtered to " + rateRows.length + " weekly (Fridays). Inserting...",
   });
 
-  // Build a lookup: currency code → database ID
-  const currencyIdMap = {};
-  for (const c of supportedCurrencies) {
-    currencyIdMap[c.code] = c.id;
-  }
-
-  // Insert all rates
+  // Insert weekly rates
   let totalRates = 0;
   const currenciesUpdated = [];
 
@@ -283,13 +331,13 @@ export async function backfillCurrencyRates(progressCallback) {
 
     progressCallback({
       type: "progress",
-      message: c.code + ": " + countForCurrency + " rates inserted",
+      message: c.code + ": " + countForCurrency + " weekly rates inserted",
     });
   }
 
   progressCallback({
     type: "complete",
-    message: "Currency rates complete: " + totalRates + " rates for " + currenciesUpdated.join(", "),
+    message: "Currency rates complete: " + totalRates + " weekly rates for " + currenciesUpdated.join(", "),
   });
 
   return { totalRates: totalRates, currenciesUpdated: currenciesUpdated };
@@ -871,4 +919,298 @@ export async function backfillBenchmarkValues(progressCallback) {
   });
 
   return { totalValues: totalValues, benchmarksUpdated: benchmarksUpdated, skipped: skipped };
+}
+
+// ---------------------------------------------------------------------------
+// Single-record test and load functions (Phase 4b)
+// ---------------------------------------------------------------------------
+
+/**
+ * @description Test historic data availability for a single investment.
+ * Fetches the 10 most recent weekly prices from Morningstar without writing to DB.
+ * @param {number} investmentId - The investment ID
+ * @returns {Promise<{success: boolean, description: string, rows: {date: string, price: number}[], error?: string}>}
+ */
+export async function testBackfillInvestment(investmentId) {
+  const db = getDatabase();
+
+  const inv = db
+    .query(
+      `SELECT i.id, i.description, i.investment_url, i.morningstar_id,
+              c.code AS currency_code
+       FROM investments i
+       JOIN currencies c ON i.currencies_id = c.id
+       WHERE i.id = ?`,
+    )
+    .get(investmentId);
+
+  if (!inv) return { success: false, description: "Unknown", rows: [], error: "Investment not found" };
+
+  // Resolve Morningstar ID
+  let morningstarId = inv.morningstar_id;
+  let universe = null;
+
+  if (!morningstarId) {
+    const isin = extractIsinFromUrl(inv.investment_url);
+    let lookupResult = null;
+
+    if (isin) {
+      lookupResult = await lookupMorningstarIdByIsin(isin);
+    } else {
+      const ticker = extractLseTickerFromUrl(inv.investment_url);
+      if (ticker) {
+        lookupResult = await lookupMorningstarIdByName(inv.description);
+      }
+    }
+
+    if (!lookupResult) {
+      return { success: false, description: inv.description, rows: [], error: "Could not find on Morningstar" };
+    }
+
+    morningstarId = lookupResult.secId;
+    universe = lookupResult.universe;
+  } else {
+    const parts = morningstarId.split("|");
+    morningstarId = parts[0];
+    universe = parts[1] || "FOGBR$$ALL";
+  }
+
+  // Fetch last ~3 months to get 10+ weekly data points
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setMonth(startDate.getMonth() - 3);
+
+  const history = await fetchMorningstarHistory(morningstarId, universe, inv.currency_code, startDate.toISOString().split("T")[0], endDate.toISOString().split("T")[0]);
+
+  // Return last 10 entries, most recent first
+  const rows = history
+    .slice(-10)
+    .reverse()
+    .map(function (entry) {
+      return { date: entry.date, price: entry.price };
+    });
+
+  return { success: true, description: inv.description, currency: inv.currency_code, rows: rows };
+}
+
+/**
+ * @description Load historic prices for a single investment (full 3-year backfill).
+ * @param {number} investmentId - The investment ID
+ * @returns {Promise<{success: boolean, description: string, count: number, error?: string}>}
+ */
+export async function loadBackfillInvestment(investmentId) {
+  const db = getDatabase();
+
+  const inv = db
+    .query(
+      `SELECT i.id, i.description, i.investment_url, i.morningstar_id,
+              c.code AS currency_code
+       FROM investments i
+       JOIN currencies c ON i.currencies_id = c.id
+       WHERE i.id = ?`,
+    )
+    .get(investmentId);
+
+  if (!inv) return { success: false, description: "Unknown", count: 0, error: "Investment not found" };
+
+  let morningstarId = inv.morningstar_id;
+  let universe = null;
+
+  if (!morningstarId) {
+    const isin = extractIsinFromUrl(inv.investment_url);
+    let lookupResult = null;
+
+    if (isin) {
+      lookupResult = await lookupMorningstarIdByIsin(isin);
+    } else {
+      const ticker = extractLseTickerFromUrl(inv.investment_url);
+      if (ticker) {
+        lookupResult = await lookupMorningstarIdByName(inv.description);
+      }
+    }
+
+    if (!lookupResult) {
+      return { success: false, description: inv.description, count: 0, error: "Could not find on Morningstar" };
+    }
+
+    morningstarId = lookupResult.secId;
+    universe = lookupResult.universe;
+
+    const cachedValue = morningstarId + "|" + universe;
+    db.run("UPDATE investments SET morningstar_id = ? WHERE id = ?", [cachedValue, inv.id]);
+  } else {
+    const parts = morningstarId.split("|");
+    morningstarId = parts[0];
+    universe = parts[1] || "FOGBR$$ALL";
+  }
+
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setFullYear(startDate.getFullYear() - 3);
+
+  const history = await fetchMorningstarHistory(morningstarId, universe, inv.currency_code, startDate.toISOString().split("T")[0], endDate.toISOString().split("T")[0]);
+
+  let count = 0;
+  for (const entry of history) {
+    const priceInMinorUnits = entry.price * 100;
+    upsertPrice(inv.id, entry.date, "00:00:00", priceInMinorUnits);
+    count++;
+  }
+
+  return { success: true, description: inv.description, count: count };
+}
+
+/**
+ * @description Test historic data availability for a single currency.
+ * Fetches the 10 most recent weekly rates from BoE without writing to DB.
+ * @param {number} currencyId - The currency ID
+ * @returns {Promise<{success: boolean, code: string, rows: {date: string, rate: number}[], error?: string}>}
+ */
+export async function testBackfillCurrency(currencyId) {
+  const db = getDatabase();
+
+  const currency = db.query("SELECT id, code FROM currencies WHERE id = ?").get(currencyId);
+
+  if (!currency) return { success: false, code: "Unknown", rows: [], error: "Currency not found" };
+  if (currency.code === "GBP") return { success: false, code: "GBP", rows: [], error: "GBP is the base currency — no exchange rate needed" };
+  if (!BOE_SERIES_CODES[currency.code]) return { success: false, code: currency.code, rows: [], error: "No Bank of England series code for " + currency.code };
+
+  // Fetch last ~3 months of daily rates, filter to weekly
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setMonth(startDate.getMonth() - 3);
+
+  const dailyRows = await fetchBoeRateHistory(startDate.toISOString().split("T")[0], endDate.toISOString().split("T")[0]);
+
+  const weeklyRows = filterToWeeklyFridays(dailyRows);
+
+  // Return last 10, most recent first
+  const rows = weeklyRows
+    .slice(-10)
+    .reverse()
+    .filter(function (row) {
+      return row.rates[currency.code] !== undefined;
+    })
+    .map(function (row) {
+      return { date: row.date, rate: row.rates[currency.code] };
+    });
+
+  return { success: true, code: currency.code, rows: rows };
+}
+
+/**
+ * @description Load historic rates for a single currency (full 3-year backfill, weekly Fridays).
+ * @param {number} currencyId - The currency ID
+ * @returns {Promise<{success: boolean, code: string, count: number, error?: string}>}
+ */
+export async function loadBackfillCurrency(currencyId) {
+  const db = getDatabase();
+
+  const currency = db.query("SELECT id, code FROM currencies WHERE id = ?").get(currencyId);
+
+  if (!currency) return { success: false, code: "Unknown", count: 0, error: "Currency not found" };
+  if (currency.code === "GBP") return { success: false, code: "GBP", count: 0, error: "GBP is the base currency — no exchange rate needed" };
+  if (!BOE_SERIES_CODES[currency.code]) return { success: false, code: currency.code, count: 0, error: "No Bank of England series code for " + currency.code };
+
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setFullYear(startDate.getFullYear() - 3);
+
+  const dailyRows = await fetchBoeRateHistory(startDate.toISOString().split("T")[0], endDate.toISOString().split("T")[0]);
+
+  const weeklyRows = filterToWeeklyFridays(dailyRows);
+
+  let count = 0;
+  for (const row of weeklyRows) {
+    const rate = row.rates[currency.code];
+    if (rate === undefined) continue;
+
+    const scaledRate = scaleRate(rate);
+    upsertRate(currency.id, row.date, "00:00:00", scaledRate);
+    count++;
+  }
+
+  return { success: true, code: currency.code, count: count };
+}
+
+/**
+ * @description Test historic data availability for a single benchmark.
+ * Fetches the 10 most recent weekly values from Yahoo Finance without writing to DB.
+ * @param {number} benchmarkId - The benchmark ID
+ * @returns {Promise<{success: boolean, description: string, rows: {date: string, value: number}[], error?: string}>}
+ */
+export async function testBackfillBenchmark(benchmarkId) {
+  const db = getDatabase();
+
+  const bm = db.query("SELECT id, description, yahoo_ticker FROM benchmarks WHERE id = ?").get(benchmarkId);
+
+  if (!bm) return { success: false, description: "Unknown", rows: [], error: "Benchmark not found" };
+
+  if (bm.description.toLowerCase().includes("msci")) {
+    return { success: false, description: bm.description, rows: [], error: "MSCI indexes have no free historic data source (live scraping only)" };
+  }
+
+  let yahooTicker = bm.yahoo_ticker || matchYahooTicker(bm.description);
+
+  if (!yahooTicker) {
+    return { success: false, description: bm.description, rows: [], error: "No Yahoo Finance ticker mapping found" };
+  }
+
+  // Fetch last ~3 months
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setMonth(startDate.getMonth() - 3);
+
+  const history = await fetchYahooBenchmarkHistory(yahooTicker, startDate.toISOString().split("T")[0], endDate.toISOString().split("T")[0]);
+
+  const rows = history
+    .slice(-10)
+    .reverse()
+    .map(function (entry) {
+      return { date: entry.date, value: entry.value };
+    });
+
+  return { success: true, description: bm.description, yahooTicker: yahooTicker, rows: rows };
+}
+
+/**
+ * @description Load historic values for a single benchmark (full 3-year backfill).
+ * @param {number} benchmarkId - The benchmark ID
+ * @returns {Promise<{success: boolean, description: string, count: number, error?: string}>}
+ */
+export async function loadBackfillBenchmark(benchmarkId) {
+  const db = getDatabase();
+
+  const bm = db.query("SELECT id, description, yahoo_ticker FROM benchmarks WHERE id = ?").get(benchmarkId);
+
+  if (!bm) return { success: false, description: "Unknown", count: 0, error: "Benchmark not found" };
+
+  if (bm.description.toLowerCase().includes("msci")) {
+    return { success: false, description: bm.description, count: 0, error: "MSCI indexes have no free historic data source (live scraping only)" };
+  }
+
+  let yahooTicker = bm.yahoo_ticker || matchYahooTicker(bm.description);
+
+  if (!yahooTicker) {
+    return { success: false, description: bm.description, count: 0, error: "No Yahoo Finance ticker mapping found" };
+  }
+
+  // Cache the ticker if not already cached
+  if (!bm.yahoo_ticker) {
+    db.run("UPDATE benchmarks SET yahoo_ticker = ? WHERE id = ?", [yahooTicker, bm.id]);
+  }
+
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setFullYear(startDate.getFullYear() - 3);
+
+  const history = await fetchYahooBenchmarkHistory(yahooTicker, startDate.toISOString().split("T")[0], endDate.toISOString().split("T")[0]);
+
+  let count = 0;
+  for (const entry of history) {
+    upsertBenchmarkData(bm.id, entry.date, "00:00:00", entry.value);
+    count++;
+  }
+
+  return { success: true, description: bm.description, count: count };
 }

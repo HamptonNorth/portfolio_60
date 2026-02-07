@@ -9,6 +9,9 @@ let deleteBenchmarkId = null;
 /** @type {string} Name of the benchmark pending deletion (for confirmation dialog) */
 let deleteBenchmarkName = "";
 
+/** @type {Object<number, number>} Track Load History click counts per benchmark ID */
+let loadHistoryCounts = {};
+
 /** @type {Array<{id: number, code: string, description: string}>} Cached currencies */
 let currencies = [];
 
@@ -212,11 +215,21 @@ async function loadBenchmarks() {
     html += '<td class="py-3 px-3 text-base">' + escapeHtml(typeDisplay) + "</td>";
     html += '<td class="py-3 px-3 text-sm text-brand-500">' + escapeHtml(urlDisplay) + "</td>";
     html += '<td class="py-3 px-3 text-sm text-brand-500 font-mono">' + escapeHtml(selectorDisplay) + "</td>";
+    const isMsci = bm.description.toLowerCase().includes("msci");
+
     html += '<td class="py-3 px-3 text-base flex gap-2">';
-    html += '<button class="bg-brand-100 hover:bg-brand-200 text-brand-700 text-sm font-medium px-3 py-1 rounded transition-colors" onclick="viewBenchmark(' + bm.id + ')">View</button>';
+    html += '<button class="bg-brand-100 hover:bg-brand-200 text-brand-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="viewBenchmark(' + bm.id + ')">View</button>';
     // Show Test button if URL exists (selector may come from config for known sites)
     if (bm.benchmark_url) {
-      html += '<button id="test-btn-' + bm.id + '" class="bg-green-100 hover:bg-green-200 text-green-700 text-sm font-medium px-3 py-1 rounded transition-colors" onclick="testScrapeBenchmark(' + bm.id + ', this)">Test</button>';
+      html += '<button id="test-btn-' + bm.id + '" class="bg-green-100 hover:bg-green-200 text-green-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="testScrapeBenchmark(' + bm.id + ', this)">Test</button>';
+    }
+    // Show Load History for benchmarks with URLs — disabled for MSCI (no free historic data source)
+    if (bm.benchmark_url) {
+      if (isMsci) {
+        html += '<button class="bg-gray-100 text-gray-400 text-sm font-medium px-2 py-1 rounded cursor-not-allowed whitespace-nowrap" disabled title="No free historic data source for MSCI indexes">Load History</button>';
+      } else {
+        html += '<button id="load-btn-' + bm.id + '" class="bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="loadHistoryBenchmark(' + bm.id + ", this, '" + escapeHtml(bm.description).replace(/'/g, "\\'") + "')\">Load History</button>";
+      }
     }
     html += "</td>";
     html += "</tr>";
@@ -474,8 +487,90 @@ async function executeDelete() {
 }
 
 /**
+ * @description Build an HTML table from historic backfill preview rows.
+ * @param {Array<{date: string, value: number}>} rows - The preview rows (most recent first)
+ * @param {string} valueLabel - Column header for the value (e.g. "Value")
+ * @returns {string} HTML table string
+ */
+function buildHistoricPreviewTable(rows, valueLabel) {
+  if (!rows || rows.length === 0) {
+    return '<p class="text-brand-500 text-sm mt-2">No historic data available.</p>';
+  }
+
+  let html = '<table class="w-full text-left border-collapse mt-2">';
+  html += '<thead><tr class="border-b-2 border-brand-200">';
+  html += '<th class="py-1 px-2 text-sm font-semibold text-brand-700">Date</th>';
+  html += '<th class="py-1 px-2 text-sm font-semibold text-brand-700 text-right">' + escapeHtml(valueLabel) + "</th>";
+  html += "</tr></thead><tbody>";
+
+  for (let i = 0; i < rows.length; i++) {
+    const rowClass = i % 2 === 0 ? "bg-white" : "bg-brand-50";
+    const val = rows[i].value !== undefined ? rows[i].value : rows[i].price;
+    html += '<tr class="' + rowClass + ' border-b border-brand-100">';
+    html += '<td class="py-1 px-2 text-sm">' + escapeHtml(rows[i].date) + "</td>";
+    html += '<td class="py-1 px-2 text-sm text-right font-mono">' + escapeHtml(String(val)) + "</td>";
+    html += "</tr>";
+  }
+
+  html += "</tbody></table>";
+  return html;
+}
+
+/**
+ * @description Build a spinner element HTML for use in progressive modals.
+ * @param {string} label - The label to show next to the spinner
+ * @returns {string} HTML string with a CSS spinner and label
+ */
+function buildSpinner(label) {
+  return '<div class="flex items-center gap-3 py-3">' + '<div class="w-5 h-5 border-2 border-brand-300 border-t-brand-700 rounded-full animate-spin"></div>' + '<span class="text-sm text-brand-500">' + escapeHtml(label) + "</span>" + "</div>";
+}
+
+/**
+ * @description Build the result HTML for a live benchmark scrape result.
+ * @param {Object} scrapeResult - The result from apiRequest
+ * @returns {string} HTML string
+ */
+function buildScrapeResultHtml(scrapeResult) {
+  if (scrapeResult.ok && scrapeResult.data.benchmark) {
+    const bm = scrapeResult.data.benchmark;
+    if (bm.success) {
+      return '<div class="bg-green-50 border border-green-200 rounded p-3 text-sm">' + "<p><strong>Benchmark:</strong> " + escapeHtml(bm.description) + "</p>" + "<p><strong>Raw value:</strong> " + escapeHtml(bm.rawValue) + "</p>" + "<p><strong>Parsed:</strong> " + escapeHtml(String(bm.parsedValue)) + "</p>" + "</div>";
+    } else {
+      return '<div class="bg-red-50 border border-red-200 rounded p-3 text-sm">' + "<p><strong>Benchmark:</strong> " + escapeHtml(bm.description) + "</p>" + "<p><strong>Error:</strong> " + escapeHtml(bm.error) + "</p>" + "</div>";
+    }
+  } else if (scrapeResult.data && scrapeResult.data.benchmark) {
+    const bm = scrapeResult.data.benchmark;
+    return '<div class="bg-red-50 border border-red-200 rounded p-3 text-sm">' + "<p><strong>Benchmark:</strong> " + escapeHtml(bm.description) + "</p>" + "<p><strong>Error:</strong> " + escapeHtml(bm.error || scrapeResult.detail || scrapeResult.error) + "</p>" + "</div>";
+  } else {
+    let html = '<div class="bg-red-50 border border-red-200 rounded p-3 text-sm">';
+    html += "<p>" + escapeHtml(scrapeResult.error || "Unknown error") + "</p>";
+    if (scrapeResult.detail) {
+      html += "<p>" + escapeHtml(scrapeResult.detail) + "</p>";
+    }
+    html += "</div>";
+    return html;
+  }
+}
+
+/**
+ * @description Build the result HTML for a historic benchmark preview.
+ * @param {Object} historyResult - The result from the backfill test API
+ * @returns {string} HTML string
+ */
+function buildHistoryResultHtml(historyResult) {
+  if (historyResult.ok && historyResult.data.success) {
+    return '<p class="text-sm text-brand-600 mb-1">' + escapeHtml(historyResult.data.description) + " (" + escapeHtml(historyResult.data.yahooTicker) + ")</p>" + buildHistoricPreviewTable(historyResult.data.rows, "Value");
+  } else if (historyResult.data && historyResult.data.error) {
+    return '<div class="bg-amber-50 border border-amber-200 rounded p-3 text-sm">' + "<p>" + escapeHtml(historyResult.data.error) + "</p>" + "</div>";
+  } else {
+    return '<div class="bg-amber-50 border border-amber-200 rounded p-3 text-sm">' + "<p>Could not fetch historic preview.</p>" + "</div>";
+  }
+}
+
+/**
  * @description Test scrape a single benchmark by ID.
- * Shows the result in a modal dialog for quick debugging.
+ * Shows a modal immediately with spinners, then progressively updates
+ * each section as the live scrape and historic preview results arrive.
  * Uses testMode=true so no database tables are updated.
  * @param {number} id - The benchmark ID to scrape
  * @param {HTMLElement} button - The button element that was clicked
@@ -483,36 +578,95 @@ async function executeDelete() {
 async function testScrapeBenchmark(id, button) {
   const originalText = button.textContent;
   button.disabled = true;
-  button.textContent = "Scraping...";
+  button.textContent = "Testing...";
+
+  // Show modal immediately with spinners for both sections
+  const initialHtml = '<h4 class="text-base font-semibold text-brand-800 mb-2">Live Scrape Result</h4>' + '<div id="test-scrape-result">' + buildSpinner("Fetching live value...") + "</div>" + '<h4 class="text-base font-semibold text-brand-800 mt-4 mb-2">Historic Data Preview (Yahoo Finance)</h4>' + '<div id="test-history-result">' + buildSpinner("Fetching historic data...") + "</div>";
+
+  showModalHtml("Test Result (No DB Update)", initialHtml);
+
+  // Fire both requests in parallel, update each section as it completes
+  const scrapePromise = apiRequest("/api/scraper/benchmarks/" + id + "?testMode=true", {
+    method: "POST",
+    timeout: 120000,
+  })
+    .then(function (result) {
+      const el = document.getElementById("test-scrape-result");
+      if (el) el.innerHTML = buildScrapeResultHtml(result);
+    })
+    .catch(function (err) {
+      const el = document.getElementById("test-scrape-result");
+      if (el) el.innerHTML = '<div class="bg-red-50 border border-red-200 rounded p-3 text-sm"><p>' + escapeHtml(err.message) + "</p></div>";
+    });
+
+  const historyPromise = apiRequest("/api/backfill/test/benchmark/" + id, {
+    timeout: 30000,
+  })
+    .then(function (result) {
+      const el = document.getElementById("test-history-result");
+      if (el) el.innerHTML = buildHistoryResultHtml(result);
+    })
+    .catch(function (err) {
+      const el = document.getElementById("test-history-result");
+      if (el) el.innerHTML = '<div class="bg-red-50 border border-red-200 rounded p-3 text-sm"><p>' + escapeHtml(err.message) + "</p></div>";
+    });
+
+  // Wait for both to complete before re-enabling the button
+  await Promise.all([scrapePromise, historyPromise]);
+
+  button.disabled = false;
+  button.textContent = originalText;
+}
+
+/**
+ * @description Load historic values for a single benchmark.
+ * Shows a confirmation dialog first, then calls the backfill load endpoint.
+ * @param {number} id - The benchmark ID
+ * @param {HTMLElement} button - The button element that was clicked
+ * @param {string} name - The benchmark description for the confirmation message
+ */
+async function loadHistoryBenchmark(id, button, name) {
+  button.disabled = true;
+  button.textContent = "Loading...";
 
   try {
-    // Use 120s timeout for scraping - some sites like MSCI take a long time
-    const result = await apiRequest("/api/scraper/benchmarks/" + id + "?testMode=true", {
+    const result = await apiRequest("/api/backfill/load/benchmark/" + id, {
       method: "POST",
       timeout: 120000,
     });
 
     button.disabled = false;
-    button.textContent = originalText;
+    button.textContent = "Load History";
 
-    if (result.ok && result.data.benchmark) {
-      const bm = result.data.benchmark;
-      if (bm.success) {
-        showModal("Test Result (No DB Update)", "Benchmark: " + bm.description + "\nRaw value: " + bm.rawValue + "\nParsed: " + bm.parsedValue);
-      } else {
-        showModal("Scrape Failed", "Benchmark: " + bm.description + "\nError: " + bm.error);
-      }
-    } else if (result.data && result.data.benchmark) {
-      // API returned error status but has benchmark info
-      const bm = result.data.benchmark;
-      showModal("Scrape Failed", "Benchmark: " + bm.description + "\nError: " + (bm.error || result.detail || result.error));
+    if (result.ok && result.data.success) {
+      loadHistoryCounts[id] = (loadHistoryCounts[id] || 0) + 1;
+      updateLoadBadge(id);
+      showModal("History Loaded", "Benchmark: " + result.data.description + "\nValues loaded: " + result.data.count);
     } else {
-      showModal("API Error", (result.error || "Unknown error") + "\n" + (result.detail || ""));
+      updateLoadBadge(id);
+      const errorMsg = (result.data && result.data.error) || result.error || "Unknown error";
+      const desc = (result.data && result.data.description) || name;
+      showModal("Load Failed", "Benchmark: " + desc + "\nError: " + errorMsg);
     }
   } catch (err) {
     button.disabled = false;
-    button.textContent = originalText;
+    button.textContent = "Load History";
+    updateLoadBadge(id);
     showModal("Network Error", err.message);
+  }
+}
+
+/**
+ * @description Update the Load History button badge for a benchmark.
+ * Shows a small count badge after the button text if the count is > 0.
+ * @param {number} id - The benchmark ID
+ */
+function updateLoadBadge(id) {
+  const btn = document.getElementById("load-btn-" + id);
+  if (!btn) return;
+  const count = loadHistoryCounts[id] || 0;
+  if (count > 0) {
+    btn.innerHTML = "Load History " + '<span class="inline-flex items-center justify-center bg-blue-600 text-white font-bold rounded-full w-5 h-5 ml-1 text-xs">' + count + "</span>";
   }
 }
 

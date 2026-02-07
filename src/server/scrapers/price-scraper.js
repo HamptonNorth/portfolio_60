@@ -3,7 +3,7 @@ import { fetchCurrencyRates } from "./currency-scraper.js";
 import { SCRAPE_DELAY_PROFILES, DEFAULT_SCRAPE_DELAY_PROFILE } from "../../shared/constants.js";
 import { upsertPrice } from "../db/prices-db.js";
 import { recordScrapingAttempt } from "../db/scraping-history-db.js";
-import { launchBrowser, createStealthContext, createStealthPage, navigateTo } from "./browser-utils.js";
+import { launchBrowser, createStealthContext, createStealthPage, navigateTo, isBrowserAlive } from "./browser-utils.js";
 import { getSelector } from "../config.js";
 
 /**
@@ -386,6 +386,17 @@ export async function scrapeAllPrices(onProgress = null, options = {}) {
     let previousDomain = "";
 
     for (const investment of scrapeable) {
+      // If the browser has crashed, relaunch before continuing
+      if (!isBrowserAlive(browser)) {
+        try {
+          await browser.close();
+        } catch {
+          // Already dead — ignore
+        }
+        browser = await launchBrowser();
+        previousDomain = ""; // Reset domain tracking after relaunch
+      }
+
       // Random delay between requests to avoid rate-limiting/blocking
       const currentDomain = extractDomain(investment.investment_url);
       const delayMs = calculateDelay(previousDomain, currentDomain);

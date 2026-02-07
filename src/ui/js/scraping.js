@@ -542,49 +542,23 @@ async function fetchAll() {
   progressDiv.classList.remove("hidden");
   resultsContainer.innerHTML = "";
 
-  let currencyHtml = "";
-  let pricesHtml = "";
-  let benchmarksHtml = "";
+  // Create section containers so each can be independently retried
+  resultsContainer.innerHTML = '<div id="section-currencies"></div>' + '<div id="section-prices"></div>' + '<div id="section-benchmarks"></div>';
 
   try {
     // Step 1: Fetch currency rates
     setProgress("Fetching currency exchange rates...");
-
-    const currencyResult = await apiRequest("/api/scraper/currency-rates", {
-      method: "POST",
-    });
-
-    if (currencyResult.ok && currencyResult.data.rates) {
-      // Cache exchange rates for display purposes
-      cachedExchangeRates = { GBP: 1 };
-      for (const r of currencyResult.data.rates) {
-        cachedExchangeRates[r.code] = r.rate;
-      }
-      currencyHtml = buildCurrencyRatesSection(currencyResult.data);
-    } else {
-      currencyHtml = '<section class="mb-8"><div class="bg-red-50 border border-red-300 text-error rounded-lg px-4 py-3">';
-      currencyHtml += '<p class="font-semibold">Failed to fetch currency rates</p>';
-      currencyHtml += '<p class="text-sm mt-1">' + escapeHtml(currencyResult.detail || currencyResult.error || "Unknown error") + "</p>";
-      currencyHtml += "</div></section>";
-    }
-
-    // Display currency results immediately
-    resultsContainer.innerHTML = currencyHtml;
+    await runCurrenciesSection();
 
     // Step 2: Fetch investment prices via SSE
     setProgress("Fetching investment prices...");
-    pricesHtml = await fetchPricesStream();
-    resultsContainer.innerHTML = currencyHtml + pricesHtml;
+    await runPricesSection();
 
     // Step 3: Fetch benchmark values via SSE
     setProgress("Fetching benchmark values...");
-    benchmarksHtml = await fetchBenchmarksStream();
-    resultsContainer.innerHTML = currencyHtml + pricesHtml + benchmarksHtml;
+    await runBenchmarksSection();
   } catch (err) {
-    resultsContainer.innerHTML += '<div class="bg-red-50 border border-red-300 text-error rounded-lg px-4 py-3 mb-4">';
-    resultsContainer.innerHTML += '<p class="font-semibold">Error during fetching</p>';
-    resultsContainer.innerHTML += '<p class="text-sm mt-1">' + escapeHtml(err.message) + "</p>";
-    resultsContainer.innerHTML += "</div>";
+    resultsContainer.insertAdjacentHTML("beforeend", '<div class="bg-red-50 border border-red-300 text-error rounded-lg px-4 py-3 mb-4">' + '<p class="font-semibold">Error during fetching</p>' + '<p class="text-sm mt-1">' + escapeHtml(err.message) + "</p>" + "</div>");
   }
 
   // Reset buttons and hide progress
@@ -594,6 +568,89 @@ async function fetchAll() {
   progressDiv.classList.add("hidden");
 
   // Refresh last scrape times
+  await loadLastScrapeTimes();
+}
+
+/**
+ * @description Run the currencies section: fetch rates and populate #section-currencies.
+ * On failure, shows an error message with a retry button.
+ */
+async function runCurrenciesSection() {
+  const container = document.getElementById("section-currencies");
+
+  const currencyResult = await apiRequest("/api/scraper/currency-rates", {
+    method: "POST",
+  });
+
+  if (currencyResult.ok && currencyResult.data.rates) {
+    // Cache exchange rates for display purposes
+    cachedExchangeRates = { GBP: 1 };
+    for (const r of currencyResult.data.rates) {
+      cachedExchangeRates[r.code] = r.rate;
+    }
+    container.innerHTML = buildCurrencyRatesSection(currencyResult.data);
+  } else {
+    let html = '<section class="mb-8"><div class="bg-red-50 border border-red-300 text-error rounded-lg px-4 py-3">';
+    html += '<p class="font-semibold">Failed to fetch currency rates</p>';
+    html += '<p class="text-sm mt-1">' + escapeHtml(currencyResult.detail || currencyResult.error || "Unknown error") + "</p>";
+    html += '<p class="mt-3"><button onclick="retryCurrenciesSection()" class="bg-amber-500 hover:bg-amber-600 text-white rounded px-3 py-1 text-sm">Retry Currency Rates</button></p>';
+    html += "</div></section>";
+    container.innerHTML = html;
+  }
+}
+
+/**
+ * @description Run the investment prices section: stream prices via SSE and populate #section-prices.
+ * On SSE connection error, shows an error message with a retry button.
+ */
+async function runPricesSection() {
+  const container = document.getElementById("section-prices");
+  container.innerHTML = "";
+  const html = await fetchPricesStream();
+  container.innerHTML = html;
+}
+
+/**
+ * @description Run the benchmarks section: stream values via SSE and populate #section-benchmarks.
+ * On SSE connection error, shows an error message with a retry button.
+ */
+async function runBenchmarksSection() {
+  const container = document.getElementById("section-benchmarks");
+  container.innerHTML = "";
+  const html = await fetchBenchmarksStream();
+  container.innerHTML = html;
+}
+
+/**
+ * @description Retry just the currencies section after a failure.
+ * Called from the retry button in the error HTML.
+ */
+async function retryCurrenciesSection() {
+  const container = document.getElementById("section-currencies");
+  container.innerHTML = '<section class="mb-8"><div class="bg-white rounded-lg shadow-md p-6">' + '<h3 class="text-lg font-semibold text-brand-700 mb-4">Currency Exchange Rates</h3>' + '<p class="text-brand-400">' + spinnerHtml() + " Retrying currency rates...</p>" + "</div></section>";
+  await runCurrenciesSection();
+  await loadLastScrapeTimes();
+}
+
+/**
+ * @description Retry just the investment prices section after a failure.
+ * Called from the retry button in the error HTML.
+ */
+async function retryPricesSection() {
+  const container = document.getElementById("section-prices");
+  container.innerHTML = '<section class="mb-8"><div class="bg-white rounded-lg shadow-md p-6">' + '<h3 class="text-lg font-semibold text-brand-700 mb-4">Investment Prices</h3>' + '<p class="text-brand-400">' + spinnerHtml() + " Retrying investment prices...</p>" + "</div></section>";
+  await runPricesSection();
+  await loadLastScrapeTimes();
+}
+
+/**
+ * @description Retry just the benchmarks section after a failure.
+ * Called from the retry button in the error HTML.
+ */
+async function retryBenchmarksSection() {
+  const container = document.getElementById("section-benchmarks");
+  container.innerHTML = '<section class="mb-8"><div class="bg-white rounded-lg shadow-md p-6">' + '<h3 class="text-lg font-semibold text-brand-700 mb-4">Benchmark Values</h3>' + '<p class="text-brand-400">' + spinnerHtml() + " Retrying benchmark values...</p>" + "</div></section>";
+  await runBenchmarksSection();
   await loadLastScrapeTimes();
 }
 
@@ -653,9 +710,9 @@ function fetchPricesStream() {
 
       tempContainer.innerHTML = initHtml;
 
-      // Append to results container temporarily so DOM updates work
-      const resultsContainer = document.getElementById("results-container");
-      resultsContainer.appendChild(tempContainer);
+      // Append to section container so DOM updates work during streaming
+      const sectionContainer = document.getElementById("section-prices") || document.getElementById("results-container");
+      sectionContainer.appendChild(tempContainer);
     });
 
     source.addEventListener("retry", function (event) {
@@ -725,6 +782,7 @@ function fetchPricesStream() {
       }
 
       html += '<p class="text-error">' + errorMsg + "</p>";
+      html += '<p class="mt-3"><button onclick="retryPricesSection()" class="bg-amber-500 hover:bg-amber-600 text-white rounded px-3 py-1 text-sm">Retry Investment Prices</button></p>';
       html += "</div></section>";
       resolve(html);
     });
@@ -787,9 +845,9 @@ function fetchBenchmarksStream() {
 
       tempContainer.innerHTML = initHtml;
 
-      // Append to results container temporarily so DOM updates work
-      const resultsContainer = document.getElementById("results-container");
-      resultsContainer.appendChild(tempContainer);
+      // Append to section container so DOM updates work during streaming
+      const sectionContainer = document.getElementById("section-benchmarks") || document.getElementById("results-container");
+      sectionContainer.appendChild(tempContainer);
     });
 
     source.addEventListener("retry", function (event) {
@@ -859,6 +917,7 @@ function fetchBenchmarksStream() {
       }
 
       html += '<p class="text-error">' + errorMsg + "</p>";
+      html += '<p class="mt-3"><button onclick="retryBenchmarksSection()" class="bg-amber-500 hover:bg-amber-600 text-white rounded px-3 py-1 text-sm">Retry Benchmark Values</button></p>';
       html += "</div></section>";
       resolve(html);
     });

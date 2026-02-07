@@ -111,6 +111,19 @@ export function getNavigationOptions(url) {
 }
 
 /**
+ * @description Check whether a Playwright browser instance is still usable.
+ * When the underlying Chromium process crashes or the connection drops,
+ * the browser object still exists but all operations on it will throw
+ * "Target page, context or browser has been closed". This check detects
+ * that state so callers can relaunch.
+ * @param {import('playwright').Browser} browser - The browser instance to check
+ * @returns {boolean} True if the browser is connected and usable
+ */
+export function isBrowserAlive(browser) {
+  return browser && browser.isConnected();
+}
+
+/**
  * @description Navigate to a URL with appropriate settings for the target site.
  * Automatically detects heavy JS sites and uses networkidle for them.
  *

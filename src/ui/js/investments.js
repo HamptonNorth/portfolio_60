@@ -9,6 +9,9 @@ let deleteInvestmentId = null;
 /** @type {string} Name of the investment pending deletion (for confirmation dialog) */
 let deleteInvestmentName = "";
 
+/** @type {Object<number, number>} Track Load History click counts per investment ID */
+let loadHistoryCounts = {};
+
 /** @type {Array<{id: number, short_description: string, description: string, usage_notes: string|null}>} Cached investment types */
 let investmentTypes = [];
 
@@ -185,10 +188,11 @@ async function loadInvestments() {
     html += '<td class="py-3 px-3 text-sm text-brand-500">' + escapeHtml(urlDisplay) + "</td>";
     html += '<td class="py-3 px-3 text-sm text-brand-500 font-mono">' + escapeHtml(selectorDisplay) + "</td>";
     html += '<td class="py-3 px-3 text-base flex gap-2">';
-    html += '<button class="bg-brand-100 hover:bg-brand-200 text-brand-700 text-sm font-medium px-3 py-1 rounded transition-colors" onclick="viewInvestment(' + inv.id + ')">View</button>';
-    // Show Test button if URL exists (selector may come from config for known sites)
+    html += '<button class="bg-brand-100 hover:bg-brand-200 text-brand-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="viewInvestment(' + inv.id + ')">View</button>';
+    // Show Test and Load History buttons if URL exists (selector may come from config for known sites)
     if (inv.investment_url) {
-      html += '<button id="test-btn-' + inv.id + '" class="bg-green-100 hover:bg-green-200 text-green-700 text-sm font-medium px-3 py-1 rounded transition-colors" onclick="testScrapeInvestment(' + inv.id + ', this)">Test</button>';
+      html += '<button id="test-btn-' + inv.id + '" class="bg-green-100 hover:bg-green-200 text-green-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="testScrapeInvestment(' + inv.id + ', this)">Test</button>';
+      html += '<button id="load-btn-' + inv.id + '" class="bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="loadHistoryInvestment(' + inv.id + ", this, '" + escapeHtml(inv.description).replace(/'/g, "\\'") + "')\">Load History</button>";
     }
     html += "</td>";
     html += "</tr>";
@@ -435,8 +439,90 @@ async function executeDelete() {
 }
 
 /**
+ * @description Build an HTML table from historic backfill preview rows.
+ * @param {Array<{date: string, price: number}>} rows - The preview rows (most recent first)
+ * @param {string} valueLabel - Column header for the value (e.g. "Price", "Rate")
+ * @returns {string} HTML table string
+ */
+function buildHistoricPreviewTable(rows, valueLabel) {
+  if (!rows || rows.length === 0) {
+    return '<p class="text-brand-500 text-sm mt-2">No historic data available.</p>';
+  }
+
+  let html = '<table class="w-full text-left border-collapse mt-2">';
+  html += '<thead><tr class="border-b-2 border-brand-200">';
+  html += '<th class="py-1 px-2 text-sm font-semibold text-brand-700">Date</th>';
+  html += '<th class="py-1 px-2 text-sm font-semibold text-brand-700 text-right">' + escapeHtml(valueLabel) + "</th>";
+  html += "</tr></thead><tbody>";
+
+  for (let i = 0; i < rows.length; i++) {
+    const rowClass = i % 2 === 0 ? "bg-white" : "bg-brand-50";
+    html += '<tr class="' + rowClass + ' border-b border-brand-100">';
+    html += '<td class="py-1 px-2 text-sm">' + escapeHtml(rows[i].date) + "</td>";
+    const displayPrice = typeof rows[i].price === "number" ? rows[i].price.toFixed(4) : String(rows[i].price);
+    html += '<td class="py-1 px-2 text-sm text-right font-mono">' + escapeHtml(displayPrice) + "</td>";
+    html += "</tr>";
+  }
+
+  html += "</tbody></table>";
+  return html;
+}
+
+/**
+ * @description Build a spinner element HTML for use in progressive modals.
+ * @param {string} label - The label to show next to the spinner
+ * @returns {string} HTML string with a CSS spinner and label
+ */
+function buildSpinner(label) {
+  return '<div class="flex items-center gap-3 py-3">' + '<div class="w-5 h-5 border-2 border-brand-300 border-t-brand-700 rounded-full animate-spin"></div>' + '<span class="text-sm text-brand-500">' + escapeHtml(label) + "</span>" + "</div>";
+}
+
+/**
+ * @description Build the result HTML for a live scrape result.
+ * @param {Object} scrapeResult - The result from apiRequest
+ * @returns {string} HTML string
+ */
+function buildScrapeResultHtml(scrapeResult) {
+  if (scrapeResult.ok && scrapeResult.data.price) {
+    const price = scrapeResult.data.price;
+    if (price.success) {
+      return '<div class="bg-green-50 border border-green-200 rounded p-3 text-sm">' + "<p><strong>Investment:</strong> " + escapeHtml(price.description) + "</p>" + "<p><strong>Currency:</strong> " + escapeHtml(price.currency) + "</p>" + "<p><strong>Raw price:</strong> " + escapeHtml(price.rawPrice) + "</p>" + "<p><strong>Parsed (minor unit):</strong> " + escapeHtml(String(price.priceMinorUnit)) + "</p>" + "</div>";
+    } else {
+      return '<div class="bg-red-50 border border-red-200 rounded p-3 text-sm">' + "<p><strong>Investment:</strong> " + escapeHtml(price.description) + "</p>" + "<p><strong>Error:</strong> " + escapeHtml(price.error) + "</p>" + "</div>";
+    }
+  } else if (scrapeResult.data && scrapeResult.data.price) {
+    const price = scrapeResult.data.price;
+    return '<div class="bg-red-50 border border-red-200 rounded p-3 text-sm">' + "<p><strong>Investment:</strong> " + escapeHtml(price.description) + "</p>" + "<p><strong>Error:</strong> " + escapeHtml(price.error) + "</p>" + "</div>";
+  } else {
+    let html = '<div class="bg-red-50 border border-red-200 rounded p-3 text-sm">';
+    html += "<p>" + escapeHtml(scrapeResult.error || "Unknown error") + "</p>";
+    if (scrapeResult.detail) {
+      html += "<p>" + escapeHtml(scrapeResult.detail) + "</p>";
+    }
+    html += "</div>";
+    return html;
+  }
+}
+
+/**
+ * @description Build the result HTML for a historic data preview.
+ * @param {Object} historyResult - The result from apiRequest
+ * @returns {string} HTML string
+ */
+function buildHistoryResultHtml(historyResult) {
+  if (historyResult.ok && historyResult.data.success) {
+    return '<p class="text-sm text-brand-600 mb-1">' + escapeHtml(historyResult.data.description) + " (" + escapeHtml(historyResult.data.currency) + ")</p>" + buildHistoricPreviewTable(historyResult.data.rows, "Price");
+  } else if (historyResult.data && historyResult.data.error) {
+    return '<div class="bg-amber-50 border border-amber-200 rounded p-3 text-sm">' + "<p>" + escapeHtml(historyResult.data.error) + "</p>" + "</div>";
+  } else {
+    return '<div class="bg-amber-50 border border-amber-200 rounded p-3 text-sm">' + "<p>Could not fetch historic preview.</p>" + "</div>";
+  }
+}
+
+/**
  * @description Test scrape a single investment by ID.
- * Shows the result in a modal dialog for quick debugging.
+ * Shows a modal immediately with spinners, then progressively updates
+ * each section as the live scrape and historic preview results arrive.
  * Uses testMode=true so no database tables are updated.
  * @param {number} id - The investment ID to scrape
  * @param {HTMLElement} button - The button element that was clicked
@@ -444,36 +530,95 @@ async function executeDelete() {
 async function testScrapeInvestment(id, button) {
   const originalText = button.textContent;
   button.disabled = true;
-  button.textContent = "Scraping...";
+  button.textContent = "Testing...";
+
+  // Show modal immediately with spinners for both sections
+  const initialHtml = '<h4 class="text-base font-semibold text-brand-800 mb-2">Live Scrape Result</h4>' + '<div id="test-scrape-result">' + buildSpinner("Fetching live price...") + "</div>" + '<h4 class="text-base font-semibold text-brand-800 mt-4 mb-2">Historic Data Preview (Morningstar)</h4>' + '<div id="test-history-result">' + buildSpinner("Fetching historic data...") + "</div>";
+
+  showModalHtml("Test Result (No DB Update)", initialHtml);
+
+  // Fire both requests in parallel, update each section as it completes
+  const scrapePromise = apiRequest("/api/scraper/prices/" + id + "?testMode=true", {
+    method: "POST",
+    timeout: 120000,
+  })
+    .then(function (result) {
+      const el = document.getElementById("test-scrape-result");
+      if (el) el.innerHTML = buildScrapeResultHtml(result);
+    })
+    .catch(function (err) {
+      const el = document.getElementById("test-scrape-result");
+      if (el) el.innerHTML = '<div class="bg-red-50 border border-red-200 rounded p-3 text-sm"><p>' + escapeHtml(err.message) + "</p></div>";
+    });
+
+  const historyPromise = apiRequest("/api/backfill/test/investment/" + id, {
+    timeout: 30000,
+  })
+    .then(function (result) {
+      const el = document.getElementById("test-history-result");
+      if (el) el.innerHTML = buildHistoryResultHtml(result);
+    })
+    .catch(function (err) {
+      const el = document.getElementById("test-history-result");
+      if (el) el.innerHTML = '<div class="bg-red-50 border border-red-200 rounded p-3 text-sm"><p>' + escapeHtml(err.message) + "</p></div>";
+    });
+
+  // Wait for both to complete before re-enabling the button
+  await Promise.all([scrapePromise, historyPromise]);
+
+  button.disabled = false;
+  button.textContent = originalText;
+}
+
+/**
+ * @description Load historic prices for a single investment.
+ * Shows a confirmation dialog first, then calls the backfill load endpoint.
+ * @param {number} id - The investment ID
+ * @param {HTMLElement} button - The button element that was clicked
+ * @param {string} name - The investment description for the confirmation message
+ */
+async function loadHistoryInvestment(id, button, name) {
+  button.disabled = true;
+  button.textContent = "Loading...";
 
   try {
-    // Use 120s timeout for scraping - some sites take a long time
-    const result = await apiRequest("/api/scraper/prices/" + id + "?testMode=true", {
+    const result = await apiRequest("/api/backfill/load/investment/" + id, {
       method: "POST",
       timeout: 120000,
     });
 
     button.disabled = false;
-    button.textContent = originalText;
+    button.textContent = "Load History";
 
-    if (result.ok && result.data.price) {
-      const price = result.data.price;
-      if (price.success) {
-        showModal("Test Result (No DB Update)", "Investment: " + price.description + "\nCurrency: " + price.currency + "\nRaw price: " + price.rawPrice + "\nParsed (minor unit): " + price.priceMinorUnit);
-      } else {
-        showModal("Scrape Failed", "Investment: " + price.description + "\nError: " + price.error);
-      }
-    } else if (result.data && result.data.price) {
-      // API returned error but still has price object
-      const price = result.data.price;
-      showModal("Scrape Failed", "Investment: " + price.description + "\nError: " + price.error);
+    if (result.ok && result.data.success) {
+      loadHistoryCounts[id] = (loadHistoryCounts[id] || 0) + 1;
+      updateLoadBadge(id);
+      showModal("History Loaded", "Investment: " + result.data.description + "\nPrices loaded: " + result.data.count);
     } else {
-      showModal("API Error", (result.error || "Unknown error") + "\n" + (result.detail || ""));
+      updateLoadBadge(id);
+      const errorMsg = (result.data && result.data.error) || result.error || "Unknown error";
+      const desc = (result.data && result.data.description) || name;
+      showModal("Load Failed", "Investment: " + desc + "\nError: " + errorMsg);
     }
   } catch (err) {
     button.disabled = false;
-    button.textContent = originalText;
+    button.textContent = "Load History";
+    updateLoadBadge(id);
     showModal("Network Error", err.message);
+  }
+}
+
+/**
+ * @description Update the Load History button badge for an investment.
+ * Shows a small count badge after the button text if the count is > 0.
+ * @param {number} id - The investment ID
+ */
+function updateLoadBadge(id) {
+  const btn = document.getElementById("load-btn-" + id);
+  if (!btn) return;
+  const count = loadHistoryCounts[id] || 0;
+  if (count > 0) {
+    btn.innerHTML = "Load History " + '<span class="inline-flex items-center justify-center bg-blue-600 text-white font-bold rounded-full w-5 h-5 ml-1 text-xs">' + count + "</span>";
   }
 }
 

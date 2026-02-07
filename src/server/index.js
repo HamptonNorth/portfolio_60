@@ -13,6 +13,7 @@ import { handleBackupRoute } from "./routes/backup-routes.js";
 import { handleBenchmarksRoute } from "./routes/benchmarks-routes.js";
 import { handleBackfillRoute } from "./routes/backfill-routes.js";
 import { initScheduledScraper, stopScheduledScraper } from "./services/scheduled-scraper.js";
+import { launchBrowser } from "./scrapers/browser-utils.js";
 
 /**
  * @description The port the server listens on.
@@ -244,6 +245,18 @@ console.log(`Portfolio 60 server running on http://localhost:${server.port}`);
 
 // Initialise scheduled scraping (after server is ready)
 initScheduledScraper();
+
+// Warm up Playwright browser in the background so first scrape is fast
+launchBrowser()
+  .then(function (browser) {
+    return browser.close();
+  })
+  .then(function () {
+    console.log("Playwright browser warmed up");
+  })
+  .catch(function () {
+    // Non-fatal — browser will launch on first scrape instead
+  });
 
 // Graceful shutdown: stop the scheduler before exiting
 process.on("SIGINT", function () {
