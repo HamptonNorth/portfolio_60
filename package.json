@@ -18,7 +18,8 @@
     "@tailwindcss/cli": "^4.1.18",
     "concurrently": "^9.2.1",
     "croner": "^10.0.1",
-    "tailwindcss": "^4.1.18"
+    "tailwindcss": "^4.1.18",
+    "yahoo-finance2": "^3.13.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.1",

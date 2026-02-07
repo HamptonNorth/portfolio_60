@@ -5,7 +5,7 @@
  */
 
 import { Router } from "../router.js";
-import { backfillCurrencyRates, backfillInvestmentPrices } from "../services/historic-backfill.js";
+import { backfillCurrencyRates, backfillInvestmentPrices, backfillBenchmarkValues } from "../services/historic-backfill.js";
 
 const backfillRouter = new Router();
 
@@ -64,6 +64,11 @@ backfillRouter.get("/api/backfill/historic/currencies/stream", async function ()
 // GET /api/backfill/historic/prices/stream — backfill investment prices from Morningstar
 backfillRouter.get("/api/backfill/historic/prices/stream", async function () {
   return createBackfillStream(backfillInvestmentPrices, "investment price backfill");
+});
+
+// GET /api/backfill/historic/benchmarks/stream — backfill benchmark values from Yahoo Finance
+backfillRouter.get("/api/backfill/historic/benchmarks/stream", async function () {
+  return createBackfillStream(backfillBenchmarkValues, "benchmark value backfill");
 });
 
 /**

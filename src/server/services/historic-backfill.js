@@ -12,6 +12,8 @@
 import { getDatabase } from "../db/connection.js";
 import { upsertRate, scaleRate } from "../db/currency-rates-db.js";
 import { upsertPrice } from "../db/prices-db.js";
+import { upsertBenchmarkData } from "../db/benchmark-data-db.js";
+import YahooFinance from "yahoo-finance2";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -659,4 +661,214 @@ export async function backfillInvestmentPrices(progressCallback) {
   });
 
   return { totalPrices: totalPrices, investmentsUpdated: investmentsUpdated, skipped: skipped };
+}
+
+// ---------------------------------------------------------------------------
+// Yahoo Finance benchmark backfill (Phase 3)
+// ---------------------------------------------------------------------------
+
+/**
+ * @description Mapping of benchmark descriptions to Yahoo Finance ticker symbols.
+ * Keys are matched case-insensitively against the start of the benchmark description.
+ * @type {Object.<string, string>}
+ */
+const YAHOO_TICKER_MAP = {
+  "FTSE 100": "^FTSE",
+  "FTSE 250": "^FTMC",
+  "FTSE All Share": "^FTAS",
+  "S&P 500": "^GSPC",
+  Nasdaq: "^IXIC",
+  "Dow Jones": "^DJI",
+  "S&P Composite 1500": "^SP1500",
+  "Vanguard FTSE All-World": "VWRL.L",
+  "Vanguard Life Strategy 80%": "0P0001824G.L",
+};
+
+/**
+ * @description Find the Yahoo Finance ticker for a benchmark by matching its
+ * description against the known ticker map. Matches case-insensitively from
+ * the start of the description.
+ * @param {string} description - The benchmark description from the database
+ * @returns {string|null} The Yahoo Finance ticker, or null if no match
+ */
+function matchYahooTicker(description) {
+  const descLower = description.toLowerCase();
+
+  for (const [prefix, ticker] of Object.entries(YAHOO_TICKER_MAP)) {
+    if (descLower.startsWith(prefix.toLowerCase())) {
+      return ticker;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * @description Fetch weekly historic values for a benchmark from Yahoo Finance.
+ * Uses the chart() API (historical() is deprecated). Handles the GBp vs GBP
+ * distinction: when Yahoo returns currency "GBp" (pence), values are divided
+ * by 100 to convert to pounds.
+ * @param {string} yahooTicker - The Yahoo Finance ticker symbol
+ * @param {string} startDate - ISO-8601 start date (YYYY-MM-DD)
+ * @param {string} endDate - ISO-8601 end date (YYYY-MM-DD)
+ * @returns {Promise<{date: string, value: number}[]>} Array of {date, value}
+ *   where value is in the benchmark's natural units (index points or GBP price)
+ */
+export async function fetchYahooBenchmarkHistory(yahooTicker, startDate, endDate) {
+  const yf = new YahooFinance({ suppressNotices: ["ripHistorical"] });
+
+  const result = await yf.chart(yahooTicker, {
+    period1: startDate,
+    period2: endDate,
+    interval: "1wk",
+  });
+
+  const isGBPence = result.meta && result.meta.currency === "GBp";
+  const quotes = result.quotes || [];
+  const results = [];
+
+  for (const quote of quotes) {
+    if (!quote.date || quote.close == null) continue;
+
+    // Convert Date object to ISO-8601 string
+    const dateStr = quote.date.toISOString().split("T")[0];
+
+    // If Yahoo returns values in GBp (pence), divide by 100 to get pounds
+    const value = isGBPence ? quote.close / 100 : quote.close;
+
+    results.push({ date: dateStr, value: value });
+  }
+
+  return results;
+}
+
+/**
+ * @description Run the benchmark value backfill. For each benchmark:
+ * 1. Match description to Yahoo Finance ticker via YAHOO_TICKER_MAP
+ * 2. Cache the ticker in benchmarks.yahoo_ticker
+ * 3. Fetch ~3 years of weekly values
+ * 4. Insert into the benchmark_data table
+ * @param {Function} progressCallback - Called with {type, message} updates
+ * @returns {Promise<{totalValues: number, benchmarksUpdated: number, skipped: string[]}>}
+ */
+export async function backfillBenchmarkValues(progressCallback) {
+  const db = getDatabase();
+
+  const benchmarks = db.query("SELECT id, description, yahoo_ticker FROM benchmarks ORDER BY description").all();
+
+  if (benchmarks.length === 0) {
+    progressCallback({ type: "info", message: "No benchmarks found" });
+    return { totalValues: 0, benchmarksUpdated: 0, skipped: [] };
+  }
+
+  // Calculate date range: ~3 years back from today
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setFullYear(startDate.getFullYear() - 3);
+
+  const startStr = startDate.toISOString().split("T")[0];
+  const endStr = endDate.toISOString().split("T")[0];
+
+  progressCallback({
+    type: "progress",
+    message: "Backfilling values for " + benchmarks.length + " benchmarks (" + startStr + " to " + endStr + ")",
+  });
+
+  let totalValues = 0;
+  let benchmarksUpdated = 0;
+  const skipped = [];
+
+  for (const bm of benchmarks) {
+    // MSCI indexes have no free historic data API — skip them.
+    // They are supported for live scraping via benchmark URL + selector only.
+    if (bm.description.toLowerCase().includes("msci")) {
+      progressCallback({
+        type: "progress",
+        message: bm.description + ": MSCI index — no free historic data source, skipping (live scraping only)",
+      });
+      skipped.push(bm.description);
+      continue;
+    }
+
+    // Step 1: Determine Yahoo ticker
+    let yahooTicker = bm.yahoo_ticker;
+
+    if (!yahooTicker) {
+      yahooTicker = matchYahooTicker(bm.description);
+
+      if (!yahooTicker) {
+        progressCallback({
+          type: "progress",
+          message: bm.description + ": no Yahoo Finance ticker mapping found, skipping",
+        });
+        skipped.push(bm.description);
+        continue;
+      }
+
+      // Cache the ticker in the database
+      db.run("UPDATE benchmarks SET yahoo_ticker = ? WHERE id = ?", [yahooTicker, bm.id]);
+
+      progressCallback({
+        type: "progress",
+        message: bm.description + ": matched to Yahoo ticker " + yahooTicker,
+      });
+    }
+
+    // Step 2: Fetch weekly history
+    progressCallback({
+      type: "progress",
+      message: bm.description + ": fetching history from Yahoo Finance...",
+    });
+
+    let history;
+    try {
+      history = await fetchYahooBenchmarkHistory(yahooTicker, startStr, endStr);
+    } catch (err) {
+      progressCallback({
+        type: "progress",
+        message: bm.description + ": Yahoo Finance fetch failed — " + err.message,
+      });
+      skipped.push(bm.description);
+      continue;
+    }
+
+    if (history.length === 0) {
+      progressCallback({
+        type: "progress",
+        message: bm.description + ": no data returned from Yahoo Finance",
+      });
+      skipped.push(bm.description);
+      continue;
+    }
+
+    // Step 3: Insert values into the database
+    // upsertBenchmarkData() takes the value directly (index points or GBP price)
+    // and scales by 10000 internally
+    let countForBenchmark = 0;
+
+    for (const entry of history) {
+      upsertBenchmarkData(bm.id, entry.date, "00:00:00", entry.value);
+      countForBenchmark++;
+    }
+
+    totalValues += countForBenchmark;
+    benchmarksUpdated++;
+
+    progressCallback({
+      type: "progress",
+      message: bm.description + ": " + countForBenchmark + " weekly values inserted",
+    });
+
+    // Small delay between benchmarks to be polite
+    await new Promise(function (resolve) {
+      setTimeout(resolve, 500);
+    });
+  }
+
+  progressCallback({
+    type: "complete",
+    message: "Benchmark values complete: " + totalValues + " values for " + benchmarksUpdated + " benchmarks" + (skipped.length > 0 ? ". Skipped: " + skipped.join(", ") : ""),
+  });
+
+  return { totalValues: totalValues, benchmarksUpdated: benchmarksUpdated, skipped: skipped };
 }
