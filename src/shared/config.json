@@ -4,8 +4,8 @@
     { "code": "hl", "name": "Hargreaves Lansdown" }
   ],
   "scheduling": {
-    "enabled": false,
-    "cron": "0 8 * * 6",
+    "enabled": true,
+    "cron": "0 6,11,20 * * *",
     "runOnStartupIfMissed": true,
     "startupDelayMinutes": 10
   },

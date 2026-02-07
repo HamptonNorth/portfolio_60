@@ -123,7 +123,7 @@ async function loadHistory() {
   const container = document.getElementById("history-table-container");
   const paginationContainer = document.getElementById("pagination-container");
 
-  container.innerHTML = '<p class="text-brand-500">Loading scraping history...</p>';
+  container.innerHTML = '<p class="text-brand-500">Loading fetching history...</p>';
   paginationContainer.classList.add("hidden");
 
   const filters = getFilters();
@@ -132,12 +132,7 @@ async function loadHistory() {
   const result = await apiRequest("/api/scraper/history?" + queryString);
 
   if (!result.ok) {
-    container.innerHTML =
-      '<div class="bg-red-50 border border-red-300 text-error rounded-lg px-4 py-3">' +
-      '<p class="text-base font-semibold">Failed to load scraping history</p>' +
-      '<p class="text-sm mt-1">' +
-      escapeHtml(result.detail || result.error) +
-      "</p></div>";
+    container.innerHTML = '<div class="bg-red-50 border border-red-300 text-error rounded-lg px-4 py-3">' + '<p class="text-base font-semibold">Failed to load fetching history</p>' + '<p class="text-sm mt-1">' + escapeHtml(result.detail || result.error) + "</p></div>";
     return;
   }
 
@@ -145,7 +140,7 @@ async function loadHistory() {
   totalCount = data.totalCount;
 
   if (data.history.length === 0) {
-    container.innerHTML = '<p class="text-brand-500">No scraping history found matching the filters.</p>';
+    container.innerHTML = '<p class="text-brand-500">No fetching history found matching the filters.</p>';
     paginationContainer.classList.add("hidden");
     return;
   }

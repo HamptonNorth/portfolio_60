@@ -26,6 +26,206 @@ let failedInvestmentIds = [];
 let failedBenchmarkIds = [];
 
 /**
+ * @description Day-of-week names indexed 0 (Sunday) through 6 (Saturday).
+ * @type {string[]}
+ */
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/**
+ * @description Format a 24-hour time value as HH:MM, omitting leading zero on the hour.
+ * @param {number} hour - Hour (0-23)
+ * @param {number} minute - Minute (0-59)
+ * @returns {string} Formatted time (e.g. "8:00", "23:30")
+ */
+function formatTime(hour, minute) {
+  return hour + ":" + (minute < 10 ? "0" : "") + minute;
+}
+
+/**
+ * @description Convert a cron expression to a human-readable English string.
+ * Handles common scheduling patterns (daily at specific times, specific days
+ * with specific times, intervals). Not a full cron parser — covers the patterns
+ * likely to appear in this application's config.
+ * @param {string} cron - Standard 5-field cron expression (minute hour dom month dow)
+ * @returns {string} Human-readable schedule description
+ */
+function cronToEnglish(cron) {
+  const parts = cron.trim().split(/\s+/);
+  if (parts.length !== 5) return cron;
+
+  const minuteField = parts[0];
+  const hourField = parts[1];
+  const domField = parts[2];
+  const monthField = parts[3];
+  const dowField = parts[4];
+
+  // Parse minute values
+  const minutes = parseField(minuteField, 0, 59);
+  // Parse hour values
+  const hours = parseField(hourField, 0, 23);
+  // Parse day-of-week values
+  const dows = parseField(dowField, 0, 6);
+
+  if (!minutes || !hours) return cron;
+
+  // Build time combinations: each hour paired with each minute
+  const times = [];
+  for (const h of hours) {
+    for (const m of minutes) {
+      times.push({ hour: h, minute: m });
+    }
+  }
+  // Sort chronologically
+  times.sort(function (a, b) {
+    return a.hour !== b.hour ? a.hour - b.hour : a.minute - b.minute;
+  });
+
+  const timeStrings = times.map(function (t) {
+    return formatTime(t.hour, t.minute);
+  });
+
+  // Every day (dow = * and dom = *)
+  if (dowField === "*" && domField === "*" && monthField === "*") {
+    if (timeStrings.length === 1) {
+      return "every day at " + timeStrings[0];
+    }
+    return "every day at " + joinWithAnd(timeStrings);
+  }
+
+  // Specific days of the week
+  if (dows && dowField !== "*" && domField === "*" && monthField === "*") {
+    // Group times by day: if all days share the same times, list days then times
+    // If only one day, simpler phrasing
+    if (dows.length === 1) {
+      const dayName = DAY_NAMES[dows[0]];
+      if (timeStrings.length === 1) {
+        return "every " + dayName + " at " + timeStrings[0];
+      }
+      return "every " + dayName + " at " + joinWithAnd(timeStrings);
+    }
+
+    // Multiple days, same times for each
+    const dayNames = dows.map(function (d) {
+      return DAY_NAMES[d];
+    });
+
+    if (timeStrings.length === 1) {
+      return "every " + joinWithAnd(dayNames) + " at " + timeStrings[0];
+    }
+
+    // Multiple days, multiple times — list each day with its time if all share,
+    // or use compact form
+    return "every " + joinWithAnd(dayNames) + " at " + joinWithAnd(timeStrings);
+  }
+
+  // Fallback: return the raw cron expression
+  return cron;
+}
+
+/**
+ * @description Parse a single cron field into an array of integer values.
+ * Supports: single values ("5"), comma-separated ("1,3,5"), ranges ("1-5"),
+ * step values ("* /10" without the space), and wildcard ("*").
+ * @param {string} field - A single cron field
+ * @param {number} min - Minimum valid value for this field
+ * @param {number} max - Maximum valid value for this field
+ * @returns {number[]|null} Sorted array of values, or null on parse failure
+ */
+function parseField(field, min, max) {
+  if (field === "*") {
+    const vals = [];
+    for (let i = min; i <= max; i++) vals.push(i);
+    return vals;
+  }
+
+  // Step: */n
+  if (field.startsWith("*/")) {
+    const step = parseInt(field.slice(2), 10);
+    if (isNaN(step) || step <= 0) return null;
+    const vals = [];
+    for (let i = min; i <= max; i += step) vals.push(i);
+    return vals;
+  }
+
+  // Comma-separated (may include ranges)
+  const segments = field.split(",");
+  const vals = [];
+
+  for (const seg of segments) {
+    if (seg.includes("-")) {
+      // Range: e.g. "1-5"
+      const rangeParts = seg.split("-");
+      if (rangeParts.length !== 2) return null;
+      const start = parseInt(rangeParts[0], 10);
+      const end = parseInt(rangeParts[1], 10);
+      if (isNaN(start) || isNaN(end) || start < min || end > max) return null;
+      for (let i = start; i <= end; i++) vals.push(i);
+    } else {
+      const val = parseInt(seg, 10);
+      if (isNaN(val) || val < min || val > max) return null;
+      vals.push(val);
+    }
+  }
+
+  vals.sort(function (a, b) {
+    return a - b;
+  });
+  return vals;
+}
+
+/**
+ * @description Join an array of strings with commas and "and" before the last item.
+ * @param {string[]} items - Array of strings to join
+ * @returns {string} Joined string (e.g. "8:00, 11:00 and 20:00")
+ */
+function joinWithAnd(items) {
+  if (items.length === 0) return "";
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return items[0] + " and " + items[1];
+  return items.slice(0, -1).join(", ") + " and " + items[items.length - 1];
+}
+
+/**
+ * @description Build the full scheduling description from the scheduling config.
+ * Combines the cron-to-English translation with the runOnStartupIfMissed flag.
+ * @param {Object} scheduling - Scheduling config from /api/config/scheduling
+ * @param {boolean} scheduling.enabled - Whether scheduling is enabled
+ * @param {string} scheduling.cron - Cron expression
+ * @param {boolean} scheduling.runOnStartupIfMissed - Whether to run on startup if missed
+ * @returns {string} Human-readable scheduling description
+ */
+function describeSchedule(scheduling) {
+  if (!scheduling.enabled) {
+    return "Scheduling disabled";
+  }
+
+  let description = "Scheduled " + cronToEnglish(scheduling.cron);
+
+  if (scheduling.runOnStartupIfMissed) {
+    description += ", run on startup if missed";
+  }
+
+  return description;
+}
+
+/**
+ * @description Load and display the scheduling configuration.
+ */
+async function loadScheduleDisplay() {
+  const el = document.getElementById("schedule-display");
+  if (!el) return;
+
+  const result = await apiRequest("/api/config/scheduling");
+
+  if (!result.ok) {
+    el.textContent = "Unable to load schedule";
+    return;
+  }
+
+  el.textContent = describeSchedule(result.data);
+}
+
+/**
  * @description Format a scaled integer rate for display as a decimal.
  * Divides by 10000 and shows 4 decimal places.
  * @param {number} scaledRate - The integer rate (e.g. 12543)
@@ -372,17 +572,17 @@ async function fetchAll() {
     resultsContainer.innerHTML = currencyHtml;
 
     // Step 2: Fetch investment prices via SSE
-    setProgress("Scraping investment prices...");
+    setProgress("Fetching investment prices...");
     pricesHtml = await fetchPricesStream();
     resultsContainer.innerHTML = currencyHtml + pricesHtml;
 
     // Step 3: Fetch benchmark values via SSE
-    setProgress("Scraping benchmark values...");
+    setProgress("Fetching benchmark values...");
     benchmarksHtml = await fetchBenchmarksStream();
     resultsContainer.innerHTML = currencyHtml + pricesHtml + benchmarksHtml;
   } catch (err) {
     resultsContainer.innerHTML += '<div class="bg-red-50 border border-red-300 text-error rounded-lg px-4 py-3 mb-4">';
-    resultsContainer.innerHTML += '<p class="font-semibold">Error during scraping</p>';
+    resultsContainer.innerHTML += '<p class="font-semibold">Error during fetching</p>';
     resultsContainer.innerHTML += '<p class="text-sm mt-1">' + escapeHtml(err.message) + "</p>";
     resultsContainer.innerHTML += "</div>";
   }
@@ -469,7 +669,7 @@ function fetchPricesStream() {
       scrapedCount++;
       if (price.success) successCount++;
       updatePriceRow(price);
-      setProgress("Scraping investment prices... " + scrapedCount + " of " + totalCount);
+      setProgress("Fetching investment prices... " + scrapedCount + " of " + totalCount);
     });
 
     source.addEventListener("done", function (event) {
@@ -482,7 +682,7 @@ function fetchPricesStream() {
       // Update footer with retry button if there are failures
       const footerEl = document.getElementById("prices-footer");
       if (footerEl) {
-        let footerText = data.successCount + " of " + data.total + " price" + (data.total === 1 ? "" : "s") + " scraped successfully";
+        let footerText = data.successCount + " of " + data.total + " price" + (data.total === 1 ? "" : "s") + " fetched successfully";
         footerEl.textContent = footerText;
 
         // Add retry button if there are failures
@@ -516,12 +716,12 @@ function fetchPricesStream() {
       if (temp) temp.remove();
 
       // Provide more detail about the error state
-      let errorMsg = "Error connecting to price scraping service.";
+      let errorMsg = "Error connecting to price fetching service.";
       if (source.readyState === EventSource.CLOSED) {
         errorMsg += " Connection was closed unexpectedly.";
       }
       if (scrapedCount > 0) {
-        errorMsg += " (" + scrapedCount + " of " + totalCount + " scraped before error)";
+        errorMsg += " (" + scrapedCount + " of " + totalCount + " fetched before error)";
       }
 
       html += '<p class="text-error">' + errorMsg + "</p>";
@@ -603,7 +803,7 @@ function fetchBenchmarksStream() {
       scrapedCount++;
       if (benchmark.success) successCount++;
       updateBenchmarkRow(benchmark);
-      setProgress("Scraping benchmark values... " + scrapedCount + " of " + totalCount);
+      setProgress("Fetching benchmark values... " + scrapedCount + " of " + totalCount);
     });
 
     source.addEventListener("done", function (event) {
@@ -616,7 +816,7 @@ function fetchBenchmarksStream() {
       // Update footer with retry button if there are failures
       const footerEl = document.getElementById("benchmarks-footer");
       if (footerEl) {
-        let footerText = data.successCount + " of " + data.total + " benchmark" + (data.total === 1 ? "" : "s") + " scraped successfully";
+        let footerText = data.successCount + " of " + data.total + " benchmark" + (data.total === 1 ? "" : "s") + " fetched successfully";
         footerEl.textContent = footerText;
 
         // Add retry button if there are failures
@@ -650,12 +850,12 @@ function fetchBenchmarksStream() {
       if (temp) temp.remove();
 
       // Provide more detail about the error state
-      let errorMsg = "Error connecting to benchmark scraping service.";
+      let errorMsg = "Error connecting to benchmark fetching service.";
       if (source.readyState === EventSource.CLOSED) {
         errorMsg += " Connection was closed unexpectedly.";
       }
       if (scrapedCount > 0) {
-        errorMsg += " (" + scrapedCount + " of " + totalCount + " scraped before error)";
+        errorMsg += " (" + scrapedCount + " of " + totalCount + " fetched before error)";
       }
 
       html += '<p class="text-error">' + errorMsg + "</p>";
@@ -1006,7 +1206,7 @@ async function showCurrent() {
 
 // Initialise the page
 document.addEventListener("DOMContentLoaded", async function () {
-  await loadLastScrapeTimes();
+  await Promise.all([loadLastScrapeTimes(), loadScheduleDisplay()]);
 
   document.getElementById("show-current-btn").addEventListener("click", showCurrent);
   document.getElementById("fetch-all-btn").addEventListener("click", fetchAll);

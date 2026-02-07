@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Portfolio 60 — Scraping</title>
+        <title>Portfolio 60 — Fetching</title>
         <link rel="stylesheet" href="/css/output.css" />
         <link rel="icon" type="image/svg+xml" href="/images/favicon.svg" />
     </head>
@@ -21,22 +21,22 @@
                     <li><a href="/pages/benchmarks.html" class="hover:text-brand-200 transition-colors" data-nav="benchmarks">Benchmarks</a></li>
                     <li><a href="/pages/currencies.html" class="hover:text-brand-200 transition-colors" data-nav="currencies">Currencies</a></li>
                     <li><a href="/pages/global-events.html" class="hover:text-brand-200 transition-colors" data-nav="global-events">Global Events</a></li>
-                    <li><a href="/pages/scraping.html" class="hover:text-brand-200 transition-colors" data-nav="scraping">Scraping</a></li>
+                    <li><a href="/pages/scraping.html" class="hover:text-brand-200 transition-colors" data-nav="scraping">Fetching</a></li>
                     <li><a href="/pages/backup.html" class="hover:text-brand-200 transition-colors" data-nav="backup">Backup</a></li>
                 </ul>
             </div>
         </nav>
         <main class="max-w-7xl mx-auto px-6 py-8 flex-1 w-full" id="main-content">
             <div class="flex items-center justify-between mb-6">
-                <h2 class="text-2xl font-semibold text-brand-800">Scraping</h2>
-                <a href="/pages/scraping-history.html" class="text-brand-600 hover:text-brand-800 transition-colors text-base">View Scraping History &rarr;</a>
+                <h2 class="text-2xl font-semibold text-brand-800">Fetching</h2>
+                <a href="/pages/scraping-history.html" class="text-brand-600 hover:text-brand-800 transition-colors text-base">View Fetching History &rarr;</a>
             </div>
 
             <div id="page-messages"></div>
 
             <!-- Last scrape indicators -->
             <div id="last-scrape-indicators" class="bg-white rounded-lg shadow-md p-4 mb-6">
-                <h3 class="text-base font-semibold text-brand-700 mb-3">Last Successful Scrapes</h3>
+                <h3 class="text-base font-semibold text-brand-700 mb-3">Last Successful Fetches</h3>
                 <div class="flex flex-wrap gap-6 text-sm">
                     <div>
                         <span class="text-brand-500">Currency rates:</span>
@@ -51,6 +51,10 @@
                         <span id="last-benchmark-scrape" class="ml-1 text-brand-700">Loading...</span>
                     </div>
                 </div>
+                <div class="mt-3 pt-3 border-t border-brand-100 text-sm">
+                    <span class="text-brand-500">Scheduled:</span>
+                    <span id="schedule-display" class="ml-1 text-brand-700">Loading...</span>
+                </div>
             </div>
 
             <!-- Single Fetch All Button -->
@@ -62,8 +66,8 @@
                             <p class="text-sm text-brand-500 mt-1">Fetches currency rates first, then investment prices, then benchmark values. This ensures all data is contemporaneous.</p>
                         </div>
                         <div class="flex gap-3">
-                            <button id="show-current-btn" class="bg-brand-700 hover:bg-brand-800 text-white font-medium px-6 py-3 rounded-lg transition-colors text-lg">Show Current</button>
-                            <button id="fetch-all-btn" class="bg-brand-700 hover:bg-brand-800 text-white font-medium px-6 py-3 rounded-lg transition-colors text-lg">Fetch All</button>
+                            <button id="show-current-btn" class="bg-brand-700 hover:bg-brand-800 text-white font-medium px-5 py-2 rounded-lg transition-colors text-base">Show Current</button>
+                            <button id="fetch-all-btn" class="bg-brand-700 hover:bg-brand-800 text-white font-medium px-5 py-2 rounded-lg transition-colors text-base">Fetch All</button>
                         </div>
                     </div>
 
