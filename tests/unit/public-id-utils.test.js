@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { detectPublicIdType, validatePublicId, buildFtMarketsUrl, getFtMarketsSelector, buildFidelitySearchUrl } from "../../src/shared/public-id-utils.js";
+import { detectPublicIdType, validatePublicId, buildFtMarketsUrl, buildFtMarketsAlternateUrl, getFtMarketsSelector, buildFidelitySearchUrl } from "../../src/shared/public-id-utils.js";
 
 // ---------------------------------------------------------------------------
 // detectPublicIdType
@@ -180,6 +180,42 @@ describe("buildFtMarketsUrl", function () {
 
   test("returns null for invalid publicId format", function () {
     expect(buildFtMarketsUrl("invalid", "GBP")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildFtMarketsAlternateUrl
+// ---------------------------------------------------------------------------
+
+describe("buildFtMarketsAlternateUrl", function () {
+  test("GBP ISIN returns GBX alternate URL", function () {
+    const url = buildFtMarketsAlternateUrl("GB00BLG2W994", "GBP");
+    expect(url).toBe("https://markets.ft.com/data/funds/tearsheet/summary?s=GB00BLG2W994:GBX");
+  });
+
+  test("GBX ISIN returns GBP alternate URL", function () {
+    const url = buildFtMarketsAlternateUrl("GB00BLG2W994", "GBX");
+    expect(url).toBe("https://markets.ft.com/data/funds/tearsheet/summary?s=GB00BLG2W994:GBP");
+  });
+
+  test("USD ISIN returns null (no alternate)", function () {
+    expect(buildFtMarketsAlternateUrl("IE00B5BMR087", "USD")).toBeNull();
+  });
+
+  test("EUR ISIN returns null (no alternate)", function () {
+    expect(buildFtMarketsAlternateUrl("LU1033663649", "EUR")).toBeNull();
+  });
+
+  test("ticker returns null (only applies to ISINs)", function () {
+    expect(buildFtMarketsAlternateUrl("LSE:AZN", "GBP")).toBeNull();
+  });
+
+  test("null publicId returns null", function () {
+    expect(buildFtMarketsAlternateUrl(null, "GBP")).toBeNull();
+  });
+
+  test("null currencyCode returns null", function () {
+    expect(buildFtMarketsAlternateUrl("GB00BLG2W994", null)).toBeNull();
   });
 });
 

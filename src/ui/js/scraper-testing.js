@@ -244,7 +244,7 @@ async function loadTestInvestments() {
     }
 
     html += '<tr id="test-row-' + ti.id + '" data-id="' + ti.id + '" class="' + rowClass + ' border-b border-brand-100 hover:bg-brand-100 transition-colors">';
-    html += '<td class="py-3 px-3 text-base">' + escapeHtml(ti.description) + "</td>";
+    html += '<td class="py-3 px-3 text-base cursor-context-menu" oncontextmenu="showScrapeDetails(' + ti.id + ', event)">' + escapeHtml(ti.description) + "</td>";
     html += '<td class="py-3 px-3 text-sm">' + escapeHtml(ti.type_description) + "</td>";
     html += '<td class="py-3 px-3 text-sm text-brand-500">' + escapeHtml(ti.source_site || "—") + "</td>";
     html += '<td class="py-3 px-3 text-sm text-brand-500 font-mono">' + escapeHtml(ti.public_id || "—") + "</td>";
@@ -606,6 +606,77 @@ async function toggleHistory(id, button) {
 
   html += "</tbody></table>";
   content.innerHTML = html;
+}
+
+/**
+ * @description Show scrape configuration details for a test investment in a modal.
+ * Triggered by right-clicking the description cell. Fetches the current record
+ * from the API so the displayed values reflect any write-backs from fallback logic.
+ * @param {number} id - The test investment ID
+ * @param {Event} event - The contextmenu event
+ */
+async function showScrapeDetails(id, event) {
+  event.preventDefault();
+
+  const [result, configResult] = await Promise.all([apiRequest("/api/test-investments/" + id), apiRequest("/api/test-investments/" + id + "/scrape-config")]);
+
+  if (!result.ok) {
+    showModal("Error", "Failed to load investment details: " + (result.detail || result.error));
+    return;
+  }
+
+  const ti = result.data;
+  const config = configResult.ok ? configResult.data : { url: null, selector: null, urlSource: "unknown", selectorSource: "unknown" };
+
+  let html = '<div class="space-y-3 text-sm">';
+
+  html += "<div>";
+  html += '<label class="block font-semibold text-brand-700 mb-1">Description</label>';
+  html += '<div class="bg-brand-50 rounded px-3 py-2 select-all">' + escapeHtml(ti.description) + "</div>";
+  html += "</div>";
+
+  if (ti.public_id) {
+    html += "<div>";
+    html += '<label class="block font-semibold text-brand-700 mb-1">Public ID</label>';
+    html += '<div class="bg-brand-50 rounded px-3 py-2 font-mono select-all">' + escapeHtml(ti.public_id) + "</div>";
+    html += "</div>";
+  }
+
+  if (ti.source_site) {
+    html += "<div>";
+    html += '<label class="block font-semibold text-brand-700 mb-1">Source Site</label>';
+    html += '<div class="bg-brand-50 rounded px-3 py-2 select-all">' + escapeHtml(ti.source_site) + "</div>";
+    html += "</div>";
+  }
+
+  html += "<div>";
+  html += '<label class="block font-semibold text-brand-700 mb-1">Effective URL <span class="font-normal text-brand-400">(' + escapeHtml(config.urlSource) + ")</span></label>";
+  if (config.url) {
+    html += '<div class="bg-brand-50 rounded px-3 py-2 font-mono text-xs break-all select-all">' + escapeHtml(config.url) + "</div>";
+  } else {
+    html += '<div class="text-brand-400 italic">No URL available</div>';
+  }
+  html += "</div>";
+
+  html += "<div>";
+  html += '<label class="block font-semibold text-brand-700 mb-1">Effective CSS Selector <span class="font-normal text-brand-400">(' + escapeHtml(config.selectorSource) + ")</span></label>";
+  if (config.selector) {
+    html += '<div class="bg-brand-50 rounded px-3 py-2 font-mono text-xs break-all select-all">' + escapeHtml(config.selector) + "</div>";
+  } else {
+    html += '<div class="text-brand-400 italic">No selector available</div>';
+  }
+  html += "</div>";
+
+  if (ti.notes) {
+    html += "<div>";
+    html += '<label class="block font-semibold text-brand-700 mb-1">Notes</label>';
+    html += '<div class="bg-brand-50 rounded px-3 py-2 select-all">' + escapeHtml(ti.notes) + "</div>";
+    html += "</div>";
+  }
+
+  html += "</div>";
+
+  showModalHtml("Scrape Details", html);
 }
 
 /**

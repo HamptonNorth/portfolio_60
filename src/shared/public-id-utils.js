@@ -127,6 +127,42 @@ export function buildFtMarketsUrl(publicId, currencyCode) {
 }
 
 /**
+ * @description Build an alternate FT Markets URL for ISIN funds, swapping GBP↔GBX.
+ * FT Markets lists some UK funds under GBP and others under GBX (pence sterling).
+ * When the primary URL fails, the alternate currency suffix can be tried.
+ *
+ * Only applies to ISIN-based lookups with GBP or GBX currency. Returns null for
+ * tickers, non-GBP/GBX currencies, or invalid input.
+ *
+ * @param {string} publicId - The ISIN code
+ * @param {string} currencyCode - The 3-letter currency code (e.g. "GBP")
+ * @returns {string|null} The alternate FT Markets URL, or null if not applicable
+ */
+export function buildFtMarketsAlternateUrl(publicId, currencyCode) {
+  if (!publicId || !currencyCode) {
+    return null;
+  }
+
+  const trimmed = publicId.trim().toUpperCase();
+  const currency = currencyCode.trim().toUpperCase();
+  const type = detectPublicIdType(trimmed);
+
+  if (type !== "isin") {
+    return null;
+  }
+
+  if (currency === "GBP") {
+    return "https://markets.ft.com/data/funds/tearsheet/summary?s=" + trimmed + ":GBX";
+  }
+
+  if (currency === "GBX") {
+    return "https://markets.ft.com/data/funds/tearsheet/summary?s=" + trimmed + ":GBP";
+  }
+
+  return null;
+}
+
+/**
  * @description Get the CSS selector for FT Markets tearsheet pages.
  * Works for both fund and equity pages.
  * @returns {string} The CSS selector string

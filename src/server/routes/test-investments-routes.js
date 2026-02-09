@@ -5,7 +5,7 @@ import { upsertTestPrice } from "../db/test-prices-db.js";
 import { getAllInvestmentTypes } from "../db/investment-types-db.js";
 import { validateTestInvestment } from "../validation.js";
 import { getScraperTestingEnabled } from "../config.js";
-import { scrapeSingleInvestmentPrice, extractDomain, calculateDelay, parsePrice, normaliseToMinorUnit } from "../scrapers/price-scraper.js";
+import { scrapeSingleInvestmentPrice, extractDomain, calculateDelay, parsePrice, normaliseToMinorUnit, resolveScrapingConfig } from "../scrapers/price-scraper.js";
 import { launchBrowser } from "../scrapers/browser-utils.js";
 import { SCRAPE_RETRY_CONFIG } from "../../shared/constants.js";
 
@@ -72,6 +72,26 @@ testInvestmentsRouter.post("/api/test-investments/reset", function () {
     );
   } catch (err) {
     return new Response(JSON.stringify({ error: "Failed to reset test data", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+  }
+});
+
+// GET /api/test-investments/:id/scrape-config — resolve the effective URL and selector
+testInvestmentsRouter.get("/api/test-investments/:id/scrape-config", function (request, params) {
+  if (!getScraperTestingEnabled()) return featureDisabledResponse();
+
+  try {
+    const testInvestment = getTestInvestmentById(Number(params.id));
+    if (!testInvestment) {
+      return new Response(JSON.stringify({ error: "Test investment not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
+    }
+
+    const config = resolveScrapingConfig(testInvestment);
+    return new Response(JSON.stringify(config), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: "Failed to resolve scrape config", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 
