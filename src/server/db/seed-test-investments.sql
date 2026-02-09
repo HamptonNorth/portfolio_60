@@ -11,7 +11,7 @@
 --
 -- Prerequisites:
 --   - Database must have test_investments table (migration 9)
---   - currencies table must have GBP (id=1) and USD (id=2)
+--   - currencies table must have GBP (id=1), USD (id=2), EUR (id=3)
 --   - investment_types must have MUTUAL (id=2), SHARE (id=1), TRUST (id=3)
 --
 -- Usage: bun scripts/seed-test-investments.js
@@ -135,14 +135,52 @@ INSERT INTO test_investments (currencies_id, investment_type_id, description, pu
 
 
 -- ============================================================================
--- SECTION 7: Google Finance source — tests Google Finance scraping
+-- SECTION 6: HL source — tests Hargreaves Lansdown scraping
+-- ============================================================================
+
+-- INSERT INTO test_investments (currencies_id, investment_type_id, description, public_id, investment_url, selector, source_site, notes) VALUES
+-- (1, 2, 'Jupiter India X Acc (HL)', NULL, 'https://www.hl.co.uk/funds/fund-discounts,-prices--and--factsheets/search-results/j/jupiter-india-class-x-accumulation', 'span.bid-price', 'Hargreaves Lansdown (Funds)', 'Live fund from HL — compare with FT Markets ISIN');
+
+-- ============================================================================
+-- SECTION 7: Popular UK & US shares — FT Markets (Equities) via ticker
+-- Tests auto-URL generation from public_id for equities across LSE and Nasdaq
+-- ============================================================================
+
+INSERT INTO test_investments (currencies_id, investment_type_id, description, public_id, source_site, notes) VALUES
+(2, 1, 'NVIDIA Corp (FT Markets)', 'NSQ:NVDA', 'FT Markets (Equities)', 'Top traded US share'),
+(1, 1, 'Rolls-Royce Holdings PLC (FT Markets)', 'LSE:RR.', 'FT Markets (Equities)', 'Top traded UK share'),
+(1, 1, 'Legal & General Group PLC (FT Markets)', 'LSE:LGEN', 'FT Markets (Equities)', 'Top traded UK share'),
+(1, 1, 'BP PLC (FT Markets)', 'LSE:BP.', 'FT Markets (Equities)', 'Top traded UK share'),
+(2, 1, 'Tesla Inc (FT Markets)', 'NSQ:TSLA', 'FT Markets (Equities)', 'Top traded US share'),
+(1, 1, 'BAE Systems PLC (FT Markets)', 'LSE:BA.', 'FT Markets (Equities)', 'Top traded UK share'),
+(1, 1, 'Barclays PLC (FT Markets)', 'LSE:BARC', 'FT Markets (Equities)', 'Top traded UK share'),
+(1, 1, 'Aviva PLC (FT Markets)', 'LSE:AV.', 'FT Markets (Equities)', 'Top traded UK share'),
+(1, 1, 'Shell PLC (FT Markets)', 'LSE:SHEL', 'FT Markets (Equities)', 'Top traded UK share'),
+(1, 1, 'Lloyds Banking Group PLC (FT Markets)', 'LSE:LLOY', 'FT Markets (Equities)', 'Top traded UK share'),
+(2, 1, 'Strategy Inc (FT Markets)', 'NSQ:MSTR', 'FT Markets (Equities)', 'Top traded US share'),
+(1, 1, 'HSBC Holdings PLC (FT Markets)', 'LSE:HSBA', 'FT Markets (Equities)', 'Top traded UK share'),
+(1, 1, 'AstraZeneca PLC (FT Markets)', 'LSE:AZN', 'FT Markets (Equities)', 'Top traded UK share'),
+(1, 1, 'Taylor Wimpey PLC (FT Markets)', 'LSE:TW.', 'FT Markets (Equities)', 'Top traded UK share'),
+(1, 1, 'Glencore PLC (FT Markets)', 'LSE:GLEN', 'FT Markets (Equities)', 'Top traded UK share'),
+(1, 1, 'Diageo PLC (FT Markets)', 'LSE:DGE', 'FT Markets (Equities)', 'Top traded UK share'),
+(1, 1, 'GSK PLC (FT Markets)', 'LSE:GSK', 'FT Markets (Equities)', 'Top traded UK share'),
+(1, 1, 'Marks & Spencer Group PLC (FT Markets)', 'LSE:MKS', 'FT Markets (Equities)', 'Top traded UK share'),
+(1, 1, 'Rio Tinto PLC (FT Markets)', 'LSE:RIO', 'FT Markets (Equities)', 'Top traded UK share'),
+(1, 1, 'Unilever PLC (FT Markets)', 'LSE:ULVR', 'FT Markets (Equities)', 'Top traded UK share'),
+(2, 1, 'Berkshire Hathaway Class B (FT Markets)', 'NYQ:BRK.B', 'FT Markets (Equities)', 'Top traded NYSE share'),
+(2, 1, 'JPMorgan Chase & Co (FT Markets)', 'NYQ:JPM', 'FT Markets (Equities)', 'Top traded NYSE share'),
+(2, 1, 'Coca-Cola Co (FT Markets)', 'NYQ:KO', 'FT Markets (Equities)', 'Top traded NYSE share'),
+(3, 1, 'ASML Holding NV (FT Markets)', 'AEX:ASML', 'FT Markets (Equities)', 'Euronext Amsterdam — EUR-priced, tests non-GBP/USD exchange');
+
+-- ============================================================================
+-- SECTION 8: Google Finance source — tests Google Finance scraping
 -- ============================================================================
 
 INSERT INTO test_investments (currencies_id, investment_type_id, description, investment_url, selector, source_site, notes) VALUES
 (1, 1, 'Polar Capital Technology (Google)', 'https://www.google.com/finance/quote/PCT:LON', '.fxKbKc', 'Google Finance', 'Google Finance for LSE-listed trusts — compare with LSE/FT');
 
 -- ============================================================================
--- SECTION 8: Copy of current live investments
+-- SECTION 9: Copy of current live investments
 -- Mirrors the live investments table so every real portfolio investment
 -- can also be tested in the sandbox. Source site set to 'Live Portfolio'
 -- to distinguish from the hard-coded test entries above.
