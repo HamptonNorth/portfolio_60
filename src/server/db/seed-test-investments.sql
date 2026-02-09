@@ -132,12 +132,7 @@ INSERT INTO test_investments (currencies_id, investment_type_id, description, pu
 (2, 1, 'Microsoft (Fidelity)', NULL, 'https://www.fidelity.co.uk/factsheet-data/factsheet/US5949181045USD-microsoft-corp/price-chart', NULL, 'Fidelity UK', 'Live USD share — Fidelity equity factsheet'),
 (2, 1, 'Nvidia (Fidelity)', NULL, 'https://www.fidelity.co.uk/factsheet-data/factsheet/US67066G1040USD-nvidia-corp/price-chart', NULL, 'Fidelity UK', 'Live USD share — Fidelity equity factsheet');
 
--- ============================================================================
--- SECTION 6: HL source — tests Hargreaves Lansdown scraping
--- ============================================================================
 
-INSERT INTO test_investments (currencies_id, investment_type_id, description, public_id, investment_url, selector, source_site, notes) VALUES
-(1, 2, 'Jupiter India X Acc (HL)', NULL, 'https://www.hl.co.uk/funds/fund-discounts,-prices--and--factsheets/search-results/j/jupiter-india-class-x-accumulation', 'span.bid-price', 'Hargreaves Lansdown (Funds)', 'Live fund from HL — compare with FT Markets ISIN');
 
 -- ============================================================================
 -- SECTION 7: Google Finance source — tests Google Finance scraping
