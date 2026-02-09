@@ -77,6 +77,30 @@ describe("detectPublicIdType", function () {
   test("returns null for number-only string", function () {
     expect(detectPublicIdType("123456789012")).toBeNull();
   });
+
+  test("detects ETF three-part code", function () {
+    expect(detectPublicIdType("ISF:LSE:GBX")).toBe("etf");
+  });
+
+  test("detects ETF with longer ticker", function () {
+    expect(detectPublicIdType("IH2O:LSE:GBX")).toBe("etf");
+  });
+
+  test("detects ETF with GBP currency", function () {
+    expect(detectPublicIdType("VUSA:LSE:GBP")).toBe("etf");
+  });
+
+  test("detects ETF with lowercase (auto-uppercased)", function () {
+    expect(detectPublicIdType("isf:lse:gbx")).toBe("etf");
+  });
+
+  test("returns null for ETF with invalid currency length", function () {
+    expect(detectPublicIdType("ISF:LSE:GB")).toBeNull();
+  });
+
+  test("returns null for four-part code", function () {
+    expect(detectPublicIdType("ISF:LSE:GBX:EXTRA")).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -133,6 +157,21 @@ describe("validatePublicId", function () {
     const result = validatePublicId("GB00B4PQW");
     expect(result.valid).toBe(false);
   });
+
+  test("valid ETF returns valid with type etf", function () {
+    const result = validatePublicId("ISF:LSE:GBX");
+    expect(result.valid).toBe(true);
+    expect(result.type).toBe("etf");
+    expect(result.error).toBeUndefined();
+  });
+
+  test("invalid format error mentions all three formats", function () {
+    const result = validatePublicId("not-valid");
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain("ISIN");
+    expect(result.error).toContain("Exchange:Ticker");
+    expect(result.error).toContain("ETF");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -181,6 +220,26 @@ describe("buildFtMarketsUrl", function () {
   test("returns null for invalid publicId format", function () {
     expect(buildFtMarketsUrl("invalid", "GBP")).toBeNull();
   });
+
+  test("ETF produces etfs tearsheet URL without reversal", function () {
+    const url = buildFtMarketsUrl("ISF:LSE:GBX", "GBP");
+    expect(url).toBe("https://markets.ft.com/data/etfs/tearsheet/summary?s=ISF:LSE:GBX");
+  });
+
+  test("ETF ignores currencyCode parameter", function () {
+    const url = buildFtMarketsUrl("IH2O:LSE:GBX", "USD");
+    expect(url).toBe("https://markets.ft.com/data/etfs/tearsheet/summary?s=IH2O:LSE:GBX");
+  });
+
+  test("ETF with lowercase input is uppercased", function () {
+    const url = buildFtMarketsUrl("isf:lse:gbx", "GBP");
+    expect(url).toBe("https://markets.ft.com/data/etfs/tearsheet/summary?s=ISF:LSE:GBX");
+  });
+
+  test("ETF works without currencyCode", function () {
+    const url = buildFtMarketsUrl("ISF:LSE:GBX", null);
+    expect(url).toBe("https://markets.ft.com/data/etfs/tearsheet/summary?s=ISF:LSE:GBX");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -216,6 +275,10 @@ describe("buildFtMarketsAlternateUrl", function () {
 
   test("null currencyCode returns null", function () {
     expect(buildFtMarketsAlternateUrl("GB00BLG2W994", null)).toBeNull();
+  });
+
+  test("ETF returns null (no alternate needed)", function () {
+    expect(buildFtMarketsAlternateUrl("ISF:LSE:GBX", "GBP")).toBeNull();
   });
 });
 
@@ -276,5 +339,9 @@ describe("buildFidelitySearchUrl", function () {
 
   test("returns null for invalid format", function () {
     expect(buildFidelitySearchUrl("not-an-isin")).toBeNull();
+  });
+
+  test("returns null for ETF (not ISIN)", function () {
+    expect(buildFidelitySearchUrl("ISF:LSE:GBX")).toBeNull();
   });
 });

@@ -88,6 +88,18 @@ async function checkUrlSiteMatch(url) {
 }
 
 /**
+ * @description Fetch and display the Public ID help content in a modal.
+ */
+async function showPublicIdHelp() {
+  const result = await apiRequest("/api/config/help/public-id");
+  if (result.ok) {
+    showModalHtml("Public ID Formats", result.data.html);
+  } else {
+    showModal("Error", "Failed to load help content: " + (result.error || "Unknown error"));
+  }
+}
+
+/**
  * @description Check the format of a public_id value and update the status display.
  * Validates whether the input is an ISIN or exchange:ticker format and shows
  * appropriate feedback below the field.
@@ -109,10 +121,21 @@ function checkPublicIdFormat(value) {
   // Ticker: EXCHANGE:SYMBOL
   const tickerPattern = /^[A-Z]{1,10}:[A-Z0-9.]{1,10}$/;
 
+  // ETF: TICKER:EXCHANGE:CURRENCY (three parts)
+  const etfPattern = /^[A-Z0-9.]{1,10}:[A-Z]{1,10}:[A-Z]{3}$/;
+
   if (isinPattern.test(trimmed)) {
     let statusHtml = "<strong>ISIN detected.</strong> FT Markets fund URL will be generated automatically.";
     if (urlField && urlField.value.trim()) {
       statusHtml = "<strong>ISIN detected.</strong> Manual URL takes priority over auto-generated URL.";
+    }
+    statusEl.className = "mt-2 px-3 py-2 rounded-md text-sm bg-green-50 border border-green-200 text-green-700";
+    statusEl.innerHTML = statusHtml;
+    statusEl.classList.remove("hidden");
+  } else if (etfPattern.test(trimmed)) {
+    let statusHtml = "<strong>ETF detected.</strong> FT Markets ETF URL will be generated automatically.";
+    if (urlField && urlField.value.trim()) {
+      statusHtml = "<strong>ETF detected.</strong> Manual URL takes priority over auto-generated URL.";
     }
     statusEl.className = "mt-2 px-3 py-2 rounded-md text-sm bg-green-50 border border-green-200 text-green-700";
     statusEl.innerHTML = statusHtml;
@@ -127,7 +150,7 @@ function checkPublicIdFormat(value) {
     statusEl.classList.remove("hidden");
   } else {
     statusEl.className = "mt-2 px-3 py-2 rounded-md text-sm bg-amber-50 border border-amber-200 text-amber-700";
-    statusEl.innerHTML = "Format not recognised. Expected ISIN (e.g. GB00B4PQW151) or Exchange:Ticker (e.g. LSE:AZN).";
+    statusEl.innerHTML = "Format not recognised. Expected ISIN (e.g. GB00B4PQW151), Exchange:Ticker (e.g. LSE:AZN), or Ticker:Exchange:Currency (e.g. ISF:LSE:GBX).";
     statusEl.classList.remove("hidden");
   }
 }

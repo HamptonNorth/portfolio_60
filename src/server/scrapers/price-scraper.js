@@ -170,6 +170,27 @@ export async function scrapeFidelityFactsheetUrl(isin, browser) {
 }
 
 /**
+ * @description Read the "Price (GBX)" or "Price (GBP)" label from an FT Markets page.
+ * The label is in a <span class="mod-ui-data-list__label"> inside the
+ * .mod-tearsheet-overview__quote container. Returns the text content of the
+ * first label, or null if not found. This is the authoritative indicator of
+ * whether the displayed price is in pence (GBX) or pounds/dollars/etc.
+ *
+ * @param {import('playwright').Page} page - The Playwright page already navigated to FT Markets
+ * @returns {Promise<string|null>} The label text (e.g. "Price (GBX)") or null
+ */
+async function readFtMarketsPriceLabel(page) {
+  try {
+    const label = await page.$(".mod-tearsheet-overview__quote .mod-ui-data-list__label");
+    if (!label) return null;
+    const text = await label.textContent();
+    return text ? text.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * @description Scrape the current price for a single investment using Playwright.
  * Launches a headless Chromium browser, navigates to the investment URL,
  * waits for the CSS selector, and extracts the text content.
@@ -317,16 +338,15 @@ export async function scrapeSingleInvestmentPrice(investment, browser = null, op
       result.parsedPrice = parsed.value;
       result.isMinorUnit = parsed.isMinorUnit;
 
-      // FT Markets fund pages labelled "PRICE (GBP)" return prices in pounds, not pence.
-      // The raw text is just a number (e.g. "3.83") with no currency indicator,
-      // so parsePrice defaults to minor units. Override when the URL tells us
-      // the price is in major units (GBP, USD, EUR — anything except GBX).
-      // Only apply to fund URLs (/data/funds) — equity URLs (/data/equities) use
-      // exchange suffixes (LSE, NYQ, etc.) not currency codes, and their prices
-      // are already in the correct units.
-      if (scrapeUrl && scrapeUrl.includes("markets.ft.com/data/funds") && parsed.isMinorUnit) {
-        const ftCurrencyMatch = scrapeUrl.match(/[?&]s=[^:]+:([A-Z]+)/i);
-        if (ftCurrencyMatch && ftCurrencyMatch[1].toUpperCase() !== "GBX") {
+      // FT Markets pages display the actual currency unit in a label like
+      // "Price (GBX)" or "Price (GBP)" — this is the ground truth regardless
+      // of what the URL suffix says. A URL ending in :GBP can still show
+      // "Price (GBX)" (pence). Scrape the label to determine the real unit.
+      // Works for both fund and equity pages.
+      if (scrapeUrl && scrapeUrl.includes("markets.ft.com") && parsed.isMinorUnit) {
+        const ftPriceLabel = await readFtMarketsPriceLabel(page);
+        if (ftPriceLabel && !ftPriceLabel.toUpperCase().includes("GBX")) {
+          // Label says GBP, USD, EUR, etc. — price is in major units
           result.isMinorUnit = false;
           parsed.isMinorUnit = false;
         }
@@ -424,11 +444,10 @@ export async function scrapeSingleInvestmentPrice(investment, browser = null, op
           const altRaw = altRawText ? altRawText.trim() : "";
           const altParsed = parsePrice(altRaw);
 
-          // Apply the same FT Markets fund GBP/GBX override as the primary scrape
-          // (alternate URLs are only generated for funds, not equities, but check anyway)
-          if (altParsed.isMinorUnit && alternateUrl.includes("markets.ft.com/data/funds")) {
-            const altCurrencyMatch = alternateUrl.match(/[?&]s=[^:]+:([A-Z]+)/i);
-            if (altCurrencyMatch && altCurrencyMatch[1].toUpperCase() !== "GBX") {
+          // Read the actual price label from the page to determine GBX vs GBP
+          if (altParsed.isMinorUnit && alternateUrl.includes("markets.ft.com")) {
+            const altPriceLabel = await readFtMarketsPriceLabel(altPage);
+            if (altPriceLabel && !altPriceLabel.toUpperCase().includes("GBX")) {
               altParsed.isMinorUnit = false;
             }
           }

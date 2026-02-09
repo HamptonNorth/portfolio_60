@@ -18,6 +18,12 @@ let scraperSites = [];
 /** @type {boolean} True when a Test All operation is in progress */
 let testAllRunning = false;
 
+/** @type {Object.<number, {success: boolean, rows: Array, error?: string, currency?: string, description?: string}>} Cached history results by test investment ID */
+let historyResults = {};
+
+/** @type {Object.<number, string>} Cached scrape error messages by test investment ID */
+let scrapeErrors = {};
+
 /**
  * @description Check the feature flag and show/hide content accordingly.
  * @returns {Promise<boolean>} True if feature is enabled
@@ -154,6 +160,18 @@ function handleSourceSiteSelect() {
 }
 
 /**
+ * @description Fetch and display the Public ID help content in a modal.
+ */
+async function showPublicIdHelp() {
+  const result = await apiRequest("/api/config/help/public-id");
+  if (result.ok) {
+    showModalHtml("Public ID Formats", result.data.html);
+  } else {
+    showModal("Error", "Failed to load help content: " + (result.error || "Unknown error"));
+  }
+}
+
+/**
  * @description Check the format of a public_id value and update the status display.
  * @param {string} value - The public_id value to check
  */
@@ -168,10 +186,15 @@ function checkPublicIdFormat(value) {
   const trimmed = value.trim().toUpperCase();
   const isinPattern = /^[A-Z]{2}[A-Z0-9]{10}$/;
   const tickerPattern = /^[A-Z]{1,10}:[A-Z0-9.]{1,10}$/;
+  const etfPattern = /^[A-Z0-9.]{1,10}:[A-Z]{1,10}:[A-Z]{3}$/;
 
   if (isinPattern.test(trimmed)) {
     statusEl.className = "mt-2 px-3 py-2 rounded-md text-sm bg-green-50 border border-green-200 text-green-700";
     statusEl.innerHTML = "<strong>ISIN detected.</strong> FT Markets fund URL will be generated automatically.";
+    statusEl.classList.remove("hidden");
+  } else if (etfPattern.test(trimmed)) {
+    statusEl.className = "mt-2 px-3 py-2 rounded-md text-sm bg-green-50 border border-green-200 text-green-700";
+    statusEl.innerHTML = "<strong>ETF detected.</strong> FT Markets ETF URL will be generated automatically.";
     statusEl.classList.remove("hidden");
   } else if (tickerPattern.test(trimmed)) {
     statusEl.className = "mt-2 px-3 py-2 rounded-md text-sm bg-green-50 border border-green-200 text-green-700";
@@ -179,7 +202,7 @@ function checkPublicIdFormat(value) {
     statusEl.classList.remove("hidden");
   } else {
     statusEl.className = "mt-2 px-3 py-2 rounded-md text-sm bg-amber-50 border border-amber-200 text-amber-700";
-    statusEl.innerHTML = "Format not recognised. Expected ISIN (e.g. GB00B4PQW151) or Exchange:Ticker (e.g. LSE:AZN).";
+    statusEl.innerHTML = "Format not recognised. Expected ISIN (e.g. GB00B4PQW151), Exchange:Ticker (e.g. LSE:AZN), or Ticker:Exchange:Currency (e.g. ISF:LSE:GBX).";
     statusEl.classList.remove("hidden");
   }
 }
@@ -215,6 +238,7 @@ async function loadTestInvestments() {
   html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700">Last Test</th>';
   html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700 text-center">Status</th>';
   html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700 text-right">Price</th>';
+  html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700 text-center">History</th>';
   html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700"></th>';
   html += "</tr>";
   html += "</thead>";
@@ -251,6 +275,7 @@ async function loadTestInvestments() {
     html += '<td class="py-3 px-3 text-sm text-brand-500">' + escapeHtml(ti.last_test_date || "—") + "</td>";
     html += '<td class="py-3 px-3 text-sm text-center" id="status-' + ti.id + '">' + statusHtml + "</td>";
     html += '<td class="py-3 px-3 text-sm text-right font-mono" id="price-' + ti.id + '">' + escapeHtml(priceDisplay) + "</td>";
+    html += '<td class="py-3 px-3 text-sm text-center" id="history-' + ti.id + '"><span class="text-brand-300">—</span></td>';
     html += '<td class="py-3 px-3 text-base flex gap-2">';
     html += '<button id="test-btn-' + ti.id + '" class="bg-green-100 hover:bg-green-200 text-green-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="testSingle(' + ti.id + ', this)">Test</button>';
     html += '<button class="bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="toggleHistory(' + ti.id + ', this)">History</button>';
@@ -260,7 +285,7 @@ async function loadTestInvestments() {
     html += "</tr>";
     // History panel (hidden by default, shown below the row)
     html += '<tr id="history-panel-' + ti.id + '" class="hidden">';
-    html += '<td colspan="8" class="px-6 py-3 bg-brand-25 border-b border-brand-200">';
+    html += '<td colspan="9" class="px-6 py-3 bg-brand-25 border-b border-brand-200">';
     html += '<div id="history-content-' + ti.id + '"></div>';
     html += "</td>";
     html += "</tr>";
@@ -431,37 +456,166 @@ async function testSingle(id, button) {
   button.disabled = true;
   button.textContent = "Testing...";
 
-  // Update status cell to show spinner
+  // Update status and history cells to show spinners
   const statusCell = document.getElementById("status-" + id);
   if (statusCell) {
     statusCell.innerHTML = '<div class="w-4 h-4 border-2 border-brand-300 border-t-brand-700 rounded-full animate-spin mx-auto"></div>';
   }
+  const historyCell = document.getElementById("history-" + id);
+  if (historyCell) {
+    historyCell.innerHTML = '<div class="w-4 h-4 border-2 border-brand-300 border-t-brand-700 rounded-full animate-spin mx-auto"></div>';
+  }
 
-  const result = await apiRequest("/api/test-investments/" + id + "/scrape", {
+  // Fire live scrape and history preview in parallel
+  let scrapedPriceMinor = null;
+  const scrapePromise = apiRequest("/api/test-investments/" + id + "/scrape", {
     method: "POST",
     timeout: 120000,
-  });
+  })
+    .then(function (result) {
+      if (result.ok && result.data.success) {
+        delete scrapeErrors[id];
+        const priceMinor = result.data.priceMinorUnit;
+        scrapedPriceMinor = priceMinor;
+        if (statusCell) {
+          statusCell.innerHTML = '<span class="text-green-600 font-bold">&#10003;</span>';
+        }
+        const priceCell = document.getElementById("price-" + id);
+        if (priceCell) {
+          priceCell.textContent = priceMinor != null ? parseFloat(priceMinor).toFixed(2) + "p" : "—";
+        }
+      } else {
+        const errorMsg = (result.data && result.data.error) || result.error || "Unknown error";
+        scrapeErrors[id] = errorMsg;
+        if (statusCell) {
+          statusCell.innerHTML = '<span class="text-red-600 font-bold cursor-pointer" onclick="showScrapeError(' + id + ')" title="Click to view error">&#10007;</span>';
+        }
+      }
+    })
+    .catch(function (err) {
+      scrapeErrors[id] = err.message;
+      if (statusCell) {
+        statusCell.innerHTML = '<span class="text-red-600 font-bold cursor-pointer" onclick="showScrapeError(' + id + ')" title="Click to view error">&#10007;</span>';
+      }
+    });
+
+  const historyPromise = apiRequest("/api/test-investments/" + id + "/backfill/test", {
+    timeout: 30000,
+  })
+    .then(function (result) {
+      updateHistoryCell(id, result.ok ? result.data : { success: false, error: result.error });
+    })
+    .catch(function () {
+      updateHistoryCell(id, { success: false, rows: [], error: "Request failed" });
+    });
+
+  await Promise.all([scrapePromise, historyPromise]);
+
+  // Cross-validate: compare live scrape price with most recent Morningstar price
+  if (scrapedPriceMinor != null && historyResults[id] && historyResults[id].success && historyResults[id].rows && historyResults[id].rows.length > 0) {
+    const scrapedMajor = scrapedPriceMinor / 100;
+    const morningstarMajor = historyResults[id].rows[0].price;
+    if (morningstarMajor > 0) {
+      const pctDiff = (Math.abs(scrapedMajor - morningstarMajor) / morningstarMajor) * 100;
+      if (pctDiff > 5) {
+        historyResults[id].priceWarning = "Price mismatch: scraped " + scrapedMajor.toFixed(4) + " vs Morningstar " + morningstarMajor.toFixed(4) + " (" + pctDiff.toFixed(1) + "% difference)";
+        updateHistoryCell(id, historyResults[id]);
+      }
+    }
+  }
 
   button.disabled = false;
   button.textContent = originalText;
+}
 
-  if (result.ok && result.data.success) {
-    const priceMinor = result.data.priceMinorUnit;
-    // Update status and price cells in-place
-    if (statusCell) {
-      statusCell.innerHTML = '<span class="text-green-600 font-bold">&#10003;</span>';
+/**
+ * @description Update the history cell for a test investment with the backfill result.
+ * Stores the result in historyResults for later detail modal display.
+ * @param {number} id - The test investment ID
+ * @param {Object} data - The backfill test result {success, rows, error?, currency?, description?}
+ */
+function updateHistoryCell(id, data) {
+  historyResults[id] = data;
+  const cell = document.getElementById("history-" + id);
+  if (!cell) return;
+
+  if (data.success && data.rows && data.rows.length > 0) {
+    if (data.priceWarning) {
+      // History found but price mismatch — amber warning with click for detail
+      cell.innerHTML = '<span class="text-amber-600 font-bold cursor-pointer" onclick="showHistoryDetail(' + id + ')" title="' + escapeHtml(data.priceWarning) + '">&#9888; ' + data.rows.length + "</span>";
+    } else {
+      cell.innerHTML = '<span class="text-green-600 font-bold cursor-pointer" onclick="showHistoryDetail(' + id + ')" title="Click to view historic prices">&#10003; ' + data.rows.length + "</span>";
     }
-    const priceCell = document.getElementById("price-" + id);
-    if (priceCell) {
-      priceCell.textContent = priceMinor != null ? parseFloat(priceMinor).toFixed(2) + "p" : "—";
-    }
+  } else if (data.success && (!data.rows || data.rows.length === 0)) {
+    cell.innerHTML = '<span class="text-amber-500" title="No historic data found">—</span>';
   } else {
-    if (statusCell) {
-      statusCell.innerHTML = '<span class="text-red-600 font-bold">&#10007;</span>';
-    }
-    const errorMsg = (result.data && result.data.error) || result.error || "Unknown error";
-    showModal("Test Failed", errorMsg);
+    cell.innerHTML = '<span class="text-red-600 font-bold cursor-pointer" onclick="showHistoryDetail(' + id + ')" title="Click to view error">&#10007;</span>';
   }
+}
+
+/**
+ * @description Show the scrape error for a test investment in a modal.
+ * @param {number} id - The test investment ID
+ */
+function showScrapeError(id) {
+  const error = scrapeErrors[id];
+  if (!error) {
+    showModal("Price Scrape", "No error recorded.");
+    return;
+  }
+  showModal("Price Scrape Failed", error);
+}
+
+/**
+ * @description Show a modal with historic price detail for a test investment.
+ * @param {number} id - The test investment ID
+ */
+function showHistoryDetail(id) {
+  const data = historyResults[id];
+  if (!data) {
+    showModal("Historic Data", "Run Test to see historic data.");
+    return;
+  }
+
+  if (!data.success) {
+    showModal("Historic Data — Error", data.error || "Could not fetch historic data from Morningstar.");
+    return;
+  }
+
+  if (!data.rows || data.rows.length === 0) {
+    showModal("Historic Data", "No historic price data found on Morningstar.");
+    return;
+  }
+
+  let html = '<div class="space-y-3">';
+  if (data.description) {
+    html += '<p class="text-sm text-brand-600">' + escapeHtml(data.description);
+    if (data.currency) {
+      html += " (" + escapeHtml(data.currency) + ")";
+    }
+    html += "</p>";
+  }
+  if (data.priceWarning) {
+    html += '<div class="bg-amber-50 border border-amber-200 rounded p-2 mb-2 text-sm text-amber-700">' + escapeHtml(data.priceWarning) + "</div>";
+  }
+  html += '<p class="text-xs text-brand-400 mb-2">Most recent ' + data.rows.length + " weekly prices from Morningstar (read-only preview, no DB writes)</p>";
+  html += '<table class="w-full text-left border-collapse">';
+  html += '<thead><tr class="border-b border-brand-200">';
+  html += '<th class="py-1 px-2 text-sm font-semibold text-brand-700">Date</th>';
+  html += '<th class="py-1 px-2 text-sm font-semibold text-brand-700 text-right">Price</th>';
+  html += "</tr></thead><tbody>";
+
+  for (var i = 0; i < data.rows.length; i++) {
+    var row = data.rows[i];
+    var rowClass = i % 2 === 0 ? "bg-white" : "bg-brand-50";
+    html += '<tr class="' + rowClass + ' border-b border-brand-100">';
+    html += '<td class="py-1 px-2 text-sm">' + escapeHtml(row.date) + "</td>";
+    html += '<td class="py-1 px-2 text-sm text-right font-mono">' + row.price.toFixed(4) + "</td>";
+    html += "</tr>";
+  }
+
+  html += "</tbody></table></div>";
+  showModalHtml("Historic Data Preview (Morningstar)", html);
 }
 
 /**
@@ -484,11 +638,15 @@ async function testAll() {
 
   eventSource.addEventListener("init", function (event) {
     const data = JSON.parse(event.data);
-    // Set all scrapeable rows to spinner
+    // Set all scrapeable rows to spinners for both status and history
     for (const inv of data.investments) {
       const statusCell = document.getElementById("status-" + inv.investmentId);
       if (statusCell) {
         statusCell.innerHTML = '<div class="w-4 h-4 border-2 border-brand-300 border-t-brand-700 rounded-full animate-spin mx-auto"></div>';
+      }
+      const historyCell = document.getElementById("history-" + inv.investmentId);
+      if (historyCell) {
+        historyCell.innerHTML = '<div class="w-4 h-4 border-2 border-brand-300 border-t-brand-700 rounded-full animate-spin mx-auto"></div>';
       }
     }
   });
@@ -499,6 +657,7 @@ async function testAll() {
     const priceCell = document.getElementById("price-" + result.investmentId);
 
     if (result.success) {
+      delete scrapeErrors[result.investmentId];
       if (statusCell) {
         statusCell.innerHTML = '<span class="text-green-600 font-bold">&#10003;</span>';
       }
@@ -507,8 +666,9 @@ async function testAll() {
         priceCell.textContent = priceMinor != null ? parseFloat(priceMinor).toFixed(2) + "p" : "—";
       }
     } else {
+      scrapeErrors[result.investmentId] = result.error || "Unknown error";
       if (statusCell) {
-        statusCell.innerHTML = '<span class="text-red-600 font-bold">&#10007;</span>';
+        statusCell.innerHTML = '<span class="text-red-600 font-bold cursor-pointer" onclick="showScrapeError(' + result.investmentId + ')" title="Click to view error">&#10007;</span>';
       }
     }
   });
@@ -521,6 +681,11 @@ async function testAll() {
     }
   });
 
+  eventSource.addEventListener("history", function (event) {
+    const data = JSON.parse(event.data);
+    updateHistoryCell(data.investmentId, data);
+  });
+
   eventSource.addEventListener("done", function (event) {
     const data = JSON.parse(event.data);
     eventSource.close();
@@ -530,7 +695,7 @@ async function testAll() {
   eventSource.addEventListener("error", function (event) {
     eventSource.close();
     finishTestAll(null);
-    showError("page-messages", "Test All failed", "Connection to server lost");
+    showError("page-messages", "Test All failed", "Connection to server lost. If a previous Test All is still running on the server, wait for it to finish or restart the server.");
   });
 }
 

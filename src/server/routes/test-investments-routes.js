@@ -8,6 +8,7 @@ import { getScraperTestingEnabled } from "../config.js";
 import { scrapeSingleInvestmentPrice, extractDomain, calculateDelay, parsePrice, normaliseToMinorUnit, resolveScrapingConfig } from "../scrapers/price-scraper.js";
 import { launchBrowser } from "../scrapers/browser-utils.js";
 import { SCRAPE_RETRY_CONFIG } from "../../shared/constants.js";
+import { testBackfillTestInvestment } from "../services/historic-backfill.js";
 
 /**
  * @description Router instance for test investment API routes.
@@ -39,6 +40,9 @@ function sleep(ms) {
     setTimeout(resolve, ms);
   });
 }
+
+/** @type {boolean} Server-side lock to prevent concurrent Test All streams */
+let testAllRunning = false;
 
 // GET /api/test-investments — list all test investments
 testInvestmentsRouter.get("/api/test-investments", function () {
@@ -92,6 +96,21 @@ testInvestmentsRouter.get("/api/test-investments/:id/scrape-config", function (r
     });
   } catch (err) {
     return new Response(JSON.stringify({ error: "Failed to resolve scrape config", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+  }
+});
+
+// GET /api/test-investments/:id/backfill/test — preview historic data availability from Morningstar
+testInvestmentsRouter.get("/api/test-investments/:id/backfill/test", async function (request, params) {
+  if (!getScraperTestingEnabled()) return featureDisabledResponse();
+
+  try {
+    const result = await testBackfillTestInvestment(Number(params.id));
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ success: false, error: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 
@@ -272,7 +291,12 @@ testInvestmentsRouter.post("/api/test-investments/:id/scrape", async function (r
 testInvestmentsRouter.get("/api/test-investments/scrape/stream", async function () {
   if (!getScraperTestingEnabled()) return featureDisabledResponse();
 
+  if (testAllRunning) {
+    return new Response(JSON.stringify({ error: "Test All already running", detail: "A Test All operation is already in progress. Wait for it to finish or restart the server." }), { status: 409, headers: { "Content-Type": "application/json" } });
+  }
+
   try {
+    testAllRunning = true;
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
@@ -380,6 +404,45 @@ testInvestmentsRouter.get("/api/test-investments/scrape/stream", async function 
               priceResult.attemptNumber = attemptNumber > SCRAPE_RETRY_CONFIG.maxAttempts ? SCRAPE_RETRY_CONFIG.maxAttempts : attemptNumber;
               priceResult.maxAttempts = SCRAPE_RETRY_CONFIG.maxAttempts;
               sendEvent("price", priceResult);
+
+              // Run Morningstar historic data preview after the price scrape
+              try {
+                const historyResult = await testBackfillTestInvestment(testInvestment.id);
+                // Cross-validate: compare live scrape price with most recent Morningstar price
+                const historyEvent = {
+                  investmentId: testInvestment.id,
+                  success: historyResult.success,
+                  rows: historyResult.rows || [],
+                  rowCount: historyResult.rows ? historyResult.rows.length : 0,
+                  currency: historyResult.currency || "",
+                  description: historyResult.description || "",
+                  error: historyResult.error || null,
+                  priceWarning: null,
+                };
+                if (priceResult.success && historyResult.success && historyResult.rows && historyResult.rows.length > 0) {
+                  const scrapedMajor = priceResult.priceMinorUnit / 100;
+                  const morningstarMajor = historyResult.rows[0].price;
+                  if (morningstarMajor > 0) {
+                    const pctDiff = (Math.abs(scrapedMajor - morningstarMajor) / morningstarMajor) * 100;
+                    if (pctDiff > 5) {
+                      historyEvent.priceWarning = "Price mismatch: scraped " + scrapedMajor.toFixed(4) + " vs Morningstar " + morningstarMajor.toFixed(4) + " (" + pctDiff.toFixed(1) + "% difference)";
+                    }
+                  }
+                }
+                sendEvent("history", historyEvent);
+              } catch (historyErr) {
+                sendEvent("history", {
+                  investmentId: testInvestment.id,
+                  success: false,
+                  rows: [],
+                  rowCount: 0,
+                  error: historyErr.message,
+                  priceWarning: null,
+                });
+              }
+
+              // Small delay for Morningstar rate politeness
+              await sleep(500);
             }
 
             const total = successCount + failCount;
@@ -409,6 +472,7 @@ testInvestmentsRouter.get("/api/test-investments/scrape/stream", async function 
           }
         }
 
+        testAllRunning = false;
         controller.close();
       },
     });
@@ -422,6 +486,7 @@ testInvestmentsRouter.get("/api/test-investments/scrape/stream", async function 
       },
     });
   } catch (err) {
+    testAllRunning = false;
     return new Response(JSON.stringify({ error: "Failed to start test scraping stream", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });

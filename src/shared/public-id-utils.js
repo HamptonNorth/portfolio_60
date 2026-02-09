@@ -1,11 +1,11 @@
 /**
  * @description Utility functions for working with investment public identifiers.
- * A public_id is either an ISIN code (mutual funds) or an exchange:ticker code
- * (shares and investment trusts). These identifiers enable automatic price URL
- * generation via FT Markets without requiring manual URL and CSS selector entry.
+ * A public_id identifies an investment for automatic price URL generation via
+ * FT Markets. Three formats are supported:
  *
  * ISIN format: 2-letter country code + 10 alphanumeric characters (e.g. GB00B4PQW151)
- * Ticker format: EXCHANGE:SYMBOL (e.g. LSE:AZN, NYSE:AAPL)
+ * Ticker format: EXCHANGE:SYMBOL (e.g. LSE:AZN, NSQ:AMZN)
+ * ETF format: TICKER:EXCHANGE:CURRENCY (e.g. ISF:LSE:GBX, IH2O:LSE:GBX)
  */
 
 /**
@@ -23,6 +23,15 @@ const ISIN_PATTERN = /^[A-Z]{2}[A-Z0-9]{10}$/;
 const TICKER_PATTERN = /^[A-Z]{1,10}:[A-Z0-9.]{1,10}$/;
 
 /**
+ * @description Regex pattern for ETF three-part codes.
+ * Format: TICKER:EXCHANGE:CURRENCY (e.g. ISF:LSE:GBX, IH2O:LSE:GBX).
+ * Ticker: 1-10 uppercase letters/digits/dots. Exchange: 1-10 uppercase letters.
+ * Currency: exactly 3 uppercase letters.
+ * @type {RegExp}
+ */
+const ETF_PATTERN = /^[A-Z0-9.]{1,10}:[A-Z]{1,10}:[A-Z]{3}$/;
+
+/**
  * @description CSS selector used on FT Markets fund and equity tearsheet pages
  * to extract the current price/NAV value.
  * @type {string}
@@ -30,9 +39,9 @@ const TICKER_PATTERN = /^[A-Z]{1,10}:[A-Z0-9.]{1,10}$/;
 const FT_MARKETS_SELECTOR = "span.mod-ui-data-list__value";
 
 /**
- * @description Detect whether a public_id is an ISIN or an exchange:ticker.
+ * @description Detect whether a public_id is an ISIN, exchange:ticker, or ETF code.
  * @param {string} publicId - The public identifier to check
- * @returns {'isin'|'ticker'|null} The detected type, or null if empty/invalid
+ * @returns {'isin'|'ticker'|'etf'|null} The detected type, or null if empty/invalid
  */
 export function detectPublicIdType(publicId) {
   if (!publicId || typeof publicId !== "string") {
@@ -49,6 +58,13 @@ export function detectPublicIdType(publicId) {
     return "isin";
   }
 
+  // Test ETF before ticker — ETF has two colons (TICKER:EXCHANGE:CURRENCY)
+  // which won't match TICKER_PATTERN (single colon), but test ETF first
+  // for clarity.
+  if (ETF_PATTERN.test(trimmed)) {
+    return "etf";
+  }
+
   if (TICKER_PATTERN.test(trimmed)) {
     return "ticker";
   }
@@ -59,7 +75,7 @@ export function detectPublicIdType(publicId) {
 /**
  * @description Validate a public_id string. Checks format and length.
  * @param {string} publicId - The public identifier to validate
- * @returns {{ valid: boolean, type: 'isin'|'ticker'|null, error?: string }}
+ * @returns {{ valid: boolean, type: 'isin'|'ticker'|'etf'|null, error?: string }}
  */
 export function validatePublicId(publicId) {
   if (!publicId || typeof publicId !== "string" || publicId.trim() === "") {
@@ -78,7 +94,7 @@ export function validatePublicId(publicId) {
     return {
       valid: false,
       type: null,
-      error: "Public ID must be an ISIN (e.g. GB00B4PQW151) or Exchange:Ticker (e.g. LSE:AZN)",
+      error: "Public ID must be an ISIN (e.g. GB00B4PQW151), Exchange:Ticker (e.g. LSE:AZN), or Ticker:Exchange:Currency for ETFs (e.g. ISF:LSE:GBX)",
     };
   }
 
@@ -88,29 +104,33 @@ export function validatePublicId(publicId) {
 /**
  * @description Build an FT Markets URL for a given public_id and currency code.
  * ISIN codes produce a funds tearsheet URL; ticker codes produce an equities
- * tearsheet URL.
+ * tearsheet URL; ETF codes produce an ETFs tearsheet URL.
  *
  * FT Markets URL formats:
  * - Funds:    https://markets.ft.com/data/funds/tearsheet/summary?s={ISIN}:{CURRENCY}
  * - Equities: https://markets.ft.com/data/equities/tearsheet/summary?s={TICKER}:{EXCHANGE}
+ * - ETFs:     https://markets.ft.com/data/etfs/tearsheet/summary?s={TICKER}:{EXCHANGE}:{CURRENCY}
  *
- * Note: FT uses TICKER:EXCHANGE order (e.g. AZN:LSE), which is the reverse of
- * our storage format EXCHANGE:TICKER (e.g. LSE:AZN).
+ * Note: For equities, FT uses TICKER:EXCHANGE order (e.g. AZN:LSE), which is the
+ * reverse of our storage format EXCHANGE:TICKER (e.g. LSE:AZN).
+ * For ETFs, the public_id already contains all three parts in FT order.
  *
- * @param {string} publicId - The ISIN or exchange:ticker code
- * @param {string} currencyCode - The 3-letter currency code (e.g. "GBP", "USD")
+ * @param {string} publicId - The ISIN, exchange:ticker, or ETF code
+ * @param {string} currencyCode - The 3-letter currency code (e.g. "GBP", "USD").
+ *   Ignored for ETFs (currency is embedded in the public_id).
  * @returns {string|null} The FT Markets URL, or null if publicId is invalid
  */
 export function buildFtMarketsUrl(publicId, currencyCode) {
-  if (!publicId || !currencyCode) {
+  if (!publicId) {
     return null;
   }
 
   const trimmed = publicId.trim().toUpperCase();
-  const currency = currencyCode.trim().toUpperCase();
   const type = detectPublicIdType(trimmed);
 
   if (type === "isin") {
+    if (!currencyCode) return null;
+    const currency = currencyCode.trim().toUpperCase();
     return "https://markets.ft.com/data/funds/tearsheet/summary?s=" + trimmed + ":" + currency;
   }
 
@@ -121,6 +141,11 @@ export function buildFtMarketsUrl(publicId, currencyCode) {
     const exchange = parts[0];
     const ticker = parts[1];
     return "https://markets.ft.com/data/equities/tearsheet/summary?s=" + ticker + ":" + exchange;
+  }
+
+  if (type === "etf") {
+    // ETF format already in FT order: TICKER:EXCHANGE:CURRENCY (e.g. ISF:LSE:GBX)
+    return "https://markets.ft.com/data/etfs/tearsheet/summary?s=" + trimmed;
   }
 
   return null;

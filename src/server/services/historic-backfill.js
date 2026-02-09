@@ -14,6 +14,7 @@ import { upsertRate, scaleRate } from "../db/currency-rates-db.js";
 import { upsertPrice } from "../db/prices-db.js";
 import { upsertBenchmarkData } from "../db/benchmark-data-db.js";
 import { detectPublicIdType } from "../../shared/public-id-utils.js";
+import { getTestInvestmentById } from "../db/test-investments-db.js";
 import YahooFinance from "yahoo-finance2";
 
 // ---------------------------------------------------------------------------
@@ -557,9 +558,11 @@ export async function backfillInvestmentPrices(progressCallback) {
   const investments = db
     .query(
       `SELECT i.id, i.description, i.investment_url, i.morningstar_id,
-              i.public_id, c.code AS currency_code
+              i.public_id, i.investment_type_id, c.code AS currency_code,
+              it.short_description AS type_short
        FROM investments i
        JOIN currencies c ON i.currencies_id = c.id
+       JOIN investment_types it ON i.investment_type_id = it.id
        ORDER BY i.description`,
     )
     .all();
@@ -600,8 +603,10 @@ export async function backfillInvestmentPrices(progressCallback) {
 
       if (publicIdType === "isin") {
         isin = inv.public_id.trim().toUpperCase();
-      } else {
-        // Priority 2: Try ISIN extraction from URL (Fidelity URLs)
+      } else if (inv.type_short === "MUTUAL") {
+        // Priority 2: Try ISIN extraction from URL (Fidelity fund URLs only).
+        // Shares and trusts trade on exchanges — their Fidelity URLs embed an
+        // ISIN that may resolve to the wrong exchange listing on Morningstar.
         isin = extractIsinFromUrl(inv.investment_url);
       }
 
@@ -611,7 +616,7 @@ export async function backfillInvestmentPrices(progressCallback) {
           message: inv.description + ": looking up ISIN " + isin + "...",
         });
         lookupResult = await lookupMorningstarIdByIsin(isin);
-      } else if (publicIdType === "ticker") {
+      } else if (publicIdType === "ticker" || publicIdType === "etf") {
         // Priority 3: public_id is a ticker — search Morningstar by name
         progressCallback({
           type: "progress",
@@ -952,9 +957,11 @@ export async function testBackfillInvestment(investmentId) {
   const inv = db
     .query(
       `SELECT i.id, i.description, i.investment_url, i.morningstar_id,
-              i.public_id, c.code AS currency_code
+              i.public_id, c.code AS currency_code,
+              it.short_description AS type_short
        FROM investments i
        JOIN currencies c ON i.currencies_id = c.id
+       JOIN investment_types it ON i.investment_type_id = it.id
        WHERE i.id = ?`,
     )
     .get(investmentId);
@@ -971,7 +978,7 @@ export async function testBackfillInvestment(investmentId) {
 
     if (publicIdType === "isin") {
       isin = inv.public_id.trim().toUpperCase();
-    } else {
+    } else if (inv.type_short === "MUTUAL") {
       isin = extractIsinFromUrl(inv.investment_url);
     }
 
@@ -979,7 +986,7 @@ export async function testBackfillInvestment(investmentId) {
 
     if (isin) {
       lookupResult = await lookupMorningstarIdByIsin(isin);
-    } else if (publicIdType === "ticker") {
+    } else if (publicIdType === "ticker" || publicIdType === "etf") {
       lookupResult = await lookupMorningstarIdByName(inv.description);
     } else {
       const ticker = extractLseTickerFromUrl(inv.investment_url);
@@ -1019,6 +1026,70 @@ export async function testBackfillInvestment(investmentId) {
 }
 
 /**
+ * @description Test historic data availability for a single test investment.
+ * Same as testBackfillInvestment but reads from the test_investments table.
+ * Fetches the 10 most recent weekly prices from Morningstar without writing to DB.
+ * Does not cache the Morningstar ID (test_investments lacks the morningstar_id column).
+ * @param {number} testInvestmentId - The test investment ID
+ * @returns {Promise<{success: boolean, description: string, currency: string, rows: {date: string, price: number}[], error?: string}>}
+ */
+export async function testBackfillTestInvestment(testInvestmentId) {
+  const inv = getTestInvestmentById(testInvestmentId);
+
+  if (!inv) return { success: false, description: "Unknown", currency: "", rows: [], error: "Test investment not found" };
+
+  // Resolve Morningstar ID (no caching — test_investments has no morningstar_id column)
+  const publicIdType = detectPublicIdType(inv.public_id);
+  let isin = null;
+
+  if (publicIdType === "isin") {
+    isin = inv.public_id.trim().toUpperCase();
+  } else if (inv.type_short === "MUTUAL") {
+    // Only extract ISINs from URLs for mutual funds. Shares and trusts
+    // may have ISINs embedded in Fidelity URLs that resolve to the wrong
+    // exchange listing on Morningstar.
+    isin = extractIsinFromUrl(inv.investment_url);
+  }
+
+  let lookupResult = null;
+
+  if (isin) {
+    lookupResult = await lookupMorningstarIdByIsin(isin);
+  } else if (publicIdType === "ticker" || publicIdType === "etf") {
+    lookupResult = await lookupMorningstarIdByName(inv.description);
+  } else {
+    const ticker = extractLseTickerFromUrl(inv.investment_url);
+    if (ticker) {
+      lookupResult = await lookupMorningstarIdByName(inv.description);
+    }
+  }
+
+  if (!lookupResult) {
+    return { success: false, description: inv.description, currency: inv.currency_code, rows: [], error: "Could not find on Morningstar" };
+  }
+
+  const morningstarId = lookupResult.secId;
+  const universe = lookupResult.universe;
+
+  // Fetch last ~3 months to get 10+ weekly data points
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setMonth(startDate.getMonth() - 3);
+
+  const history = await fetchMorningstarHistory(morningstarId, universe, inv.currency_code, startDate.toISOString().split("T")[0], endDate.toISOString().split("T")[0]);
+
+  // Return last 10 entries, most recent first
+  const rows = history
+    .slice(-10)
+    .reverse()
+    .map(function (entry) {
+      return { date: entry.date, price: entry.price };
+    });
+
+  return { success: true, description: inv.description, currency: inv.currency_code, rows: rows };
+}
+
+/**
  * @description Load historic prices for a single investment (full 3-year backfill).
  * @param {number} investmentId - The investment ID
  * @returns {Promise<{success: boolean, description: string, count: number, error?: string}>}
@@ -1029,9 +1100,11 @@ export async function loadBackfillInvestment(investmentId) {
   const inv = db
     .query(
       `SELECT i.id, i.description, i.investment_url, i.morningstar_id,
-              i.public_id, c.code AS currency_code
+              i.public_id, c.code AS currency_code,
+              it.short_description AS type_short
        FROM investments i
        JOIN currencies c ON i.currencies_id = c.id
+       JOIN investment_types it ON i.investment_type_id = it.id
        WHERE i.id = ?`,
     )
     .get(investmentId);
@@ -1047,7 +1120,7 @@ export async function loadBackfillInvestment(investmentId) {
 
     if (publicIdType === "isin") {
       isin = inv.public_id.trim().toUpperCase();
-    } else {
+    } else if (inv.type_short === "MUTUAL") {
       isin = extractIsinFromUrl(inv.investment_url);
     }
 
@@ -1055,7 +1128,7 @@ export async function loadBackfillInvestment(investmentId) {
 
     if (isin) {
       lookupResult = await lookupMorningstarIdByIsin(isin);
-    } else if (publicIdType === "ticker") {
+    } else if (publicIdType === "ticker" || publicIdType === "etf") {
       lookupResult = await lookupMorningstarIdByName(inv.description);
     } else {
       const ticker = extractLseTickerFromUrl(inv.investment_url);

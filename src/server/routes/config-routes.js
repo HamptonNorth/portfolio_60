@@ -144,6 +144,24 @@ export function handleConfigRoute(method, path) {
     });
   }
 
+  // GET /api/config/help/public-id — return the public-id help markdown as HTML
+  if (method === "GET" && path === "/api/config/help/public-id") {
+    try {
+      const helpPath = resolve("src/shared/public-id-help.md");
+      const markdown = readFileSync(helpPath, "utf-8");
+      const html = convertMarkdownToHtml(markdown);
+      return new Response(JSON.stringify({ html: html }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: "Failed to load help content", detail: err.message }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  }
+
   // POST /api/config/scraper-sites/match — check if a URL matches a known site
   if (method === "POST" && path === "/api/config/scraper-sites/match") {
     // This will be handled async below
@@ -151,6 +169,86 @@ export function handleConfigRoute(method, path) {
   }
 
   return null;
+}
+
+/**
+ * @description Escape HTML special characters for safe rendering.
+ * @param {string} text - Raw text to escape
+ * @returns {string} Escaped HTML-safe text
+ */
+function escapeHtmlServer(text) {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/**
+ * @description Convert basic markdown to HTML for help content display.
+ * Supports headings (#, ##, ###), bold (**text**), inline code (`text`),
+ * code blocks (```), and paragraphs. Reads from an external .md file so the
+ * content can be edited outside the application.
+ * @param {string} markdown - The markdown text to convert
+ * @returns {string} HTML string with Tailwind classes for styling
+ */
+function convertMarkdownToHtml(markdown) {
+  const lines = markdown.split("\n");
+  let html = "";
+  let inCodeBlock = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (line.trim().startsWith("```")) {
+      if (inCodeBlock) {
+        html += "</code></pre>";
+        inCodeBlock = false;
+      } else {
+        html += '<pre class="bg-brand-50 border border-brand-200 rounded px-3 py-2 text-sm font-mono overflow-x-auto my-2"><code>';
+        inCodeBlock = true;
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      html += escapeHtmlServer(line) + "\n";
+      continue;
+    }
+
+    if (line.trim() === "") {
+      continue;
+    }
+
+    if (line.startsWith("### ")) {
+      html += '<h4 class="text-base font-semibold text-brand-800 mt-3 mb-1">' + escapeHtmlServer(line.slice(4)) + "</h4>";
+      continue;
+    }
+    if (line.startsWith("## ")) {
+      html += '<h3 class="text-lg font-semibold text-brand-800 mt-4 mb-1">' + escapeHtmlServer(line.slice(3)) + "</h3>";
+      continue;
+    }
+    if (line.startsWith("# ")) {
+      html += '<h2 class="text-xl font-semibold text-brand-800 mb-2">' + escapeHtmlServer(line.slice(2)) + "</h2>";
+      continue;
+    }
+
+    // List items
+    if (line.trimStart().startsWith("- ")) {
+      const indent = line.length - line.trimStart().length;
+      const content = line.trimStart().slice(2);
+      let formatted = escapeHtmlServer(content);
+      formatted = formatted.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+      formatted = formatted.replace(/`(.+?)`/g, '<code class="bg-brand-50 px-1 rounded text-sm font-mono">$1</code>');
+      const marginClass = indent > 0 ? " ml-4" : "";
+      html += '<p class="text-sm text-brand-700 mb-0.5' + marginClass + '">&bull; ' + formatted + "</p>";
+      continue;
+    }
+
+    let formatted = escapeHtmlServer(line);
+    formatted = formatted.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    formatted = formatted.replace(/`(.+?)`/g, '<code class="bg-brand-50 px-1 rounded text-sm font-mono">$1</code>');
+
+    html += '<p class="text-sm text-brand-700 mb-1">' + formatted + "</p>";
+  }
+
+  return html;
 }
 
 /**
