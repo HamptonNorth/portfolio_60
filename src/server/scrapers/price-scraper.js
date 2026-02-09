@@ -317,11 +317,14 @@ export async function scrapeSingleInvestmentPrice(investment, browser = null, op
       result.parsedPrice = parsed.value;
       result.isMinorUnit = parsed.isMinorUnit;
 
-      // FT Markets prices labelled "PRICE (GBP)" are in pounds, not pence.
+      // FT Markets fund pages labelled "PRICE (GBP)" return prices in pounds, not pence.
       // The raw text is just a number (e.g. "3.83") with no currency indicator,
       // so parsePrice defaults to minor units. Override when the URL tells us
       // the price is in major units (GBP, USD, EUR — anything except GBX).
-      if (scrapeUrl && scrapeUrl.includes("markets.ft.com") && parsed.isMinorUnit) {
+      // Only apply to fund URLs (/data/funds) — equity URLs (/data/equities) use
+      // exchange suffixes (LSE, NYQ, etc.) not currency codes, and their prices
+      // are already in the correct units.
+      if (scrapeUrl && scrapeUrl.includes("markets.ft.com/data/funds") && parsed.isMinorUnit) {
         const ftCurrencyMatch = scrapeUrl.match(/[?&]s=[^:]+:([A-Z]+)/i);
         if (ftCurrencyMatch && ftCurrencyMatch[1].toUpperCase() !== "GBX") {
           result.isMinorUnit = false;
@@ -377,7 +380,6 @@ export async function scrapeSingleInvestmentPrice(investment, browser = null, op
       browserInstance = null; // Clear so fallback knows to launch its own
     }
   }
-
   // Record the primary scraping attempt in history
   if (recordHistory) {
     recordScrapingAttempt({
@@ -422,8 +424,9 @@ export async function scrapeSingleInvestmentPrice(investment, browser = null, op
           const altRaw = altRawText ? altRawText.trim() : "";
           const altParsed = parsePrice(altRaw);
 
-          // Apply the same FT Markets GBP/GBX override as the primary scrape
-          if (altParsed.isMinorUnit) {
+          // Apply the same FT Markets fund GBP/GBX override as the primary scrape
+          // (alternate URLs are only generated for funds, not equities, but check anyway)
+          if (altParsed.isMinorUnit && alternateUrl.includes("markets.ft.com/data/funds")) {
             const altCurrencyMatch = alternateUrl.match(/[?&]s=[^:]+:([A-Z]+)/i);
             if (altCurrencyMatch && altCurrencyMatch[1].toUpperCase() !== "GBX") {
               altParsed.isMinorUnit = false;
@@ -531,6 +534,20 @@ export async function scrapeSingleInvestmentPrice(investment, browser = null, op
         result.priceMinorUnit = normaliseToMinorUnit(fallbackParsed.value, fallbackParsed.isMinorUnit);
         result.error = "";
         result.fallbackUsed = true;
+
+        // Record the successful Fidelity fallback in scraping history
+        // so it's visible that FT Markets failed but Fidelity saved the day.
+        if (recordHistory) {
+          recordScrapingAttempt({
+            scrapeType: "investment",
+            referenceId: investment.id,
+            startedBy: startedBy,
+            attemptNumber: attemptNumber,
+            success: true,
+            errorCode: "FIDELITY_FALLBACK",
+            errorMessage: "WARNING: FT Markets failed, price obtained via Fidelity fallback. Original error: " + primaryError,
+          });
+        }
 
         // Store the price in the database (skip in test mode)
         if (!testMode) {
@@ -761,6 +778,40 @@ export function getScrapeableInvestments() {
 }
 
 /**
+ * @description Scrape the price for a single investment by its ID.
+ * Does NOT fetch currency rates first (unlike scrapeAllPrices).
+ * Use this for re-scraping an individual investment.
+ *
+ * @param {number} id - The investment ID
+ * @param {Object} [options={}] - Additional options
+ * @param {boolean} [options.testMode=false] - If true, skip database writes (for testing)
+ * @returns {Promise<{success: boolean, price: Object|null, message: string, error?: string}>}
+ */
+export async function scrapePriceById(id, options = {}) {
+  const testMode = options.testMode || false;
+  const scrapeTime = options.scrapeTime || new Date().toTimeString().slice(0, 8);
+  const investment = getInvestmentById(id);
+
+  if (!investment) {
+    return {
+      success: false,
+      price: null,
+      message: "Investment not found",
+      error: "No investment with ID " + id,
+    };
+  }
+
+  const priceResult = await scrapeSingleInvestmentPrice(investment, null, { testMode: testMode, scrapeTime: scrapeTime });
+
+  return {
+    success: priceResult.success,
+    price: priceResult,
+    message: priceResult.success ? "Price scraped for " + investment.description : "Failed to scrape price for " + investment.description,
+    error: priceResult.error || undefined,
+  };
+}
+
+/**
  * @description Resolve the effective scraping URL and CSS selector for an investment
  * without actually scraping. Follows the same priority logic as scrapeSingleInvestmentPrice:
  * 1. Manual investment_url (user override wins)
@@ -801,38 +852,4 @@ export function resolveScrapingConfig(investment) {
   }
 
   return { url, selector, urlSource, selectorSource };
-}
-
-/**
- * @description Scrape the price for a single investment by its ID.
- * Does NOT fetch currency rates first (unlike scrapeAllPrices).
- * Use this for re-scraping an individual investment.
- *
- * @param {number} id - The investment ID
- * @param {Object} [options={}] - Additional options
- * @param {boolean} [options.testMode=false] - If true, skip database writes (for testing)
- * @returns {Promise<{success: boolean, price: Object|null, message: string, error?: string}>}
- */
-export async function scrapePriceById(id, options = {}) {
-  const testMode = options.testMode || false;
-  const scrapeTime = options.scrapeTime || new Date().toTimeString().slice(0, 8);
-  const investment = getInvestmentById(id);
-
-  if (!investment) {
-    return {
-      success: false,
-      price: null,
-      message: "Investment not found",
-      error: "No investment with ID " + id,
-    };
-  }
-
-  const priceResult = await scrapeSingleInvestmentPrice(investment, null, { testMode: testMode, scrapeTime: scrapeTime });
-
-  return {
-    success: priceResult.success,
-    price: priceResult,
-    message: priceResult.success ? "Price scraped for " + investment.description : "Failed to scrape price for " + investment.description,
-    error: priceResult.error || undefined,
-  };
 }

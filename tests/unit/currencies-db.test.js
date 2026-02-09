@@ -4,13 +4,7 @@ process.env.DB_PATH = "data/portfolio_60_test/test-currencies-db.db";
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { existsSync, unlinkSync } from "node:fs";
 import { createDatabase, closeDatabase, getDatabasePath } from "../../src/server/db/connection.js";
-import {
-  getAllCurrencies,
-  getCurrencyById,
-  createCurrency,
-  updateCurrency,
-  deleteCurrency,
-} from "../../src/server/db/currencies-db.js";
+import { getAllCurrencies, getCurrencyById, createCurrency, updateCurrency, deleteCurrency } from "../../src/server/db/currencies-db.js";
 
 const testDbPath = getDatabasePath();
 

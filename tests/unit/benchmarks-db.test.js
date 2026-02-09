@@ -5,14 +5,7 @@ import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { existsSync, unlinkSync } from "node:fs";
 import { createDatabase, closeDatabase, getDatabasePath } from "../../src/server/db/connection.js";
 import { getAllCurrencies, createCurrency } from "../../src/server/db/currencies-db.js";
-import {
-  getAllBenchmarks,
-  getBenchmarkById,
-  createBenchmark,
-  updateBenchmark,
-  deleteBenchmark,
-  getGbpCurrencyId,
-} from "../../src/server/db/benchmarks-db.js";
+import { getAllBenchmarks, getBenchmarkById, createBenchmark, updateBenchmark, deleteBenchmark, getGbpCurrencyId } from "../../src/server/db/benchmarks-db.js";
 
 const testDbPath = getDatabasePath();
 

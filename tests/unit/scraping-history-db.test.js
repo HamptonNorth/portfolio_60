@@ -8,14 +8,7 @@ import { getAllCurrencies, createCurrency } from "../../src/server/db/currencies
 import { createInvestment } from "../../src/server/db/investments-db.js";
 import { createBenchmark } from "../../src/server/db/benchmarks-db.js";
 import { getAllInvestmentTypes } from "../../src/server/db/investment-types-db.js";
-import {
-  recordScrapingAttempt,
-  getLastSuccessfulScrape,
-  getLastSuccessfulScrapeByType,
-  getScrapingHistory,
-  getScrapingHistoryCount,
-  getScrapingHistoryWithDescriptions,
-} from "../../src/server/db/scraping-history-db.js";
+import { recordScrapingAttempt, getLastSuccessfulScrape, getLastSuccessfulScrapeByType, getScrapingHistory, getScrapingHistoryCount, getScrapingHistoryWithDescriptions } from "../../src/server/db/scraping-history-db.js";
 
 const testDbPath = getDatabasePath();
 

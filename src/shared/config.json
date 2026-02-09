@@ -31,7 +31,7 @@
       {
         "pattern": "markets.ft.com/data/funds",
         "name": "FT Markets (Funds)",
-        "selector": "span.mod-ui-data-list__value",
+        "selector": "XXspan.mod-ui-data-list__value",
         "waitStrategy": "networkidle",
         "notes": "Fund/ETF tearsheet pages. Auto-used when public_id contains an ISIN."
       },
