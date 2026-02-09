@@ -13,6 +13,7 @@ import { getDatabase } from "../db/connection.js";
 import { upsertRate, scaleRate } from "../db/currency-rates-db.js";
 import { upsertPrice } from "../db/prices-db.js";
 import { upsertBenchmarkData } from "../db/benchmark-data-db.js";
+import { detectPublicIdType } from "../../shared/public-id-utils.js";
 import YahooFinance from "yahoo-finance2";
 
 // ---------------------------------------------------------------------------
@@ -552,11 +553,11 @@ export async function fetchMorningstarHistory(morningstarId, universe, currencyC
 export async function backfillInvestmentPrices(progressCallback) {
   const db = getDatabase();
 
-  // Fetch all investments with their currency code and morningstar_id
+  // Fetch all investments with their currency code, morningstar_id, and public_id
   const investments = db
     .query(
       `SELECT i.id, i.description, i.investment_url, i.morningstar_id,
-              c.code AS currency_code
+              i.public_id, c.code AS currency_code
        FROM investments i
        JOIN currencies c ON i.currencies_id = c.id
        ORDER BY i.description`,
@@ -593,8 +594,16 @@ export async function backfillInvestmentPrices(progressCallback) {
     if (!morningstarId) {
       let lookupResult = null;
 
-      // Try ISIN extraction first (Fidelity URLs)
-      const isin = extractIsinFromUrl(inv.investment_url);
+      // Priority 1: Check public_id for ISIN
+      const publicIdType = detectPublicIdType(inv.public_id);
+      let isin = null;
+
+      if (publicIdType === "isin") {
+        isin = inv.public_id.trim().toUpperCase();
+      } else {
+        // Priority 2: Try ISIN extraction from URL (Fidelity URLs)
+        isin = extractIsinFromUrl(inv.investment_url);
+      }
 
       if (isin) {
         progressCallback({
@@ -602,8 +611,15 @@ export async function backfillInvestmentPrices(progressCallback) {
           message: inv.description + ": looking up ISIN " + isin + "...",
         });
         lookupResult = await lookupMorningstarIdByIsin(isin);
+      } else if (publicIdType === "ticker") {
+        // Priority 3: public_id is a ticker — search Morningstar by name
+        progressCallback({
+          type: "progress",
+          message: inv.description + ": looking up ticker " + inv.public_id + "...",
+        });
+        lookupResult = await lookupMorningstarIdByName(inv.description);
       } else {
-        // Try LSE ticker extraction
+        // Priority 4: Try LSE ticker extraction from URL
         const ticker = extractLseTickerFromUrl(inv.investment_url);
 
         if (ticker) {
@@ -611,12 +627,11 @@ export async function backfillInvestmentPrices(progressCallback) {
             type: "progress",
             message: inv.description + ": looking up LSE ticker " + ticker + "...",
           });
-          // Search by the investment description since Morningstar doesn't search by ticker directly
           lookupResult = await lookupMorningstarIdByName(inv.description);
         } else {
           progressCallback({
             type: "progress",
-            message: inv.description + ": no ISIN or ticker found in URL, skipping",
+            message: inv.description + ": no ISIN or ticker found, skipping",
           });
           skipped.push(inv.description);
           continue;
@@ -937,7 +952,7 @@ export async function testBackfillInvestment(investmentId) {
   const inv = db
     .query(
       `SELECT i.id, i.description, i.investment_url, i.morningstar_id,
-              c.code AS currency_code
+              i.public_id, c.code AS currency_code
        FROM investments i
        JOIN currencies c ON i.currencies_id = c.id
        WHERE i.id = ?`,
@@ -951,11 +966,21 @@ export async function testBackfillInvestment(investmentId) {
   let universe = null;
 
   if (!morningstarId) {
-    const isin = extractIsinFromUrl(inv.investment_url);
+    const publicIdType = detectPublicIdType(inv.public_id);
+    let isin = null;
+
+    if (publicIdType === "isin") {
+      isin = inv.public_id.trim().toUpperCase();
+    } else {
+      isin = extractIsinFromUrl(inv.investment_url);
+    }
+
     let lookupResult = null;
 
     if (isin) {
       lookupResult = await lookupMorningstarIdByIsin(isin);
+    } else if (publicIdType === "ticker") {
+      lookupResult = await lookupMorningstarIdByName(inv.description);
     } else {
       const ticker = extractLseTickerFromUrl(inv.investment_url);
       if (ticker) {
@@ -1004,7 +1029,7 @@ export async function loadBackfillInvestment(investmentId) {
   const inv = db
     .query(
       `SELECT i.id, i.description, i.investment_url, i.morningstar_id,
-              c.code AS currency_code
+              i.public_id, c.code AS currency_code
        FROM investments i
        JOIN currencies c ON i.currencies_id = c.id
        WHERE i.id = ?`,
@@ -1017,11 +1042,21 @@ export async function loadBackfillInvestment(investmentId) {
   let universe = null;
 
   if (!morningstarId) {
-    const isin = extractIsinFromUrl(inv.investment_url);
+    const publicIdType = detectPublicIdType(inv.public_id);
+    let isin = null;
+
+    if (publicIdType === "isin") {
+      isin = inv.public_id.trim().toUpperCase();
+    } else {
+      isin = extractIsinFromUrl(inv.investment_url);
+    }
+
     let lookupResult = null;
 
     if (isin) {
       lookupResult = await lookupMorningstarIdByIsin(isin);
+    } else if (publicIdType === "ticker") {
+      lookupResult = await lookupMorningstarIdByName(inv.description);
     } else {
       const ticker = extractLseTickerFromUrl(inv.investment_url);
       if (ticker) {

@@ -206,6 +206,58 @@ function runMigrations(database) {
   if (!hasYahooTicker) {
     database.exec("ALTER TABLE benchmarks ADD COLUMN yahoo_ticker TEXT");
   }
+
+  // Migration 8: Add public_id column to investments (v0.4.0)
+  // Stores an ISIN code (e.g. "GB00B4PQW151") for mutual funds, or an
+  // exchange:ticker code (e.g. "LSE:AZN") for shares and investment trusts.
+  // Used to auto-generate FT Markets pricing URLs without manual URL entry.
+  const hasPublicId = investmentsCols.some(function (col) {
+    return col.name === "public_id";
+  });
+
+  if (!hasPublicId) {
+    database.exec("ALTER TABLE investments ADD COLUMN public_id TEXT");
+  }
+
+  // Migration 9: Add test_investments and test_prices tables (v0.4.0)
+  // Scraper testing sandbox — allows users to test scraper configurations
+  // without affecting live portfolio data.
+  const testInvestmentsTable = database.query("SELECT name FROM sqlite_master WHERE type='table' AND name='test_investments'").get();
+
+  if (!testInvestmentsTable) {
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS test_investments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        currencies_id INTEGER NOT NULL,
+        investment_type_id INTEGER NOT NULL,
+        description TEXT NOT NULL CHECK(length(description) <= 60),
+        public_id TEXT CHECK(public_id IS NULL OR length(public_id) <= 20),
+        investment_url TEXT CHECK(investment_url IS NULL OR length(investment_url) <= 255),
+        selector TEXT CHECK(selector IS NULL OR length(selector) <= 255),
+        source_site TEXT CHECK(source_site IS NULL OR length(source_site) <= 60),
+        notes TEXT CHECK(notes IS NULL OR length(notes) <= 255),
+        last_test_date TEXT,
+        last_test_success INTEGER,
+        last_test_price TEXT,
+        FOREIGN KEY (currencies_id) REFERENCES currencies(id),
+        FOREIGN KEY (investment_type_id) REFERENCES investment_types(id)
+      )
+    `);
+
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS test_prices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        test_investment_id INTEGER NOT NULL,
+        price_date TEXT NOT NULL,
+        price_time TEXT NOT NULL DEFAULT '00:00:00',
+        price INTEGER NOT NULL,
+        FOREIGN KEY (test_investment_id) REFERENCES test_investments(id) ON DELETE CASCADE,
+        UNIQUE(test_investment_id, price_date)
+      )
+    `);
+
+    database.exec("CREATE INDEX IF NOT EXISTS idx_test_prices_lookup ON test_prices(test_investment_id, price_date DESC)");
+  }
 }
 
 /**

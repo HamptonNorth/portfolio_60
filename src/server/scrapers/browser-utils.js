@@ -136,8 +136,10 @@ export function isBrowserAlive(browser) {
  */
 export async function navigateTo(page, url, options = {}) {
   const defaults = getNavigationOptions(url);
-  const timeout = options.timeout || defaults.timeout;
   const waitUntil = options.waitUntil || defaults.waitUntil;
+  // Use a longer timeout for networkidle (even if the URL isn't in HEAVY_JS_SITES)
+  const defaultTimeout = waitUntil === "networkidle" ? 60000 : defaults.timeout;
+  const timeout = options.timeout || defaultTimeout;
 
   return await page.goto(url, {
     waitUntil: waitUntil,

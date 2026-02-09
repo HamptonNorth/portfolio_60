@@ -127,6 +127,12 @@ export function loadConfig() {
     sites: Array.isArray(rawScraperSites.sites) ? rawScraperSites.sites : DEFAULTS.scraperSites.sites,
   };
 
+  // scraperTesting — feature flag for the scraper testing sandbox
+  const rawScraperTesting = rawConfig.scraperTesting || {};
+  config.scraperTesting = {
+    enabled: typeof rawScraperTesting.enabled === "boolean" ? rawScraperTesting.enabled : false,
+  };
+
   configCache = config;
   return config;
 }
@@ -165,6 +171,15 @@ export function getScrapeDelayProfile() {
 export function getAllowedProviders() {
   const config = loadConfig();
   return config.allowed_providers;
+}
+
+/**
+ * @description Check whether the Scraper Testing feature is enabled in config.
+ * @returns {boolean} True if scraperTesting.enabled is true
+ */
+export function getScraperTestingEnabled() {
+  const config = loadConfig();
+  return config.scraperTesting && config.scraperTesting.enabled === true;
 }
 
 /**

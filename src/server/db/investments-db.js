@@ -14,6 +14,7 @@ export function getAllInvestments() {
         i.currencies_id,
         i.investment_type_id,
         i.description,
+        i.public_id,
         i.investment_url,
         i.selector,
         c.code AS currency_code,
@@ -42,6 +43,7 @@ export function getInvestmentById(id) {
         i.currencies_id,
         i.investment_type_id,
         i.description,
+        i.public_id,
         i.investment_url,
         i.selector,
         c.code AS currency_code,
@@ -69,9 +71,9 @@ export function getInvestmentById(id) {
 export function createInvestment(data) {
   const db = getDatabase();
   const result = db.run(
-    `INSERT INTO investments (currencies_id, investment_type_id, description, investment_url, selector)
-     VALUES (?, ?, ?, ?, ?)`,
-    [data.currencies_id, data.investment_type_id, data.description, data.investment_url || null, data.selector || null],
+    `INSERT INTO investments (currencies_id, investment_type_id, description, public_id, investment_url, selector)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [data.currencies_id, data.investment_type_id, data.description, data.public_id || null, data.investment_url || null, data.selector || null],
   );
 
   return getInvestmentById(result.lastInsertRowid);
@@ -88,9 +90,9 @@ export function updateInvestment(id, data) {
   const result = db.run(
     `UPDATE investments SET
        currencies_id = ?, investment_type_id = ?, description = ?,
-       investment_url = ?, selector = ?
+       public_id = ?, investment_url = ?, selector = ?
      WHERE id = ?`,
-    [data.currencies_id, data.investment_type_id, data.description, data.investment_url || null, data.selector || null, id],
+    [data.currencies_id, data.investment_type_id, data.description, data.public_id || null, data.investment_url || null, data.selector || null, id],
   );
 
   if (result.changes === 0) {
@@ -98,6 +100,21 @@ export function updateInvestment(id, data) {
   }
 
   return getInvestmentById(id);
+}
+
+/**
+ * @description Update only the scraping source fields (investment_url and selector)
+ * on an investment. Used by the Fidelity fallback to write back the discovered
+ * factsheet URL without requiring a full record update.
+ * @param {number} id - The investment ID to update
+ * @param {string|null} url - The new investment_url value
+ * @param {string|null} selector - The new selector value (null if config provides it)
+ * @returns {boolean} True if the investment was updated, false if not found
+ */
+export function updateInvestmentScrapingSource(id, url, selector) {
+  const db = getDatabase();
+  const result = db.run("UPDATE investments SET investment_url = ?, selector = ? WHERE id = ?", [url || null, selector || null, id]);
+  return result.changes > 0;
 }
 
 /**

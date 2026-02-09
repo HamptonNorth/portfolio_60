@@ -1,10 +1,12 @@
-import { getAllInvestments, getInvestmentById } from "../db/investments-db.js";
+import { getAllInvestments, getInvestmentById, updateInvestmentScrapingSource } from "../db/investments-db.js";
+import { updateTestInvestmentScrapingSource } from "../db/test-investments-db.js";
 import { fetchCurrencyRates } from "./currency-scraper.js";
 import { SCRAPE_DELAY_PROFILES, DEFAULT_SCRAPE_DELAY_PROFILE } from "../../shared/constants.js";
 import { upsertPrice } from "../db/prices-db.js";
 import { recordScrapingAttempt } from "../db/scraping-history-db.js";
 import { launchBrowser, createStealthContext, createStealthPage, navigateTo, isBrowserAlive } from "./browser-utils.js";
 import { getSelector } from "../config.js";
+import { buildFtMarketsUrl, getFtMarketsSelector, buildFidelitySearchUrl, detectPublicIdType } from "../../shared/public-id-utils.js";
 
 /**
  * @description Parse a price string extracted from a web page into a numeric value.
@@ -106,25 +108,100 @@ export function normaliseToMinorUnit(value, isMinorUnit) {
 }
 
 /**
+ * @description Discover the Fidelity UK factsheet URL for a given ISIN by searching
+ * the Fidelity website. Navigates to the Fidelity search page, waits for the
+ * search results iframe to load, and extracts the "View Factsheet" link href.
+ *
+ * The search results are rendered inside an iframe (#answers-frame) from Fidelity's
+ * Yext search platform. The factsheet link has the class "HitchhikerCTA".
+ *
+ * @param {string} isin - The ISIN code to search for (e.g. "GB00BJS8SH10")
+ * @param {import('playwright').Browser} browser - An existing browser instance to use
+ * @returns {Promise<{success: boolean, url: string|null, error: string|null}>}
+ */
+export async function scrapeFidelityFactsheetUrl(isin, browser) {
+  const searchUrl = buildFidelitySearchUrl(isin);
+  if (!searchUrl) {
+    return { success: false, url: null, error: "Invalid ISIN for Fidelity search: " + isin };
+  }
+
+  let page = null;
+  try {
+    const context = await createStealthContext(browser, searchUrl);
+    page = await createStealthPage(context);
+
+    // Navigate to the Fidelity search page
+    await navigateTo(page, searchUrl, { waitUntil: "networkidle" });
+
+    // The search results are inside an iframe (#answers-frame)
+    const iframeEl = await page.waitForSelector("#answers-frame", { timeout: 15000 });
+    if (!iframeEl) {
+      return { success: false, url: null, error: "Fidelity search iframe not found" };
+    }
+
+    const frame = await iframeEl.contentFrame();
+    if (!frame) {
+      return { success: false, url: null, error: "Could not access Fidelity search iframe content" };
+    }
+
+    // Wait for the "View Factsheet" link to appear inside the iframe
+    const factsheetLink = await frame.waitForSelector("a.HitchhikerCTA", { timeout: 15000 });
+    if (!factsheetLink) {
+      return { success: false, url: null, error: "View Factsheet link not found in search results for ISIN: " + isin };
+    }
+
+    const href = await factsheetLink.getAttribute("href");
+    if (!href || !href.includes("factsheet")) {
+      return { success: false, url: null, error: "Factsheet link has unexpected href: " + (href || "(empty)") };
+    }
+
+    return { success: true, url: href, error: null };
+  } catch (err) {
+    return { success: false, url: null, error: "Fidelity search failed: " + err.message };
+  } finally {
+    if (page) {
+      try {
+        await page.close();
+      } catch {
+        // Ignore close errors
+      }
+    }
+  }
+}
+
+/**
  * @description Scrape the current price for a single investment using Playwright.
  * Launches a headless Chromium browser, navigates to the investment URL,
  * waits for the CSS selector, and extracts the text content.
  * Stores successful prices in the prices table and records all attempts in scraping_history.
  *
+ * When the primary source (manual URL or FT Markets) fails for an ISIN-based investment,
+ * attempts a Fidelity UK fallback: searches Fidelity by ISIN to discover the factsheet
+ * URL, then scrapes the price from that page. On success, writes the factsheet URL back
+ * to the investment record so subsequent scrapes go direct without the search step.
+ *
  * @param {Object} investment - The investment object (from getAllInvestments or getInvestmentById)
  * @param {Object} [browser=null] - An existing Playwright browser instance to reuse.
  *   If null, a new browser is launched and closed after scraping.
  * @param {Object} [options={}] - Additional options
- * @param {number} [options.startedBy=0] - 0 = manual/interactive, 1 = scheduled/cron
+ * @param {number} [options.startedBy=0] - 0 = manual/interactive, 1 = scheduled/cron, 3 = test investments
  * @param {number} [options.attemptNumber=1] - Retry attempt counter (1-5)
- * @param {boolean} [options.testMode=false] - If true, skip database writes (for testing)
- * @returns {Promise<{success: boolean, investmentId: number, description: string, rawPrice: string, parsedPrice: number|null, isMinorUnit: boolean, priceMinorUnit: number|null, currency: string, error?: string}>}
+ * @param {boolean} [options.testMode=false] - If true, skip writing to the live prices table.
+ *   Scraping history is still recorded when startedBy=3 (test investments).
+ * @param {string} [options.sourceTable="investments"] - Which table this investment comes from:
+ *   "investments" or "test_investments". Used by the Fidelity fallback to write back
+ *   the discovered factsheet URL to the correct table.
+ * @returns {Promise<{success: boolean, investmentId: number, description: string, rawPrice: string, parsedPrice: number|null, isMinorUnit: boolean, priceMinorUnit: number|null, currency: string, error?: string, fallbackUsed?: boolean}>}
  */
 export async function scrapeSingleInvestmentPrice(investment, browser = null, options = {}) {
   const startedBy = options.startedBy || 0;
   const attemptNumber = options.attemptNumber || 1;
   const testMode = options.testMode || false;
   const scrapeTime = options.scrapeTime || new Date().toTimeString().slice(0, 8);
+  const sourceTable = options.sourceTable || "investments";
+  // Record scraping history for live scrapes and test investment scrapes (startedBy=3),
+  // but not for unit test mode where testMode=true and startedBy is 0 or 1.
+  const recordHistory = !testMode || startedBy === 3;
   const result = {
     success: false,
     investmentId: investment.id,
@@ -135,12 +212,26 @@ export async function scrapeSingleInvestmentPrice(investment, browser = null, op
     priceMinorUnit: null,
     currency: investment.currency_code || "",
     error: "",
+    fallbackUsed: false,
   };
 
-  if (!investment.investment_url) {
-    result.error = "No URL configured";
-    // Record failed attempt in history (skip in test mode)
-    if (!testMode) {
+  // Resolve the scraping URL and selector. Priority:
+  // 1. Manual investment_url (user override always wins)
+  // 2. Auto-generated URL from public_id via FT Markets
+  // 3. No URL available — skip
+  let scrapeUrl = investment.investment_url || null;
+  let scrapeSelector = investment.selector || null;
+
+  if (!scrapeUrl && investment.public_id) {
+    scrapeUrl = buildFtMarketsUrl(investment.public_id, investment.currency_code);
+    if (scrapeUrl) {
+      scrapeSelector = getFtMarketsSelector();
+    }
+  }
+
+  if (!scrapeUrl) {
+    result.error = "No URL configured and no public ID available";
+    if (recordHistory) {
       recordScrapingAttempt({
         scrapeType: "investment",
         referenceId: investment.id,
@@ -154,13 +245,12 @@ export async function scrapeSingleInvestmentPrice(investment, browser = null, op
     return result;
   }
 
-  // Look up selector from config if not provided in the investment record
-  const selectorInfo = getSelector(investment.investment_url, investment.selector);
+  // Look up selector from config if not provided in the investment record or auto-generated
+  const selectorInfo = getSelector(scrapeUrl, scrapeSelector);
 
   if (!selectorInfo.selector) {
     result.error = "No CSS selector configured and URL does not match any known site";
-    // Record failed attempt in history (skip in test mode)
-    if (!testMode) {
+    if (recordHistory) {
       recordScrapingAttempt({
         scrapeType: "investment",
         referenceId: investment.id,
@@ -192,11 +282,11 @@ export async function scrapeSingleInvestmentPrice(investment, browser = null, op
     }
 
     // Create stealth context with anti-bot bypasses (including Google consent cookie)
-    const context = await createStealthContext(browserInstance, investment.investment_url);
+    const context = await createStealthContext(browserInstance, scrapeUrl);
     page = await createStealthPage(context);
 
-    // Navigate to the investment URL with appropriate settings for the site
-    await navigateTo(page, investment.investment_url);
+    // Navigate to the scraping URL using the wait strategy from site config
+    await navigateTo(page, scrapeUrl, { waitUntil: waitStrategy });
     navigationSucceeded = true;
 
     // Capture page title for diagnostics
@@ -207,7 +297,7 @@ export async function scrapeSingleInvestmentPrice(investment, browser = null, op
     }
 
     // Wait for the selector to appear on the page (longer timeout for heavy JS sites)
-    const selectorTimeout = waitStrategy === "networkidle" ? 30000 : 20000;
+    const selectorTimeout = waitStrategy === "networkidle" ? 45000 : 20000;
     const element = await page.waitForSelector(activeSelector, {
       timeout: selectorTimeout,
     });
@@ -270,11 +360,12 @@ export async function scrapeSingleInvestmentPrice(investment, browser = null, op
       } catch {
         // Ignore close errors
       }
+      browserInstance = null; // Clear so fallback knows to launch its own
     }
   }
 
-  // Record the scraping attempt in history (skip in test mode)
-  if (!testMode) {
+  // Record the primary scraping attempt in history
+  if (recordHistory) {
     recordScrapingAttempt({
       scrapeType: "investment",
       referenceId: investment.id,
@@ -284,6 +375,108 @@ export async function scrapeSingleInvestmentPrice(investment, browser = null, op
       errorCode: result.success ? null : errorCode,
       errorMessage: result.success ? null : result.error,
     });
+  }
+
+  // --- Fidelity fallback ---
+  // If the primary source failed and the investment has an ISIN public_id,
+  // try discovering the Fidelity factsheet URL and scraping the price from there.
+  if (!result.success && investment.public_id && detectPublicIdType(investment.public_id) === "isin") {
+    const primaryError = result.error;
+    let fallbackBrowser = browserInstance;
+    const launchedFallbackBrowser = !fallbackBrowser;
+
+    try {
+      if (launchedFallbackBrowser) {
+        fallbackBrowser = await launchBrowser();
+      }
+
+      // Step 1: Search Fidelity to discover the factsheet URL
+      const discovery = await scrapeFidelityFactsheetUrl(investment.public_id, fallbackBrowser);
+      if (!discovery.success) {
+        // Fallback discovery failed — keep the original error
+        result.error = primaryError + " | Fidelity fallback also failed: " + discovery.error;
+        return result;
+      }
+
+      const factsheetUrl = discovery.url;
+
+      // Step 2: Scrape the price from the factsheet page
+      const fidelitySelectorInfo = getSelector(factsheetUrl, null);
+      if (!fidelitySelectorInfo.selector) {
+        result.error = primaryError + " | Fidelity fallback: no selector for factsheet URL";
+        return result;
+      }
+
+      let fallbackPage = null;
+      try {
+        const fallbackContext = await createStealthContext(fallbackBrowser, factsheetUrl);
+        fallbackPage = await createStealthPage(fallbackContext);
+
+        await navigateTo(fallbackPage, factsheetUrl, {
+          waitUntil: fidelitySelectorInfo.waitStrategy || "networkidle",
+        });
+
+        const fallbackElement = await fallbackPage.waitForSelector(fidelitySelectorInfo.selector, {
+          timeout: 30000,
+        });
+
+        if (!fallbackElement) {
+          result.error = primaryError + " | Fidelity fallback: selector not found on factsheet page";
+          return result;
+        }
+
+        const fallbackRawText = await fallbackElement.textContent();
+        const fallbackRaw = fallbackRawText ? fallbackRawText.trim() : "";
+        const fallbackParsed = parsePrice(fallbackRaw);
+
+        if (fallbackParsed.value === null) {
+          result.error = primaryError + " | Fidelity fallback: could not parse price from: " + fallbackRaw;
+          return result;
+        }
+
+        // Fallback succeeded — update the result
+        result.success = true;
+        result.rawPrice = fallbackRaw;
+        result.parsedPrice = fallbackParsed.value;
+        result.isMinorUnit = fallbackParsed.isMinorUnit;
+        result.priceMinorUnit = normaliseToMinorUnit(fallbackParsed.value, fallbackParsed.isMinorUnit);
+        result.error = "";
+        result.fallbackUsed = true;
+
+        // Store the price in the database (skip in test mode)
+        if (!testMode) {
+          const today = new Date().toISOString().split("T")[0];
+          upsertPrice(investment.id, today, scrapeTime, result.priceMinorUnit);
+        }
+
+        // Write the discovered factsheet URL back to the investment record
+        // so subsequent scrapes go direct to Fidelity without the search step.
+        // Selector is left null — the Fidelity config pattern match provides it.
+        if (sourceTable === "test_investments") {
+          updateTestInvestmentScrapingSource(investment.id, factsheetUrl, null);
+        } else {
+          updateInvestmentScrapingSource(investment.id, factsheetUrl, null);
+        }
+      } finally {
+        if (fallbackPage) {
+          try {
+            await fallbackPage.close();
+          } catch {
+            // Ignore close errors
+          }
+        }
+      }
+    } catch (err) {
+      result.error = primaryError + " | Fidelity fallback error: " + err.message;
+    } finally {
+      if (launchedFallbackBrowser && fallbackBrowser) {
+        try {
+          await fallbackBrowser.close();
+        } catch {
+          // Ignore close errors
+        }
+      }
+    }
   }
 
   return result;
@@ -398,7 +591,9 @@ export async function scrapeAllPrices(onProgress = null, options = {}) {
       }
 
       // Random delay between requests to avoid rate-limiting/blocking
-      const currentDomain = extractDomain(investment.investment_url);
+      // Use the resolved URL (manual URL or auto-generated from public_id) for domain comparison
+      const effectiveUrl = investment.investment_url || buildFtMarketsUrl(investment.public_id, investment.currency_code) || "";
+      const currentDomain = extractDomain(effectiveUrl);
       const delayMs = calculateDelay(previousDomain, currentDomain);
       if (delayMs > 0) {
         await sleep(delayMs);
@@ -454,21 +649,25 @@ export async function scrapeAllPrices(onProgress = null, options = {}) {
 
 /**
  * @description Get the list of scrapeable investments.
- * An investment is scrapeable if it has a URL AND either:
- * - has a custom selector configured, OR
- * - its URL matches a known site in the scraper config
+ * An investment is scrapeable if it has:
+ * - a URL AND either a custom selector or a URL that matches a known site, OR
+ * - a public_id (ISIN or ticker) that can generate an FT Markets URL
  * Used by the SSE endpoint to send the investment list before scraping begins.
  * @returns {Object[]} Array of investment objects that can be scraped
  */
 export function getScrapeableInvestments() {
   const allInvestments = getAllInvestments();
   return allInvestments.filter(function (inv) {
-    if (!inv.investment_url) {
-      return false;
+    // Option 1: has a manual URL with a resolvable selector
+    if (inv.investment_url) {
+      const selectorInfo = getSelector(inv.investment_url, inv.selector);
+      return selectorInfo.selector !== null;
     }
-    // Has custom selector, or URL matches a known site
-    const selectorInfo = getSelector(inv.investment_url, inv.selector);
-    return selectorInfo.selector !== null;
+    // Option 2: has a public_id that can generate an FT Markets URL
+    if (inv.public_id) {
+      return buildFtMarketsUrl(inv.public_id, inv.currency_code) !== null;
+    }
+    return false;
   });
 }
 

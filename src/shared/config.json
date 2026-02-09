@@ -14,6 +14,10 @@
     "maxAttempts": 5
   },
   "scrapeDelayProfile": "cron",
+  "scraperTesting": {
+    "_readme": "Enable the Scraper Testing page — a sandbox for testing scraper configurations without affecting live portfolio data. Disabled by default; set enabled to true via Edit Settings to show the page.",
+    "enabled": true
+  },
   "scraperSites": {
     "_readme": "Known website patterns for price/benchmark scraping. Tech-savvy users can edit this section to add new sites or fix broken selectors. The app matches URLs against these patterns and auto-fills the selector.",
     "_format": {
@@ -24,6 +28,20 @@
       "notes": "Optional notes about the site or selector"
     },
     "sites": [
+      {
+        "pattern": "markets.ft.com/data/funds",
+        "name": "FT Markets (Funds)",
+        "selector": "span.mod-ui-data-list__value",
+        "waitStrategy": "networkidle",
+        "notes": "Fund/ETF tearsheet pages. Auto-used when public_id contains an ISIN."
+      },
+      {
+        "pattern": "markets.ft.com/data/equities",
+        "name": "FT Markets (Equities)",
+        "selector": "span.mod-ui-data-list__value",
+        "waitStrategy": "networkidle",
+        "notes": "Share/investment trust tearsheet pages. Auto-used when public_id contains a ticker."
+      },
       {
         "pattern": "google.com/finance",
         "name": "Google Finance",

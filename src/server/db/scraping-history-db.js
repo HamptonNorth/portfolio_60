@@ -5,7 +5,7 @@ import { getDatabase } from "./connection.js";
  * @param {Object} params - The scraping history parameters
  * @param {string} params.scrapeType - 'currency', 'investment', or 'benchmark'
  * @param {number} params.referenceId - FK to the relevant table (currencies, investments, or benchmarks)
- * @param {number} [params.startedBy=0] - 0 = manual/interactive, 1 = scheduled/cron
+ * @param {number} [params.startedBy=0] - 0 = manual/interactive, 1 = scheduled/cron, 3 = test investments
  * @param {number} [params.attemptNumber=1] - Retry attempt counter (1-5)
  * @param {boolean} params.success - Whether the scrape succeeded
  * @param {string|null} [params.errorCode=null] - HTTP status or error type
@@ -20,16 +20,7 @@ export function recordScrapingAttempt(params) {
     `INSERT INTO scraping_history
      (scrape_type, reference_id, scrape_datetime, started_by, attempt_number, success, error_code, error_message)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      params.scrapeType,
-      params.referenceId,
-      now,
-      params.startedBy || 0,
-      params.attemptNumber || 1,
-      params.success ? 1 : 0,
-      params.errorCode || null,
-      params.errorMessage || null,
-    ],
+    [params.scrapeType, params.referenceId, now, params.startedBy || 0, params.attemptNumber || 1, params.success ? 1 : 0, params.errorCode || null, params.errorMessage || null],
   );
 
   return result.lastInsertRowid;

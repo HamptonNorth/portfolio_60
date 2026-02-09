@@ -565,8 +565,30 @@ async function showAboutModal() {
   okBtn.focus();
 }
 
+/**
+ * @description Check whether the Scraper Testing feature is enabled and show/hide
+ * the nav link accordingly. Fetches the flag from the config API.
+ */
+async function checkScraperTestingNav() {
+  const navLink = document.getElementById("nav-scraper-testing");
+  if (!navLink) return;
+
+  try {
+    const response = await fetch("/api/config/scraper-testing-enabled");
+    if (response.ok) {
+      const data = await response.json();
+      if (data.enabled) {
+        navLink.classList.remove("hidden");
+      }
+    }
+  } catch {
+    // Silently fail — link stays hidden
+  }
+}
+
 // Initialise on page load
 document.addEventListener("DOMContentLoaded", function () {
   highlightActiveNav();
   loadBuildTime();
+  checkScraperTestingNav();
 });

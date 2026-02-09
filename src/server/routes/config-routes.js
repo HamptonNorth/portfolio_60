@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { getAllSiteConfigs, findSiteConfig, loadConfig, getAllowedProviders, getSchedulingConfig, reloadConfig } from "../config.js";
+import { getAllSiteConfigs, findSiteConfig, loadConfig, getAllowedProviders, getSchedulingConfig, reloadConfig, getScraperTestingEnabled } from "../config.js";
 
 /**
  * @description Get the list of allowed provider codes.
@@ -130,6 +130,15 @@ export function handleConfigRoute(method, path) {
   if (method === "GET" && path === "/api/config/scheduling") {
     const scheduling = getSchedulingConfig();
     return new Response(JSON.stringify(scheduling), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // GET /api/config/scraper-testing-enabled — check if scraper testing feature is enabled
+  if (method === "GET" && path === "/api/config/scraper-testing-enabled") {
+    const enabled = getScraperTestingEnabled();
+    return new Response(JSON.stringify({ enabled: enabled }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });

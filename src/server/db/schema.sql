@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS investments (
     currencies_id INTEGER NOT NULL,
     investment_type_id INTEGER NOT NULL,
     description TEXT NOT NULL CHECK(length(description) <= 60),
+    public_id TEXT CHECK(public_id IS NULL OR length(public_id) <= 20),
     investment_url TEXT CHECK(investment_url IS NULL OR length(investment_url) <= 255),
     selector TEXT CHECK(selector IS NULL OR length(selector) <= 255),
     FOREIGN KEY (currencies_id) REFERENCES currencies(id),
@@ -106,6 +107,35 @@ CREATE TABLE IF NOT EXISTS scraping_history (
     error_message TEXT
 );
 
+-- Test investments: sandbox for testing scraper configurations (Phase B, v0.4.0)
+CREATE TABLE IF NOT EXISTS test_investments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    currencies_id INTEGER NOT NULL,
+    investment_type_id INTEGER NOT NULL,
+    description TEXT NOT NULL CHECK(length(description) <= 60),
+    public_id TEXT CHECK(public_id IS NULL OR length(public_id) <= 20),
+    investment_url TEXT CHECK(investment_url IS NULL OR length(investment_url) <= 255),
+    selector TEXT CHECK(selector IS NULL OR length(selector) <= 255),
+    source_site TEXT CHECK(source_site IS NULL OR length(source_site) <= 60),
+    notes TEXT CHECK(notes IS NULL OR length(notes) <= 255),
+    last_test_date TEXT,
+    last_test_success INTEGER,
+    last_test_price TEXT,
+    FOREIGN KEY (currencies_id) REFERENCES currencies(id),
+    FOREIGN KEY (investment_type_id) REFERENCES investment_types(id)
+);
+
+-- Test prices: scraped prices from test investments (kept for comparison)
+CREATE TABLE IF NOT EXISTS test_prices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    test_investment_id INTEGER NOT NULL,
+    price_date TEXT NOT NULL,
+    price_time TEXT NOT NULL DEFAULT '00:00:00',
+    price INTEGER NOT NULL,
+    FOREIGN KEY (test_investment_id) REFERENCES test_investments(id) ON DELETE CASCADE,
+    UNIQUE(test_investment_id, price_date)
+);
+
 -- Indexes for query performance
 CREATE INDEX IF NOT EXISTS idx_currency_rates_lookup ON currency_rates(currencies_id, rate_date DESC);
 CREATE INDEX IF NOT EXISTS idx_investments_type ON investments(investment_type_id);
@@ -117,3 +147,4 @@ CREATE INDEX IF NOT EXISTS idx_prices_lookup ON prices(investment_id, price_date
 CREATE INDEX IF NOT EXISTS idx_benchmark_data_lookup ON benchmark_data(benchmark_id, benchmark_date DESC);
 CREATE INDEX IF NOT EXISTS idx_scraping_history_datetime ON scraping_history(scrape_datetime DESC);
 CREATE INDEX IF NOT EXISTS idx_scraping_history_type_ref ON scraping_history(scrape_type, reference_id);
+CREATE INDEX IF NOT EXISTS idx_test_prices_lookup ON test_prices(test_investment_id, price_date DESC);

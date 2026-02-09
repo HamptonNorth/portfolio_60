@@ -88,6 +88,51 @@ async function checkUrlSiteMatch(url) {
 }
 
 /**
+ * @description Check the format of a public_id value and update the status display.
+ * Validates whether the input is an ISIN or exchange:ticker format and shows
+ * appropriate feedback below the field.
+ * @param {string} value - The public_id value to check
+ */
+function checkPublicIdFormat(value) {
+  const statusEl = document.getElementById("public-id-status");
+  const urlField = document.getElementById("investment_url");
+
+  if (!value || value.trim() === "") {
+    statusEl.classList.add("hidden");
+    return;
+  }
+
+  const trimmed = value.trim().toUpperCase();
+
+  // ISIN: exactly 12 chars, 2 uppercase letters + 10 alphanumeric
+  const isinPattern = /^[A-Z]{2}[A-Z0-9]{10}$/;
+  // Ticker: EXCHANGE:SYMBOL
+  const tickerPattern = /^[A-Z]{1,10}:[A-Z0-9.]{1,10}$/;
+
+  if (isinPattern.test(trimmed)) {
+    let statusHtml = "<strong>ISIN detected.</strong> FT Markets fund URL will be generated automatically.";
+    if (urlField && urlField.value.trim()) {
+      statusHtml = "<strong>ISIN detected.</strong> Manual URL takes priority over auto-generated URL.";
+    }
+    statusEl.className = "mt-2 px-3 py-2 rounded-md text-sm bg-green-50 border border-green-200 text-green-700";
+    statusEl.innerHTML = statusHtml;
+    statusEl.classList.remove("hidden");
+  } else if (tickerPattern.test(trimmed)) {
+    let statusHtml = "<strong>Exchange:Ticker detected.</strong> FT Markets equity URL will be generated automatically.";
+    if (urlField && urlField.value.trim()) {
+      statusHtml = "<strong>Exchange:Ticker detected.</strong> Manual URL takes priority over auto-generated URL.";
+    }
+    statusEl.className = "mt-2 px-3 py-2 rounded-md text-sm bg-green-50 border border-green-200 text-green-700";
+    statusEl.innerHTML = statusHtml;
+    statusEl.classList.remove("hidden");
+  } else {
+    statusEl.className = "mt-2 px-3 py-2 rounded-md text-sm bg-amber-50 border border-amber-200 text-amber-700";
+    statusEl.innerHTML = "Format not recognised. Expected ISIN (e.g. GB00B4PQW151) or Exchange:Ticker (e.g. LSE:AZN).";
+    statusEl.classList.remove("hidden");
+  }
+}
+
+/**
  * @description Load currencies from the API and cache them.
  */
 async function loadCurrencies() {
@@ -258,6 +303,7 @@ async function loadInvestments() {
   html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700">Description</th>';
   html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700">Type</th>';
   html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700">Currency</th>';
+  html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700">Public ID</th>';
   html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700">URL</th>';
   html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700">Selector</th>';
   html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700"></th>';
@@ -279,12 +325,13 @@ async function loadInvestments() {
     html += '<td class="py-3 px-3 text-base">' + escapeHtml(inv.description) + "</td>";
     html += '<td class="py-3 px-3 text-base">' + escapeHtml(getTypeDisplayName(inv.type_short, inv.type_description)) + "</td>";
     html += '<td class="py-3 px-3 text-base">' + escapeHtml(inv.currency_code) + "</td>";
+    html += '<td class="py-3 px-3 text-sm text-brand-500 font-mono">' + escapeHtml(inv.public_id || "—") + "</td>";
     html += '<td class="py-3 px-3 text-sm text-brand-500">' + escapeHtml(urlDisplay) + "</td>";
     html += '<td class="py-3 px-3 text-sm text-brand-500 font-mono">' + escapeHtml(selectorDisplay) + "</td>";
     html += '<td class="py-3 px-3 text-base flex gap-2">';
     html += '<button class="bg-brand-100 hover:bg-brand-200 text-brand-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="viewInvestment(' + inv.id + ')">View</button>';
-    // Show Test and Load History buttons if URL exists (selector may come from config for known sites)
-    if (inv.investment_url) {
+    // Show Test and Load History buttons if scrapeable (has URL or public_id)
+    if (inv.investment_url || inv.public_id) {
       html += '<button id="test-btn-' + inv.id + '" class="bg-green-100 hover:bg-green-200 text-green-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="testScrapeInvestment(' + inv.id + ', this)">Test</button>';
       html += '<button id="load-btn-' + inv.id + '" class="bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="loadHistoryInvestment(' + inv.id + ", this, '" + escapeHtml(inv.description).replace(/'/g, "\\'") + "')\">Load History</button>";
     }
@@ -341,6 +388,7 @@ async function viewInvestment(id) {
   document.getElementById("view-description").textContent = inv.description;
   document.getElementById("view-type").textContent = typeDisplay;
   document.getElementById("view-currency").textContent = currencyDisplay;
+  document.getElementById("view-public-id").textContent = inv.public_id || "—";
   document.getElementById("view-url").textContent = inv.investment_url || "—";
   document.getElementById("view-selector").textContent = inv.selector || "—";
 
@@ -379,6 +427,8 @@ function showAddForm() {
   populateTypeDropdown();
   populateCurrencyDropdown();
   clearRowHighlight();
+  // Reset public ID status
+  document.getElementById("public-id-status").classList.add("hidden");
   // Reset URL site status and site dropdown
   document.getElementById("url-site-status").classList.add("hidden");
   document.getElementById("selector-optional").classList.add("hidden");
@@ -410,9 +460,13 @@ async function editInvestment(id) {
   document.getElementById("description").value = inv.description;
   populateTypeDropdown(inv.investment_type_id);
   populateCurrencyDropdown(inv.currencies_id);
+  document.getElementById("public_id").value = inv.public_id || "";
   document.getElementById("investment_url").value = inv.investment_url || "";
   document.getElementById("selector").value = inv.selector || "";
   document.getElementById("form-errors").textContent = "";
+
+  // Check public ID format and show status
+  checkPublicIdFormat(inv.public_id || "");
 
   // Check URL against known sites
   if (inv.investment_url) {
@@ -466,6 +520,7 @@ async function handleFormSubmit(event) {
     description: document.getElementById("description").value.trim(),
     investment_type_id: document.getElementById("investment_type_id").value || null,
     currencies_id: document.getElementById("currencies_id").value || null,
+    public_id: document.getElementById("public_id").value.trim().toUpperCase() || null,
     investment_url: document.getElementById("investment_url").value.trim() || null,
     selector: document.getElementById("selector").value.trim() || null,
   };
@@ -730,6 +785,17 @@ document.addEventListener("DOMContentLoaded", async function () {
   document.getElementById("delete-cancel-btn").addEventListener("click", hideDeleteDialog);
   document.getElementById("delete-confirm-btn").addEventListener("click", executeDelete);
   document.getElementById("view-close-btn").addEventListener("click", hideView);
+
+  // Check public ID format when it changes (debounced)
+  let publicIdCheckTimeout = null;
+  document.getElementById("public_id").addEventListener("input", function (event) {
+    if (publicIdCheckTimeout) {
+      clearTimeout(publicIdCheckTimeout);
+    }
+    publicIdCheckTimeout = setTimeout(function () {
+      checkPublicIdFormat(event.target.value);
+    }, 500);
+  });
 
   // Check URL against known sites when it changes (debounced)
   let urlCheckTimeout = null;
