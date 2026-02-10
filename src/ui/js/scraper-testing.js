@@ -27,6 +27,21 @@ let streamCompletedCount = 0;
 /** @type {number} Total items in the current stream */
 let streamTotalCount = 0;
 
+/** @type {number} Cumulative success count across auto-retries */
+let cumulativeSuccessCount = 0;
+
+/** @type {number} Number of auto-retries remaining for the current stream */
+let streamRetriesLeft = 0;
+
+/** @type {string|null} URL of the current stream (for auto-retry reconnect) */
+let currentStreamUrl = null;
+
+/** @type {EventSource|null} The active SSE connection (for stop button) */
+let activeEventSource = null;
+
+/** @type {number} Maximum number of auto-retries when a stream dies mid-way */
+const MAX_STREAM_RETRIES = 3;
+
 /** @type {number} Configured stalest limit from config.json (default 20) */
 let stalestLimit = 20;
 
@@ -678,33 +693,44 @@ function showHistoryDetail(id) {
 /**
  * @description Start an SSE test stream against the given URL and wire up
  * the standard event handlers (init, price, retry, history, done, error).
- * Shared by both Test All and Test Stalest buttons.
+ * Shared by both Test All and Test Stalest buttons. If the stream dies
+ * mid-way and auto-retries remain, waits briefly then reconnects — the
+ * server's stalest query naturally excludes already-tested investments.
  * @param {string} streamUrl - The SSE endpoint URL
  */
 function startTestStream(streamUrl) {
+  currentStreamUrl = streamUrl;
   const eventSource = new EventSource(streamUrl);
+  activeEventSource = eventSource;
+
+  // Show the Stop button while a stream is running
+  var stopBtn = document.getElementById("stop-test-btn");
+  if (stopBtn) stopBtn.classList.remove("hidden");
+
+  /** @type {boolean} True once at least one price event was received in this stream segment */
+  let receivedPriceEvent = false;
 
   eventSource.addEventListener("init", function (event) {
     const data = JSON.parse(event.data);
-    // Set up counter badge
-    streamTotalCount = data.total || 0;
-    streamCompletedCount = 0;
+    // On a retry, the total is only the remaining items — badge shows progress within this segment
+    streamTotalCount = cumulativeSuccessCount + (data.total || 0);
+    streamCompletedCount = cumulativeSuccessCount;
     updateActiveBadge();
-    // Set all scrapeable rows to spinners for both status and history
+    // Set scrapeable rows to spinners for status
     for (const inv of data.investments) {
       const statusCell = document.getElementById("status-" + inv.investmentId);
       if (statusCell) {
         statusCell.innerHTML = '<div class="w-4 h-4 border-2 border-brand-300 border-t-brand-700 rounded-full animate-spin mx-auto"></div>';
-      }
-      const historyCell = document.getElementById("history-" + inv.investmentId);
-      if (historyCell) {
-        historyCell.innerHTML = '<div class="w-4 h-4 border-2 border-brand-300 border-t-brand-700 rounded-full animate-spin mx-auto"></div>';
       }
     }
   });
 
   eventSource.addEventListener("price", function (event) {
     const result = JSON.parse(event.data);
+    receivedPriceEvent = true;
+    if (result.success) {
+      cumulativeSuccessCount++;
+    }
     streamCompletedCount++;
     updateActiveBadge();
     const statusCell = document.getElementById("status-" + result.investmentId);
@@ -735,11 +761,6 @@ function startTestStream(streamUrl) {
     }
   });
 
-  eventSource.addEventListener("history", function (event) {
-    const data = JSON.parse(event.data);
-    updateHistoryCell(data.investmentId, data);
-  });
-
   eventSource.addEventListener("done", function (event) {
     const data = JSON.parse(event.data);
     eventSource.close();
@@ -748,8 +769,21 @@ function startTestStream(streamUrl) {
 
   eventSource.addEventListener("error", function (event) {
     eventSource.close();
-    finishTestAll(null);
-    showError("page-messages", "Test failed", "Connection to server lost. If a previous test is still running on the server, wait for it to finish or restart the server.");
+
+    // Auto-retry: if we made progress (got at least one price event) and have retries left,
+    // wait a few seconds for the server to release the lock, then reconnect.
+    // The stalest query will naturally skip already-tested investments.
+    if (receivedPriceEvent && streamRetriesLeft > 0 && currentStreamUrl) {
+      streamRetriesLeft--;
+      var retryNum = MAX_STREAM_RETRIES - streamRetriesLeft;
+      showSuccess("page-messages", "Stream interrupted — auto-retrying (" + retryNum + "/" + MAX_STREAM_RETRIES + ") in 5 seconds...");
+      setTimeout(function () {
+        startTestStream(currentStreamUrl);
+      }, 5000);
+    } else {
+      finishTestAll(null);
+      showError("page-messages", "Test failed", "Connection to server lost. If a previous test is still running on the server, wait for it to finish or restart the server.");
+    }
   });
 }
 
@@ -786,12 +820,14 @@ function testAll() {
   activeBadgeId = "test-all-badge";
   streamCompletedCount = 0;
   streamTotalCount = 0;
+  cumulativeSuccessCount = 0;
+  streamRetriesLeft = MAX_STREAM_RETRIES;
   disableTestButtons();
   startTestStream("/api/test-investments/scrape/stream");
 }
 
 /**
- * @description Test the stalest 20 test investments via SSE streaming.
+ * @description Test the stalest investments via SSE streaming.
  * Uses the cron delay profile for longer, more polite pauses.
  */
 function testStalest() {
@@ -800,6 +836,8 @@ function testStalest() {
   activeBadgeId = "stalest-badge";
   streamCompletedCount = 0;
   streamTotalCount = 0;
+  cumulativeSuccessCount = 0;
+  streamRetriesLeft = MAX_STREAM_RETRIES;
   disableTestButtons();
   startTestStream("/api/test-investments/scrape/stalest?limit=" + stalestLimit);
 }
@@ -810,6 +848,14 @@ function testStalest() {
  */
 function finishTestAll(summary) {
   testAllRunning = false;
+  currentStreamUrl = null;
+  cumulativeSuccessCount = 0;
+  streamRetriesLeft = 0;
+  activeEventSource = null;
+
+  // Hide the Stop button
+  var stopBtn = document.getElementById("stop-test-btn");
+  if (stopBtn) stopBtn.classList.add("hidden");
 
   document.getElementById("test-all-btn").disabled = false;
   document.getElementById("test-stalest-btn").disabled = false;
@@ -999,6 +1045,17 @@ document.addEventListener("DOMContentLoaded", async function () {
   document.getElementById("add-test-btn").addEventListener("click", showAddForm);
   document.getElementById("test-all-btn").addEventListener("click", testAll);
   document.getElementById("test-stalest-btn").addEventListener("click", testStalest);
+  document.getElementById("stop-test-btn").addEventListener("click", function () {
+    if (activeEventSource) {
+      activeEventSource.close();
+      activeEventSource = null;
+    }
+    // Prevent auto-retry by clearing retries
+    streamRetriesLeft = 0;
+    currentStreamUrl = null;
+    finishTestAll(null);
+    showSuccess("page-messages", "Test stopped by user.");
+  });
   document.getElementById("cancel-btn").addEventListener("click", hideForm);
   document.getElementById("test-form").addEventListener("submit", handleFormSubmit);
   document.getElementById("delete-cancel-btn").addEventListener("click", hideDeleteDialog);
