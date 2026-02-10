@@ -124,6 +124,7 @@ export function updateInvestmentScrapingSource(id, url, selector) {
  */
 export function deleteInvestment(id) {
   const db = getDatabase();
+  db.run("DELETE FROM prices WHERE investment_id = ?", [id]);
   const result = db.run("DELETE FROM investments WHERE id = ?", [id]);
   return result.changes > 0;
 }
