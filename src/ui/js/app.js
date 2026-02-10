@@ -96,6 +96,26 @@ async function apiRequest(url, options = {}) {
       clearTimeout(timeoutId);
     }
 
+    // If the response was redirected to the passphrase page (auth expired),
+    // show a clear message instead of a cryptic JSON parse error.
+    if (response.redirected && response.url && response.url.includes("passphrase")) {
+      return {
+        ok: false,
+        error: "Session expired",
+        detail: "Please refresh the page and enter your passphrase.",
+      };
+    }
+
+    // Guard against non-JSON responses (e.g. HTML error pages)
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      return {
+        ok: false,
+        error: response.ok ? "Unexpected response" : "Request failed (HTTP " + response.status + ")",
+        detail: "Server returned " + contentType.split(";")[0] + " instead of JSON",
+      };
+    }
+
     const data = await response.json();
 
     if (!response.ok) {

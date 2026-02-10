@@ -129,8 +129,10 @@ export function loadConfig() {
 
   // scraperTesting — feature flag for the scraper testing sandbox
   const rawScraperTesting = rawConfig.scraperTesting || {};
+  const stalestLimit = parseInt(rawScraperTesting.stalestLimit, 10);
   config.scraperTesting = {
     enabled: typeof rawScraperTesting.enabled === "boolean" ? rawScraperTesting.enabled : false,
+    stalestLimit: Number.isFinite(stalestLimit) && stalestLimit > 0 ? stalestLimit : 20,
   };
 
   configCache = config;
@@ -180,6 +182,16 @@ export function getAllowedProviders() {
 export function getScraperTestingEnabled() {
   const config = loadConfig();
   return config.scraperTesting && config.scraperTesting.enabled === true;
+}
+
+/**
+ * @description Get the configured limit for the "Test Stalest" feature.
+ * Defaults to 20 if not set or invalid.
+ * @returns {number} Number of stalest investments to test per run
+ */
+export function getStalestLimit() {
+  const config = loadConfig();
+  return config.scraperTesting ? config.scraperTesting.stalestLimit : 20;
 }
 
 /**

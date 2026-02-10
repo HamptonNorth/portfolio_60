@@ -30,6 +30,16 @@ function createBackfillStream(backfillFn, errorLabel) {
         controller.enqueue(encoder.encode("data: " + JSON.stringify(data) + "\n\n"));
       }
 
+      // Send SSE comment every 30s to prevent Bun's idleTimeout (255s) from
+      // closing the connection during long-running backfill operations.
+      const keepaliveId = setInterval(function () {
+        try {
+          controller.enqueue(encoder.encode(":keepalive\n\n"));
+        } catch {
+          clearInterval(keepaliveId);
+        }
+      }, 30000);
+
       try {
         const result = await backfillFn(function (progress) {
           sendEvent("progress", progress);
@@ -42,6 +52,7 @@ function createBackfillStream(backfillFn, errorLabel) {
         });
       }
 
+      clearInterval(keepaliveId);
       controller.close();
     },
   });

@@ -163,6 +163,44 @@ export function updateTestResult(id, date, success, price) {
 }
 
 /**
+ * @description Get the N test investments with the oldest last_test_date,
+ * prioritising those that have never been tested (NULL last_test_date).
+ * Only returns investments that have a URL or public_id configured.
+ * @param {number} [limit=20] - Maximum number of investments to return
+ * @returns {Object[]} Array of test investment objects with joined currency/type fields
+ */
+export function getStalestTestInvestments(limit = 20) {
+  const db = getDatabase();
+  return db
+    .query(
+      `SELECT
+        ti.id,
+        ti.currencies_id,
+        ti.investment_type_id,
+        ti.description,
+        ti.public_id,
+        ti.investment_url,
+        ti.selector,
+        ti.source_site,
+        ti.notes,
+        ti.last_test_date,
+        ti.last_test_success,
+        ti.last_test_price,
+        c.code AS currency_code,
+        c.description AS currency_description,
+        it.short_description AS type_short,
+        it.description AS type_description
+      FROM test_investments ti
+      JOIN currencies c ON ti.currencies_id = c.id
+      JOIN investment_types it ON ti.investment_type_id = it.id
+      WHERE ti.investment_url IS NOT NULL OR ti.public_id IS NOT NULL
+      ORDER BY ti.last_test_date ASC NULLS FIRST, ti.id ASC
+      LIMIT ?`,
+    )
+    .all(limit);
+}
+
+/**
  * @description Reset all test data by executing the seed SQL script.
  * Clears scraping_history (started_by=3), test_prices, and test_investments,
  * then re-inserts the standard test data set plus a copy of live investments.

@@ -13,7 +13,7 @@ import { getDatabase } from "../db/connection.js";
 import { upsertRate, scaleRate } from "../db/currency-rates-db.js";
 import { upsertPrice } from "../db/prices-db.js";
 import { upsertBenchmarkData } from "../db/benchmark-data-db.js";
-import { detectPublicIdType } from "../../shared/public-id-utils.js";
+import { detectPublicIdType, extractTickerFromPublicId } from "../../shared/public-id-utils.js";
 import { getTestInvestmentById } from "../db/test-investments-db.js";
 import YahooFinance from "yahoo-finance2";
 
@@ -191,7 +191,7 @@ export async function fetchBoeRateHistory(startDate, endDate) {
     const toStr = formatBoeRequestDate(chunkEnd);
     const url = buildBoeUrl(fromStr, toStr, seriesCodes);
 
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: AbortSignal.timeout(MORNINGSTAR_FETCH_TIMEOUT_MS) });
     if (!response.ok) {
       throw new Error("BoE request failed: HTTP " + response.status + " for " + fromStr + " to " + toStr);
     }
@@ -364,6 +364,17 @@ const MORNINGSTAR_SCREENER_URL = "https://tools.morningstar.co.uk/api/rest.svc/9
 const MORNINGSTAR_TIMESERIES_URL = "https://tools.morningstar.co.uk/api/rest.svc/timeseries_price/t92wz0sj7c";
 
 /**
+ * @description Base URL for the Morningstar UK security search API.
+ * A lightweight search endpoint that covers securities (including investment trusts)
+ * not indexed by the screener API. Returns pipe-delimited text, not JSON.
+ * @type {string}
+ */
+const MORNINGSTAR_SEARCH_URL = "https://www.morningstar.co.uk/uk/util/SecuritySearch.ashx";
+
+/** @type {number} Timeout in ms for Morningstar API requests (15 seconds). */
+const MORNINGSTAR_FETCH_TIMEOUT_MS = 15000;
+
+/**
  * @description Extract an ISIN from a Fidelity-style investment URL.
  * Handles two Fidelity URL formats:
  *   - /factsheet/GB00B41YBW71/...   (funds — ISIN after /factsheet/)
@@ -418,7 +429,7 @@ export async function lookupMorningstarIdByIsin(isin) {
   });
 
   const url = MORNINGSTAR_SCREENER_URL + "?" + params.toString();
-  const response = await fetch(url);
+  const response = await fetch(url, { signal: AbortSignal.timeout(MORNINGSTAR_FETCH_TIMEOUT_MS) });
 
   if (!response.ok) {
     throw new Error("Morningstar screener returned HTTP " + response.status);
@@ -458,7 +469,7 @@ export async function lookupMorningstarIdByName(description) {
   });
 
   const url = MORNINGSTAR_SCREENER_URL + "?" + params.toString();
-  const response = await fetch(url);
+  const response = await fetch(url, { signal: AbortSignal.timeout(MORNINGSTAR_FETCH_TIMEOUT_MS) });
 
   if (!response.ok) {
     throw new Error("Morningstar screener returned HTTP " + response.status);
@@ -476,6 +487,121 @@ export async function lookupMorningstarIdByName(description) {
     universe: row.Universe || "",
     name: row.Name,
   };
+}
+
+/**
+ * @description Look up a Morningstar SecId by stock ticker symbol.
+ * Tries three approaches in order:
+ *   1. Screener API with Ticker filter (exact match, covers most equities/ETFs)
+ *   2. SecuritySearch API (covers investment trusts and other securities not in the screener)
+ *   3. Screener API with text-based term search (last resort)
+ * @param {string} ticker - The ticker symbol (e.g. "BARC", "LLOY", "SSON")
+ * @returns {Promise<{secId: string, universe: string, name: string}|null>}
+ *   The Morningstar SecId, universe, and name, or null if not found
+ */
+export async function lookupMorningstarIdByTicker(ticker) {
+  // Priority 1: screener API with exact ticker filter
+  const filterParams = new URLSearchParams({
+    outputType: "json",
+    version: "1",
+    languageId: "en-GB",
+    currencyId: "GBP",
+    securityDataPoints: "SecId,Name,ISIN,Universe,Ticker,ExchangeId",
+    filters: "Ticker:IN:" + ticker,
+    rows: "1",
+  });
+
+  const filterUrl = MORNINGSTAR_SCREENER_URL + "?" + filterParams.toString();
+  const filterResponse = await fetch(filterUrl, { signal: AbortSignal.timeout(MORNINGSTAR_FETCH_TIMEOUT_MS) });
+
+  if (!filterResponse.ok) {
+    throw new Error("Morningstar screener returned HTTP " + filterResponse.status);
+  }
+
+  const filterData = await filterResponse.json();
+  const filterRows = filterData && filterData.rows;
+
+  if (filterRows && filterRows.length > 0) {
+    const row = filterRows[0];
+    return {
+      secId: row.SecId,
+      universe: row.Universe || "",
+      name: row.Name,
+    };
+  }
+
+  // Priority 2: SecuritySearch API (covers investment trusts not in the screener)
+  const searchResult = await lookupMorningstarIdBySecuritySearch(ticker);
+  if (searchResult) {
+    return searchResult;
+  }
+
+  // Priority 3: fall back to text-based term search
+  return lookupMorningstarIdByName(ticker);
+}
+
+/**
+ * @description Look up a Morningstar SecId via the SecuritySearch.ashx endpoint.
+ * This endpoint covers securities (especially closed-end investment trusts) that
+ * are not indexed by the screener API. The response is pipe-delimited text, not JSON.
+ * Matches are filtered to results where the ticker column exactly matches the query.
+ * @param {string} ticker - The ticker symbol to search for
+ * @returns {Promise<{secId: string, universe: string, name: string}|null>}
+ */
+async function lookupMorningstarIdBySecuritySearch(ticker) {
+  const params = new URLSearchParams({
+    q: ticker,
+    limit: "10",
+    preferedList: "",
+    source: "nav",
+  });
+
+  const url = MORNINGSTAR_SEARCH_URL + "?" + params.toString();
+  const response = await fetch(url, { signal: AbortSignal.timeout(MORNINGSTAR_FETCH_TIMEOUT_MS) });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const text = await response.text();
+  const lines = text.split("\n");
+
+  // Each result line is pipe-delimited:
+  // Name|{JSON metadata}|Type|Ticker|Exchange|Category
+  // The JSON metadata contains: i=SecId, n=Name, s=Ticker, e=Exchange, t=type
+  for (const line of lines) {
+    const parts = line.split("|");
+    if (parts.length < 5) continue;
+
+    const resultTicker = (parts[3] || "").trim().toUpperCase();
+    if (resultTicker !== ticker.toUpperCase()) continue;
+
+    // Parse the JSON metadata to extract SecId
+    try {
+      const meta = JSON.parse(parts[1]);
+      if (meta && meta.i) {
+        // Determine universe from the type field and exchange
+        // t=21 is closed-end fund, e=LSE exchange
+        const exchange = (meta.e || "").toUpperCase();
+        let universe = "";
+        if (meta.t === 21 || meta.t === "21") {
+          universe = "CEEXG$X" + (exchange === "LSE" ? "LON" : exchange) + "_3519";
+        } else {
+          universe = "E0EXG$X" + (exchange === "LSE" ? "LON" : exchange) + "_3520";
+        }
+
+        return {
+          secId: meta.i,
+          universe: universe,
+          name: meta.n || parts[0] || "",
+        };
+      }
+    } catch {
+      // Skip malformed JSON metadata
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -506,7 +632,7 @@ export async function fetchMorningstarHistory(morningstarId, universe, currencyC
   });
 
   const url = MORNINGSTAR_TIMESERIES_URL + "?" + params.toString();
-  const response = await fetch(url);
+  const response = await fetch(url, { signal: AbortSignal.timeout(MORNINGSTAR_FETCH_TIMEOUT_MS) });
 
   if (!response.ok) {
     throw new Error("Morningstar timeseries returned HTTP " + response.status);
@@ -617,12 +743,13 @@ export async function backfillInvestmentPrices(progressCallback) {
         });
         lookupResult = await lookupMorningstarIdByIsin(isin);
       } else if (publicIdType === "ticker" || publicIdType === "etf") {
-        // Priority 3: public_id is a ticker — search Morningstar by name
+        // Priority 3: public_id is a ticker — search Morningstar by ticker symbol
+        const tickerSymbol = extractTickerFromPublicId(inv.public_id);
         progressCallback({
           type: "progress",
-          message: inv.description + ": looking up ticker " + inv.public_id + "...",
+          message: inv.description + ": looking up ticker " + tickerSymbol + "...",
         });
-        lookupResult = await lookupMorningstarIdByName(inv.description);
+        lookupResult = await lookupMorningstarIdByTicker(tickerSymbol);
       } else {
         // Priority 4: Try LSE ticker extraction from URL
         const ticker = extractLseTickerFromUrl(inv.investment_url);
@@ -632,7 +759,7 @@ export async function backfillInvestmentPrices(progressCallback) {
             type: "progress",
             message: inv.description + ": looking up LSE ticker " + ticker + "...",
           });
-          lookupResult = await lookupMorningstarIdByName(inv.description);
+          lookupResult = await lookupMorningstarIdByTicker(ticker);
         } else {
           progressCallback({
             type: "progress",
@@ -987,11 +1114,12 @@ export async function testBackfillInvestment(investmentId) {
     if (isin) {
       lookupResult = await lookupMorningstarIdByIsin(isin);
     } else if (publicIdType === "ticker" || publicIdType === "etf") {
-      lookupResult = await lookupMorningstarIdByName(inv.description);
+      const tickerSymbol = extractTickerFromPublicId(inv.public_id);
+      lookupResult = await lookupMorningstarIdByTicker(tickerSymbol);
     } else {
       const ticker = extractLseTickerFromUrl(inv.investment_url);
       if (ticker) {
-        lookupResult = await lookupMorningstarIdByName(inv.description);
+        lookupResult = await lookupMorningstarIdByTicker(ticker);
       }
     }
 
@@ -1056,11 +1184,12 @@ export async function testBackfillTestInvestment(testInvestmentId) {
   if (isin) {
     lookupResult = await lookupMorningstarIdByIsin(isin);
   } else if (publicIdType === "ticker" || publicIdType === "etf") {
-    lookupResult = await lookupMorningstarIdByName(inv.description);
+    const tickerSymbol = extractTickerFromPublicId(inv.public_id);
+    lookupResult = await lookupMorningstarIdByTicker(tickerSymbol);
   } else {
     const ticker = extractLseTickerFromUrl(inv.investment_url);
     if (ticker) {
-      lookupResult = await lookupMorningstarIdByName(inv.description);
+      lookupResult = await lookupMorningstarIdByTicker(ticker);
     }
   }
 
@@ -1129,11 +1258,12 @@ export async function loadBackfillInvestment(investmentId) {
     if (isin) {
       lookupResult = await lookupMorningstarIdByIsin(isin);
     } else if (publicIdType === "ticker" || publicIdType === "etf") {
-      lookupResult = await lookupMorningstarIdByName(inv.description);
+      const tickerSymbol = extractTickerFromPublicId(inv.public_id);
+      lookupResult = await lookupMorningstarIdByTicker(tickerSymbol);
     } else {
       const ticker = extractLseTickerFromUrl(inv.investment_url);
       if (ticker) {
-        lookupResult = await lookupMorningstarIdByName(inv.description);
+        lookupResult = await lookupMorningstarIdByTicker(ticker);
       }
     }
 

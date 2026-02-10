@@ -18,6 +18,18 @@ let scraperSites = [];
 /** @type {boolean} True when a Test All operation is in progress */
 let testAllRunning = false;
 
+/** @type {string|null} ID of the badge element for the currently active stream ('stalest-badge' or 'test-all-badge') */
+let activeBadgeId = null;
+
+/** @type {number} Running count of completed items during a stream */
+let streamCompletedCount = 0;
+
+/** @type {number} Total items in the current stream */
+let streamTotalCount = 0;
+
+/** @type {number} Configured stalest limit from config.json (default 20) */
+let stalestLimit = 20;
+
 /** @type {Object.<number, {success: boolean, rows: Array, error?: string, currency?: string, description?: string}>} Cached history results by test investment ID */
 let historyResults = {};
 
@@ -33,6 +45,14 @@ async function checkFeatureEnabled() {
   if (result.ok && result.data.enabled) {
     document.getElementById("feature-disabled").classList.add("hidden");
     document.getElementById("feature-content").classList.remove("hidden");
+    // Read stalest limit from config and update button label
+    if (result.data.stalestLimit && result.data.stalestLimit > 0) {
+      stalestLimit = result.data.stalestLimit;
+    }
+    const stalestBtn = document.getElementById("test-stalest-btn");
+    if (stalestBtn) {
+      stalestBtn.firstChild.textContent = "Test Stalest " + stalestLimit + " ";
+    }
     return true;
   } else {
     document.getElementById("feature-disabled").classList.remove("hidden");
@@ -222,6 +242,15 @@ async function loadTestInvestments() {
 
   const tests = result.data;
 
+  // Update total count in header
+  const scrapeable = tests.filter(function (ti) {
+    return ti.investment_url || ti.public_id;
+  });
+  const totalCountEl = document.getElementById("test-total-count");
+  if (totalCountEl) {
+    totalCountEl.textContent = "(" + scrapeable.length + " scrapeable of " + tests.length + " total)";
+  }
+
   if (tests.length === 0) {
     container.innerHTML = '<p class="text-brand-500">No test investments yet. Click "Add Test" to create one.</p>';
     return;
@@ -231,15 +260,15 @@ async function loadTestInvestments() {
   html += '<table class="w-full text-left border-collapse">';
   html += "<thead>";
   html += '<tr class="border-b-2 border-brand-200">';
-  html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700">Description</th>';
-  html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700">Type</th>';
-  html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700">Source Site</th>';
-  html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700">Public ID</th>';
-  html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700">Last Test</th>';
-  html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700 text-center">Status</th>';
-  html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700 text-right">Price</th>';
-  html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700 text-center">History</th>';
-  html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700"></th>';
+  html += '<th class="py-1.5 px-2 text-xs font-semibold text-brand-700">Description</th>';
+  html += '<th class="py-1.5 px-2 text-xs font-semibold text-brand-700">Type</th>';
+  html += '<th class="py-1.5 px-2 text-xs font-semibold text-brand-700">Source Site</th>';
+  html += '<th class="py-1.5 px-2 text-xs font-semibold text-brand-700">Public ID</th>';
+  html += '<th class="py-1.5 px-2 text-xs font-semibold text-brand-700">Last Test</th>';
+  html += '<th class="py-1.5 px-2 text-xs font-semibold text-brand-700 text-center">Status</th>';
+  html += '<th class="py-1.5 px-2 text-xs font-semibold text-brand-700 text-right">Price</th>';
+  html += '<th class="py-1.5 px-2 text-xs font-semibold text-brand-700 text-center">History</th>';
+  html += '<th class="py-1.5 px-2 text-xs font-semibold text-brand-700"></th>';
   html += "</tr>";
   html += "</thead>";
   html += "<tbody>";
@@ -268,24 +297,24 @@ async function loadTestInvestments() {
     }
 
     html += '<tr id="test-row-' + ti.id + '" data-id="' + ti.id + '" class="' + rowClass + ' border-b border-brand-100 hover:bg-brand-100 transition-colors">';
-    html += '<td class="py-3 px-3 text-base cursor-context-menu" oncontextmenu="showScrapeDetails(' + ti.id + ', event)">' + escapeHtml(ti.description) + "</td>";
-    html += '<td class="py-3 px-3 text-sm">' + escapeHtml(ti.type_description) + "</td>";
-    html += '<td class="py-3 px-3 text-sm text-brand-500">' + escapeHtml(ti.source_site || "—") + "</td>";
-    html += '<td class="py-3 px-3 text-sm text-brand-500 font-mono">' + escapeHtml(ti.public_id || "—") + "</td>";
-    html += '<td class="py-3 px-3 text-sm text-brand-500">' + escapeHtml(ti.last_test_date || "—") + "</td>";
-    html += '<td class="py-3 px-3 text-sm text-center" id="status-' + ti.id + '">' + statusHtml + "</td>";
-    html += '<td class="py-3 px-3 text-sm text-right font-mono" id="price-' + ti.id + '">' + escapeHtml(priceDisplay) + "</td>";
-    html += '<td class="py-3 px-3 text-sm text-center" id="history-' + ti.id + '"><span class="text-brand-300">—</span></td>';
-    html += '<td class="py-3 px-3 text-base flex gap-2">';
-    html += '<button id="test-btn-' + ti.id + '" class="bg-green-100 hover:bg-green-200 text-green-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="testSingle(' + ti.id + ', this)">Test</button>';
-    html += '<button class="bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="toggleHistory(' + ti.id + ', this)">History</button>';
-    html += '<button class="bg-brand-100 hover:bg-brand-200 text-brand-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="editTestInvestment(' + ti.id + ')">Edit</button>';
-    html += '<button class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="confirmDelete(' + ti.id + ", '" + escapeHtml(ti.description).replace(/'/g, "\\'") + "')\">" + "Delete</button>";
+    html += '<td class="py-1.5 px-2 text-xs cursor-context-menu" oncontextmenu="showScrapeDetails(' + ti.id + ', event)">' + escapeHtml(ti.description) + "</td>";
+    html += '<td class="py-1.5 px-2 text-xs">' + escapeHtml(ti.type_description) + "</td>";
+    html += '<td class="py-1.5 px-2 text-xs text-brand-500">' + escapeHtml(ti.source_site || "—") + "</td>";
+    html += '<td class="py-1.5 px-2 text-xs text-brand-500 font-mono">' + escapeHtml(ti.public_id || "—") + "</td>";
+    html += '<td class="py-1.5 px-2 text-xs text-brand-500">' + escapeHtml(ti.last_test_date || "—") + "</td>";
+    html += '<td class="py-1.5 px-2 text-xs text-center" id="status-' + ti.id + '">' + statusHtml + "</td>";
+    html += '<td class="py-1.5 px-2 text-xs text-right font-mono" id="price-' + ti.id + '">' + escapeHtml(priceDisplay) + "</td>";
+    html += '<td class="py-1.5 px-2 text-xs text-center" id="history-' + ti.id + '"><span class="text-brand-300">—</span></td>';
+    html += '<td class="py-1.5 px-2 text-xs flex gap-1">';
+    html += '<button id="test-btn-' + ti.id + '" class="bg-green-100 hover:bg-green-200 text-green-700 text-xs font-medium px-1.5 py-0.5 rounded transition-colors whitespace-nowrap" onclick="testSingle(' + ti.id + ', this)">Test</button>';
+    html += '<button class="bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-medium px-1.5 py-0.5 rounded transition-colors whitespace-nowrap" onclick="toggleHistory(' + ti.id + ', this)">History</button>';
+    html += '<button class="bg-brand-100 hover:bg-brand-200 text-brand-700 text-xs font-medium px-1.5 py-0.5 rounded transition-colors whitespace-nowrap" onclick="editTestInvestment(' + ti.id + ')">Edit</button>';
+    html += '<button class="bg-red-100 hover:bg-red-200 text-red-700 text-xs font-medium px-1.5 py-0.5 rounded transition-colors whitespace-nowrap" onclick="confirmDelete(' + ti.id + ", '" + escapeHtml(ti.description).replace(/'/g, "\\'") + "')\">" + "Delete</button>";
     html += "</td>";
     html += "</tr>";
     // History panel (hidden by default, shown below the row)
     html += '<tr id="history-panel-' + ti.id + '" class="hidden">';
-    html += '<td colspan="9" class="px-6 py-3 bg-brand-25 border-b border-brand-200">';
+    html += '<td colspan="9" class="px-4 py-2 bg-brand-25 border-b border-brand-200">';
     html += '<div id="history-content-' + ti.id + '"></div>';
     html += "</td>";
     html += "</tr>";
@@ -515,10 +544,16 @@ async function testSingle(id, button) {
   if (scrapedPriceMinor != null && historyResults[id] && historyResults[id].success && historyResults[id].rows && historyResults[id].rows.length > 0) {
     const scrapedMajor = scrapedPriceMinor / 100;
     const morningstarMajor = historyResults[id].rows[0].price;
+    const morningstarDate = historyResults[id].rows[0].date;
     if (morningstarMajor > 0) {
-      const pctDiff = (Math.abs(scrapedMajor - morningstarMajor) / morningstarMajor) * 100;
-      if (pctDiff > 5) {
-        historyResults[id].priceWarning = "Price mismatch: scraped " + scrapedMajor.toFixed(4) + " vs Morningstar " + morningstarMajor.toFixed(4) + " (" + pctDiff.toFixed(1) + "% difference)";
+      const pctDiff = ((scrapedMajor - morningstarMajor) / morningstarMajor) * 100;
+      if (Math.abs(pctDiff) > 5) {
+        historyResults[id].priceWarning = {
+          scrapedPrice: scrapedMajor,
+          morningstarPrice: morningstarMajor,
+          morningstarDate: morningstarDate,
+          pctDiff: pctDiff,
+        };
         updateHistoryCell(id, historyResults[id]);
       }
     }
@@ -539,10 +574,30 @@ function updateHistoryCell(id, data) {
   const cell = document.getElementById("history-" + id);
   if (!cell) return;
 
+  // Remove any existing price-warning row for this investment
+  const existingWarning = document.getElementById("price-warning-" + id);
+  if (existingWarning) {
+    existingWarning.remove();
+  }
+
   if (data.success && data.rows && data.rows.length > 0) {
     if (data.priceWarning) {
+      const w = data.priceWarning;
+      const sign = w.pctDiff >= 0 ? "+" : "";
+      const tooltipText = "Scraped " + w.scrapedPrice.toFixed(4) + " vs Morningstar " + w.morningstarPrice.toFixed(4) + " (" + sign + w.pctDiff.toFixed(1) + "%)";
+
       // History found but price mismatch — amber warning with click for detail
-      cell.innerHTML = '<span class="text-amber-600 font-bold cursor-pointer" onclick="showHistoryDetail(' + id + ')" title="' + escapeHtml(data.priceWarning) + '">&#9888; ' + data.rows.length + "</span>";
+      cell.innerHTML = '<span class="text-amber-600 font-bold cursor-pointer" onclick="showHistoryDetail(' + id + ')" title="' + escapeHtml(tooltipText) + '">&#9888; ' + data.rows.length + "</span>";
+
+      // Insert a warning detail row after the main row
+      const mainRow = document.getElementById("test-row-" + id);
+      if (mainRow) {
+        const warningRow = document.createElement("tr");
+        warningRow.id = "price-warning-" + id;
+        warningRow.className = "bg-amber-50 border-b border-amber-200";
+        warningRow.innerHTML = '<td colspan="9" class="py-0.5 px-2 text-xs text-amber-700">' + '<span class="font-medium">Price check:</span> ' + "Scraped <strong>" + w.scrapedPrice.toFixed(4) + "</strong>" + " &mdash; Morningstar <strong>" + w.morningstarPrice.toFixed(4) + "</strong>" + " (" + w.morningstarDate + ")" + " &mdash; difference: <strong>" + sign + w.pctDiff.toFixed(1) + "%</strong>" + "</td>";
+        mainRow.insertAdjacentElement("afterend", warningRow);
+      }
     } else {
       cell.innerHTML = '<span class="text-green-600 font-bold cursor-pointer" onclick="showHistoryDetail(' + id + ')" title="Click to view historic prices">&#10003; ' + data.rows.length + "</span>";
     }
@@ -596,7 +651,9 @@ function showHistoryDetail(id) {
     html += "</p>";
   }
   if (data.priceWarning) {
-    html += '<div class="bg-amber-50 border border-amber-200 rounded p-2 mb-2 text-sm text-amber-700">' + escapeHtml(data.priceWarning) + "</div>";
+    var w = data.priceWarning;
+    var sign = w.pctDiff >= 0 ? "+" : "";
+    html += '<div class="bg-amber-50 border border-amber-200 rounded p-2 mb-2 text-sm text-amber-700">' + '<span class="font-medium">Price check:</span> ' + "Scraped <strong>" + w.scrapedPrice.toFixed(4) + "</strong>" + " &mdash; Morningstar <strong>" + w.morningstarPrice.toFixed(4) + "</strong>" + " (" + w.morningstarDate + ")" + " &mdash; difference: <strong>" + sign + w.pctDiff.toFixed(1) + "%</strong>" + "</div>";
   }
   html += '<p class="text-xs text-brand-400 mb-2">Most recent ' + data.rows.length + " weekly prices from Morningstar (read-only preview, no DB writes)</p>";
   html += '<table class="w-full text-left border-collapse">';
@@ -619,25 +676,20 @@ function showHistoryDetail(id) {
 }
 
 /**
- * @description Test all test investments via SSE streaming.
+ * @description Start an SSE test stream against the given URL and wire up
+ * the standard event handlers (init, price, retry, history, done, error).
+ * Shared by both Test All and Test Stalest buttons.
+ * @param {string} streamUrl - The SSE endpoint URL
  */
-async function testAll() {
-  if (testAllRunning) return;
-  testAllRunning = true;
-
-  const testAllBtn = document.getElementById("test-all-btn");
-  testAllBtn.disabled = true;
-  testAllBtn.textContent = "Testing...";
-
-  // Disable all individual Test buttons
-  document.querySelectorAll('[id^="test-btn-"]').forEach(function (btn) {
-    btn.disabled = true;
-  });
-
-  const eventSource = new EventSource("/api/test-investments/scrape/stream");
+function startTestStream(streamUrl) {
+  const eventSource = new EventSource(streamUrl);
 
   eventSource.addEventListener("init", function (event) {
     const data = JSON.parse(event.data);
+    // Set up counter badge
+    streamTotalCount = data.total || 0;
+    streamCompletedCount = 0;
+    updateActiveBadge();
     // Set all scrapeable rows to spinners for both status and history
     for (const inv of data.investments) {
       const statusCell = document.getElementById("status-" + inv.investmentId);
@@ -653,6 +705,8 @@ async function testAll() {
 
   eventSource.addEventListener("price", function (event) {
     const result = JSON.parse(event.data);
+    streamCompletedCount++;
+    updateActiveBadge();
     const statusCell = document.getElementById("status-" + result.investmentId);
     const priceCell = document.getElementById("price-" + result.investmentId);
 
@@ -695,20 +749,79 @@ async function testAll() {
   eventSource.addEventListener("error", function (event) {
     eventSource.close();
     finishTestAll(null);
-    showError("page-messages", "Test All failed", "Connection to server lost. If a previous Test All is still running on the server, wait for it to finish or restart the server.");
+    showError("page-messages", "Test failed", "Connection to server lost. If a previous test is still running on the server, wait for it to finish or restart the server.");
   });
 }
 
 /**
- * @description Clean up after Test All completes.
+ * @description Update the counter badge on the active stream button.
+ */
+function updateActiveBadge() {
+  if (!activeBadgeId) return;
+  const badge = document.getElementById(activeBadgeId);
+  if (badge) {
+    badge.textContent = streamCompletedCount + "/" + streamTotalCount;
+  }
+}
+
+/**
+ * @description Disable both test stream buttons and all individual Test buttons.
+ * Does not change button labels — just disables them.
+ */
+function disableTestButtons() {
+  document.getElementById("test-all-btn").disabled = true;
+  document.getElementById("test-stalest-btn").disabled = true;
+
+  document.querySelectorAll('[id^="test-btn-"]').forEach(function (btn) {
+    btn.disabled = true;
+  });
+}
+
+/**
+ * @description Test all test investments via SSE streaming.
+ */
+function testAll() {
+  if (testAllRunning) return;
+  testAllRunning = true;
+  activeBadgeId = "test-all-badge";
+  streamCompletedCount = 0;
+  streamTotalCount = 0;
+  disableTestButtons();
+  startTestStream("/api/test-investments/scrape/stream");
+}
+
+/**
+ * @description Test the stalest 20 test investments via SSE streaming.
+ * Uses the cron delay profile for longer, more polite pauses.
+ */
+function testStalest() {
+  if (testAllRunning) return;
+  testAllRunning = true;
+  activeBadgeId = "stalest-badge";
+  streamCompletedCount = 0;
+  streamTotalCount = 0;
+  disableTestButtons();
+  startTestStream("/api/test-investments/scrape/stalest?limit=" + stalestLimit);
+}
+
+/**
+ * @description Clean up after Test All or Test Stalest completes.
  * @param {Object|null} summary - The done event data, or null on error
  */
 function finishTestAll(summary) {
   testAllRunning = false;
 
-  const testAllBtn = document.getElementById("test-all-btn");
-  testAllBtn.disabled = false;
-  testAllBtn.textContent = "Test All";
+  document.getElementById("test-all-btn").disabled = false;
+  document.getElementById("test-stalest-btn").disabled = false;
+
+  // Clear the badge
+  if (activeBadgeId) {
+    const badge = document.getElementById(activeBadgeId);
+    if (badge) {
+      badge.textContent = "";
+    }
+    activeBadgeId = null;
+  }
 
   // Re-enable individual Test buttons
   document.querySelectorAll('[id^="test-btn-"]').forEach(function (btn) {
@@ -885,6 +998,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   document.getElementById("add-test-btn").addEventListener("click", showAddForm);
   document.getElementById("test-all-btn").addEventListener("click", testAll);
+  document.getElementById("test-stalest-btn").addEventListener("click", testStalest);
   document.getElementById("cancel-btn").addEventListener("click", hideForm);
   document.getElementById("test-form").addEventListener("submit", handleFormSubmit);
   document.getElementById("delete-cancel-btn").addEventListener("click", hideDeleteDialog);

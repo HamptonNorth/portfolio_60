@@ -126,11 +126,11 @@ INSERT INTO test_investments (currencies_id, investment_type_id, description, pu
 -- Tests Fidelity scraping for USD-denominated shares
 -- ============================================================================
 
-INSERT INTO test_investments (currencies_id, investment_type_id, description, public_id, investment_url, selector, source_site, notes) VALUES
-(2, 1, 'Amazon (Fidelity)', NULL, 'https://www.fidelity.co.uk/factsheet-data/factsheet/US0231351067USD-amazon-com-inc/price-chart', NULL, 'Fidelity UK', 'Live USD share — Fidelity equity factsheet'),
-(2, 1, 'Google GOOG (Fidelity)', NULL, 'https://www.fidelity.co.uk/factsheet-data/factsheet/US02079K1079-alphabet-inc/key-statistics', NULL, 'Fidelity UK', 'Live USD share — Fidelity equity factsheet'),
-(2, 1, 'Microsoft (Fidelity)', NULL, 'https://www.fidelity.co.uk/factsheet-data/factsheet/US5949181045USD-microsoft-corp/price-chart', NULL, 'Fidelity UK', 'Live USD share — Fidelity equity factsheet'),
-(2, 1, 'Nvidia (Fidelity)', NULL, 'https://www.fidelity.co.uk/factsheet-data/factsheet/US67066G1040USD-nvidia-corp/price-chart', NULL, 'Fidelity UK', 'Live USD share — Fidelity equity factsheet');
+-- INSERT INTO test_investments (currencies_id, investment_type_id, description, public_id, investment_url, selector, source_site, notes) VALUES
+
+-- (2, 1, 'Google GOOG ', NULL, 'https://www.fidelity.co.uk/factsheet-data/factsheet/US02079K1079-alphabet-inc/key-statistics', NULL, 'Fidelity UK', 'Live USD share — Fidelity equity factsheet'),
+-- (2, 1, 'Microsoft ', NULL, 'https://www.fidelity.co.uk/factsheet-data/factsheet/US5949181045USD-microsoft-corp/price-chart', NULL, 'Fidelity UK', 'Live USD share — Fidelity equity factsheet'),
+-- (2, 1, 'Nvidia ', NULL, 'https://www.fidelity.co.uk/factsheet-data/factsheet/US67066G1040USD-nvidia-corp/price-chart', NULL, 'Fidelity UK', 'Live USD share — Fidelity equity factsheet');
 
 
 
@@ -148,6 +148,10 @@ INSERT INTO test_investments (currencies_id, investment_type_id, description, pu
 
 INSERT INTO test_investments (currencies_id, investment_type_id, description, public_id, source_site, notes) VALUES
 (2, 1, 'NVIDIA Corp (FT Markets)', 'NSQ:NVDA', 'FT Markets (Equities)', 'Top traded US share'),
+(2, 1, 'Amazon (FT Markets)', 'NSQ:AMZN', 'FT Markets (Equities)', 'Top traded US share'),
+(2, 1, 'Alphabet GOOG (FT Markets)', 'NSQ:GOOG', 'FT Markets (Equities)', 'Top traded US share'),
+(2, 1, 'Microsoft (FT Markets)', 'NSQ:MSFT', 'FT Markets (Equities)', 'Top traded US share'),
+(2, 1, 'NVIDIA (FT Markets)', 'NSQ:NVDA', 'FT Markets (Equities)', 'Top traded US share'),
 (1, 1, 'Rolls-Royce Holdings PLC (FT Markets)', 'LSE:RR.', 'FT Markets (Equities)', 'Top traded UK share'),
 (1, 1, 'Legal & General Group PLC (FT Markets)', 'LSE:LGEN', 'FT Markets (Equities)', 'Top traded UK share'),
 (1, 1, 'BP PLC (FT Markets)', 'LSE:BP.', 'FT Markets (Equities)', 'Top traded UK share'),

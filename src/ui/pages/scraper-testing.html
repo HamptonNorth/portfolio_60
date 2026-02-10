@@ -66,9 +66,10 @@
             <!-- Main content (shown when feature is enabled) -->
             <div id="feature-content" class="hidden">
                 <div class="flex items-center justify-between mb-6">
-                    <h2 class="text-2xl font-semibold text-brand-800">Scraper Testing</h2>
+                    <h2 class="text-2xl font-semibold text-brand-800">Scraper Testing <span id="test-total-count" class="text-base font-normal text-brand-500"></span></h2>
                     <div class="flex gap-3">
-                        <button id="test-all-btn" class="bg-green-600 hover:bg-green-700 text-white font-medium px-5 py-2 rounded-lg transition-colors">Test All</button>
+                        <button id="test-stalest-btn" class="bg-amber-600 hover:bg-amber-700 text-white font-medium px-5 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Test Stalest 20 <span id="stalest-badge" class="inline-block bg-amber-800 text-white text-xs font-bold rounded-full px-2 py-0.5 ml-1"></span></button>
+                        <button id="test-all-btn" class="bg-green-600 hover:bg-green-700 text-white font-medium px-5 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Test All <span id="test-all-badge" class="inline-block bg-green-800 text-white text-xs font-bold rounded-full px-2 py-0.5 ml-1"></span></button>
                         <button id="add-test-btn" class="bg-brand-700 hover:bg-brand-800 text-white font-medium px-5 py-2 rounded-lg transition-colors">Add Test</button>
                     </div>
                 </div>

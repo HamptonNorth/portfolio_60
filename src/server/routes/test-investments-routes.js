@@ -1,13 +1,12 @@
 import { Router } from "../router.js";
-import { getAllTestInvestments, getTestInvestmentById, createTestInvestment, updateTestInvestment, deleteTestInvestment, updateTestResult, resetTestInvestments } from "../db/test-investments-db.js";
+import { getAllTestInvestments, getTestInvestmentById, createTestInvestment, updateTestInvestment, deleteTestInvestment, updateTestResult, resetTestInvestments, getStalestTestInvestments } from "../db/test-investments-db.js";
 import { getTestPriceHistory } from "../db/test-prices-db.js";
 import { upsertTestPrice } from "../db/test-prices-db.js";
 import { getAllInvestmentTypes } from "../db/investment-types-db.js";
 import { validateTestInvestment } from "../validation.js";
-import { getScraperTestingEnabled } from "../config.js";
+import { getScraperTestingEnabled, getStalestLimit } from "../config.js";
 import { scrapeSingleInvestmentPrice, extractDomain, calculateDelay, parsePrice, normaliseToMinorUnit, resolveScrapingConfig } from "../scrapers/price-scraper.js";
-import { launchBrowser } from "../scrapers/browser-utils.js";
-import { SCRAPE_RETRY_CONFIG } from "../../shared/constants.js";
+import { SCRAPE_RETRY_CONFIG, SCRAPE_DELAY_PROFILES } from "../../shared/constants.js";
 import { testBackfillTestInvestment } from "../services/historic-backfill.js";
 
 /**
@@ -39,6 +38,45 @@ function sleep(ms) {
   return new Promise(function (resolve) {
     setTimeout(resolve, ms);
   });
+}
+
+/**
+ * @description Maximum time (ms) to wait for a single investment's complete scrape cycle
+ * (including all retries and fallbacks) before giving up. Prevents the stream from hanging
+ * indefinitely if a Playwright browser process becomes unresponsive.
+ * @type {number}
+ */
+const PER_INVESTMENT_TIMEOUT_MS = 300000; // 5 minutes
+
+/**
+ * @description Wrap a promise with a timeout. If the promise does not resolve within
+ * the given time, resolves with a failure result instead of hanging forever.
+ * @param {Promise<Object>} promise - The scrape promise to wrap
+ * @param {number} timeoutMs - Maximum wait time in milliseconds
+ * @param {number} investmentId - Investment ID for the failure result
+ * @param {string} description - Investment description for the failure result
+ * @returns {Promise<Object>} The scrape result, or a failure result if timed out
+ */
+function withScrapeTimeout(promise, timeoutMs, investmentId, description) {
+  return Promise.race([
+    promise,
+    new Promise(function (resolve) {
+      setTimeout(function () {
+        resolve({
+          success: false,
+          investmentId: investmentId,
+          description: description,
+          rawPrice: "",
+          parsedPrice: null,
+          isMinorUnit: false,
+          priceMinorUnit: null,
+          currency: "",
+          error: "Scrape timed out after " + timeoutMs / 1000 + " seconds",
+          fallbackUsed: false,
+        });
+      }, timeoutMs);
+    }),
+  ]);
 }
 
 /** @type {boolean} Server-side lock to prevent concurrent Test All streams */
@@ -311,7 +349,16 @@ testInvestmentsRouter.get("/api/test-investments/scrape/stream", async function 
           controller.enqueue(encoder.encode("data: " + JSON.stringify(data) + "\n\n"));
         }
 
-        let browser = null;
+        // Send SSE comment every 30s to prevent Bun's idleTimeout (255s) from
+        // closing the connection during long gaps between price events.
+        const keepaliveId = setInterval(function () {
+          try {
+            controller.enqueue(encoder.encode(":keepalive\n\n"));
+          } catch {
+            // Stream already closed — clear interval silently
+            clearInterval(keepaliveId);
+          }
+        }, 30000);
 
         try {
           const scrapeTime = new Date().toTimeString().slice(0, 8);
@@ -344,7 +391,6 @@ testInvestmentsRouter.get("/api/test-investments/scrape/stream", async function 
               failedIds: [],
             });
           } else {
-            browser = await launchBrowser();
             let successCount = 0;
             let failCount = 0;
             let previousDomain = "";
@@ -358,18 +404,24 @@ testInvestmentsRouter.get("/api/test-investments/scrape/stream", async function 
                 await sleep(delayMs);
               }
 
-              // Scrape with retry logic
+              // Scrape with retry logic — fresh browser per investment (null)
+              // Wrapped in per-investment timeout to prevent stream hanging if Playwright freezes
               let priceResult = null;
               let attemptNumber = 1;
 
               while (attemptNumber <= SCRAPE_RETRY_CONFIG.maxAttempts) {
-                priceResult = await scrapeSingleInvestmentPrice(testInvestment, browser, {
-                  testMode: true,
-                  startedBy: 3,
-                  scrapeTime: scrapeTime,
-                  attemptNumber: attemptNumber,
-                  sourceTable: "test_investments",
-                });
+                priceResult = await withScrapeTimeout(
+                  scrapeSingleInvestmentPrice(testInvestment, null, {
+                    testMode: true,
+                    startedBy: 3,
+                    scrapeTime: scrapeTime,
+                    attemptNumber: attemptNumber,
+                    sourceTable: "test_investments",
+                  }),
+                  PER_INVESTMENT_TIMEOUT_MS,
+                  testInvestment.id,
+                  testInvestment.description,
+                );
 
                 if (priceResult.success) break;
 
@@ -422,10 +474,16 @@ testInvestmentsRouter.get("/api/test-investments/scrape/stream", async function 
                 if (priceResult.success && historyResult.success && historyResult.rows && historyResult.rows.length > 0) {
                   const scrapedMajor = priceResult.priceMinorUnit / 100;
                   const morningstarMajor = historyResult.rows[0].price;
+                  const morningstarDate = historyResult.rows[0].date;
                   if (morningstarMajor > 0) {
-                    const pctDiff = (Math.abs(scrapedMajor - morningstarMajor) / morningstarMajor) * 100;
-                    if (pctDiff > 5) {
-                      historyEvent.priceWarning = "Price mismatch: scraped " + scrapedMajor.toFixed(4) + " vs Morningstar " + morningstarMajor.toFixed(4) + " (" + pctDiff.toFixed(1) + "% difference)";
+                    const pctDiff = ((scrapedMajor - morningstarMajor) / morningstarMajor) * 100;
+                    if (Math.abs(pctDiff) > 5) {
+                      historyEvent.priceWarning = {
+                        scrapedPrice: scrapedMajor,
+                        morningstarPrice: morningstarMajor,
+                        morningstarDate: morningstarDate,
+                        pctDiff: pctDiff,
+                      };
                     }
                   }
                 }
@@ -462,16 +520,9 @@ testInvestmentsRouter.get("/api/test-investments/scrape/stream", async function 
           }
         } catch (err) {
           sendEvent("error", { error: err.message });
-        } finally {
-          if (browser) {
-            try {
-              await browser.close();
-            } catch {
-              // Ignore close errors
-            }
-          }
         }
 
+        clearInterval(keepaliveId);
         testAllRunning = false;
         controller.close();
       },
@@ -488,6 +539,234 @@ testInvestmentsRouter.get("/api/test-investments/scrape/stream", async function 
   } catch (err) {
     testAllRunning = false;
     return new Response(JSON.stringify({ error: "Failed to start test scraping stream", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+  }
+});
+
+/**
+ * @description Calculate a random delay using the cron delay profile, which uses
+ * longer pauses between requests to be more polite to target sites.
+ * @param {string} previousDomain - Hostname of the previous request (empty string if first)
+ * @param {string} currentDomain - Hostname of the current request
+ * @returns {number} Delay in milliseconds (0 if this is the first request)
+ */
+function calculateCronDelay(previousDomain, currentDomain) {
+  if (!previousDomain) return 0;
+  const range = previousDomain === currentDomain ? SCRAPE_DELAY_PROFILES.cron.sameDomain : SCRAPE_DELAY_PROFILES.cron.differentDomain;
+  return Math.floor(Math.random() * (range.max - range.min + 1)) + range.min;
+}
+
+// GET /api/test-investments/scrape/stalest — SSE stream that scrapes the N oldest-tested investments
+testInvestmentsRouter.get("/api/test-investments/scrape/stalest", async function (request) {
+  if (!getScraperTestingEnabled()) return featureDisabledResponse();
+
+  if (testAllRunning) {
+    return new Response(JSON.stringify({ error: "A test scrape is already running. Wait for it to finish or restart the server." }), { status: 409, headers: { "Content-Type": "application/json" } });
+  }
+
+  try {
+    testAllRunning = true;
+
+    // Use limit from query string if provided, otherwise from config (default 20)
+    const url = new URL(request.url);
+    const limitParam = parseInt(url.searchParams.get("limit"), 10);
+    const limit = Number.isFinite(limitParam) && limitParam > 0 ? limitParam : getStalestLimit();
+
+    const encoder = new TextEncoder();
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        /**
+         * @description Send an SSE event to the client.
+         * @param {string} eventName - The event type
+         * @param {Object} data - The data payload (will be JSON-stringified)
+         */
+        function sendEvent(eventName, data) {
+          controller.enqueue(encoder.encode("event: " + eventName + "\n"));
+          controller.enqueue(encoder.encode("data: " + JSON.stringify(data) + "\n\n"));
+        }
+
+        // Keepalive to prevent Bun's idleTimeout from closing the connection
+        const keepaliveId = setInterval(function () {
+          try {
+            controller.enqueue(encoder.encode(":keepalive\n\n"));
+          } catch {
+            clearInterval(keepaliveId);
+          }
+        }, 30000);
+
+        try {
+          const scrapeTime = new Date().toTimeString().slice(0, 8);
+          const today = new Date().toISOString().split("T")[0];
+          const scrapeable = getStalestTestInvestments(limit);
+
+          sendEvent("init", {
+            investments: scrapeable.map(function (ti) {
+              return {
+                investmentId: ti.id,
+                description: ti.description,
+                currency: ti.currency_code,
+              };
+            }),
+            total: scrapeable.length,
+          });
+
+          if (scrapeable.length === 0) {
+            sendEvent("done", {
+              success: true,
+              message: "No test investments with URL or public ID configured",
+              total: 0,
+              successCount: 0,
+              failCount: 0,
+              failedIds: [],
+            });
+          } else {
+            let successCount = 0;
+            let failCount = 0;
+            let previousDomain = "";
+            const failedIds = [];
+
+            for (const testInvestment of scrapeable) {
+              // Longer cron delays between requests
+              const currentDomain = extractDomain(testInvestment.investment_url || "");
+              const delayMs = calculateCronDelay(previousDomain, currentDomain);
+              if (delayMs > 0) {
+                await sleep(delayMs);
+              }
+
+              // Scrape with retry logic — fresh browser per investment (null)
+              // Wrapped in per-investment timeout to prevent stream hanging if Playwright freezes
+              let priceResult = null;
+              let attemptNumber = 1;
+
+              while (attemptNumber <= SCRAPE_RETRY_CONFIG.maxAttempts) {
+                priceResult = await withScrapeTimeout(
+                  scrapeSingleInvestmentPrice(testInvestment, null, {
+                    testMode: true,
+                    startedBy: 3,
+                    scrapeTime: scrapeTime,
+                    attemptNumber: attemptNumber,
+                    sourceTable: "test_investments",
+                  }),
+                  PER_INVESTMENT_TIMEOUT_MS,
+                  testInvestment.id,
+                  testInvestment.description,
+                );
+
+                if (priceResult.success) break;
+
+                if (attemptNumber < SCRAPE_RETRY_CONFIG.maxAttempts) {
+                  const retryDelay = SCRAPE_RETRY_CONFIG.retryDelays[attemptNumber - 1] || 2000;
+                  sendEvent("retry", {
+                    investmentId: testInvestment.id,
+                    description: testInvestment.description,
+                    attemptNumber: attemptNumber,
+                    maxAttempts: SCRAPE_RETRY_CONFIG.maxAttempts,
+                    error: priceResult.error,
+                    retryingIn: retryDelay,
+                  });
+                  await sleep(retryDelay);
+                }
+
+                attemptNumber++;
+              }
+
+              // Store result and update last_test_* fields
+              if (priceResult.success) {
+                upsertTestPrice(testInvestment.id, today, scrapeTime, priceResult.priceMinorUnit);
+                updateTestResult(testInvestment.id, today, true, String(priceResult.priceMinorUnit));
+                successCount++;
+              } else {
+                updateTestResult(testInvestment.id, today, false, null);
+                failCount++;
+                failedIds.push(testInvestment.id);
+              }
+
+              previousDomain = currentDomain;
+              priceResult.attemptNumber = attemptNumber > SCRAPE_RETRY_CONFIG.maxAttempts ? SCRAPE_RETRY_CONFIG.maxAttempts : attemptNumber;
+              priceResult.maxAttempts = SCRAPE_RETRY_CONFIG.maxAttempts;
+              sendEvent("price", priceResult);
+
+              // Run Morningstar historic data preview after the price scrape
+              try {
+                const historyResult = await testBackfillTestInvestment(testInvestment.id);
+                const historyEvent = {
+                  investmentId: testInvestment.id,
+                  success: historyResult.success,
+                  rows: historyResult.rows || [],
+                  rowCount: historyResult.rows ? historyResult.rows.length : 0,
+                  currency: historyResult.currency || "",
+                  description: historyResult.description || "",
+                  error: historyResult.error || null,
+                  priceWarning: null,
+                };
+                if (priceResult.success && historyResult.success && historyResult.rows && historyResult.rows.length > 0) {
+                  const scrapedMajor = priceResult.priceMinorUnit / 100;
+                  const morningstarMajor = historyResult.rows[0].price;
+                  const morningstarDate = historyResult.rows[0].date;
+                  if (morningstarMajor > 0) {
+                    const pctDiff = ((scrapedMajor - morningstarMajor) / morningstarMajor) * 100;
+                    if (Math.abs(pctDiff) > 5) {
+                      historyEvent.priceWarning = {
+                        scrapedPrice: scrapedMajor,
+                        morningstarPrice: morningstarMajor,
+                        morningstarDate: morningstarDate,
+                        pctDiff: pctDiff,
+                      };
+                    }
+                  }
+                }
+                sendEvent("history", historyEvent);
+              } catch (historyErr) {
+                sendEvent("history", {
+                  investmentId: testInvestment.id,
+                  success: false,
+                  rows: [],
+                  rowCount: 0,
+                  error: historyErr.message,
+                  priceWarning: null,
+                });
+              }
+
+              // Small delay for Morningstar rate politeness
+              await sleep(500);
+            }
+
+            const total = successCount + failCount;
+            let message = "Tested " + successCount + " of " + total + " stalest investment" + (total === 1 ? "" : "s");
+            if (failCount > 0) {
+              message += " (" + failCount + " failed after " + SCRAPE_RETRY_CONFIG.maxAttempts + " attempts each)";
+            }
+
+            sendEvent("done", {
+              success: true,
+              message: message,
+              total: total,
+              successCount: successCount,
+              failCount: failCount,
+              failedIds: failedIds,
+            });
+          }
+        } catch (err) {
+          sendEvent("error", { error: err.message });
+        }
+
+        clearInterval(keepaliveId);
+        testAllRunning = false;
+        controller.close();
+      },
+    });
+
+    return new Response(stream, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  } catch (err) {
+    testAllRunning = false;
+    return new Response(JSON.stringify({ error: "Failed to start stalest test stream", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 

@@ -165,6 +165,16 @@ scraperRouter.get("/api/scraper/prices/stream", async function () {
           controller.enqueue(encoder.encode("data: " + JSON.stringify(data) + "\n\n"));
         }
 
+        // Send SSE comment every 30s to prevent Bun's idleTimeout (255s) from
+        // closing the connection during long gaps between price events.
+        const keepaliveId = setInterval(function () {
+          try {
+            controller.enqueue(encoder.encode(":keepalive\n\n"));
+          } catch {
+            clearInterval(keepaliveId);
+          }
+        }, 30000);
+
         let browser = null;
 
         try {
@@ -289,6 +299,7 @@ scraperRouter.get("/api/scraper/prices/stream", async function () {
           }
         }
 
+        clearInterval(keepaliveId);
         controller.close();
       },
     });
@@ -415,6 +426,16 @@ scraperRouter.get("/api/scraper/benchmarks/stream", async function () {
           controller.enqueue(encoder.encode("data: " + JSON.stringify(data) + "\n\n"));
         }
 
+        // Send SSE comment every 30s to prevent Bun's idleTimeout (255s) from
+        // closing the connection during long gaps between benchmark events.
+        const keepaliveId = setInterval(function () {
+          try {
+            controller.enqueue(encoder.encode(":keepalive\n\n"));
+          } catch {
+            clearInterval(keepaliveId);
+          }
+        }, 30000);
+
         let browser = null;
 
         try {
@@ -536,6 +557,7 @@ scraperRouter.get("/api/scraper/benchmarks/stream", async function () {
           }
         }
 
+        clearInterval(keepaliveId);
         controller.close();
       },
     });

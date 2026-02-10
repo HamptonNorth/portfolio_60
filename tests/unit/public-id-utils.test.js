@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { detectPublicIdType, validatePublicId, buildFtMarketsUrl, buildFtMarketsAlternateUrl, getFtMarketsSelector, buildFidelitySearchUrl } from "../../src/shared/public-id-utils.js";
+import { detectPublicIdType, validatePublicId, buildFtMarketsUrl, buildFtMarketsAlternateUrl, getFtMarketsSelector, buildFidelitySearchUrl, extractTickerFromPublicId } from "../../src/shared/public-id-utils.js";
 
 // ---------------------------------------------------------------------------
 // detectPublicIdType
@@ -343,5 +343,51 @@ describe("buildFidelitySearchUrl", function () {
 
   test("returns null for ETF (not ISIN)", function () {
     expect(buildFidelitySearchUrl("ISF:LSE:GBX")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extractTickerFromPublicId
+// ---------------------------------------------------------------------------
+
+describe("extractTickerFromPublicId", function () {
+  test("extracts ticker from EXCHANGE:TICKER format", function () {
+    expect(extractTickerFromPublicId("LSE:AZN")).toBe("AZN");
+  });
+
+  test("extracts ticker from NSQ:GOOG", function () {
+    expect(extractTickerFromPublicId("NSQ:GOOG")).toBe("GOOG");
+  });
+
+  test("extracts ticker from AEX:ASML", function () {
+    expect(extractTickerFromPublicId("AEX:ASML")).toBe("ASML");
+  });
+
+  test("handles ticker with dot (LSE:BP.)", function () {
+    expect(extractTickerFromPublicId("LSE:BP.")).toBe("BP.");
+  });
+
+  test("extracts ticker from ETF format (TICKER:EXCHANGE:CURRENCY)", function () {
+    expect(extractTickerFromPublicId("ISF:LSE:GBX")).toBe("ISF");
+  });
+
+  test("extracts ticker from ETF IH2O:LSE:GBX", function () {
+    expect(extractTickerFromPublicId("IH2O:LSE:GBX")).toBe("IH2O");
+  });
+
+  test("returns null for ISIN", function () {
+    expect(extractTickerFromPublicId("GB00B4PQW151")).toBeNull();
+  });
+
+  test("returns null for null", function () {
+    expect(extractTickerFromPublicId(null)).toBeNull();
+  });
+
+  test("returns null for empty string", function () {
+    expect(extractTickerFromPublicId("")).toBeNull();
+  });
+
+  test("is case-insensitive (lowercased input)", function () {
+    expect(extractTickerFromPublicId("lse:azn")).toBe("AZN");
   });
 });

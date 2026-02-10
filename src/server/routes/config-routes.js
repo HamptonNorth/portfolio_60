@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { getAllSiteConfigs, findSiteConfig, loadConfig, getAllowedProviders, getSchedulingConfig, reloadConfig, getScraperTestingEnabled } from "../config.js";
+import { getAllSiteConfigs, findSiteConfig, loadConfig, getAllowedProviders, getSchedulingConfig, reloadConfig, getScraperTestingEnabled, getStalestLimit } from "../config.js";
 
 /**
  * @description Get the list of allowed provider codes.
@@ -138,7 +138,7 @@ export function handleConfigRoute(method, path) {
   // GET /api/config/scraper-testing-enabled — check if scraper testing feature is enabled
   if (method === "GET" && path === "/api/config/scraper-testing-enabled") {
     const enabled = getScraperTestingEnabled();
-    return new Response(JSON.stringify({ enabled: enabled }), {
+    return new Response(JSON.stringify({ enabled: enabled, stalestLimit: getStalestLimit() }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
