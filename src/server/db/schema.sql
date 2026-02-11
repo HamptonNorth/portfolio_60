@@ -136,6 +136,53 @@ CREATE TABLE IF NOT EXISTS test_prices (
     UNIQUE(test_investment_id, price_date)
 );
 
+-- Accounts: user investment accounts (trading, ISA, SIPP)
+CREATE TABLE IF NOT EXISTS accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    account_type TEXT NOT NULL CHECK(account_type IN ('trading', 'isa', 'sipp')),
+    account_ref TEXT NOT NULL CHECK(length(account_ref) <= 15),
+    cash_balance INTEGER NOT NULL DEFAULT 0,
+    warn_cash INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    UNIQUE(user_id, account_type)
+);
+
+-- Holdings: investment positions within an account
+CREATE TABLE IF NOT EXISTS holdings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER NOT NULL,
+    investment_id INTEGER NOT NULL,
+    quantity INTEGER NOT NULL DEFAULT 0,
+    average_cost INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (account_id) REFERENCES accounts(id),
+    FOREIGN KEY (investment_id) REFERENCES investments(id),
+    UNIQUE(account_id, investment_id)
+);
+
+-- Cash transactions: deposits, withdrawals, drawdowns and adjustments (future UI)
+CREATE TABLE IF NOT EXISTS cash_transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER NOT NULL,
+    transaction_type TEXT NOT NULL CHECK(transaction_type IN ('deposit', 'withdrawal', 'drawdown', 'adjustment')),
+    transaction_date TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    notes TEXT CHECK(notes IS NULL OR length(notes) <= 255),
+    FOREIGN KEY (account_id) REFERENCES accounts(id)
+);
+
+-- Holding movements: buy, sell and adjustment transactions (future UI)
+CREATE TABLE IF NOT EXISTS holding_movements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    holding_id INTEGER NOT NULL,
+    movement_type TEXT NOT NULL CHECK(movement_type IN ('buy', 'sell', 'adjustment')),
+    movement_date TEXT NOT NULL,
+    quantity INTEGER NOT NULL,
+    movement_value INTEGER NOT NULL,
+    notes TEXT CHECK(notes IS NULL OR length(notes) <= 255),
+    FOREIGN KEY (holding_id) REFERENCES holdings(id)
+);
+
 -- Indexes for query performance
 CREATE INDEX IF NOT EXISTS idx_currency_rates_lookup ON currency_rates(currencies_id, rate_date DESC);
 CREATE INDEX IF NOT EXISTS idx_investments_type ON investments(investment_type_id);
@@ -148,3 +195,8 @@ CREATE INDEX IF NOT EXISTS idx_benchmark_data_lookup ON benchmark_data(benchmark
 CREATE INDEX IF NOT EXISTS idx_scraping_history_datetime ON scraping_history(scrape_datetime DESC);
 CREATE INDEX IF NOT EXISTS idx_scraping_history_type_ref ON scraping_history(scrape_type, reference_id);
 CREATE INDEX IF NOT EXISTS idx_test_prices_lookup ON test_prices(test_investment_id, price_date DESC);
+CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(user_id);
+CREATE INDEX IF NOT EXISTS idx_holdings_account ON holdings(account_id);
+CREATE INDEX IF NOT EXISTS idx_holdings_investment ON holdings(investment_id);
+CREATE INDEX IF NOT EXISTS idx_cash_transactions_account ON cash_transactions(account_id, transaction_date DESC);
+CREATE INDEX IF NOT EXISTS idx_holding_movements_holding ON holding_movements(holding_id, movement_date DESC);

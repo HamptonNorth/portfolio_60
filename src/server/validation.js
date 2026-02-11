@@ -251,6 +251,92 @@ export function validateGlobalEvent(data) {
 }
 
 /**
+ * @description Validate account data for create or update operations.
+ * Returns an array of error messages (empty if all valid).
+ * @param {Object} data - The account data to validate
+ * @returns {string[]} Array of validation error messages
+ */
+export function validateAccount(data) {
+  const errors = [];
+
+  // Required fields
+  const requiredChecks = [validateRequired(data.account_type, "Account type"), validateRequired(data.account_ref, "Account reference")];
+
+  for (const error of requiredChecks) {
+    if (error) errors.push(error);
+  }
+
+  // account_type must be one of the allowed values
+  if (data.account_type !== undefined && data.account_type !== null) {
+    const accountType = String(data.account_type).trim();
+    if (accountType !== "" && accountType !== "trading" && accountType !== "isa" && accountType !== "sipp") {
+      errors.push("Account type must be one of: trading, isa, sipp");
+    }
+  }
+
+  // Max length checks
+  const lengthChecks = [validateMaxLength(data.account_ref, 15, "Account reference")];
+
+  for (const error of lengthChecks) {
+    if (error) errors.push(error);
+  }
+
+  // cash_balance must be a non-negative number if provided
+  if (data.cash_balance !== undefined && data.cash_balance !== null) {
+    const cashBalance = Number(data.cash_balance);
+    if (isNaN(cashBalance) || cashBalance < 0) {
+      errors.push("Cash balance must be a non-negative number");
+    }
+  }
+
+  // warn_cash must be a non-negative number if provided
+  if (data.warn_cash !== undefined && data.warn_cash !== null) {
+    const warnCash = Number(data.warn_cash);
+    if (isNaN(warnCash) || warnCash < 0) {
+      errors.push("Warning threshold must be a non-negative number");
+    }
+  }
+
+  return errors;
+}
+
+/**
+ * @description Validate holding data for create or update operations.
+ * Returns an array of error messages (empty if all valid).
+ * @param {Object} data - The holding data to validate
+ * @returns {string[]} Array of validation error messages
+ */
+export function validateHolding(data) {
+  const errors = [];
+
+  // investment_id required for create (not needed for update)
+  if (data.investment_id !== undefined && data.investment_id !== null) {
+    const investmentId = Number(data.investment_id);
+    if (!Number.isInteger(investmentId) || investmentId <= 0) {
+      errors.push("Investment must be a valid selection");
+    }
+  }
+
+  // quantity must be a non-negative number
+  if (data.quantity !== undefined && data.quantity !== null) {
+    const quantity = Number(data.quantity);
+    if (isNaN(quantity) || quantity < 0) {
+      errors.push("Quantity must be a non-negative number");
+    }
+  }
+
+  // average_cost must be a non-negative number
+  if (data.average_cost !== undefined && data.average_cost !== null) {
+    const averageCost = Number(data.average_cost);
+    if (isNaN(averageCost) || averageCost < 0) {
+      errors.push("Average cost must be a non-negative number");
+    }
+  }
+
+  return errors;
+}
+
+/**
  * @description Validate benchmark data for create or update operations.
  * Returns an array of error messages (empty if all valid).
  * Note: The check that index benchmarks must use GBP currency is done at the route

@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en-GB">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Portfolio 60 — Portfolio</title>
+        <link rel="stylesheet" href="/css/output.css" />
+        <link rel="icon" type="image/svg+xml" href="/images/favicon.svg" />
+    </head>
+    <body class="bg-brand-25 text-brand-900 min-h-screen flex flex-col">
+        <nav class="bg-brand-800 text-white px-6 py-4 shadow-md">
+            <div class="flex items-center justify-between max-w-7xl mx-auto">
+                <h1 class="text-xl font-semibold tracking-wide flex items-center gap-2">
+                    <img src="/images/redmug-logo.svg" alt="Red Mug logo" class="h-8 w-8" />
+                    Portfolio 60
+                </h1>
+                <ul class="flex gap-6 text-base items-center">
+                    <li><a href="/" class="hover:text-brand-200 transition-colors" data-nav="home">Home</a></li>
+                    <li class="relative group">
+                        <span class="hover:text-brand-200 transition-colors cursor-pointer select-none" data-nav-parent="setup">Set Up <span class="text-xs">&#9662;</span></span>
+                        <div class="hidden group-hover:block absolute left-0 top-full pt-1 z-50">
+                            <div class="bg-white text-brand-800 rounded-md shadow-lg border border-brand-200 py-1 min-w-48">
+                                <a href="/pages/users.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="users">Users</a>
+                                <a href="/pages/investments.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="investments">Investments</a>
+                                <a href="/pages/benchmarks.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="benchmarks">Benchmarks</a>
+                                <a href="/pages/currencies.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="currencies">Currencies</a>
+                                <a href="/pages/global-events.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="global-events">Global Events</a>
+                                <a href="/pages/scraping.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="scraping">Fetching</a>
+                                <a href="/pages/scraper-testing.html" class="hidden block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="scraper-testing" id="nav-scraper-testing">Scraper Testing</a>
+                                <a href="/pages/backup.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="backup">Backup</a>
+                            </div>
+                        </div>
+                    </li>
+                    <li><a href="/pages/portfolio.html" class="hover:text-brand-200 transition-colors" data-nav="portfolio">Portfolio</a></li>
+                    <li><span class="text-brand-400 cursor-not-allowed select-none">Reports</span></li>
+                    <li class="relative group">
+                        <span class="hover:text-brand-200 transition-colors cursor-pointer select-none" data-nav-parent="settings">
+                            <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.573-1.066z"
+                                />
+                                <circle cx="12" cy="12" r="3" />
+                            </svg>
+                        </span>
+                        <div class="hidden group-hover:block absolute right-0 top-full pt-1 z-50">
+                            <div class="bg-white text-brand-800 rounded-md shadow-lg border border-brand-200 py-1 min-w-48">
+                                <a href="#" onclick="showEditSettingsModal(); return false;" class="block px-4 py-2 hover:bg-brand-50 transition-colors">Edit Settings</a>
+                                <a href="#" onclick="showAboutModal(); return false;" class="block px-4 py-2 hover:bg-brand-50 transition-colors">About</a>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+        <main class="max-w-7xl mx-auto px-6 py-8 flex-1 w-full" id="main-content">
+            <!-- View 1: Accounts list -->
+            <div id="accounts-view">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-semibold text-brand-800">Portfolio — Accounts</h2>
+                    <div class="flex items-center gap-4">
+                        <label for="user-select" class="text-base font-medium text-brand-700">User:</label>
+                        <select id="user-select" class="px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white min-w-48">
+                            <option value="">Select a user...</option>
+                        </select>
+                        <button id="add-account-btn" class="hidden bg-brand-700 hover:bg-brand-800 text-white font-medium px-5 py-2 rounded-lg transition-colors">Add Account</button>
+                    </div>
+                </div>
+
+                <div id="page-messages"></div>
+
+                <div id="accounts-table-container">
+                    <p class="text-brand-500">Select a user to view their accounts.</p>
+                </div>
+            </div>
+
+            <!-- View 2: Holdings list -->
+            <div id="holdings-view" class="hidden">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 class="text-2xl font-semibold text-brand-800">Portfolio — Holdings</h2>
+                        <p id="holdings-header" class="text-base text-brand-600 mt-1"></p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button id="add-holding-btn" class="bg-brand-700 hover:bg-brand-800 text-white font-medium px-5 py-2 rounded-lg transition-colors">Add Holding</button>
+                        <button id="back-to-accounts-btn" class="bg-brand-100 hover:bg-brand-200 text-brand-700 font-medium px-5 py-2 rounded-lg transition-colors">Back to Accounts</button>
+                    </div>
+                </div>
+
+                <div id="holdings-messages"></div>
+
+                <div id="holdings-table-container">
+                    <p class="text-brand-500">Loading holdings...</p>
+                </div>
+            </div>
+
+            <!-- Account add/edit form modal -->
+            <div id="account-form-container" class="hidden fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+                <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto mx-4">
+                    <h3 id="account-form-title" class="text-xl font-semibold text-brand-800 mb-4">Add Account</h3>
+                    <form id="account-form" class="space-y-4">
+                        <input type="hidden" id="account-id" value="" />
+
+                        <div>
+                            <label for="account-type" class="block text-sm font-medium text-brand-700 mb-1">Account Type *</label>
+                            <select id="account-type" name="account_type" required class="w-full px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white">
+                                <option value="">Select type...</option>
+                                <option value="trading">Trading</option>
+                                <option value="isa">ISA</option>
+                                <option value="sipp">SIPP</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="account-ref" class="block text-sm font-medium text-brand-700 mb-1">Account Reference *</label>
+                            <input type="text" id="account-ref" name="account_ref" maxlength="15" required class="w-full px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="e.g. 12345" />
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="cash-balance" class="block text-sm font-medium text-brand-700 mb-1">Cash Balance (GBP)</label>
+                                <input type="number" id="cash-balance" name="cash_balance" step="0.01" min="0" class="w-full px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="0.00" />
+                            </div>
+                            <div>
+                                <label for="warn-cash" class="block text-sm font-medium text-brand-700 mb-1">Warning Threshold (GBP)</label>
+                                <input type="number" id="warn-cash" name="warn_cash" step="0.01" min="0" class="w-full px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="0.00" />
+                            </div>
+                        </div>
+
+                        <div id="account-form-errors" class="text-error text-sm"></div>
+
+                        <div class="flex items-center justify-between pt-2">
+                            <div class="flex gap-3">
+                                <button type="submit" class="bg-brand-700 hover:bg-brand-800 text-white font-medium px-5 py-2 rounded-lg transition-colors">Save</button>
+                                <button type="button" id="account-cancel-btn" class="bg-brand-100 hover:bg-brand-200 text-brand-700 font-medium px-5 py-2 rounded-lg transition-colors">Cancel</button>
+                            </div>
+                            <button type="button" id="account-delete-btn" class="hidden text-sm text-brand-400 hover:text-red-600 transition-colors">Delete this account</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Holding add/edit form modal -->
+            <div id="holding-form-container" class="hidden fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+                <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto mx-4">
+                    <h3 id="holding-form-title" class="text-xl font-semibold text-brand-800 mb-4">Add Holding</h3>
+                    <form id="holding-form" class="space-y-4">
+                        <input type="hidden" id="holding-id" value="" />
+
+                        <div class="relative">
+                            <label for="holding-investment-search" class="block text-sm font-medium text-brand-700 mb-1">Investment *</label>
+                            <input type="hidden" id="holding-investment" name="investment_id" value="" />
+                            <input type="text" id="holding-investment-search" autocomplete="off" class="w-full px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Type to search investments..." />
+                            <div id="holding-investment-list" class="hidden absolute z-10 w-full mt-1 bg-white border border-brand-300 rounded-md shadow-lg max-h-60 overflow-y-auto"></div>
+                        </div>
+
+                        <div>
+                            <label for="holding-quantity" class="block text-sm font-medium text-brand-700 mb-1">Quantity</label>
+                            <input type="number" id="holding-quantity" name="quantity" step="0.0001" min="0" class="w-full px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="0.0000" />
+                        </div>
+
+                        <p class="text-sm text-brand-500">Enter either Average Cost or Book Cost Value. If both are entered, they must be consistent.</p>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="holding-avg-cost" class="block text-sm font-medium text-brand-700 mb-1">Average Cost</label>
+                                <input type="number" id="holding-avg-cost" name="average_cost" step="0.000001" min="0" class="w-full px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="0.000000" />
+                            </div>
+                            <div>
+                                <label for="holding-book-cost" class="block text-sm font-medium text-brand-700 mb-1">Book Cost Value</label>
+                                <input type="number" id="holding-book-cost" step="0.01" min="0" class="w-full px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="0.00" />
+                            </div>
+                        </div>
+
+                        <div id="holding-form-errors" class="text-error text-sm"></div>
+
+                        <div class="flex items-center justify-between pt-2">
+                            <div class="flex gap-3">
+                                <button type="submit" class="bg-brand-700 hover:bg-brand-800 text-white font-medium px-5 py-2 rounded-lg transition-colors">Save</button>
+                                <button type="button" id="holding-cancel-btn" class="bg-brand-100 hover:bg-brand-200 text-brand-700 font-medium px-5 py-2 rounded-lg transition-colors">Cancel</button>
+                            </div>
+                            <button type="button" id="holding-delete-btn" class="hidden text-sm text-brand-400 hover:text-red-600 transition-colors">Delete this holding</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Delete confirmation dialog -->
+            <div id="delete-dialog" class="hidden fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+                <div class="bg-white rounded-lg shadow-lg p-6 max-w-sm">
+                    <h3 class="text-lg font-semibold text-brand-800 mb-3">Confirm Deletion</h3>
+                    <p class="text-base text-brand-600 mb-4">Are you sure you want to delete <strong id="delete-item-name"></strong>?</p>
+                    <div class="flex gap-3 justify-end">
+                        <button id="delete-cancel-btn" class="bg-brand-100 hover:bg-brand-200 text-brand-700 font-medium px-4 py-2 rounded-lg transition-colors">Cancel</button>
+                        <button id="delete-confirm-btn" class="bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">Delete</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+        <footer class="text-brand-400 text-sm py-4 border-t border-brand-100 flex justify-between px-6 max-w-7xl mx-auto w-full">
+            <span>Portfolio 60 v0.1.0</span>
+            <span id="build-time"></span>
+        </footer>
+        <script src="/js/app.js"></script>
+        <script src="/js/portfolio.js"></script>
+    </body>
+</html>

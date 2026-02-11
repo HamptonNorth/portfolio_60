@@ -13,6 +13,8 @@ import { handleBackupRoute } from "./routes/backup-routes.js";
 import { handleBenchmarksRoute } from "./routes/benchmarks-routes.js";
 import { handleBackfillRoute } from "./routes/backfill-routes.js";
 import { handleTestInvestmentsRoute } from "./routes/test-investments-routes.js";
+import { handleAccountsRoute } from "./routes/accounts-routes.js";
+import { handleHoldingsRoute } from "./routes/holdings-routes.js";
 import { initScheduledScraper, stopScheduledScraper } from "./services/scheduled-scraper.js";
 import { launchBrowser } from "./scrapers/browser-utils.js";
 
@@ -163,6 +165,39 @@ const server = Bun.serve({
       const configResultAsync = await handleConfigRouteAsync(method, path, request);
       if (configResultAsync) {
         return configResultAsync;
+      }
+    }
+
+    // Accounts routes (nested under users and standalone)
+    // Must be checked before users routes since /api/users/:id/accounts starts with /api/users
+    if (path.startsWith("/api/users") && path.includes("/accounts")) {
+      const accountsResult = await handleAccountsRoute(method, path, request);
+      if (accountsResult) {
+        return accountsResult;
+      }
+    }
+
+    if (path.startsWith("/api/accounts")) {
+      // Holdings routes (nested under accounts)
+      if (path.includes("/holdings")) {
+        const holdingsResult = await handleHoldingsRoute(method, path, request);
+        if (holdingsResult) {
+          return holdingsResult;
+        }
+      }
+
+      // Standalone accounts routes
+      const accountsResult = await handleAccountsRoute(method, path, request);
+      if (accountsResult) {
+        return accountsResult;
+      }
+    }
+
+    // Holdings routes (standalone)
+    if (path.startsWith("/api/holdings")) {
+      const holdingsResult = await handleHoldingsRoute(method, path, request);
+      if (holdingsResult) {
+        return holdingsResult;
       }
     }
 

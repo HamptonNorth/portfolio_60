@@ -258,6 +258,86 @@ function runMigrations(database) {
 
     database.exec("CREATE INDEX IF NOT EXISTS idx_test_prices_lookup ON test_prices(test_investment_id, price_date DESC)");
   }
+
+  // Migration 10: Add accounts, holdings, cash_transactions and holding_movements tables (v0.6.0)
+  // Portfolio hierarchy: users → accounts → holdings, with future transaction tracking.
+  const accountsTable = database.query("SELECT name FROM sqlite_master WHERE type='table' AND name='accounts'").get();
+
+  if (!accountsTable) {
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS accounts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        account_type TEXT NOT NULL CHECK(account_type IN ('trading', 'isa', 'sipp')),
+        account_ref TEXT NOT NULL CHECK(length(account_ref) <= 15),
+        cash_balance INTEGER NOT NULL DEFAULT 0,
+        warn_cash INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        UNIQUE(user_id, account_type)
+      )
+    `);
+    database.exec("CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(user_id)");
+
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS holdings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        account_id INTEGER NOT NULL,
+        investment_id INTEGER NOT NULL,
+        quantity INTEGER NOT NULL DEFAULT 0,
+        average_cost INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (account_id) REFERENCES accounts(id),
+        FOREIGN KEY (investment_id) REFERENCES investments(id),
+        UNIQUE(account_id, investment_id)
+      )
+    `);
+    database.exec("CREATE INDEX IF NOT EXISTS idx_holdings_account ON holdings(account_id)");
+    database.exec("CREATE INDEX IF NOT EXISTS idx_holdings_investment ON holdings(investment_id)");
+
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS cash_transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        account_id INTEGER NOT NULL,
+        transaction_type TEXT NOT NULL CHECK(transaction_type IN ('deposit', 'withdrawal', 'drawdown', 'adjustment')),
+        transaction_date TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        notes TEXT CHECK(notes IS NULL OR length(notes) <= 255),
+        FOREIGN KEY (account_id) REFERENCES accounts(id)
+      )
+    `);
+    database.exec("CREATE INDEX IF NOT EXISTS idx_cash_transactions_account ON cash_transactions(account_id, transaction_date DESC)");
+
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS holding_movements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        holding_id INTEGER NOT NULL,
+        movement_type TEXT NOT NULL CHECK(movement_type IN ('buy', 'sell', 'adjustment')),
+        movement_date TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        movement_value INTEGER NOT NULL,
+        notes TEXT CHECK(notes IS NULL OR length(notes) <= 255),
+        FOREIGN KEY (holding_id) REFERENCES holdings(id)
+      )
+    `);
+    database.exec("CREATE INDEX IF NOT EXISTS idx_holding_movements_holding ON holding_movements(holding_id, movement_date DESC)");
+
+    // Migrate existing user account references into accounts rows.
+    // For each user with a trading_ref, isa_ref, or sipp_ref, create the
+    // corresponding account row with zero cash balance.
+    const users = database.query("SELECT id, trading_ref, isa_ref, sipp_ref FROM users").all();
+    const insertAccount = database.query("INSERT INTO accounts (user_id, account_type, account_ref, cash_balance, warn_cash) VALUES (?, ?, ?, 0, 0)");
+
+    for (const user of users) {
+      if (user.trading_ref) {
+        insertAccount.run(user.id, "trading", user.trading_ref);
+      }
+      if (user.isa_ref) {
+        insertAccount.run(user.id, "isa", user.isa_ref);
+      }
+      if (user.sipp_ref) {
+        insertAccount.run(user.id, "sipp", user.sipp_ref);
+      }
+    }
+  }
 }
 
 /**
