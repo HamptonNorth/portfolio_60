@@ -179,6 +179,8 @@ CREATE TABLE IF NOT EXISTS holding_movements (
     movement_date TEXT NOT NULL,
     quantity INTEGER NOT NULL,
     movement_value INTEGER NOT NULL,
+    book_cost INTEGER NOT NULL DEFAULT 0,
+    deductible_costs INTEGER NOT NULL DEFAULT 0,
     notes TEXT CHECK(notes IS NULL OR length(notes) <= 255),
     FOREIGN KEY (holding_id) REFERENCES holdings(id)
 );

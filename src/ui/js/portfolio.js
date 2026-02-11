@@ -21,6 +21,9 @@ let currentHoldings = [];
 /** @type {Object|null} Pending delete info: { type: 'account'|'holding', id, name } */
 let pendingDelete = null;
 
+/** @type {Object|null} The holding currently targeted by the action menu (from detail view summary data) */
+let actionMenuHolding = null;
+
 // ─── Formatting helpers ──────────────────────────────────────────────
 
 /**
@@ -249,6 +252,7 @@ async function showDetail(userId, accountId) {
   }
 
   cashViewContext = "detail";
+  currentDetailAccount = targetAccount;
 
   document.getElementById("summary-view").classList.add("hidden");
   document.getElementById("detail-view").classList.remove("hidden");
@@ -302,6 +306,7 @@ function renderDetailHoldings(account) {
   html += '<table class="w-full border-collapse text-base">';
   html += "<thead>";
   html += '<tr class="bg-brand-100 text-brand-700">';
+  html += '<th class="py-3 px-1 w-8"></th>';
   html += '<th class="py-3 px-3 text-left text-sm font-semibold">Investment</th>';
   html += '<th class="py-3 px-3 text-left text-sm font-semibold">Currency</th>';
   html += '<th class="py-3 px-3 text-right text-sm font-semibold">Quantity</th>';
@@ -331,6 +336,12 @@ function renderDetailHoldings(account) {
 
     html += '<tr class="' + rowClass + ' border-b border-brand-100">';
 
+    // Action button (3-dot menu)
+    html += '<td class="py-2 px-1 text-center align-top">';
+    html += '<button class="holding-action-btn text-brand-400 hover:text-brand-700 text-lg leading-none px-1 py-1 rounded transition-colors" data-holding-index="' + i + '" title="Buy or Sell">';
+    html += "&#8942;"; // vertical ellipsis
+    html += "</button></td>";
+
     // Investment: public_id on line 1, name on line 2
     html += '<td class="py-2 px-3">';
     if (publicIdText) {
@@ -355,7 +366,7 @@ function renderDetailHoldings(account) {
 
   // Total row
   html += '<tr class="border-t-2 border-brand-300 bg-white">';
-  html += '<td colspan="6" class="py-3 px-3 text-right font-semibold text-brand-700">Total Investments GBP</td>';
+  html += '<td colspan="7" class="py-3 px-3 text-right font-semibold text-brand-700">Total Investments GBP</td>';
   html += '<td class="py-3 px-3 text-right font-mono bg-brand-38">' + formatGBPWhole(account.investments_total) + "</td>";
   html += '<td class="py-3 px-3"></td>';
   html += "</tr>";
@@ -369,6 +380,7 @@ function renderDetailHoldings(account) {
  */
 function backToSummary() {
   selectedAccount = null;
+  currentDetailAccount = null;
   cashViewContext = "holdings";
   document.getElementById("detail-view").classList.add("hidden");
   document.getElementById("summary-view").classList.remove("hidden");
@@ -1430,6 +1442,263 @@ function getTodayISO() {
   return year + "-" + month + "-" + day;
 }
 
+// ─── Buy / Sell Movements ────────────────────────────────────────────
+
+/** @type {Object|null} The currently displayed detail account (from summary data) */
+let currentDetailAccount = null;
+
+/**
+ * @description Show the 3-dot action menu next to a holding row button.
+ * The menu is positioned absolutely relative to the clicked button.
+ * @param {number} holdingIndex - Index into currentDetailAccount.holdings
+ * @param {HTMLElement} buttonEl - The clicked button element
+ */
+function showActionMenu(holdingIndex, buttonEl) {
+  const menu = document.getElementById("holding-action-menu");
+
+  if (!currentDetailAccount || !currentDetailAccount.holdings[holdingIndex]) {
+    return;
+  }
+
+  actionMenuHolding = currentDetailAccount.holdings[holdingIndex];
+
+  // Disable Sell if quantity is zero
+  const sellBtn = document.getElementById("action-sell-btn");
+  if (actionMenuHolding.quantity <= 0) {
+    sellBtn.disabled = true;
+    sellBtn.classList.add("text-brand-300", "cursor-not-allowed");
+    sellBtn.classList.remove("hover:bg-brand-50");
+  } else {
+    sellBtn.disabled = false;
+    sellBtn.classList.remove("text-brand-300", "cursor-not-allowed");
+    sellBtn.classList.add("hover:bg-brand-50");
+  }
+
+  // Position the menu below the button
+  const rect = buttonEl.getBoundingClientRect();
+  menu.style.top = rect.bottom + window.scrollY + "px";
+  menu.style.left = rect.left + window.scrollX + "px";
+  menu.classList.remove("hidden");
+}
+
+/**
+ * @description Hide the holding action menu.
+ */
+function hideActionMenu() {
+  document.getElementById("holding-action-menu").classList.add("hidden");
+  actionMenuHolding = null;
+}
+
+/**
+ * @description Show the Buy form modal for the selected holding.
+ */
+function showBuyForm() {
+  if (!actionMenuHolding || !selectedAccount) return;
+
+  const h = actionMenuHolding;
+  hideActionMenu();
+
+  document.getElementById("movement-form-title").textContent = "Buy";
+  document.getElementById("movement-type").value = "buy";
+  document.getElementById("movement-holding-id").value = h.holding_id;
+  document.getElementById("movement-form").reset();
+  document.getElementById("movement-date").value = getTodayISO();
+  document.getElementById("movement-deductible").value = "0";
+  document.getElementById("movement-form-errors").textContent = "";
+
+  // Holding info
+  const publicIdText = h.public_id ? " (" + h.public_id + ")" : "";
+  document.getElementById("movement-form-holding-info").innerHTML = "<strong>" + escapeHtml(h.description) + "</strong>" + escapeHtml(publicIdText) + '<br><span class="text-sm">Current quantity: ' + formatQuantity(h.quantity) + "</span>";
+
+  // Show available cash info
+  document.getElementById("movement-cash-info").textContent = "Available cash: " + formatGBP(selectedAccount.cash_balance);
+  document.getElementById("movement-qty-info").textContent = "";
+
+  // Show deductible costs, hide book cost display
+  document.getElementById("movement-deductible-hint").textContent = "e.g. stamp duty, commission — excluded from average cost";
+  document.getElementById("movement-bookcost-row").classList.add("hidden");
+
+  // Submit button style
+  const submitBtn = document.getElementById("movement-submit-btn");
+  submitBtn.className = "bg-green-600 hover:bg-green-700 text-white font-medium px-5 py-2 rounded-lg transition-colors";
+  submitBtn.textContent = "Confirm Buy";
+
+  document.getElementById("movement-form-container").classList.remove("hidden");
+  setTimeout(function () {
+    document.getElementById("movement-quantity").focus();
+  }, 50);
+}
+
+/**
+ * @description Show the Sell form modal for the selected holding.
+ */
+function showSellForm() {
+  if (!actionMenuHolding || !selectedAccount) return;
+
+  const h = actionMenuHolding;
+  hideActionMenu();
+
+  document.getElementById("movement-form-title").textContent = "Sell";
+  document.getElementById("movement-type").value = "sell";
+  document.getElementById("movement-holding-id").value = h.holding_id;
+  document.getElementById("movement-form").reset();
+  document.getElementById("movement-date").value = getTodayISO();
+  document.getElementById("movement-deductible").value = "0";
+  document.getElementById("movement-form-errors").textContent = "";
+
+  // Holding info
+  const publicIdText = h.public_id ? " (" + h.public_id + ")" : "";
+  document.getElementById("movement-form-holding-info").innerHTML = "<strong>" + escapeHtml(h.description) + "</strong>" + escapeHtml(publicIdText) + '<br><span class="text-sm">Current quantity: ' + formatQuantity(h.quantity) + " | Avg cost: " + formatDetailPrice(h.average_cost) + "</span>";
+
+  // Show quantity info
+  document.getElementById("movement-qty-info").textContent = "Maximum: " + formatQuantity(h.quantity);
+  document.getElementById("movement-cash-info").textContent = "";
+
+  // Show deductible costs and book cost display
+  document.getElementById("movement-deductible-hint").textContent = "e.g. commission — usually zero for mutual funds";
+  document.getElementById("movement-bookcost-row").classList.remove("hidden");
+  document.getElementById("movement-bookcost-display").textContent = "";
+
+  // Submit button style
+  const submitBtn = document.getElementById("movement-submit-btn");
+  submitBtn.className = "bg-amber-600 hover:bg-amber-700 text-white font-medium px-5 py-2 rounded-lg transition-colors";
+  submitBtn.textContent = "Confirm Sell";
+
+  document.getElementById("movement-form-container").classList.remove("hidden");
+  setTimeout(function () {
+    document.getElementById("movement-quantity").focus();
+  }, 50);
+}
+
+/**
+ * @description Update the book cost display when the sell quantity changes.
+ * Book cost = sell quantity x average cost.
+ */
+function updateSellBookCost() {
+  const movementType = document.getElementById("movement-type").value;
+  if (movementType !== "sell") return;
+
+  const qty = Number(document.getElementById("movement-quantity").value) || 0;
+  const holdingId = Number(document.getElementById("movement-holding-id").value);
+
+  // Find the holding's average cost from the detail account data
+  let avgCost = 0;
+  if (currentDetailAccount) {
+    const h = currentDetailAccount.holdings.find(function (x) {
+      return x.holding_id === holdingId;
+    });
+    if (h) avgCost = h.average_cost;
+  }
+
+  if (qty > 0 && avgCost > 0) {
+    const bookCost = qty * avgCost;
+    document.getElementById("movement-bookcost-display").textContent = formatGBP(bookCost);
+  } else {
+    document.getElementById("movement-bookcost-display").textContent = "";
+  }
+}
+
+/**
+ * @description Hide the movement form modal.
+ */
+function hideMovementForm() {
+  document.getElementById("movement-form-container").classList.add("hidden");
+}
+
+/**
+ * @description Handle movement form submission (buy or sell).
+ * Posts to the API, then refreshes the detail view.
+ * @param {Event} event - The form submit event
+ */
+async function handleMovementSubmit(event) {
+  event.preventDefault();
+
+  const errorsDiv = document.getElementById("movement-form-errors");
+  errorsDiv.textContent = "";
+
+  const holdingId = Number(document.getElementById("movement-holding-id").value);
+  const movementType = document.getElementById("movement-type").value;
+  const movementDate = document.getElementById("movement-date").value;
+  const quantity = Number(document.getElementById("movement-quantity").value);
+  const totalConsideration = Number(document.getElementById("movement-consideration").value);
+  const deductibleCosts = Number(document.getElementById("movement-deductible").value) || 0;
+  const notes = document.getElementById("movement-notes").value.trim();
+
+  // Client-side validation
+  if (movementType === "buy" && totalConsideration > selectedAccount.cash_balance) {
+    errorsDiv.textContent = "Total consideration exceeds available cash of " + formatGBP(selectedAccount.cash_balance);
+    return;
+  }
+
+  if (movementType === "sell" && currentDetailAccount) {
+    const h = currentDetailAccount.holdings.find(function (x) {
+      return x.holding_id === holdingId;
+    });
+    if (h && quantity > h.quantity) {
+      errorsDiv.textContent = "Sell quantity exceeds holding quantity of " + formatQuantity(h.quantity);
+      return;
+    }
+  }
+
+  const data = {
+    movement_type: movementType,
+    movement_date: movementDate,
+    quantity: quantity,
+    total_consideration: totalConsideration,
+    deductible_costs: deductibleCosts,
+    notes: notes || null,
+  };
+
+  const result = await apiRequest("/api/holdings/" + holdingId + "/movements", {
+    method: "POST",
+    body: data,
+  });
+
+  if (result.ok) {
+    hideMovementForm();
+
+    // Refresh the account data
+    await refreshSelectedAccount();
+    updateCashBalanceDisplay();
+
+    // Reload the portfolio summary to get updated quantities and valuations
+    const userValue = document.getElementById("summary-user-select").value;
+    let summaryResult;
+    if (userValue === "all" || !userValue) {
+      summaryResult = await apiRequest("/api/portfolio/summary");
+    } else {
+      summaryResult = await apiRequest("/api/portfolio/summary/" + userValue);
+    }
+
+    if (summaryResult.ok) {
+      const summaries = Array.isArray(summaryResult.data) ? summaryResult.data : [summaryResult.data];
+      summaryData = summaries;
+
+      // Find the updated account in the refreshed summary
+      for (const summary of summaryData) {
+        for (const acct of summary.accounts) {
+          if (acct.id === selectedAccount.id) {
+            currentDetailAccount = acct;
+            renderDetailHeader(summary.user, acct);
+            renderDetailHoldings(acct);
+            break;
+          }
+        }
+      }
+    }
+
+    // Refresh cash transactions if expanded
+    if (cashTxExpanded) {
+      await loadCashTransactions();
+    }
+
+    const action = movementType === "buy" ? "Buy" : "Sell";
+    showSuccess("detail-header", action + " recorded successfully");
+  } else {
+    errorsDiv.textContent = result.detail || result.error;
+  }
+}
+
 // ─── Drawdown Preview ────────────────────────────────────────────────
 
 /**
@@ -1639,6 +1908,37 @@ document.addEventListener("DOMContentLoaded", async function () {
   document.getElementById("cash-tx-delete-cancel-btn").addEventListener("click", hideCashTxDeleteDialog);
   document.getElementById("cash-tx-delete-confirm-btn").addEventListener("click", executeCashTxDelete);
 
+  // Buy/Sell movement form
+  document.getElementById("action-buy-btn").addEventListener("click", showBuyForm);
+  document.getElementById("action-sell-btn").addEventListener("click", showSellForm);
+  document.getElementById("movement-form").addEventListener("submit", handleMovementSubmit);
+  document.getElementById("movement-cancel-btn").addEventListener("click", hideMovementForm);
+  document.getElementById("movement-quantity").addEventListener("input", updateSellBookCost);
+
+  // Action menu — delegate clicks on 3-dot buttons in the detail holdings table
+  document.getElementById("detail-container").addEventListener("click", function (event) {
+    const btn = event.target.closest(".holding-action-btn");
+    if (btn) {
+      event.stopPropagation();
+      const index = Number(btn.dataset.holdingIndex);
+      // Toggle: if menu is already open for this holding, close it
+      const menu = document.getElementById("holding-action-menu");
+      if (!menu.classList.contains("hidden") && actionMenuHolding && currentDetailAccount && currentDetailAccount.holdings[index] === actionMenuHolding) {
+        hideActionMenu();
+      } else {
+        showActionMenu(index, btn);
+      }
+    }
+  });
+
+  // Close action menu when clicking outside
+  document.addEventListener("click", function (event) {
+    const menu = document.getElementById("holding-action-menu");
+    if (!menu.classList.contains("hidden") && !menu.contains(event.target) && !event.target.closest(".holding-action-btn")) {
+      hideActionMenu();
+    }
+  });
+
   // Drawdown preview
   document.getElementById("test-drawdown-btn").addEventListener("click", testDrawdownProcessor);
   document.getElementById("drawdown-preview-close-btn").addEventListener("click", hideDrawdownPreview);
@@ -1666,18 +1966,27 @@ document.addEventListener("DOMContentLoaded", async function () {
   document.getElementById("cash-tx-delete-dialog").addEventListener("click", function (event) {
     if (event.target === this) hideCashTxDeleteDialog();
   });
+  document.getElementById("movement-form-container").addEventListener("click", function (event) {
+    if (event.target === this) hideMovementForm();
+  });
 
   // Close modals with Escape key
   document.addEventListener("keydown", function (event) {
     if (event.key === "Escape") {
+      const movementForm = document.getElementById("movement-form-container");
       const cashTxDeleteDialog = document.getElementById("cash-tx-delete-dialog");
       const cashTxForm = document.getElementById("cash-tx-form-container");
       const deleteDialog = document.getElementById("delete-dialog");
       const accountForm = document.getElementById("account-form-container");
       const holdingForm = document.getElementById("holding-form-container");
       const drawdownPreview = document.getElementById("drawdown-preview-modal");
+      const actionMenu = document.getElementById("holding-action-menu");
 
-      if (!cashTxDeleteDialog.classList.contains("hidden")) {
+      if (!actionMenu.classList.contains("hidden")) {
+        hideActionMenu();
+      } else if (!movementForm.classList.contains("hidden")) {
+        hideMovementForm();
+      } else if (!cashTxDeleteDialog.classList.contains("hidden")) {
         hideCashTxDeleteDialog();
       } else if (!cashTxForm.classList.contains("hidden")) {
         hideCashTxForm();

@@ -18,6 +18,7 @@ import { handleHoldingsRoute } from "./routes/holdings-routes.js";
 import { handlePortfolioRoute } from "./routes/portfolio-routes.js";
 import { handleCashTransactionsRoute } from "./routes/cash-transactions-routes.js";
 import { handleDrawdownSchedulesRoute } from "./routes/drawdown-schedules-routes.js";
+import { handleHoldingMovementsRoute } from "./routes/holding-movements-routes.js";
 import { initScheduledScraper, stopScheduledScraper } from "./services/scheduled-scraper.js";
 import { launchBrowser } from "./scrapers/browser-utils.js";
 import { processDrawdowns } from "./services/drawdown-processor.js";
@@ -246,8 +247,24 @@ const server = Bun.serve({
       }
     }
 
-    // Holdings routes (standalone)
+    // Holding movement routes (standalone)
+    if (path.startsWith("/api/holding-movements")) {
+      const movementsResult = await handleHoldingMovementsRoute(method, path, request);
+      if (movementsResult) {
+        return movementsResult;
+      }
+    }
+
+    // Holdings routes (standalone) — must check for /movements sub-path first
     if (path.startsWith("/api/holdings")) {
+      // Holding movements nested under holdings
+      if (path.includes("/movements")) {
+        const movementsResult = await handleHoldingMovementsRoute(method, path, request);
+        if (movementsResult) {
+          return movementsResult;
+        }
+      }
+
       const holdingsResult = await handleHoldingsRoute(method, path, request);
       if (holdingsResult) {
         return holdingsResult;

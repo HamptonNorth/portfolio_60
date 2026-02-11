@@ -339,6 +339,15 @@ function runMigrations(database) {
     }
   }
 
+  // Migration 12: Add book_cost and deductible_costs columns to holding_movements (v0.8.0)
+  // These columns record the cost basis and transaction costs for buy/sell movements.
+  const hasBookCost = database.query("SELECT COUNT(*) AS cnt FROM pragma_table_info('holding_movements') WHERE name='book_cost'").get();
+
+  if (hasBookCost.cnt === 0) {
+    database.exec("ALTER TABLE holding_movements ADD COLUMN book_cost INTEGER NOT NULL DEFAULT 0");
+    database.exec("ALTER TABLE holding_movements ADD COLUMN deductible_costs INTEGER NOT NULL DEFAULT 0");
+  }
+
   // Migration 11: Add drawdown_schedules table (v0.7.0)
   // Recurring SIPP pension withdrawal schedules, processed on app startup.
   const drawdownSchedulesTable = database.query("SELECT name FROM sqlite_master WHERE type='table' AND name='drawdown_schedules'").get();
