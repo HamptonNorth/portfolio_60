@@ -13,6 +13,11 @@
     "delayMinutes": 5,
     "maxAttempts": 5
   },
+  "isaAllowance": {
+    "annualLimit": 20000,
+    "taxYearStartMonth": 4,
+    "taxYearStartDay": 6
+  },
   "scrapeDelayProfile": "cron",
   "scraperTesting": {
     "_readme": "Enable the Scraper Testing page — a sandbox for testing scraper configurations without affecting live portfolio data. Disabled by default; set enabled to true via Edit Settings to show the page.",

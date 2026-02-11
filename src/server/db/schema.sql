@@ -183,6 +183,20 @@ CREATE TABLE IF NOT EXISTS holding_movements (
     FOREIGN KEY (holding_id) REFERENCES holdings(id)
 );
 
+-- Drawdown schedules: recurring SIPP pension withdrawals
+CREATE TABLE IF NOT EXISTS drawdown_schedules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER NOT NULL,
+    frequency TEXT NOT NULL CHECK(frequency IN ('monthly', 'quarterly', 'annually')),
+    trigger_day INTEGER NOT NULL CHECK(trigger_day >= 1 AND trigger_day <= 28),
+    from_date TEXT NOT NULL,
+    to_date TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    notes TEXT CHECK(notes IS NULL OR length(notes) <= 255),
+    active INTEGER NOT NULL DEFAULT 1,
+    FOREIGN KEY (account_id) REFERENCES accounts(id)
+);
+
 -- Indexes for query performance
 CREATE INDEX IF NOT EXISTS idx_currency_rates_lookup ON currency_rates(currencies_id, rate_date DESC);
 CREATE INDEX IF NOT EXISTS idx_investments_type ON investments(investment_type_id);
@@ -200,3 +214,4 @@ CREATE INDEX IF NOT EXISTS idx_holdings_account ON holdings(account_id);
 CREATE INDEX IF NOT EXISTS idx_holdings_investment ON holdings(investment_id);
 CREATE INDEX IF NOT EXISTS idx_cash_transactions_account ON cash_transactions(account_id, transaction_date DESC);
 CREATE INDEX IF NOT EXISTS idx_holding_movements_holding ON holding_movements(holding_id, movement_date DESC);
+CREATE INDEX IF NOT EXISTS idx_drawdown_schedules_account ON drawdown_schedules(account_id);

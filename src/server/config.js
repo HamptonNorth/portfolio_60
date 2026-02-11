@@ -27,6 +27,11 @@ const DEFAULTS = {
     delayMinutes: 5,
     maxAttempts: 5,
   },
+  isaAllowance: {
+    annualLimit: 20000,
+    taxYearStartMonth: 4,
+    taxYearStartDay: 6,
+  },
   scrapeDelayProfile: "cron",
   scraperSites: {
     sites: [],
@@ -115,6 +120,16 @@ export function loadConfig() {
     maxAttempts: typeof rawRetry.maxAttempts === "number" && Number.isInteger(rawRetry.maxAttempts) && rawRetry.maxAttempts >= 1 && rawRetry.maxAttempts <= 10 ? rawRetry.maxAttempts : DEFAULTS.retry.maxAttempts,
   };
 
+  // isaAllowance — validate each sub-key
+  const rawIsaAllowance = rawConfig.isaAllowance || {};
+  config.isaAllowance = {
+    annualLimit: typeof rawIsaAllowance.annualLimit === "number" && rawIsaAllowance.annualLimit > 0 ? rawIsaAllowance.annualLimit : DEFAULTS.isaAllowance.annualLimit,
+
+    taxYearStartMonth: typeof rawIsaAllowance.taxYearStartMonth === "number" && Number.isInteger(rawIsaAllowance.taxYearStartMonth) && rawIsaAllowance.taxYearStartMonth >= 1 && rawIsaAllowance.taxYearStartMonth <= 12 ? rawIsaAllowance.taxYearStartMonth : DEFAULTS.isaAllowance.taxYearStartMonth,
+
+    taxYearStartDay: typeof rawIsaAllowance.taxYearStartDay === "number" && Number.isInteger(rawIsaAllowance.taxYearStartDay) && rawIsaAllowance.taxYearStartDay >= 1 && rawIsaAllowance.taxYearStartDay <= 28 ? rawIsaAllowance.taxYearStartDay : DEFAULTS.isaAllowance.taxYearStartDay,
+  };
+
   // scrapeDelayProfile — must be "interactive" or "cron"
   const validProfiles = ["interactive", "cron"];
   config.scrapeDelayProfile = validProfiles.includes(rawConfig.scrapeDelayProfile) ? rawConfig.scrapeDelayProfile : DEFAULTS.scrapeDelayProfile;
@@ -175,6 +190,15 @@ export function getScrapeDelayProfile() {
 export function getAllowedProviders() {
   const config = loadConfig();
   return config.allowed_providers;
+}
+
+/**
+ * @description Get the ISA allowance configuration with defaults applied.
+ * @returns {{ annualLimit: number, taxYearStartMonth: number, taxYearStartDay: number }}
+ */
+export function getIsaAllowanceConfig() {
+  const config = loadConfig();
+  return config.isaAllowance;
 }
 
 /**

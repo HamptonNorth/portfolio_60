@@ -8,59 +8,8 @@
         <link rel="icon" type="image/svg+xml" href="/images/favicon.svg" />
     </head>
     <body class="bg-brand-25 text-brand-900 min-h-screen flex flex-col">
-        <nav class="bg-brand-800 text-white px-6 py-4 shadow-md">
-            <div class="flex items-center justify-between max-w-7xl mx-auto">
-                <h1 class="text-xl font-semibold tracking-wide flex items-center gap-2">
-                    <img src="/images/redmug-logo.svg" alt="Red Mug logo" class="h-8 w-8" />
-                    Portfolio 60
-                </h1>
-                <ul class="flex gap-6 text-base items-center">
-                    <li><a href="/" class="hover:text-brand-200 transition-colors" data-nav="home">Home</a></li>
-                    <li class="relative group">
-                        <span class="hover:text-brand-200 transition-colors cursor-pointer select-none" data-nav-parent="setup">Set Up <span class="text-xs">&#9662;</span></span>
-                        <div class="hidden group-hover:block absolute left-0 top-full pt-1 z-50">
-                            <div class="bg-white text-brand-800 rounded-md shadow-lg border border-brand-200 py-1 min-w-48">
-                                <a href="/pages/users.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="users">Users</a>
-                                <a href="/pages/investments.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="investments">Investments</a>
-                                <a href="/pages/benchmarks.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="benchmarks">Benchmarks</a>
-                                <a href="/pages/currencies.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="currencies">Currencies</a>
-                                <a href="/pages/global-events.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="global-events">Global Events</a>
-                                <a href="/pages/scraping.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="scraping">Fetching</a>
-                                <a href="/pages/scraper-testing.html" class="hidden block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="scraper-testing" id="nav-scraper-testing">Scraper Testing</a>
-                                <a href="/pages/backup.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="backup">Backup</a>
-                            </div>
-                        </div>
-                    </li>
-                    <li><a href="/pages/portfolio.html" class="hover:text-brand-200 transition-colors" data-nav="portfolio">Portfolio</a></li>
-                    <li><span class="text-brand-400 cursor-not-allowed select-none">Reports</span></li>
-                    <li class="relative group">
-                        <span class="hover:text-brand-200 transition-colors cursor-pointer select-none" data-nav-parent="settings">
-                            <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.573-1.066z"
-                                />
-                                <circle cx="12" cy="12" r="3" />
-                            </svg>
-                        </span>
-                        <div class="hidden group-hover:block absolute right-0 top-full pt-1 z-50">
-                            <div class="bg-white text-brand-800 rounded-md shadow-lg border border-brand-200 py-1 min-w-48">
-                                <a href="#" onclick="showEditSettingsModal(); return false;" class="block px-4 py-2 hover:bg-brand-50 transition-colors">Edit Settings</a>
-                                <a href="#" onclick="showAboutModal(); return false;" class="block px-4 py-2 hover:bg-brand-50 transition-colors">About</a>
-                            </div>
-                        </div>
-                    </li>
-                </ul>
-            </div>
-        </nav>
+        <app-navbar></app-navbar>
         <main class="max-w-7xl mx-auto px-6 py-8 flex-1 w-full" id="main-content">
-            <!-- Mode selector tabs -->
-            <div class="flex gap-2 mb-6 border-b border-brand-200 pb-3">
-                <button id="tab-summary" class="px-4 py-2 text-base font-medium rounded-t-md bg-brand-700 text-white transition-colors">Summary Valuation</button>
-                <button id="tab-setup" class="px-4 py-2 text-base font-medium rounded-t-md bg-brand-100 text-brand-700 hover:bg-brand-200 transition-colors">Account Setup</button>
-            </div>
-
             <!-- View 0: Summary Valuation Report -->
             <div id="summary-view">
                 <div class="flex items-center justify-between mb-6">
@@ -90,6 +39,35 @@
                 <div id="detail-container">
                     <p class="text-brand-500">Loading holdings detail...</p>
                 </div>
+
+                <!-- Cash balance bar (detail view) -->
+                <div id="detail-cash-balance-bar" class="mt-6 bg-white border border-brand-200 rounded-lg px-5 py-4 flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <span class="text-base font-medium text-brand-700">Cash Balance:</span>
+                        <span id="detail-cash-balance-display" class="text-xl font-semibold font-mono text-brand-800">£0</span>
+                        <span id="detail-cash-balance-warning" class="hidden text-red-600 font-medium text-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button id="detail-deposit-btn" class="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">Deposit</button>
+                        <button id="detail-withdraw-btn" class="bg-amber-600 hover:bg-amber-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">Withdraw</button>
+                    </div>
+                </div>
+
+                <!-- Cash transaction history (detail view) -->
+                <div id="detail-cash-transactions-section" class="mt-4">
+                    <div class="flex items-center justify-between cursor-pointer select-none py-2" id="detail-cash-tx-toggle">
+                        <h3 class="text-lg font-semibold text-brand-700">Cash Transactions</h3>
+                        <span id="detail-cash-tx-toggle-icon" class="text-brand-400 text-sm">Show &#9662;</span>
+                    </div>
+                    <div id="detail-cash-tx-list-container" class="hidden">
+                        <div id="detail-cash-tx-list">
+                            <p class="text-brand-500 text-sm">Loading transactions...</p>
+                        </div>
+                        <div id="detail-cash-tx-show-more" class="hidden mt-2">
+                            <button id="detail-cash-tx-more-btn" class="text-brand-600 hover:text-brand-800 text-sm font-medium transition-colors">Show more...</button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- View 1: Accounts list -->
@@ -102,6 +80,7 @@
                             <option value="">Select a user...</option>
                         </select>
                         <button id="add-account-btn" class="hidden bg-brand-700 hover:bg-brand-800 text-white font-medium px-5 py-2 rounded-lg transition-colors">Add Account</button>
+                        <button id="test-drawdown-btn" class="hidden bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2 rounded-lg transition-colors">Test Drawdown Processor</button>
                     </div>
                 </div>
 
@@ -129,6 +108,35 @@
 
                 <div id="holdings-table-container">
                     <p class="text-brand-500">Loading holdings...</p>
+                </div>
+
+                <!-- Cash balance bar -->
+                <div id="cash-balance-bar" class="mt-6 bg-white border border-brand-200 rounded-lg px-5 py-4 flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <span class="text-base font-medium text-brand-700">Cash Balance:</span>
+                        <span id="cash-balance-display" class="text-xl font-semibold font-mono text-brand-800">£0</span>
+                        <span id="cash-balance-warning" class="hidden text-red-600 font-medium text-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button id="deposit-btn" class="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">Deposit</button>
+                        <button id="withdraw-btn" class="bg-amber-600 hover:bg-amber-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">Withdraw</button>
+                    </div>
+                </div>
+
+                <!-- Cash transaction history -->
+                <div id="cash-transactions-section" class="mt-4">
+                    <div class="flex items-center justify-between cursor-pointer select-none py-2" id="cash-tx-toggle">
+                        <h3 class="text-lg font-semibold text-brand-700">Cash Transactions</h3>
+                        <span id="cash-tx-toggle-icon" class="text-brand-400 text-sm">Show &#9662;</span>
+                    </div>
+                    <div id="cash-tx-list-container" class="hidden">
+                        <div id="cash-tx-list">
+                            <p class="text-brand-500 text-sm">Loading transactions...</p>
+                        </div>
+                        <div id="cash-tx-show-more" class="hidden mt-2">
+                            <button id="cash-tx-more-btn" class="text-brand-600 hover:text-brand-800 text-sm font-medium transition-colors">Show more...</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -234,12 +242,70 @@
                     </div>
                 </div>
             </div>
+            <!-- Cash transaction (deposit/withdrawal) form modal -->
+            <div id="cash-tx-form-container" class="hidden fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+                <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto mx-4">
+                    <h3 id="cash-tx-form-title" class="text-xl font-semibold text-brand-800 mb-4">Deposit</h3>
+                    <div id="cash-tx-available" class="hidden mb-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                        <span class="text-sm text-amber-700">Available balance:</span>
+                        <span id="cash-tx-available-amount" class="text-base font-semibold font-mono text-amber-800 ml-2"></span>
+                    </div>
+                    <form id="cash-tx-form" class="space-y-4">
+                        <input type="hidden" id="cash-tx-type" value="deposit" />
+
+                        <div>
+                            <label for="cash-tx-date" class="block text-sm font-medium text-brand-700 mb-1">Date *</label>
+                            <input type="date" id="cash-tx-date" name="transaction_date" required class="w-full px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                        </div>
+
+                        <div>
+                            <label for="cash-tx-amount" class="block text-sm font-medium text-brand-700 mb-1">Amount (GBP) *</label>
+                            <input type="number" id="cash-tx-amount" name="amount" step="0.01" min="0.01" required class="w-full px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="0.00" />
+                        </div>
+
+                        <div>
+                            <label for="cash-tx-notes" class="block text-sm font-medium text-brand-700 mb-1">Notes</label>
+                            <input type="text" id="cash-tx-notes" name="notes" maxlength="255" class="w-full px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Optional" />
+                        </div>
+
+                        <div id="cash-tx-form-errors" class="text-error text-sm"></div>
+
+                        <div class="flex gap-3 pt-2">
+                            <button type="submit" id="cash-tx-submit-btn" class="bg-brand-700 hover:bg-brand-800 text-white font-medium px-5 py-2 rounded-lg transition-colors">Save</button>
+                            <button type="button" id="cash-tx-cancel-btn" class="bg-brand-100 hover:bg-brand-200 text-brand-700 font-medium px-5 py-2 rounded-lg transition-colors">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Cash transaction delete confirmation dialog -->
+            <div id="cash-tx-delete-dialog" class="hidden fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+                <div class="bg-white rounded-lg shadow-lg p-6 max-w-sm mx-4">
+                    <h3 class="text-lg font-semibold text-brand-800 mb-3">Confirm Deletion</h3>
+                    <p id="cash-tx-delete-message" class="text-base text-brand-600 mb-2"></p>
+                    <p class="text-sm text-brand-500 mb-4">This will reverse the cash balance change.</p>
+                    <div class="flex gap-3 justify-end">
+                        <button id="cash-tx-delete-cancel-btn" class="bg-brand-100 hover:bg-brand-200 text-brand-700 font-medium px-4 py-2 rounded-lg transition-colors">Cancel</button>
+                        <button id="cash-tx-delete-confirm-btn" class="bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">Delete</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Drawdown preview results modal -->
+            <div id="drawdown-preview-modal" class="hidden fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+                <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto mx-4">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-semibold text-brand-800">Drawdown Processor — Dry Run</h3>
+                        <button id="drawdown-preview-close-btn" class="text-brand-400 hover:text-brand-600 text-2xl leading-none">&times;</button>
+                    </div>
+                    <p class="text-sm text-blue-600 bg-blue-50 border border-blue-200 rounded px-3 py-2 mb-4">This is a preview only — no changes have been made to the database.</p>
+                    <div id="drawdown-preview-content"></div>
+                </div>
+            </div>
         </main>
-        <footer class="text-brand-400 text-sm py-4 border-t border-brand-100 flex justify-between px-6 max-w-7xl mx-auto w-full">
-            <span>Portfolio 60 v0.1.0</span>
-            <span id="build-time"></span>
-        </footer>
+        <app-footer></app-footer>
         <script src="/js/app.js"></script>
+        <script src="/js/components.bundle.js"></script>
         <script src="/js/portfolio.js"></script>
     </body>
 </html>

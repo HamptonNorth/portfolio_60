@@ -9,6 +9,7 @@
  */
 function highlightActiveNav() {
   const currentPath = window.location.pathname;
+  const currentSearch = window.location.search;
   const navLinks = document.querySelectorAll("nav a[data-nav]");
 
   // Reset all sub-links and parent triggers
@@ -21,7 +22,23 @@ function highlightActiveNav() {
 
   navLinks.forEach(function (link) {
     const href = link.getAttribute("href");
-    const isActive = (currentPath === "/" && href === "/") || (currentPath !== "/" && href !== "/" && currentPath.startsWith(href));
+    const hrefUrl = new URL(href, window.location.origin);
+    const hrefPath = hrefUrl.pathname;
+    const hrefSearch = hrefUrl.search;
+
+    // Match: exact path for "/", or path prefix match for others.
+    // If the link has query params, those must also match.
+    let isActive = false;
+    if (currentPath === "/" && hrefPath === "/") {
+      isActive = true;
+    } else if (hrefPath !== "/" && currentPath.startsWith(hrefPath)) {
+      if (hrefSearch) {
+        // Link has query params — require exact match
+        isActive = currentSearch === hrefSearch;
+      } else {
+        isActive = true;
+      }
+    }
 
     if (isActive) {
       const isInDropdown = link.closest("li.relative");
@@ -606,9 +623,7 @@ async function checkScraperTestingNav() {
   }
 }
 
-// Initialise on page load
-document.addEventListener("DOMContentLoaded", function () {
-  highlightActiveNav();
-  loadBuildTime();
-  checkScraperTestingNav();
-});
+// Navigation highlighting, build time loading, and scraper testing nav check
+// are handled by the <app-navbar> and <app-footer> web components
+// in their firstUpdated() lifecycle methods.
+// The functions remain defined here as globals for the components to call.

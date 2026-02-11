@@ -8,52 +8,7 @@
         <link rel="icon" type="image/svg+xml" href="/images/favicon.svg" />
     </head>
     <body class="bg-brand-25 text-brand-900 min-h-screen flex flex-col">
-        <nav class="bg-brand-800 text-white px-6 py-4 shadow-md">
-            <div class="flex items-center justify-between max-w-7xl mx-auto">
-                <h1 class="text-xl font-semibold tracking-wide flex items-center gap-2">
-                    <img src="/images/redmug-logo.svg" alt="Red Mug logo" class="h-8 w-8" />
-                    Portfolio 60
-                </h1>
-                <ul class="flex gap-6 text-base items-center">
-                    <li><a href="/" class="hover:text-brand-200 transition-colors" data-nav="home">Home</a></li>
-                    <li class="relative group">
-                        <span class="hover:text-brand-200 transition-colors cursor-pointer select-none" data-nav-parent="setup">Set Up <span class="text-xs">&#9662;</span></span>
-                        <div class="hidden group-hover:block absolute left-0 top-full pt-1 z-50">
-                            <div class="bg-white text-brand-800 rounded-md shadow-lg border border-brand-200 py-1 min-w-48">
-                                <a href="/pages/users.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="users">Users</a>
-                                <a href="/pages/investments.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="investments">Investments</a>
-                                <a href="/pages/benchmarks.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="benchmarks">Benchmarks</a>
-                                <a href="/pages/currencies.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="currencies">Currencies</a>
-                                <a href="/pages/global-events.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="global-events">Global Events</a>
-                                <a href="/pages/scraping.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="scraping">Fetching</a>
-                                <a href="/pages/scraper-testing.html" class="hidden block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="scraper-testing" id="nav-scraper-testing">Scraper Testing</a>
-                                <a href="/pages/backup.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="backup">Backup</a>
-                            </div>
-                        </div>
-                    </li>
-                    <li><a href="/pages/portfolio.html" class="hover:text-brand-200 transition-colors" data-nav="portfolio">Portfolio</a></li>
-                    <li><span class="text-brand-400 cursor-not-allowed select-none">Reports</span></li>
-                    <li class="relative group">
-                        <span class="hover:text-brand-200 transition-colors cursor-pointer select-none" data-nav-parent="settings">
-                            <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.573-1.066z"
-                                />
-                                <circle cx="12" cy="12" r="3" />
-                            </svg>
-                        </span>
-                        <div class="hidden group-hover:block absolute right-0 top-full pt-1 z-50">
-                            <div class="bg-white text-brand-800 rounded-md shadow-lg border border-brand-200 py-1 min-w-48">
-                                <a href="#" onclick="showEditSettingsModal(); return false;" class="block px-4 py-2 hover:bg-brand-50 transition-colors">Edit Settings</a>
-                                <a href="#" onclick="showAboutModal(); return false;" class="block px-4 py-2 hover:bg-brand-50 transition-colors">About</a>
-                            </div>
-                        </div>
-                    </li>
-                </ul>
-            </div>
-        </nav>
+        <app-navbar></app-navbar>
         <main class="max-w-7xl mx-auto px-6 py-8 flex-1 w-full" id="main-content">
             <div class="flex items-center justify-between mb-6">
                 <h2 class="text-2xl font-semibold text-brand-800">Investments</h2>
@@ -191,11 +146,9 @@
                 </div>
             </div>
         </main>
-        <footer class="text-brand-400 text-sm py-4 border-t border-brand-100 flex justify-between px-6 max-w-7xl mx-auto w-full">
-            <span>Portfolio 60 v0.1.0</span>
-            <span id="build-time"></span>
-        </footer>
+        <app-footer></app-footer>
         <script src="/js/app.js"></script>
+        <script src="/js/components.bundle.js"></script>
         <script src="/js/investments.js"></script>
     </body>
 </html>

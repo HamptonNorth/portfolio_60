@@ -337,6 +337,149 @@ export function validateHolding(data) {
 }
 
 /**
+ * @description Validate cash transaction data for create operations.
+ * Returns an array of error messages (empty if all valid).
+ * @param {Object} data - The cash transaction data to validate
+ * @returns {string[]} Array of validation error messages
+ */
+export function validateCashTransaction(data) {
+  const errors = [];
+
+  // Required fields
+  const requiredChecks = [validateRequired(data.transaction_type, "Transaction type"), validateRequired(data.transaction_date, "Transaction date"), validateRequired(data.amount, "Amount")];
+
+  for (const error of requiredChecks) {
+    if (error) errors.push(error);
+  }
+
+  // transaction_type must be 'deposit' or 'withdrawal' (drawdowns/adjustments are system-created)
+  if (data.transaction_type !== undefined && data.transaction_type !== null) {
+    const txType = String(data.transaction_type).trim();
+    if (txType !== "" && txType !== "deposit" && txType !== "withdrawal") {
+      errors.push("Transaction type must be either 'deposit' or 'withdrawal'");
+    }
+  }
+
+  // transaction_date must be ISO-8601 format (YYYY-MM-DD)
+  if (data.transaction_date !== undefined && data.transaction_date !== null && String(data.transaction_date).trim() !== "") {
+    const dateStr = String(data.transaction_date).trim();
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    if (!datePattern.test(dateStr)) {
+      errors.push("Transaction date must be in YYYY-MM-DD format");
+    } else {
+      const parsed = new Date(dateStr + "T00:00:00");
+      if (isNaN(parsed.getTime())) {
+        errors.push("Transaction date is not a valid date");
+      }
+    }
+  }
+
+  // amount must be a positive number
+  if (data.amount !== undefined && data.amount !== null) {
+    const amount = Number(data.amount);
+    if (isNaN(amount) || amount <= 0) {
+      errors.push("Amount must be greater than zero");
+    }
+  }
+
+  // notes is optional, max 255 chars
+  const lengthChecks = [validateMaxLength(data.notes, 255, "Notes")];
+
+  for (const error of lengthChecks) {
+    if (error) errors.push(error);
+  }
+
+  return errors;
+}
+
+/**
+ * @description Validate drawdown schedule data for create or update operations.
+ * Returns an array of error messages (empty if all valid).
+ * @param {Object} data - The drawdown schedule data to validate
+ * @returns {string[]} Array of validation error messages
+ */
+export function validateDrawdownSchedule(data) {
+  const errors = [];
+
+  // Required fields
+  const requiredChecks = [validateRequired(data.frequency, "Frequency"), validateRequired(data.trigger_day, "Trigger day"), validateRequired(data.from_date, "From date"), validateRequired(data.to_date, "To date"), validateRequired(data.amount, "Amount")];
+
+  for (const error of requiredChecks) {
+    if (error) errors.push(error);
+  }
+
+  // frequency must be one of the allowed values
+  if (data.frequency !== undefined && data.frequency !== null) {
+    const freq = String(data.frequency).trim();
+    if (freq !== "" && freq !== "monthly" && freq !== "quarterly" && freq !== "annually") {
+      errors.push("Frequency must be one of: monthly, quarterly, annually");
+    }
+  }
+
+  // trigger_day must be an integer between 1 and 28
+  if (data.trigger_day !== undefined && data.trigger_day !== null) {
+    const day = Number(data.trigger_day);
+    if (!Number.isInteger(day) || day < 1 || day > 28) {
+      errors.push("Trigger day must be between 1 and 28");
+    }
+  }
+
+  // from_date must be ISO-8601 format (YYYY-MM-DD)
+  if (data.from_date !== undefined && data.from_date !== null && String(data.from_date).trim() !== "") {
+    const dateStr = String(data.from_date).trim();
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    if (!datePattern.test(dateStr)) {
+      errors.push("From date must be in YYYY-MM-DD format");
+    } else {
+      const parsed = new Date(dateStr + "T00:00:00");
+      if (isNaN(parsed.getTime())) {
+        errors.push("From date is not a valid date");
+      }
+    }
+  }
+
+  // to_date must be ISO-8601 format (YYYY-MM-DD)
+  if (data.to_date !== undefined && data.to_date !== null && String(data.to_date).trim() !== "") {
+    const dateStr = String(data.to_date).trim();
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    if (!datePattern.test(dateStr)) {
+      errors.push("To date must be in YYYY-MM-DD format");
+    } else {
+      const parsed = new Date(dateStr + "T00:00:00");
+      if (isNaN(parsed.getTime())) {
+        errors.push("To date is not a valid date");
+      }
+    }
+  }
+
+  // to_date must be after from_date
+  if (data.from_date && data.to_date) {
+    const fromStr = String(data.from_date).trim();
+    const toStr = String(data.to_date).trim();
+    if (fromStr >= toStr) {
+      errors.push("To date must be after from date");
+    }
+  }
+
+  // amount must be a positive number
+  if (data.amount !== undefined && data.amount !== null) {
+    const amount = Number(data.amount);
+    if (isNaN(amount) || amount <= 0) {
+      errors.push("Amount must be greater than zero");
+    }
+  }
+
+  // notes is optional, max 255 chars
+  const lengthChecks = [validateMaxLength(data.notes, 255, "Notes")];
+
+  for (const error of lengthChecks) {
+    if (error) errors.push(error);
+  }
+
+  return errors;
+}
+
+/**
  * @description Validate benchmark data for create or update operations.
  * Returns an array of error messages (empty if all valid).
  * Note: The check that index benchmarks must use GBP currency is done at the route

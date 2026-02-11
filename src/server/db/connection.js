@@ -338,6 +338,28 @@ function runMigrations(database) {
       }
     }
   }
+
+  // Migration 11: Add drawdown_schedules table (v0.7.0)
+  // Recurring SIPP pension withdrawal schedules, processed on app startup.
+  const drawdownSchedulesTable = database.query("SELECT name FROM sqlite_master WHERE type='table' AND name='drawdown_schedules'").get();
+
+  if (!drawdownSchedulesTable) {
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS drawdown_schedules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        account_id INTEGER NOT NULL,
+        frequency TEXT NOT NULL CHECK(frequency IN ('monthly', 'quarterly', 'annually')),
+        trigger_day INTEGER NOT NULL CHECK(trigger_day >= 1 AND trigger_day <= 28),
+        from_date TEXT NOT NULL,
+        to_date TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        notes TEXT CHECK(notes IS NULL OR length(notes) <= 255),
+        active INTEGER NOT NULL DEFAULT 1,
+        FOREIGN KEY (account_id) REFERENCES accounts(id)
+      )
+    `);
+    database.exec("CREATE INDEX IF NOT EXISTS idx_drawdown_schedules_account ON drawdown_schedules(account_id)");
+  }
 }
 
 /**

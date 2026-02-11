@@ -16,6 +16,10 @@ Future versions will add portfolio holdings per person, valuations, performance 
 - **Cron-scheduled automated scraping**: Run price/benchmark scrapes on a schedule without user interaction.
 - **YubiKey HMAC-SHA1 challenge-response**: Hardware-bound authentication.
 - **SQLCipher database encryption**: Encrypt database at rest.
+- **Buy/Sell transactions**: Record investment purchases and sales in `holding_movements` table. Buys increase holding quantity and debit account cash; sells decrease quantity and credit cash. Average cost recalculated on each buy. Book cost recorded on sell.
+- **Deposits/Withdrawals**: Record cash movements in/out of accounts via `cash_transactions` table. Deposit credits cash; withdrawal debits. SIPP drawdowns as a special withdrawal type on fixed schedule (15th or last day of month).
+- **Cash adjustments**: Direct adjustments to account cash balance to reconcile with provider (management charges, admin fees, etc.).
+- **Holding adjustments**: Small adjustments to holding quantity and average cost for mutual income funds with automatic reinvestment.
 
 ## Tech Stack
 - **Runtime/Server**: Bun with Bun.serve for the backend HTTP server
@@ -136,22 +140,77 @@ Rate is stored as integer-scaled value (multiplied by 10000) for financial preci
 | event_date | TEXT NOT NULL | ISO-8601 date (YYYY-MM-DD) |
 | description | TEXT(255) NOT NULL | |
 
+### accounts
+| Column | Type | Notes |
+|---|---|---|
+| id | INTEGER PRIMARY KEY AUTOINCREMENT | |
+| user_id | INTEGER NOT NULL | FK to users |
+| account_type | TEXT NOT NULL | CHECK('trading', 'isa', 'sipp') |
+| account_ref | TEXT NOT NULL | Max 15 chars |
+| cash_balance | INTEGER NOT NULL DEFAULT 0 | GBP × 10000 |
+| warn_cash | INTEGER NOT NULL DEFAULT 0 | Warning threshold × 10000 |
+
+Each user may have up to one account per type (UNIQUE on user_id + account_type).
+
+### holdings
+| Column | Type | Notes |
+|---|---|---|
+| id | INTEGER PRIMARY KEY AUTOINCREMENT | |
+| account_id | INTEGER NOT NULL | FK to accounts |
+| investment_id | INTEGER NOT NULL | FK to investments |
+| quantity | INTEGER NOT NULL DEFAULT 0 | Quantity × 10000 |
+| average_cost | INTEGER NOT NULL DEFAULT 0 | Average cost price × 10000 |
+
+One holding per investment per account (UNIQUE on account_id + investment_id).
+
+### cash_transactions (schema only — no UI yet)
+| Column | Type | Notes |
+|---|---|---|
+| id | INTEGER PRIMARY KEY AUTOINCREMENT | |
+| account_id | INTEGER NOT NULL | FK to accounts |
+| transaction_type | TEXT NOT NULL | CHECK('deposit', 'withdrawal', 'drawdown', 'adjustment') |
+| transaction_date | TEXT NOT NULL | ISO-8601 date |
+| amount | INTEGER NOT NULL | Amount × 10000 |
+| notes | TEXT | Max 255 chars |
+
+### holding_movements (schema only — no UI yet)
+| Column | Type | Notes |
+|---|---|---|
+| id | INTEGER PRIMARY KEY AUTOINCREMENT | |
+| holding_id | INTEGER NOT NULL | FK to holdings |
+| movement_type | TEXT NOT NULL | CHECK('buy', 'sell', 'adjustment') |
+| movement_date | TEXT NOT NULL | ISO-8601 date |
+| quantity | INTEGER NOT NULL | Quantity × 10000 |
+| movement_value | INTEGER NOT NULL | Value × 10000 |
+| notes | TEXT | Max 255 chars |
+
 ### Database Constraints and Indexes
 
 **Foreign keys** (enforced via `PRAGMA foreign_keys = ON`):
 - `investments.currencies_id` → `currencies.id`
 - `investments.investment_type_id` → `investment_types.id`
 - `currency_rates.currencies_id` → `currencies.id`
+- `accounts.user_id` → `users.id`
+- `holdings.account_id` → `accounts.id`
+- `holdings.investment_id` → `investments.id`
+- `cash_transactions.account_id` → `accounts.id`
+- `holding_movements.holding_id` → `holdings.id`
 
 **Indexes** (add as data grows; included in schema from day 1 where the cost is negligible):
 - `idx_currency_rates_lookup` ON `currency_rates(currencies_id, rate_date DESC)` — fast latest-rate lookup
 - `idx_investments_type` ON `investments(investment_type_id)` — filter by type
 - `idx_investments_currency` ON `investments(currencies_id)` — filter by currency
 - `idx_global_events_date` ON `global_events(event_date DESC)` — chronological listing
+- `idx_accounts_user` ON `accounts(user_id)` — list accounts per user
+- `idx_holdings_account` ON `holdings(account_id)` — list holdings per account
+- `idx_cash_transactions_account` ON `cash_transactions(account_id, transaction_date DESC)` — list transactions per account
+- `idx_holding_movements_holding` ON `holding_movements(holding_id, movement_date DESC)` — list movements per holding
 
 **Unique constraints:**
 - `currencies.code` — already marked UNIQUE
 - `currency_rates(currencies_id, rate_date)` — one rate per currency per day. If a rate is fetched again on the same day, the existing row is overwritten (INSERT OR REPLACE) with the latest value.
+- `accounts(user_id, account_type)` — one account per type per user
+- `holdings(account_id, investment_id)` — one holding per investment per account
 
 **Overwrite behaviour**: Both currency rates and scraped prices use INSERT OR REPLACE. A user may trigger valuations multiple times per day; each run overwrites the previous values for that day with the latest data.
 
@@ -177,6 +236,16 @@ Rate is stored as integer-scaled value (multiplied by 10000) for financial preci
 12. One-click database backup and one-click restore
 -- **PAUSE: Manual testing** — Verify backup creates timestamped file, restore overwrites DB, full end-to-end walkthrough --
 
+## Development Milestones (v0.6.0)
+
+13. Database: Add accounts, holdings, cash_transactions, holding_movements tables (Migration 10). Auto-migrate user refs to accounts rows.
+14. API: CRUD routes for accounts (`/api/users/:userId/accounts`, `/api/accounts/:id`) and holdings (`/api/accounts/:accountId/holdings`, `/api/holdings/:id`)
+15. UI: Portfolio page with account setup view (add/edit/delete accounts per user) and holdings setup view (add/edit/delete holdings per account with searchable investment dropdown, avg cost price / book cost value input)
+-- **PAUSE: Manual testing** — Verify account and holding CRUD, book cost auto-calculation, investment search --
+16. API: Portfolio summary service (`/api/portfolio/summary`, `/api/portfolio/summary/:userId`) computing valuations with latest prices, currency conversion to GBP, cash warnings, and aggregated totals
+17. UI: Summary Valuation report (default landing view) with per-user summary table, drill-down to holdings detail with price, rate, local/GBP values
+-- **PAUSE: Manual testing** — Verify summary report accuracy, currency conversion, drill-down, tab switching --
+
 ## Coding Conventions
 
 - **Language**: Vanilla JavaScript (latest ES features) throughout — no TypeScript. Use JSDoc comments on all functions, including `@param`, `@returns`, and `@description` tags.
@@ -192,7 +261,7 @@ Rate is stored as integer-scaled value (multiplied by 10000) for financial preci
 ## Ports
 
 - **Application server**: Port 1420 (`src/shared/constants.js` → `SERVER_PORT`). Used by the user for manual testing and by Tauri dev mode.
-- **Automated testing (Claude)**: Ports 1430+ (each test file uses a unique port). All test files must spawn the server with `env: { PORT: "<unique_port>" }` to avoid conflicts with the user's running application on port 1420 and with each other. The server reads the `PORT` environment variable and falls back to `SERVER_PORT` (1420) if not set. Current allocations: server.test.js=1430, auth-routes.test.js=1431. New test files should increment from there.
+- **Automated testing (Claude)**: Ports 1430+ (each test file uses a unique port). All test files must spawn the server with `env: { PORT: "<unique_port>" }` to avoid conflicts with the user's running application on port 1420 and with each other. The server reads the `PORT` environment variable and falls back to `SERVER_PORT` (1420) if not set. Current allocations: server.test.js=1430, auth-routes.test.js=1431, accounts-db.test.js=1440, holdings-db.test.js=1441, accounts-routes.test.js=1442, holdings-routes.test.js=1443, portfolio-routes.test.js=1444. New test files should increment from there.
 
 ## Commands
 ```bash

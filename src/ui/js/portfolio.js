@@ -58,36 +58,42 @@ function formatAccountType(type) {
   return type.toUpperCase();
 }
 
-// ─── Tab switching ───────────────────────────────────────────────────
+// ─── View routing ────────────────────────────────────────────────────
 
-/** @type {string} Current active tab: "summary" or "setup" */
-let activeTab = "summary";
+/** @type {string} Current active view: "summary" or "setup" */
+let activeView = "summary";
 
 /**
- * @description Switch to the specified tab view.
- * @param {string} tab - "summary" or "setup"
+ * @description Determine the initial view from the URL query parameter.
+ * Defaults to "summary" if no ?view= param is present.
+ * @returns {string} "summary" or "setup"
  */
-function switchTab(tab) {
-  activeTab = tab;
-  const summaryBtn = document.getElementById("tab-summary");
-  const setupBtn = document.getElementById("tab-setup");
+function getViewFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const view = params.get("view");
+  if (view === "setup") return "setup";
+  return "summary";
+}
+
+/**
+ * @description Show the specified view, hiding all others.
+ * @param {string} view - "summary" or "setup"
+ */
+function showView(view) {
+  activeView = view;
 
   const summaryView = document.getElementById("summary-view");
   const detailView = document.getElementById("detail-view");
   const accountsView = document.getElementById("accounts-view");
   const holdingsView = document.getElementById("holdings-view");
 
-  if (tab === "summary") {
-    summaryBtn.className = "px-4 py-2 text-base font-medium rounded-t-md bg-brand-700 text-white transition-colors";
-    setupBtn.className = "px-4 py-2 text-base font-medium rounded-t-md bg-brand-100 text-brand-700 hover:bg-brand-200 transition-colors";
+  if (view === "summary") {
     summaryView.classList.remove("hidden");
     detailView.classList.add("hidden");
     accountsView.classList.add("hidden");
     holdingsView.classList.add("hidden");
     loadSummary();
   } else {
-    setupBtn.className = "px-4 py-2 text-base font-medium rounded-t-md bg-brand-700 text-white transition-colors";
-    summaryBtn.className = "px-4 py-2 text-base font-medium rounded-t-md bg-brand-100 text-brand-700 hover:bg-brand-200 transition-colors";
     summaryView.classList.add("hidden");
     detailView.classList.add("hidden");
     accountsView.classList.remove("hidden");
@@ -216,7 +222,7 @@ function renderUserSummary(summary) {
  * @param {number|string} userId - The user ID
  * @param {number|string} accountId - The account ID
  */
-function showDetail(userId, accountId) {
+async function showDetail(userId, accountId) {
   // Find the account in cached summaryData
   let targetSummary = null;
   let targetAccount = null;
@@ -236,11 +242,25 @@ function showDetail(userId, accountId) {
 
   if (!targetSummary || !targetAccount) return;
 
+  // Load full account data for cash movements
+  const acctResult = await apiRequest("/api/accounts/" + accountId);
+  if (acctResult.ok) {
+    selectedAccount = acctResult.data;
+  }
+
+  cashViewContext = "detail";
+
   document.getElementById("summary-view").classList.add("hidden");
   document.getElementById("detail-view").classList.remove("hidden");
 
   renderDetailHeader(targetSummary.user, targetAccount);
   renderDetailHoldings(targetAccount);
+
+  // Set up cash balance and reset transactions section
+  updateCashBalanceDisplay();
+  cashTxExpanded = false;
+  document.getElementById("detail-cash-tx-list-container").classList.add("hidden");
+  document.getElementById("detail-cash-tx-toggle-icon").innerHTML = "Show &#9662;";
 }
 
 /**
@@ -348,6 +368,8 @@ function renderDetailHoldings(account) {
  * @description Go back from detail view to summary view.
  */
 function backToSummary() {
+  selectedAccount = null;
+  cashViewContext = "holdings";
   document.getElementById("detail-view").classList.add("hidden");
   document.getElementById("summary-view").classList.remove("hidden");
 }
@@ -435,12 +457,14 @@ async function onUserSelected() {
   if (!userId) {
     selectedUserId = null;
     document.getElementById("add-account-btn").classList.add("hidden");
+    document.getElementById("test-drawdown-btn").classList.add("hidden");
     document.getElementById("accounts-table-container").innerHTML = '<p class="text-brand-500">Select a user to view their accounts.</p>';
     return;
   }
 
   selectedUserId = userId;
   document.getElementById("add-account-btn").classList.remove("hidden");
+  document.getElementById("test-drawdown-btn").classList.remove("hidden");
   await loadAccounts();
 }
 
@@ -657,8 +681,17 @@ async function viewHoldings(accountId) {
 
   document.getElementById("holdings-header").textContent = userName + " — " + formatAccountType(selectedAccount.account_type) + " Account " + selectedAccount.account_ref;
 
+  cashViewContext = "holdings";
+
   document.getElementById("accounts-view").classList.add("hidden");
   document.getElementById("holdings-view").classList.remove("hidden");
+
+  updateCashBalanceDisplay();
+
+  // Reset cash transactions section to collapsed
+  cashTxExpanded = false;
+  document.getElementById("cash-tx-list-container").classList.add("hidden");
+  document.getElementById("cash-tx-toggle-icon").innerHTML = "Show &#9662;";
 
   await loadHoldings();
 }
@@ -1090,18 +1123,433 @@ async function executeDelete() {
   }
 }
 
+// ─── Cash Movements ──────────────────────────────────────────────────
+
+/** @type {number} Current transaction list limit */
+let cashTxLimit = 20;
+
+/** @type {boolean} Whether the cash transactions section is expanded */
+let cashTxExpanded = false;
+
+/** @type {number|null} ID of the cash transaction pending deletion */
+let pendingCashTxDelete = null;
+
+/**
+ * @type {string} Which view is currently showing cash elements: "holdings" or "detail".
+ * Used to target the correct DOM elements since both views have cash balance bars.
+ */
+let cashViewContext = "holdings";
+
+/**
+ * @description Get the correct element ID prefix for the current cash view context.
+ * The detail view uses "detail-" prefixed IDs; the holdings view uses unprefixed IDs.
+ * @returns {string} The prefix string ("detail-" or "")
+ */
+function cashPrefix() {
+  return cashViewContext === "detail" ? "detail-" : "";
+}
+
+/**
+ * @description Update the cash balance display bar with the current account's balance.
+ * Shows a warning if balance is below the warn threshold.
+ * Works in both holdings and detail views based on cashViewContext.
+ */
+function updateCashBalanceDisplay() {
+  if (!selectedAccount) return;
+
+  const prefix = cashPrefix();
+  const displayEl = document.getElementById(prefix + "cash-balance-display");
+  const warningEl = document.getElementById(prefix + "cash-balance-warning");
+
+  displayEl.textContent = formatGBP(selectedAccount.cash_balance);
+
+  if (selectedAccount.warn_cash > 0 && selectedAccount.cash_balance < selectedAccount.warn_cash) {
+    warningEl.textContent = "Below minimum (" + formatGBP(selectedAccount.warn_cash) + ")";
+    warningEl.classList.remove("hidden");
+  } else {
+    warningEl.classList.add("hidden");
+  }
+}
+
+/**
+ * @description Reload the selected account data from the server (to get updated cash_balance).
+ */
+async function refreshSelectedAccount() {
+  if (!selectedAccount) return;
+  const result = await apiRequest("/api/accounts/" + selectedAccount.id);
+  if (result.ok) {
+    selectedAccount = result.data;
+  }
+}
+
+/**
+ * @description Load and display cash transactions for the selected account.
+ * @param {number} [limit=20] - Maximum number of transactions to fetch
+ */
+async function loadCashTransactions(limit) {
+  if (!selectedAccount) return;
+
+  limit = limit || cashTxLimit;
+  const prefix = cashPrefix();
+  const container = document.getElementById(prefix + "cash-tx-list");
+  const result = await apiRequest("/api/accounts/" + selectedAccount.id + "/cash-transactions?limit=" + (limit + 1));
+
+  if (!result.ok) {
+    container.innerHTML = '<p class="text-red-600 text-sm">Failed to load transactions.</p>';
+    return;
+  }
+
+  const transactions = result.data;
+  const hasMore = transactions.length > limit;
+  const displayTx = hasMore ? transactions.slice(0, limit) : transactions;
+
+  if (displayTx.length === 0) {
+    container.innerHTML = '<p class="text-brand-500 text-sm">No cash transactions recorded.</p>';
+    document.getElementById(prefix + "cash-tx-show-more").classList.add("hidden");
+    return;
+  }
+
+  let html = '<table class="w-full text-left border-collapse">';
+  html += "<thead>";
+  html += '<tr class="border-b-2 border-brand-200">';
+  html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Date</th>';
+  html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Type</th>';
+  html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700 text-right">Amount</th>';
+  html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Notes</th>';
+  html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700"></th>';
+  html += "</tr>";
+  html += "</thead><tbody>";
+
+  for (let i = 0; i < displayTx.length; i++) {
+    const tx = displayTx[i];
+    const rowClass = i % 2 === 0 ? "bg-white" : "bg-brand-50";
+    const typeLabel = tx.transaction_type.charAt(0).toUpperCase() + tx.transaction_type.slice(1);
+    const typeClass = tx.transaction_type === "deposit" ? "text-green-700" : tx.transaction_type === "withdrawal" ? "text-amber-700" : "text-brand-600";
+    const canDelete = tx.transaction_type !== "drawdown";
+
+    html += '<tr class="' + rowClass + ' border-b border-brand-100">';
+    html += '<td class="py-2 px-3 text-sm">' + formatDateUK(tx.transaction_date) + "</td>";
+    html += '<td class="py-2 px-3 text-sm font-medium ' + typeClass + '">' + escapeHtml(typeLabel) + "</td>";
+    html += '<td class="py-2 px-3 text-sm text-right font-mono">' + formatGBP(tx.amount) + "</td>";
+    html += '<td class="py-2 px-3 text-sm text-brand-500">' + escapeHtml(tx.notes || "") + "</td>";
+    html += '<td class="py-2 px-3 text-sm text-right">';
+    if (canDelete) {
+      html += '<button class="text-brand-400 hover:text-red-600 text-xs font-medium transition-colors" onclick="confirmCashTxDelete(' + tx.id + ", '" + escapeHtml(typeLabel) + "', " + tx.amount + ", '" + escapeHtml(tx.transaction_date) + "'" + ')">Delete</button>';
+    }
+    html += "</td>";
+    html += "</tr>";
+  }
+
+  html += "</tbody></table>";
+  container.innerHTML = html;
+
+  // Show/hide "Show more" button
+  const moreContainer = document.getElementById(prefix + "cash-tx-show-more");
+  if (hasMore) {
+    moreContainer.classList.remove("hidden");
+  } else {
+    moreContainer.classList.add("hidden");
+  }
+}
+
+/**
+ * @description Toggle the cash transactions section visibility.
+ */
+function toggleCashTransactions() {
+  cashTxExpanded = !cashTxExpanded;
+  const prefix = cashPrefix();
+  const container = document.getElementById(prefix + "cash-tx-list-container");
+  const icon = document.getElementById(prefix + "cash-tx-toggle-icon");
+
+  if (cashTxExpanded) {
+    container.classList.remove("hidden");
+    icon.innerHTML = "Hide &#9652;";
+    loadCashTransactions();
+  } else {
+    container.classList.add("hidden");
+    icon.innerHTML = "Show &#9662;";
+  }
+}
+
+/**
+ * @description Show the deposit form modal. Sets up the form for a deposit transaction.
+ */
+function showDepositForm() {
+  document.getElementById("cash-tx-form-title").textContent = "Deposit";
+  document.getElementById("cash-tx-type").value = "deposit";
+  document.getElementById("cash-tx-form").reset();
+  document.getElementById("cash-tx-date").value = getTodayISO();
+  document.getElementById("cash-tx-form-errors").textContent = "";
+  document.getElementById("cash-tx-available").classList.add("hidden");
+
+  // Green submit button for deposit
+  const submitBtn = document.getElementById("cash-tx-submit-btn");
+  submitBtn.className = "bg-green-600 hover:bg-green-700 text-white font-medium px-5 py-2 rounded-lg transition-colors";
+  submitBtn.textContent = "Deposit";
+
+  document.getElementById("cash-tx-form-container").classList.remove("hidden");
+  setTimeout(function () {
+    document.getElementById("cash-tx-amount").focus();
+  }, 50);
+}
+
+/**
+ * @description Show the withdrawal form modal. Shows available balance and sets up validation.
+ */
+function showWithdrawForm() {
+  document.getElementById("cash-tx-form-title").textContent = "Withdraw";
+  document.getElementById("cash-tx-type").value = "withdrawal";
+  document.getElementById("cash-tx-form").reset();
+  document.getElementById("cash-tx-date").value = getTodayISO();
+  document.getElementById("cash-tx-form-errors").textContent = "";
+
+  // Show available balance
+  const availableDiv = document.getElementById("cash-tx-available");
+  availableDiv.classList.remove("hidden");
+  document.getElementById("cash-tx-available-amount").textContent = formatGBP(selectedAccount.cash_balance);
+
+  // Amber submit button for withdrawal
+  const submitBtn = document.getElementById("cash-tx-submit-btn");
+  submitBtn.className = "bg-amber-600 hover:bg-amber-700 text-white font-medium px-5 py-2 rounded-lg transition-colors";
+  submitBtn.textContent = "Withdraw";
+
+  document.getElementById("cash-tx-form-container").classList.remove("hidden");
+  setTimeout(function () {
+    document.getElementById("cash-tx-amount").focus();
+  }, 50);
+}
+
+/**
+ * @description Hide the cash transaction form modal.
+ */
+function hideCashTxForm() {
+  document.getElementById("cash-tx-form-container").classList.add("hidden");
+}
+
+/**
+ * @description Handle cash transaction form submission (deposit or withdrawal).
+ * @param {Event} event - The form submit event
+ */
+async function handleCashTxSubmit(event) {
+  event.preventDefault();
+
+  const errorsDiv = document.getElementById("cash-tx-form-errors");
+  errorsDiv.textContent = "";
+
+  const transactionType = document.getElementById("cash-tx-type").value;
+  const amount = Number(document.getElementById("cash-tx-amount").value);
+  const transactionDate = document.getElementById("cash-tx-date").value;
+  const notes = document.getElementById("cash-tx-notes").value.trim();
+
+  // Client-side withdrawal check
+  if (transactionType === "withdrawal" && amount > selectedAccount.cash_balance) {
+    errorsDiv.textContent = "Withdrawal amount exceeds available balance of " + formatGBP(selectedAccount.cash_balance);
+    return;
+  }
+
+  const data = {
+    transaction_type: transactionType,
+    transaction_date: transactionDate,
+    amount: amount,
+    notes: notes || null,
+  };
+
+  const result = await apiRequest("/api/accounts/" + selectedAccount.id + "/cash-transactions", {
+    method: "POST",
+    body: data,
+  });
+
+  if (result.ok) {
+    hideCashTxForm();
+    await refreshSelectedAccount();
+    updateCashBalanceDisplay();
+    if (cashTxExpanded) {
+      await loadCashTransactions();
+    }
+    const msgContainer = cashViewContext === "detail" ? "detail-header" : "holdings-messages";
+    showSuccess(msgContainer, transactionType === "deposit" ? "Deposit recorded successfully" : "Withdrawal recorded successfully");
+  } else {
+    errorsDiv.textContent = result.detail || result.error;
+  }
+}
+
+/**
+ * @description Show the delete confirmation dialog for a cash transaction.
+ * @param {number} txId - The transaction ID to delete
+ * @param {string} typeLabel - Display label for the transaction type
+ * @param {number} amount - The transaction amount
+ * @param {string} dateStr - The ISO date string of the transaction
+ */
+function confirmCashTxDelete(txId, typeLabel, amount, dateStr) {
+  pendingCashTxDelete = txId;
+  document.getElementById("cash-tx-delete-message").textContent = "Delete this " + formatGBP(amount) + " " + typeLabel.toLowerCase() + " from " + formatDateUK(dateStr) + "?";
+  document.getElementById("cash-tx-delete-dialog").classList.remove("hidden");
+}
+
+/**
+ * @description Hide the cash transaction delete dialog.
+ */
+function hideCashTxDeleteDialog() {
+  pendingCashTxDelete = null;
+  document.getElementById("cash-tx-delete-dialog").classList.add("hidden");
+}
+
+/**
+ * @description Execute the pending cash transaction deletion.
+ */
+async function executeCashTxDelete() {
+  if (!pendingCashTxDelete) return;
+
+  const txId = pendingCashTxDelete;
+  hideCashTxDeleteDialog();
+
+  const result = await apiRequest("/api/cash-transactions/" + txId, { method: "DELETE" });
+
+  const msgContainer = cashViewContext === "detail" ? "detail-header" : "holdings-messages";
+  if (result.ok) {
+    await refreshSelectedAccount();
+    updateCashBalanceDisplay();
+    if (cashTxExpanded) {
+      await loadCashTransactions();
+    }
+    showSuccess(msgContainer, "Transaction deleted successfully");
+  } else {
+    showError(msgContainer, "Failed to delete transaction", result.detail || result.error);
+  }
+}
+
+/**
+ * @description Get today's date as an ISO-8601 string (YYYY-MM-DD).
+ * @returns {string} Today's date
+ */
+function getTodayISO() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return year + "-" + month + "-" + day;
+}
+
+// ─── Drawdown Preview ────────────────────────────────────────────────
+
+/**
+ * @description Call the drawdown processor dry-run endpoint and display
+ * the results in a modal. No database changes are made.
+ */
+async function testDrawdownProcessor() {
+  const btn = document.getElementById("test-drawdown-btn");
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Testing...";
+
+  try {
+    const result = await apiRequest("/api/drawdown-schedules/preview", {
+      method: "POST",
+    });
+
+    if (result.ok) {
+      showDrawdownPreviewResults(result.data);
+    } else {
+      showError("page-messages", "Drawdown test failed", result.detail || result.error);
+    }
+  } catch (error) {
+    showError("page-messages", "Drawdown test failed", error.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
+/**
+ * @description Render the drawdown preview results inside the modal and show it.
+ * @param {Object} data - The preview response from the API
+ */
+function showDrawdownPreviewResults(data) {
+  const container = document.getElementById("drawdown-preview-content");
+  const items = data.would_process || [];
+  const alreadyExist = data.already_exist || 0;
+  const totalAmount = data.total_amount || 0;
+
+  let html = "";
+
+  // Summary counts
+  html += '<div class="grid grid-cols-3 gap-3 mb-4">';
+  html += '<div class="bg-green-50 border border-green-200 rounded-lg p-3 text-center">';
+  html += '<div class="text-sm text-green-700">Would Create</div>';
+  html += '<div class="text-2xl font-semibold text-green-800">' + items.length + "</div>";
+  html += "</div>";
+  html += '<div class="bg-brand-50 border border-brand-200 rounded-lg p-3 text-center">';
+  html += '<div class="text-sm text-brand-600">Already Exist</div>';
+  html += '<div class="text-2xl font-semibold text-brand-800">' + alreadyExist + "</div>";
+  html += "</div>";
+  html += '<div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">';
+  html += '<div class="text-sm text-amber-700">Total Amount</div>';
+  html += '<div class="text-2xl font-semibold text-amber-800">&pound;' + formatDetailValue(totalAmount) + "</div>";
+  html += "</div>";
+  html += "</div>";
+
+  if (items.length === 0 && alreadyExist === 0) {
+    html += '<p class="text-brand-500">No active drawdown schedules found.</p>';
+  } else if (items.length === 0) {
+    html += '<p class="text-brand-500">All due drawdowns have already been processed. Nothing new to create.</p>';
+  } else {
+    // Warnings
+    const warnings = items.filter(function (item) {
+      return item.warning !== null;
+    });
+    if (warnings.length > 0) {
+      html += '<div class="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">';
+      html += '<div class="text-sm font-semibold text-red-700 mb-2">Warnings (' + warnings.length + ")</div>";
+      html += '<ul class="text-sm text-red-700 space-y-1">';
+      for (const w of warnings) {
+        html += "<li>" + escapeHtml(w.account_ref + " on " + formatDateUK(w.date) + ": " + w.warning) + "</li>";
+      }
+      html += "</ul></div>";
+    }
+
+    // Detail table
+    html += '<table class="w-full text-left border-collapse">';
+    html += '<thead><tr class="border-b-2 border-brand-200">';
+    html += '<th class="py-2 px-2 text-sm font-semibold text-brand-700">Date</th>';
+    html += '<th class="py-2 px-2 text-sm font-semibold text-brand-700">Account</th>';
+    html += '<th class="py-2 px-2 text-sm font-semibold text-brand-700 text-right">Amount</th>';
+    html += '<th class="py-2 px-2 text-sm font-semibold text-brand-700">Notes</th>';
+    html += "</tr></thead><tbody>";
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const rowClass = i % 2 === 1 ? ' class="bg-brand-25"' : "";
+      const warningClass = item.warning ? ' class="text-red-700"' : "";
+      html += "<tr" + rowClass + ">";
+      html += '<td class="py-1.5 px-2 text-sm"' + warningClass + ">" + formatDateUK(item.date) + "</td>";
+      html += '<td class="py-1.5 px-2 text-sm">' + escapeHtml(item.account_ref) + "</td>";
+      html += '<td class="py-1.5 px-2 text-sm text-right">&pound;' + formatDetailValue(item.amount) + "</td>";
+      html += '<td class="py-1.5 px-2 text-sm text-brand-500">' + escapeHtml(item.notes || "") + "</td>";
+      html += "</tr>";
+    }
+
+    html += "</tbody></table>";
+  }
+
+  container.innerHTML = html;
+  document.getElementById("drawdown-preview-modal").classList.remove("hidden");
+}
+
+/**
+ * @description Hide the drawdown preview modal.
+ */
+function hideDrawdownPreview() {
+  document.getElementById("drawdown-preview-modal").classList.add("hidden");
+}
+
 // ─── Initialisation ──────────────────────────────────────────────────
 
 document.addEventListener("DOMContentLoaded", async function () {
   await loadUsers();
 
-  // Tab switching
-  document.getElementById("tab-summary").addEventListener("click", function () {
-    switchTab("summary");
-  });
-  document.getElementById("tab-setup").addEventListener("click", function () {
-    switchTab("setup");
-  });
+  // Determine view from URL query parameter
+  const initialView = getViewFromUrl();
+  showView(initialView);
 
   // Summary user selection
   document.getElementById("summary-user-select").addEventListener("change", function () {
@@ -1110,9 +1558,6 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   // Back to summary button
   document.getElementById("back-to-summary-btn").addEventListener("click", backToSummary);
-
-  // Load initial summary
-  loadSummary();
 
   // User selection (setup tab)
   document.getElementById("user-select").addEventListener("change", onUserSelected);
@@ -1170,6 +1615,34 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
   });
 
+  // Cash movements — holdings view
+  document.getElementById("deposit-btn").addEventListener("click", showDepositForm);
+  document.getElementById("withdraw-btn").addEventListener("click", showWithdrawForm);
+  document.getElementById("cash-tx-toggle").addEventListener("click", toggleCashTransactions);
+  document.getElementById("cash-tx-more-btn").addEventListener("click", function () {
+    cashTxLimit += 20;
+    loadCashTransactions(cashTxLimit);
+  });
+
+  // Cash movements — detail view
+  document.getElementById("detail-deposit-btn").addEventListener("click", showDepositForm);
+  document.getElementById("detail-withdraw-btn").addEventListener("click", showWithdrawForm);
+  document.getElementById("detail-cash-tx-toggle").addEventListener("click", toggleCashTransactions);
+  document.getElementById("detail-cash-tx-more-btn").addEventListener("click", function () {
+    cashTxLimit += 20;
+    loadCashTransactions(cashTxLimit);
+  });
+
+  // Cash movements — shared form and delete dialog
+  document.getElementById("cash-tx-form").addEventListener("submit", handleCashTxSubmit);
+  document.getElementById("cash-tx-cancel-btn").addEventListener("click", hideCashTxForm);
+  document.getElementById("cash-tx-delete-cancel-btn").addEventListener("click", hideCashTxDeleteDialog);
+  document.getElementById("cash-tx-delete-confirm-btn").addEventListener("click", executeCashTxDelete);
+
+  // Drawdown preview
+  document.getElementById("test-drawdown-btn").addEventListener("click", testDrawdownProcessor);
+  document.getElementById("drawdown-preview-close-btn").addEventListener("click", hideDrawdownPreview);
+
   // Delete dialog
   document.getElementById("delete-cancel-btn").addEventListener("click", hideDeleteDialog);
   document.getElementById("delete-confirm-btn").addEventListener("click", executeDelete);
@@ -1184,15 +1657,33 @@ document.addEventListener("DOMContentLoaded", async function () {
   document.getElementById("delete-dialog").addEventListener("click", function (event) {
     if (event.target === this) hideDeleteDialog();
   });
+  document.getElementById("drawdown-preview-modal").addEventListener("click", function (event) {
+    if (event.target === this) hideDrawdownPreview();
+  });
+  document.getElementById("cash-tx-form-container").addEventListener("click", function (event) {
+    if (event.target === this) hideCashTxForm();
+  });
+  document.getElementById("cash-tx-delete-dialog").addEventListener("click", function (event) {
+    if (event.target === this) hideCashTxDeleteDialog();
+  });
 
   // Close modals with Escape key
   document.addEventListener("keydown", function (event) {
     if (event.key === "Escape") {
+      const cashTxDeleteDialog = document.getElementById("cash-tx-delete-dialog");
+      const cashTxForm = document.getElementById("cash-tx-form-container");
       const deleteDialog = document.getElementById("delete-dialog");
       const accountForm = document.getElementById("account-form-container");
       const holdingForm = document.getElementById("holding-form-container");
+      const drawdownPreview = document.getElementById("drawdown-preview-modal");
 
-      if (!deleteDialog.classList.contains("hidden")) {
+      if (!cashTxDeleteDialog.classList.contains("hidden")) {
+        hideCashTxDeleteDialog();
+      } else if (!cashTxForm.classList.contains("hidden")) {
+        hideCashTxForm();
+      } else if (!drawdownPreview.classList.contains("hidden")) {
+        hideDrawdownPreview();
+      } else if (!deleteDialog.classList.contains("hidden")) {
         hideDeleteDialog();
       } else if (!holdingForm.classList.contains("hidden")) {
         hideHoldingForm();

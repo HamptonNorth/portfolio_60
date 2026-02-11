@@ -16,8 +16,12 @@ import { handleTestInvestmentsRoute } from "./routes/test-investments-routes.js"
 import { handleAccountsRoute } from "./routes/accounts-routes.js";
 import { handleHoldingsRoute } from "./routes/holdings-routes.js";
 import { handlePortfolioRoute } from "./routes/portfolio-routes.js";
+import { handleCashTransactionsRoute } from "./routes/cash-transactions-routes.js";
+import { handleDrawdownSchedulesRoute } from "./routes/drawdown-schedules-routes.js";
 import { initScheduledScraper, stopScheduledScraper } from "./services/scheduled-scraper.js";
 import { launchBrowser } from "./scrapers/browser-utils.js";
+import { processDrawdowns } from "./services/drawdown-processor.js";
+import { databaseExists } from "./db/connection.js";
 
 /**
  * @description The port the server listens on.
@@ -187,6 +191,30 @@ const server = Bun.serve({
     }
 
     if (path.startsWith("/api/accounts")) {
+      // Cash transaction routes (nested under accounts)
+      if (path.includes("/cash-transactions")) {
+        const cashTxResult = await handleCashTransactionsRoute(method, path, request);
+        if (cashTxResult) {
+          return cashTxResult;
+        }
+      }
+
+      // Drawdown schedule routes (nested under accounts)
+      if (path.includes("/drawdown-schedules")) {
+        const drawdownResult = await handleDrawdownSchedulesRoute(method, path, request);
+        if (drawdownResult) {
+          return drawdownResult;
+        }
+      }
+
+      // ISA allowance route (nested under accounts)
+      if (path.includes("/isa-allowance")) {
+        const isaResult = await handleCashTransactionsRoute(method, path, request);
+        if (isaResult) {
+          return isaResult;
+        }
+      }
+
       // Holdings routes (nested under accounts)
       if (path.includes("/holdings")) {
         const holdingsResult = await handleHoldingsRoute(method, path, request);
@@ -199,6 +227,22 @@ const server = Bun.serve({
       const accountsResult = await handleAccountsRoute(method, path, request);
       if (accountsResult) {
         return accountsResult;
+      }
+    }
+
+    // Cash transaction routes (standalone)
+    if (path.startsWith("/api/cash-transactions")) {
+      const cashTxResult = await handleCashTransactionsRoute(method, path, request);
+      if (cashTxResult) {
+        return cashTxResult;
+      }
+    }
+
+    // Drawdown schedule routes (standalone)
+    if (path.startsWith("/api/drawdown-schedules")) {
+      const drawdownResult = await handleDrawdownSchedulesRoute(method, path, request);
+      if (drawdownResult) {
+        return drawdownResult;
       }
     }
 
@@ -296,6 +340,15 @@ const server = Bun.serve({
 });
 
 console.log(`Portfolio 60 server running on http://localhost:${server.port}`);
+
+// Process any due drawdowns (only if database already exists — skipped on fresh installs)
+if (databaseExists()) {
+  try {
+    processDrawdowns();
+  } catch (err) {
+    console.warn("[Drawdown] Failed to process drawdowns on startup:", err.message);
+  }
+}
 
 // Initialise scheduled scraping (after server is ready)
 initScheduledScraper();
