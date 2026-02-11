@@ -39,12 +39,356 @@ function formatGBP(amount) {
 }
 
 /**
+ * @description Format a number as GBP currency string rounded to whole pounds.
+ * Used for summary display where pence-level precision is not needed.
+ * @param {number} amount - The amount to format
+ * @returns {string} Formatted string like "£1,234"
+ */
+function formatGBPWhole(amount) {
+  if (amount === 0) return "£0";
+  return "£" + Math.round(amount).toLocaleString("en-GB");
+}
+
+/**
  * @description Format account type for display (uppercase).
  * @param {string} type - Account type ('trading', 'isa', 'sipp')
  * @returns {string} Display string like "TRADING", "ISA", "SIPP"
  */
 function formatAccountType(type) {
   return type.toUpperCase();
+}
+
+// ─── Tab switching ───────────────────────────────────────────────────
+
+/** @type {string} Current active tab: "summary" or "setup" */
+let activeTab = "summary";
+
+/**
+ * @description Switch to the specified tab view.
+ * @param {string} tab - "summary" or "setup"
+ */
+function switchTab(tab) {
+  activeTab = tab;
+  const summaryBtn = document.getElementById("tab-summary");
+  const setupBtn = document.getElementById("tab-setup");
+
+  const summaryView = document.getElementById("summary-view");
+  const detailView = document.getElementById("detail-view");
+  const accountsView = document.getElementById("accounts-view");
+  const holdingsView = document.getElementById("holdings-view");
+
+  if (tab === "summary") {
+    summaryBtn.className = "px-4 py-2 text-base font-medium rounded-t-md bg-brand-700 text-white transition-colors";
+    setupBtn.className = "px-4 py-2 text-base font-medium rounded-t-md bg-brand-100 text-brand-700 hover:bg-brand-200 transition-colors";
+    summaryView.classList.remove("hidden");
+    detailView.classList.add("hidden");
+    accountsView.classList.add("hidden");
+    holdingsView.classList.add("hidden");
+    loadSummary();
+  } else {
+    setupBtn.className = "px-4 py-2 text-base font-medium rounded-t-md bg-brand-700 text-white transition-colors";
+    summaryBtn.className = "px-4 py-2 text-base font-medium rounded-t-md bg-brand-100 text-brand-700 hover:bg-brand-200 transition-colors";
+    summaryView.classList.add("hidden");
+    detailView.classList.add("hidden");
+    accountsView.classList.remove("hidden");
+    holdingsView.classList.add("hidden");
+  }
+}
+
+// ─── Summary Valuation ──────────────────────────────────────────────
+
+/** @type {Array<Object>} Cached portfolio summaries */
+let summaryData = [];
+
+/**
+ * @description Populate the summary user dropdown with loaded users.
+ */
+function populateSummaryUserDropdown() {
+  const select = document.getElementById("summary-user-select");
+  select.innerHTML = '<option value="all">All Users</option>';
+  for (const user of users) {
+    const option = document.createElement("option");
+    option.value = user.id;
+    option.textContent = user.first_name + " " + user.last_name;
+    select.appendChild(option);
+  }
+}
+
+/**
+ * @description Load and display the portfolio summary.
+ * Fetches all summaries or a single user's summary depending on dropdown selection.
+ */
+async function loadSummary() {
+  const userValue = document.getElementById("summary-user-select").value;
+  const container = document.getElementById("summary-container");
+
+  let result;
+  if (userValue === "all") {
+    result = await apiRequest("/api/portfolio/summary");
+  } else {
+    result = await apiRequest("/api/portfolio/summary/" + userValue);
+  }
+
+  if (!result.ok) {
+    container.innerHTML = '<p class="text-red-600">Failed to load portfolio summary.</p>';
+    return;
+  }
+
+  // Normalise to array
+  const summaries = Array.isArray(result.data) ? result.data : [result.data];
+  summaryData = summaries;
+
+  if (summaries.length === 0) {
+    container.innerHTML = '<p class="text-brand-500">No portfolio data available.</p>';
+    return;
+  }
+
+  let html = "";
+  for (const summary of summaries) {
+    html += renderUserSummary(summary);
+  }
+  container.innerHTML = html;
+}
+
+/**
+ * @description Render the summary table for a single user.
+ * @param {Object} summary - The portfolio summary object from the API
+ * @returns {string} HTML string
+ */
+function renderUserSummary(summary) {
+  const user = summary.user;
+  const dateStr = formatDateUK(summary.valuation_date);
+
+  let html = '<div class="mb-8">';
+  html += '<h3 class="text-xl font-semibold text-brand-800 mb-3">';
+  html += escapeHtml(user.first_name + " " + user.last_name);
+  html += '<span class="text-brand-400 text-base font-normal ml-3">Summary valuation  ' + escapeHtml(dateStr) + "</span>";
+  html += "</h3>";
+
+  if (summary.accounts.length === 0) {
+    html += '<p class="text-brand-500 mb-4">No accounts set up for this user.</p>';
+    html += "</div>";
+    return html;
+  }
+
+  html += '<div class="overflow-x-auto">';
+  html += '<table class="w-full border-collapse">';
+  html += "<tbody>";
+
+  for (let i = 0; i < summary.accounts.length; i++) {
+    const acct = summary.accounts[i];
+    const rowClass = i % 2 === 0 ? "bg-white" : "bg-brand-50";
+    const cashWarningHtml = acct.cash_warning ? '<span class="text-red-600 font-medium ml-2">** min cash ' + formatGBPWhole(acct.warn_cash) + "</span>" : "";
+
+    html += '<tr class="' + rowClass + ' border-b border-brand-100">';
+    html += '<td class="py-3 px-3 text-base font-semibold text-brand-700 w-24">' + formatAccountType(acct.account_type) + "</td>";
+    html += '<td class="py-3 px-3 text-base text-brand-600">Account ' + escapeHtml(acct.account_ref) + "</td>";
+    html += '<td class="py-3 px-3 text-base text-right text-brand-500">Investments</td>';
+    html += '<td class="py-3 px-3 text-base text-right font-mono w-32">' + formatGBPWhole(acct.investments_total) + "</td>";
+    html += '<td class="py-3 px-3 text-base text-right text-brand-500">Cash</td>';
+    html += '<td class="py-3 px-3 text-base text-right font-mono w-28">' + formatGBPWhole(acct.cash_balance) + "</td>";
+    html += '<td class="py-3 px-3 text-base text-right font-mono w-32 bg-brand-38">' + formatGBPWhole(acct.account_total) + "</td>";
+    html += '<td class="py-3 px-3 text-base">' + cashWarningHtml + "</td>";
+    html += '<td class="py-3 px-3 text-right">';
+    html += '<button class="bg-brand-100 hover:bg-brand-200 text-brand-700 text-sm font-medium px-3 py-1 rounded transition-colors" ';
+    html += "onclick=\"showDetail('" + user.id + "', '" + acct.id + "')\">View</button>";
+    html += "</td>";
+    html += "</tr>";
+  }
+
+  // Totals row
+  html += '<tr class="border-t-2 border-brand-300 bg-white">';
+  html += '<td class="py-3 px-3" colspan="2"></td>';
+  html += '<td class="py-3 px-3 text-base text-right font-semibold text-brand-700">Total</td>';
+  html += '<td class="py-3 px-3 text-base text-right font-mono">' + formatGBPWhole(summary.totals.investments) + "</td>";
+  html += '<td class="py-3 px-3"></td>';
+  html += '<td class="py-3 px-3 text-base text-right font-mono">' + formatGBPWhole(summary.totals.cash) + "</td>";
+  html += '<td class="py-3 px-3 text-base text-right font-mono bg-brand-38">' + formatGBPWhole(summary.totals.grand_total) + "</td>";
+  html += '<td colspan="2"></td>';
+  html += "</tr>";
+
+  html += "</tbody></table></div></div>";
+  return html;
+}
+
+/**
+ * @description Show the holdings detail drill-down for a specific account.
+ * @param {number|string} userId - The user ID
+ * @param {number|string} accountId - The account ID
+ */
+function showDetail(userId, accountId) {
+  // Find the account in cached summaryData
+  let targetSummary = null;
+  let targetAccount = null;
+
+  for (const summary of summaryData) {
+    if (summary.user.id === Number(userId)) {
+      targetSummary = summary;
+      for (const acct of summary.accounts) {
+        if (acct.id === Number(accountId)) {
+          targetAccount = acct;
+          break;
+        }
+      }
+      break;
+    }
+  }
+
+  if (!targetSummary || !targetAccount) return;
+
+  document.getElementById("summary-view").classList.add("hidden");
+  document.getElementById("detail-view").classList.remove("hidden");
+
+  renderDetailHeader(targetSummary.user, targetAccount);
+  renderDetailHoldings(targetAccount);
+}
+
+/**
+ * @description Render the detail view header with account info.
+ * @param {Object} user - The user object { first_name, last_name }
+ * @param {Object} account - The account summary object
+ */
+function renderDetailHeader(user, account) {
+  const cashWarningHtml = account.cash_warning ? '<span class="text-red-600 font-medium">** min cash ' + formatGBP(account.warn_cash) + "</span>" : "";
+
+  let html = '<h3 class="text-xl font-semibold text-brand-800 mb-2">';
+  html += escapeHtml(user.first_name + " " + user.last_name) + " — ";
+  html += formatAccountType(account.account_type) + "  Account " + escapeHtml(account.account_ref);
+  html += "</h3>";
+  html += '<div class="flex gap-6 text-base text-brand-600 mb-4">';
+  html += '<span>Investments <strong class="font-mono">' + formatGBP(account.investments_total) + "</strong></span>";
+  html += '<span>Cash <strong class="font-mono">' + formatGBP(account.cash_balance) + "</strong></span>";
+  html += '<span>Total <strong class="font-mono font-bold">' + formatGBP(account.account_total) + "</strong></span>";
+  html += cashWarningHtml;
+  html += "</div>";
+
+  document.getElementById("detail-header").innerHTML = html;
+}
+
+/**
+ * @description Render the holdings detail table for an account.
+ * @param {Object} account - The account summary with holdings array
+ */
+function renderDetailHoldings(account) {
+  const container = document.getElementById("detail-container");
+  const holdings = account.holdings;
+
+  if (holdings.length === 0) {
+    container.innerHTML = '<p class="text-brand-500">No holdings in this account.</p>';
+    return;
+  }
+
+  let html = '<div class="overflow-x-auto">';
+  html += '<table class="w-full border-collapse text-base">';
+  html += "<thead>";
+  html += '<tr class="bg-brand-100 text-brand-700">';
+  html += '<th class="py-3 px-3 text-left text-sm font-semibold">Investment</th>';
+  html += '<th class="py-3 px-3 text-left text-sm font-semibold">Currency</th>';
+  html += '<th class="py-3 px-3 text-right text-sm font-semibold">Quantity</th>';
+  html += '<th class="py-3 px-3 text-right text-sm font-semibold">Price</th>';
+  html += '<th class="py-3 px-3 text-right text-sm font-semibold">Rate</th>';
+  html += '<th class="py-3 px-3 text-right text-sm font-semibold">Value</th>';
+  html += '<th class="py-3 px-3 text-right text-sm font-semibold">Value GBP</th>';
+  html += '<th class="py-3 px-3 text-right text-sm font-semibold">Avg Cost Price</th>';
+  html += "</tr></thead><tbody>";
+
+  for (let i = 0; i < holdings.length; i++) {
+    const h = holdings[i];
+    const rowClass = i % 2 === 0 ? "bg-white" : "bg-brand-50";
+    const isGBP = h.currency_code === "GBP";
+    const publicIdText = h.public_id || "";
+    const priceStr = h.price > 0 ? formatDetailPrice(h.price) : "No price";
+    const priceDate = h.price_date || "";
+    const rateStr = h.rate ? h.rate.toFixed(4) : "";
+    const valueLocalStr = h.value_local > 0 ? formatDetailValue(h.value_local) : "";
+    const valueGBPStr = h.value_gbp > 0 ? formatDetailValue(h.value_gbp) : h.price > 0 ? "£0" : "";
+
+    // For GBP holdings, show value only in Value GBP column (skip Value column)
+    const showLocalValue = !isGBP && h.value_local > 0;
+
+    // Average cost with currency suffix for non-GBP
+    const avgCostStr = h.average_cost > 0 ? formatDetailPrice(h.average_cost) + (isGBP ? "" : " " + h.currency_code) : "";
+
+    html += '<tr class="' + rowClass + ' border-b border-brand-100">';
+
+    // Investment: public_id on line 1, name on line 2
+    html += '<td class="py-2 px-3">';
+    if (publicIdText) {
+      html += '<div class="text-sm font-medium text-brand-500">' + escapeHtml(publicIdText) + "</div>";
+    }
+    html += '<div class="text-base">' + escapeHtml(h.description) + "</div>";
+    if (priceDate) {
+      html += '<div class="text-xs text-brand-400">Price date: ' + formatDateUK(priceDate) + "</div>";
+    }
+    html += "</td>";
+
+    html += '<td class="py-2 px-3 text-base">' + escapeHtml(h.currency_code) + "</td>";
+    html += '<td class="py-2 px-3 text-base text-right font-mono">' + formatQuantity(h.quantity) + "</td>";
+    html += '<td class="py-2 px-3 text-base text-right font-mono">' + priceStr + "</td>";
+    html += '<td class="py-2 px-3 text-base text-right font-mono">' + rateStr + "</td>";
+    html += '<td class="py-2 px-3 text-base text-right font-mono">' + (showLocalValue ? formatDetailValue(h.value_local) : "") + "</td>";
+    html += '<td class="py-2 px-3 text-base text-right font-mono bg-brand-38">' + valueGBPStr + "</td>";
+    html += '<td class="py-2 px-3 text-base text-right font-mono">' + avgCostStr + "</td>";
+
+    html += "</tr>";
+  }
+
+  // Total row
+  html += '<tr class="border-t-2 border-brand-300 bg-white">';
+  html += '<td colspan="6" class="py-3 px-3 text-right font-semibold text-brand-700">Total Investments GBP</td>';
+  html += '<td class="py-3 px-3 text-right font-mono bg-brand-38">' + formatGBPWhole(account.investments_total) + "</td>";
+  html += '<td class="py-3 px-3"></td>';
+  html += "</tr>";
+
+  html += "</tbody></table></div>";
+  container.innerHTML = html;
+}
+
+/**
+ * @description Go back from detail view to summary view.
+ */
+function backToSummary() {
+  document.getElementById("detail-view").classList.add("hidden");
+  document.getElementById("summary-view").classList.remove("hidden");
+}
+
+/**
+ * @description Format a date from ISO-8601 (YYYY-MM-DD) to UK format (DD/MM/YYYY).
+ * @param {string} isoDate - The ISO date string
+ * @returns {string} UK formatted date
+ */
+function formatDateUK(isoDate) {
+  if (!isoDate) return "";
+  const parts = isoDate.split("-");
+  if (parts.length !== 3) return isoDate;
+  return parts[2] + "/" + parts[1] + "/" + parts[0];
+}
+
+/**
+ * @description Format a price for the detail view (up to 4 decimal places, trailing zeros stripped).
+ * @param {number} value - The price value
+ * @returns {string} Formatted price string
+ */
+function formatDetailPrice(value) {
+  if (value === 0) return "0";
+  let formatted = value.toFixed(4);
+  formatted = formatted.replace(/\.?0+$/, "");
+  return formatted;
+}
+
+/**
+ * @description Format a monetary value for the detail view with commas but no currency symbol.
+ * Shows whole numbers without decimals, fractional amounts with 2dp.
+ * @param {number} value - The value to format
+ * @returns {string} Formatted value string
+ */
+function formatDetailValue(value) {
+  if (value === 0) return "0";
+  const isWhole = Math.abs(value - Math.round(value)) < 0.005;
+  if (isWhole) {
+    return Math.round(value).toLocaleString("en-GB");
+  }
+  return value.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 // ─── Users loading ───────────────────────────────────────────────────
@@ -58,6 +402,7 @@ async function loadUsers() {
     users = result.data;
   }
   populateUserDropdown();
+  populateSummaryUserDropdown();
 }
 
 /**
@@ -357,7 +702,7 @@ async function loadHoldings() {
   html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700">Investment</th>';
   html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700">Currency</th>';
   html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700 text-right">Quantity</th>';
-  html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700 text-right">Average Cost</th>';
+  html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700 text-right">Avg Cost Price</th>';
   html += '<th class="py-3 px-3 text-sm font-semibold text-brand-700"></th>';
   html += "</tr>";
   html += "</thead>";
@@ -649,7 +994,7 @@ async function handleHoldingSubmit(event) {
     const expectedBook = averageCost * quantity;
     // Allow 1p tolerance for rounding differences
     if (Math.abs(expectedBook - bookCost) > 0.01) {
-      errorsDiv.textContent = "Average Cost and Book Cost Value are inconsistent. " + "Average Cost \u00d7 Quantity = " + expectedBook.toFixed(2) + " but Book Cost Value = " + bookCost.toFixed(2);
+      errorsDiv.textContent = "Avg Cost Price and Book Cost Value are inconsistent. " + "Avg Cost Price \u00d7 Quantity = " + expectedBook.toFixed(2) + " but Book Cost Value = " + bookCost.toFixed(2);
       return;
     }
   }
@@ -750,7 +1095,26 @@ async function executeDelete() {
 document.addEventListener("DOMContentLoaded", async function () {
   await loadUsers();
 
-  // User selection
+  // Tab switching
+  document.getElementById("tab-summary").addEventListener("click", function () {
+    switchTab("summary");
+  });
+  document.getElementById("tab-setup").addEventListener("click", function () {
+    switchTab("setup");
+  });
+
+  // Summary user selection
+  document.getElementById("summary-user-select").addEventListener("change", function () {
+    loadSummary();
+  });
+
+  // Back to summary button
+  document.getElementById("back-to-summary-btn").addEventListener("click", backToSummary);
+
+  // Load initial summary
+  loadSummary();
+
+  // User selection (setup tab)
   document.getElementById("user-select").addEventListener("change", onUserSelected);
 
   // Account form

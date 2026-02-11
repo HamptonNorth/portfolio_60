@@ -9,6 +9,7 @@
 /* Custom colour overrides via Tailwind v4 theme */
 @theme {
     --color-brand-25: #f7f9fc;
+    --color-brand-38: #f3f7fb;
     --color-brand-50: #f0f4f8;
     --color-brand-100: #d9e2ec;
     --color-brand-200: #bcccdc;

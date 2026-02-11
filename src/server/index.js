@@ -15,6 +15,7 @@ import { handleBackfillRoute } from "./routes/backfill-routes.js";
 import { handleTestInvestmentsRoute } from "./routes/test-investments-routes.js";
 import { handleAccountsRoute } from "./routes/accounts-routes.js";
 import { handleHoldingsRoute } from "./routes/holdings-routes.js";
+import { handlePortfolioRoute } from "./routes/portfolio-routes.js";
 import { initScheduledScraper, stopScheduledScraper } from "./services/scheduled-scraper.js";
 import { launchBrowser } from "./scrapers/browser-utils.js";
 
@@ -165,6 +166,14 @@ const server = Bun.serve({
       const configResultAsync = await handleConfigRouteAsync(method, path, request);
       if (configResultAsync) {
         return configResultAsync;
+      }
+    }
+
+    // Portfolio summary routes
+    if (path.startsWith("/api/portfolio")) {
+      const portfolioResult = await handlePortfolioRoute(method, path, request);
+      if (portfolioResult) {
+        return portfolioResult;
       }
     }
 
