@@ -6,16 +6,7 @@ import { existsSync, unlinkSync } from "node:fs";
 import { createDatabase, closeDatabase, getDatabasePath } from "../../src/server/db/connection.js";
 import { createUser } from "../../src/server/db/users-db.js";
 import { createAccount, getAccountById } from "../../src/server/db/accounts-db.js";
-import {
-  createCashTransaction,
-  getCashTransactionById,
-  getCashTransactionsByAccountId,
-  deleteCashTransaction,
-  getIsaDepositsForTaxYear,
-  drawdownExistsForDate,
-  scaleCashAmount,
-  unscaleCashAmount,
-} from "../../src/server/db/cash-transactions-db.js";
+import { createCashTransaction, getCashTransactionById, getCashTransactionsByAccountId, deleteCashTransaction, getIsaDepositsForTaxYear, drawdownExistsForDate, scaleCashAmount, unscaleCashAmount } from "../../src/server/db/cash-transactions-db.js";
 
 const testDbPath = getDatabasePath();
 
@@ -220,17 +211,20 @@ describe("getCashTransactionsByAccountId", () => {
   test("returns transactions ordered newest first", () => {
     const txList = getCashTransactionsByAccountId(sippAccount.id);
 
-    expect(txList.length).toBe(4);
-    // Most recent first (2026-02-05, 2026-02-01, 2026-01-20, 2026-01-15)
-    expect(txList[0].transaction_date).toBe("2026-02-05");
-    expect(txList[1].transaction_date).toBe("2026-02-01");
-    expect(txList[2].transaction_date).toBe("2026-01-20");
-    expect(txList[3].transaction_date).toBe("2026-01-15");
+    expect(txList.length).toBe(5);
+    // Most recent first: opening balance (today), then 2026-02-05, 2026-02-01, 2026-01-20, 2026-01-15
+    expect(txList[0].notes).toBe("Opening balance");
+    expect(txList[1].transaction_date).toBe("2026-02-05");
+    expect(txList[2].transaction_date).toBe("2026-02-01");
+    expect(txList[3].transaction_date).toBe("2026-01-20");
+    expect(txList[4].transaction_date).toBe("2026-01-15");
   });
 
-  test("returns empty array for account with no transactions", () => {
+  test("ISA account has opening balance transaction", () => {
     const txList = getCashTransactionsByAccountId(isaAccount.id);
-    expect(txList).toEqual([]);
+    expect(txList.length).toBe(1);
+    expect(txList[0].notes).toBe("Opening balance");
+    expect(txList[0].amount).toBe(5000);
   });
 
   test("respects the limit parameter", () => {
@@ -246,9 +240,7 @@ describe("deleteCashTransaction", () => {
     // Current SIPP balance: 10400
     // The 100 deposit on 2026-02-05 was the last one
     const txList = getCashTransactionsByAccountId(sippAccount.id);
-    const depositTx = txList.find(
-      (t) => t.transaction_date === "2026-02-05" && t.transaction_type === "deposit",
-    );
+    const depositTx = txList.find((t) => t.transaction_date === "2026-02-05" && t.transaction_type === "deposit");
 
     const result = deleteCashTransaction(depositTx.id);
     expect(result).toBe(true);
@@ -310,8 +302,8 @@ describe("getIsaDepositsForTaxYear", () => {
 
     // Tax year 2025/26: 6 Apr 2025 to 5 Apr 2026
     const total = getIsaDepositsForTaxYear(isaAccount.id, "2025-04-06", "2026-04-05");
-    // Only deposits count: 4500 + 3000 = 7500
-    expect(total).toBe(7500);
+    // Only deposits count: 5000 (opening balance) + 4500 + 3000 = 12500
+    expect(total).toBe(12500);
   });
 
   test("returns 0 when no deposits in range", () => {

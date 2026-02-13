@@ -111,6 +111,10 @@ export function updateHolding(id, data) {
  */
 export function deleteHolding(id) {
   const db = getDatabase();
+  // Delete in dependency order (no ON DELETE CASCADE in schema)
+  // cash_transactions references holding_movements via holding_movement_id FK, so must go first
+  db.run("DELETE FROM cash_transactions WHERE holding_movement_id IN (SELECT id FROM holding_movements WHERE holding_id = ?)", [id]);
+  db.run("DELETE FROM holding_movements WHERE holding_id = ?", [id]);
   const result = db.run("DELETE FROM holdings WHERE id = ?", [id]);
   return result.changes > 0;
 }

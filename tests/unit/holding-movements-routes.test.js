@@ -321,7 +321,7 @@ describe("Holding Movements Routes", () => {
         movement_date: "2026-02-11",
         quantity: 30,
         total_consideration: 200,
-        deductible_costs: 5.50,
+        deductible_costs: 5.5,
         notes: "Sold 30 shares",
       }),
     });
@@ -336,8 +336,8 @@ describe("Holding Movements Routes", () => {
     // Holding quantity reduced: 150 - 30 = 120
     expect(data.holding.quantity).toBe(120);
 
-    // Cash increased by consideration
-    expect(data.account.cash_balance).toBe(49900); // 49700 + 200
+    // Cash increased by net proceeds (consideration - deductible costs)
+    expect(data.account.cash_balance).toBe(49894.5); // 49700 + (200 - 5.5)
   });
 
   test("POST sell movement: insufficient quantity returns 400", async () => {

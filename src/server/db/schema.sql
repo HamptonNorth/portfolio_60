@@ -164,11 +164,13 @@ CREATE TABLE IF NOT EXISTS holdings (
 CREATE TABLE IF NOT EXISTS cash_transactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_id INTEGER NOT NULL,
-    transaction_type TEXT NOT NULL CHECK(transaction_type IN ('deposit', 'withdrawal', 'drawdown', 'adjustment')),
+    holding_movement_id INTEGER,
+    transaction_type TEXT NOT NULL CHECK(transaction_type IN ('deposit', 'withdrawal', 'drawdown', 'adjustment', 'buy', 'sell')),
     transaction_date TEXT NOT NULL,
     amount INTEGER NOT NULL,
     notes TEXT CHECK(notes IS NULL OR length(notes) <= 255),
-    FOREIGN KEY (account_id) REFERENCES accounts(id)
+    FOREIGN KEY (account_id) REFERENCES accounts(id),
+    FOREIGN KEY (holding_movement_id) REFERENCES holding_movements(id)
 );
 
 -- Holding movements: buy, sell and adjustment transactions (future UI)
@@ -181,6 +183,7 @@ CREATE TABLE IF NOT EXISTS holding_movements (
     movement_value INTEGER NOT NULL,
     book_cost INTEGER NOT NULL DEFAULT 0,
     deductible_costs INTEGER NOT NULL DEFAULT 0,
+    revised_avg_cost INTEGER NOT NULL DEFAULT 0,
     notes TEXT CHECK(notes IS NULL OR length(notes) <= 255),
     FOREIGN KEY (holding_id) REFERENCES holdings(id)
 );

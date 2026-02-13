@@ -50,18 +50,14 @@ export function createBuyMovement(data) {
   db.exec("BEGIN");
   try {
     // Read the current holding (scaled values direct from DB)
-    const holding = db
-      .query("SELECT id, account_id, quantity, average_cost FROM holdings WHERE id = ?")
-      .get(data.holding_id);
+    const holding = db.query("SELECT id, account_id, quantity, average_cost FROM holdings WHERE id = ?").get(data.holding_id);
 
     if (!holding) {
       throw new Error("Holding not found");
     }
 
     // Read the current account cash balance
-    const account = db
-      .query("SELECT id, cash_balance FROM accounts WHERE id = ?")
-      .get(holding.account_id);
+    const account = db.query("SELECT id, cash_balance FROM accounts WHERE id = ?").get(holding.account_id);
 
     if (!account) {
       throw new Error("Account not found");
@@ -79,9 +75,7 @@ export function createBuyMovement(data) {
     const newQuantity = oldQuantity + data.quantity;
 
     // Guard against divide-by-zero (shouldn't happen on a buy, but be safe)
-    const newAvgCost = newQuantity > 0
-      ? (oldBookCost + addedBookCost) / newQuantity
-      : 0;
+    const newAvgCost = newQuantity > 0 ? (oldBookCost + addedBookCost) / newQuantity : 0;
 
     const scaledNewQuantity = scaleValue(newQuantity);
     const scaledNewAvgCost = scaleValue(newAvgCost);
@@ -89,26 +83,32 @@ export function createBuyMovement(data) {
 
     // Insert the movement record
     const result = db.run(
-      `INSERT INTO holding_movements (holding_id, movement_type, movement_date, quantity, movement_value, book_cost, deductible_costs, notes)
-       VALUES (?, 'buy', ?, ?, ?, ?, ?, ?)`,
-      [data.holding_id, data.movement_date, scaledQuantity, scaledConsideration, scaledBookCost, scaledDeductible, data.notes || null],
+      `INSERT INTO holding_movements (holding_id, movement_type, movement_date, quantity, movement_value, book_cost, deductible_costs, revised_avg_cost, notes)
+       VALUES (?, 'buy', ?, ?, ?, ?, ?, ?, ?)`,
+      [data.holding_id, data.movement_date, scaledQuantity, scaledConsideration, scaledBookCost, scaledDeductible, scaledNewAvgCost, data.notes || null],
     );
 
     // Update the holding quantity and average cost
-    db.run(
-      "UPDATE holdings SET quantity = ?, average_cost = ? WHERE id = ?",
-      [scaledNewQuantity, scaledNewAvgCost, data.holding_id],
-    );
+    db.run("UPDATE holdings SET quantity = ?, average_cost = ? WHERE id = ?", [scaledNewQuantity, scaledNewAvgCost, data.holding_id]);
 
     // Deduct total consideration from account cash balance
+    db.run("UPDATE accounts SET cash_balance = cash_balance - ? WHERE id = ?", [scaledConsideration, holding.account_id]);
+
+    // Create matching cash_transaction for audit trail (balance already adjusted above)
+    const movementId = result.lastInsertRowid;
+    const investmentRow = db.query("SELECT i.description FROM holdings h JOIN investments i ON h.investment_id = i.id WHERE h.id = ?").get(data.holding_id);
+    const investmentName = investmentRow ? investmentRow.description : "Unknown";
+    const cashNotes = "Buy: " + investmentName + (data.notes ? " — " + data.notes : "");
+
     db.run(
-      "UPDATE accounts SET cash_balance = cash_balance - ? WHERE id = ?",
-      [scaledConsideration, holding.account_id],
+      `INSERT INTO cash_transactions (account_id, holding_movement_id, transaction_type, transaction_date, amount, notes)
+       VALUES (?, ?, 'buy', ?, ?, ?)`,
+      [holding.account_id, movementId, data.movement_date, scaledConsideration, cashNotes],
     );
 
     db.exec("COMMIT");
 
-    return getMovementById(result.lastInsertRowid);
+    return getMovementById(movementId);
   } catch (err) {
     db.exec("ROLLBACK");
     throw err;
@@ -146,9 +146,7 @@ export function createSellMovement(data) {
   db.exec("BEGIN");
   try {
     // Read the current holding (scaled values direct from DB)
-    const holding = db
-      .query("SELECT id, account_id, quantity, average_cost FROM holdings WHERE id = ?")
-      .get(data.holding_id);
+    const holding = db.query("SELECT id, account_id, quantity, average_cost FROM holdings WHERE id = ?").get(data.holding_id);
 
     if (!holding) {
       throw new Error("Holding not found");
@@ -175,20 +173,27 @@ export function createSellMovement(data) {
     );
 
     // Reduce the holding quantity (average_cost unchanged on sell)
-    db.run(
-      "UPDATE holdings SET quantity = ? WHERE id = ?",
-      [newScaledQuantity, data.holding_id],
-    );
+    db.run("UPDATE holdings SET quantity = ? WHERE id = ?", [newScaledQuantity, data.holding_id]);
 
-    // Add total consideration to account cash balance
+    // Add net proceeds (total consideration minus deductible costs) to account cash balance
+    const scaledNetProceeds = scaledConsideration - scaledDeductible;
+    db.run("UPDATE accounts SET cash_balance = cash_balance + ? WHERE id = ?", [scaledNetProceeds, holding.account_id]);
+
+    // Create matching cash_transaction for audit trail (balance already adjusted above)
+    const movementId = result.lastInsertRowid;
+    const investmentRow = db.query("SELECT i.description FROM holdings h JOIN investments i ON h.investment_id = i.id WHERE h.id = ?").get(data.holding_id);
+    const investmentName = investmentRow ? investmentRow.description : "Unknown";
+    const cashNotes = "Sell: " + investmentName + (data.notes ? " — " + data.notes : "");
+
     db.run(
-      "UPDATE accounts SET cash_balance = cash_balance + ? WHERE id = ?",
-      [scaledConsideration, holding.account_id],
+      `INSERT INTO cash_transactions (account_id, holding_movement_id, transaction_type, transaction_date, amount, notes)
+       VALUES (?, ?, 'sell', ?, ?, ?)`,
+      [holding.account_id, movementId, data.movement_date, scaledNetProceeds, cashNotes],
     );
 
     db.exec("COMMIT");
 
-    return getMovementById(result.lastInsertRowid);
+    return getMovementById(movementId);
   } catch (err) {
     db.exec("ROLLBACK");
     throw err;
@@ -204,7 +209,7 @@ export function getMovementById(id) {
   const db = getDatabase();
   const row = db
     .query(
-      `SELECT id, holding_id, movement_type, movement_date, quantity, movement_value, book_cost, deductible_costs, notes
+      `SELECT id, holding_id, movement_type, movement_date, quantity, movement_value, book_cost, deductible_costs, revised_avg_cost, notes
        FROM holding_movements
        WHERE id = ?`,
     )
@@ -224,7 +229,7 @@ export function getMovementsByHoldingId(holdingId, limit = 50) {
   const db = getDatabase();
   const rows = db
     .query(
-      `SELECT id, holding_id, movement_type, movement_date, quantity, movement_value, book_cost, deductible_costs, notes
+      `SELECT id, holding_id, movement_type, movement_date, quantity, movement_value, book_cost, deductible_costs, revised_avg_cost, notes
        FROM holding_movements
        WHERE holding_id = ?
        ORDER BY movement_date DESC, id DESC
@@ -250,10 +255,12 @@ function unscaleMovementRow(row) {
     movement_value: unscaleValue(row.movement_value),
     book_cost: unscaleValue(row.book_cost),
     deductible_costs: unscaleValue(row.deductible_costs),
+    revised_avg_cost: unscaleValue(row.revised_avg_cost),
     quantity_scaled: row.quantity,
     movement_value_scaled: row.movement_value,
     book_cost_scaled: row.book_cost,
     deductible_costs_scaled: row.deductible_costs,
+    revised_avg_cost_scaled: row.revised_avg_cost,
     notes: row.notes,
   };
 }

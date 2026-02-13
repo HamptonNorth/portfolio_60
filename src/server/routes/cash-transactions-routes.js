@@ -1,11 +1,5 @@
 import { Router } from "../router.js";
-import {
-  createCashTransaction,
-  getCashTransactionById,
-  getCashTransactionsByAccountId,
-  deleteCashTransaction,
-  getIsaDepositsForTaxYear,
-} from "../db/cash-transactions-db.js";
+import { createCashTransaction, getCashTransactionById, getCashTransactionsByAccountId, getIsaDepositsForTaxYear } from "../db/cash-transactions-db.js";
 import { getAccountById } from "../db/accounts-db.js";
 import { getIsaAllowanceConfig } from "../config.js";
 import { validateCashTransaction } from "../validation.js";
@@ -22,10 +16,7 @@ cashTxRouter.get("/api/accounts/:accountId/cash-transactions", function (request
     const accountId = Number(params.accountId);
     const account = getAccountById(accountId);
     if (!account) {
-      return new Response(
-        JSON.stringify({ error: "Account not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Account not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
     }
 
     const url = new URL(request.url);
@@ -36,10 +27,7 @@ cashTxRouter.get("/api/accounts/:accountId/cash-transactions", function (request
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "Failed to fetch transactions", detail: err.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Failed to fetch transactions", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 
@@ -48,20 +36,14 @@ cashTxRouter.get("/api/cash-transactions/:id", function (request, params) {
   try {
     const tx = getCashTransactionById(Number(params.id));
     if (!tx) {
-      return new Response(
-        JSON.stringify({ error: "Transaction not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Transaction not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
     }
     return new Response(JSON.stringify(tx), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "Failed to fetch transaction", detail: err.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Failed to fetch transaction", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 
@@ -71,27 +53,18 @@ cashTxRouter.post("/api/accounts/:accountId/cash-transactions", async function (
   try {
     body = await request.json();
   } catch {
-    return new Response(
-      JSON.stringify({ error: "Invalid request", detail: "Request body must be valid JSON" }),
-      { status: 400, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Invalid request", detail: "Request body must be valid JSON" }), { status: 400, headers: { "Content-Type": "application/json" } });
   }
 
   const accountId = Number(params.accountId);
   const account = getAccountById(accountId);
   if (!account) {
-    return new Response(
-      JSON.stringify({ error: "Account not found" }),
-      { status: 404, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Account not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
   }
 
   const errors = validateCashTransaction(body);
   if (errors.length > 0) {
-    return new Response(
-      JSON.stringify({ error: "Validation failed", detail: errors.join("; ") }),
-      { status: 400, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Validation failed", detail: errors.join("; ") }), { status: 400, headers: { "Content-Type": "application/json" } });
   }
 
   // Hard check: withdrawals must not exceed available cash balance
@@ -119,50 +92,13 @@ cashTxRouter.post("/api/accounts/:accountId/cash-transactions", async function (
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "Failed to create transaction", detail: err.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Failed to create transaction", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 
-// DELETE /api/cash-transactions/:id — delete a transaction and reverse balance
-cashTxRouter.delete("/api/cash-transactions/:id", function (request, params) {
-  try {
-    // Load the transaction first to check it exists and is user-deletable
-    const tx = getCashTransactionById(Number(params.id));
-    if (!tx) {
-      return new Response(
-        JSON.stringify({ error: "Transaction not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } },
-      );
-    }
-
-    // Drawdown transactions cannot be deleted by the user
-    if (tx.transaction_type === "drawdown") {
-      return new Response(
-        JSON.stringify({ error: "Cannot delete drawdown", detail: "Drawdown transactions are system-generated and cannot be deleted" }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
-      );
-    }
-
-    const deleted = deleteCashTransaction(Number(params.id));
-    if (!deleted) {
-      return new Response(
-        JSON.stringify({ error: "Transaction not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } },
-      );
-    }
-    return new Response(JSON.stringify({ message: "Transaction deleted" }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "Failed to delete transaction", detail: err.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    );
-  }
+// DELETE /api/cash-transactions/:id — blocked for audit trail integrity
+cashTxRouter.delete("/api/cash-transactions/:id", function () {
+  return new Response(JSON.stringify({ error: "Cannot delete transaction", detail: "Transactions cannot be deleted. Use an adjustment transaction to correct errors." }), { status: 400, headers: { "Content-Type": "application/json" } });
 });
 
 // GET /api/accounts/:accountId/isa-allowance — get ISA allowance usage for current tax year
@@ -171,17 +107,11 @@ cashTxRouter.get("/api/accounts/:accountId/isa-allowance", function (request, pa
     const accountId = Number(params.accountId);
     const account = getAccountById(accountId);
     if (!account) {
-      return new Response(
-        JSON.stringify({ error: "Account not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Account not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
     }
 
     if (account.account_type !== "isa") {
-      return new Response(
-        JSON.stringify({ error: "Not an ISA account", detail: "ISA allowance is only available for ISA accounts" }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Not an ISA account", detail: "ISA allowance is only available for ISA accounts" }), { status: 400, headers: { "Content-Type": "application/json" } });
     }
 
     const isaConfig = getIsaAllowanceConfig();
@@ -201,10 +131,7 @@ cashTxRouter.get("/api/accounts/:accountId/isa-allowance", function (request, pa
       { status: 200, headers: { "Content-Type": "application/json" } },
     );
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "Failed to fetch ISA allowance", detail: err.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Failed to fetch ISA allowance", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 

@@ -77,9 +77,10 @@ export function updateUser(id, data) {
 export function deleteUser(id) {
   const db = getDatabase();
   // Delete in dependency order (no ON DELETE CASCADE in schema)
+  // cash_transactions references holding_movements via holding_movement_id FK, so must go first
+  db.run("DELETE FROM cash_transactions WHERE account_id IN (SELECT id FROM accounts WHERE user_id = ?)", [id]);
   db.run("DELETE FROM holding_movements WHERE holding_id IN (SELECT h.id FROM holdings h JOIN accounts a ON h.account_id = a.id WHERE a.user_id = ?)", [id]);
   db.run("DELETE FROM holdings WHERE account_id IN (SELECT id FROM accounts WHERE user_id = ?)", [id]);
-  db.run("DELETE FROM cash_transactions WHERE account_id IN (SELECT id FROM accounts WHERE user_id = ?)", [id]);
   db.run("DELETE FROM drawdown_schedules WHERE account_id IN (SELECT id FROM accounts WHERE user_id = ?)", [id]);
   db.run("DELETE FROM accounts WHERE user_id = ?", [id]);
   const result = db.run("DELETE FROM users WHERE id = ?", [id]);

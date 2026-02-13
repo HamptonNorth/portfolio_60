@@ -52,13 +52,32 @@ export function getAccountById(id) {
  */
 export function createAccount(data) {
   const db = getDatabase();
-  const result = db.run(
-    `INSERT INTO accounts (user_id, account_type, account_ref, cash_balance, warn_cash)
-     VALUES (?, ?, ?, ?, ?)`,
-    [data.user_id, data.account_type, data.account_ref, scaleCash(data.cash_balance || 0), scaleCash(data.warn_cash || 0)],
-  );
+  const scaledCash = scaleCash(data.cash_balance || 0);
 
-  return getAccountById(result.lastInsertRowid);
+  db.exec("BEGIN");
+  try {
+    const result = db.run(
+      `INSERT INTO accounts (user_id, account_type, account_ref, cash_balance, warn_cash)
+       VALUES (?, ?, ?, ?, ?)`,
+      [data.user_id, data.account_type, data.account_ref, scaledCash, scaleCash(data.warn_cash || 0)],
+    );
+
+    // Auto-create opening balance deposit if cash balance is non-zero
+    if (scaledCash > 0) {
+      const today = new Date().toISOString().slice(0, 10);
+      db.run(
+        `INSERT INTO cash_transactions (account_id, transaction_type, transaction_date, amount, notes)
+         VALUES (?, 'deposit', ?, ?, 'Opening balance')`,
+        [result.lastInsertRowid, today, scaledCash],
+      );
+    }
+
+    db.exec("COMMIT");
+    return getAccountById(result.lastInsertRowid);
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
 }
 
 /**
@@ -94,9 +113,10 @@ export function updateAccount(id, data) {
 export function deleteAccount(id) {
   const db = getDatabase();
   // Delete in dependency order (no ON DELETE CASCADE in schema)
+  // cash_transactions references holding_movements via holding_movement_id FK, so must go first
+  db.run("DELETE FROM cash_transactions WHERE account_id = ?", [id]);
   db.run("DELETE FROM holding_movements WHERE holding_id IN (SELECT id FROM holdings WHERE account_id = ?)", [id]);
   db.run("DELETE FROM holdings WHERE account_id = ?", [id]);
-  db.run("DELETE FROM cash_transactions WHERE account_id = ?", [id]);
   db.run("DELETE FROM drawdown_schedules WHERE account_id = ?", [id]);
   const result = db.run("DELETE FROM accounts WHERE id = ?", [id]);
   return result.changes > 0;

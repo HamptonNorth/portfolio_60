@@ -282,14 +282,25 @@ function formatDatetime(datetime) {
 }
 
 /**
- * @description Format a minor-unit price value for display as 9(6).9(4).
- * Always shows exactly 4 decimal places for consistency.
- * @param {number} value - The price in minor units
- * @returns {string} Formatted price string
+ * @description Format a minor-unit price value for display as £X.XXXX.
+ * Converts from pence to pounds (divides by 100).
+ * Shows up to 4 decimal places; if the price has more precision, shows up to 6dp.
+ * @param {number} value - The price in minor units (pence/cents)
+ * @returns {string} Formatted price string in pounds
  */
 function formatPrice(value) {
   if (value === null || value === undefined) return "—";
-  return value.toFixed(4);
+  const pounds = value / 100;
+  // Check if more than 4dp of precision exists
+  const at4dp = parseFloat(pounds.toFixed(4));
+  const at6dp = parseFloat(pounds.toFixed(6));
+  if (at4dp !== at6dp) {
+    return "£" + pounds.toFixed(6).replace(/0+$/, "");
+  }
+  let formatted = pounds.toFixed(4);
+  // Remove trailing zeros but keep at least 2 decimal places
+  formatted = formatted.replace(/(\.\d{2}\d*?)0+$/, "$1");
+  return "£" + formatted;
 }
 
 /**
@@ -696,7 +707,7 @@ function fetchPricesStream() {
       initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Currency</th>';
       initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Status</th>';
       initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Raw Text</th>';
-      initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700 text-right">Parsed Price</th>';
+      initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700 text-right">Price</th>';
       initHtml += "</tr>";
       initHtml += "</thead>";
       initHtml += '<tbody id="prices-tbody">';

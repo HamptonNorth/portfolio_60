@@ -139,11 +139,14 @@ describe("Cash Transactions Routes", () => {
 
   // --- List transactions (empty) ---
 
-  test("GET /api/accounts/:id/cash-transactions returns empty array initially", async () => {
+  test("GET /api/accounts/:id/cash-transactions returns opening balance initially", async () => {
     const response = await fetch(`${BASE_URL}/api/accounts/${sippAccountId}/cash-transactions`);
     expect(response.status).toBe(200);
     const data = await response.json();
-    expect(data).toEqual([]);
+    expect(data.length).toBe(1);
+    expect(data[0].transaction_type).toBe("deposit");
+    expect(data[0].notes).toBe("Opening balance");
+    expect(data[0].amount).toBe(10000);
   });
 
   test("GET /api/accounts/:id/cash-transactions returns 404 for non-existent account", async () => {
@@ -301,10 +304,12 @@ describe("Cash Transactions Routes", () => {
     const response = await fetch(`${BASE_URL}/api/accounts/${sippAccountId}/cash-transactions`);
     expect(response.status).toBe(200);
     const data = await response.json();
-    expect(data.length).toBe(2);
-    // Most recent first
-    expect(data[0].transaction_date).toBe("2026-01-20");
-    expect(data[1].transaction_date).toBe("2026-01-15");
+    // Opening balance (today) + deposit (2026-01-15) + withdrawal (2026-01-20) = 3
+    expect(data.length).toBe(3);
+    // Most recent first: opening balance (today), then 2026-01-20, then 2026-01-15
+    expect(data[0].notes).toBe("Opening balance");
+    expect(data[1].transaction_date).toBe("2026-01-20");
+    expect(data[2].transaction_date).toBe("2026-01-15");
   });
 
   test("GET /api/accounts/:id/cash-transactions respects limit", async () => {
@@ -329,39 +334,34 @@ describe("Cash Transactions Routes", () => {
 
   // --- Delete transactions ---
 
-  test("DELETE /api/cash-transactions/:id reverses deposit balance", async () => {
-    // Before: balance is 11500, deposit was 2000
+  test("DELETE /api/cash-transactions/:id returns 400 for deposit (audit trail)", async () => {
     const response = await fetch(`${BASE_URL}/api/cash-transactions/${depositTxId}`, {
       method: "DELETE",
     });
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(400);
     const data = await response.json();
-    expect(data.message).toBe("Transaction deleted");
+    expect(data.error).toContain("Cannot delete");
 
-    // Balance should decrease by 2000: 11500 - 2000 = 9500
+    // Balance should remain unchanged at 11500
     const accountRes = await fetch(`${BASE_URL}/api/accounts/${sippAccountId}`);
     const account = await accountRes.json();
-    expect(account.cash_balance).toBe(9500);
+    expect(account.cash_balance).toBe(11500);
   });
 
-  test("DELETE /api/cash-transactions/:id reverses withdrawal balance", async () => {
-    // Before: balance is 9500, withdrawal was 500
+  test("DELETE /api/cash-transactions/:id returns 400 for withdrawal (audit trail)", async () => {
     const response = await fetch(`${BASE_URL}/api/cash-transactions/${withdrawalTxId}`, {
       method: "DELETE",
     });
-    expect(response.status).toBe(200);
-
-    // Balance should increase by 500: 9500 + 500 = 10000
-    const accountRes = await fetch(`${BASE_URL}/api/accounts/${sippAccountId}`);
-    const account = await accountRes.json();
-    expect(account.cash_balance).toBe(10000);
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data.error).toContain("Cannot delete");
   });
 
-  test("DELETE /api/cash-transactions/:id returns 404 for non-existent", async () => {
+  test("DELETE /api/cash-transactions/:id returns 400 for non-existent", async () => {
     const response = await fetch(`${BASE_URL}/api/cash-transactions/9999`, {
       method: "DELETE",
     });
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(400);
   });
 
   // --- ISA allowance ---
@@ -383,8 +383,9 @@ describe("Cash Transactions Routes", () => {
     const data = await response.json();
     expect(data.annual_limit).toBe(20000);
     expect(data.tax_year).toMatch(/^\d{4}\/\d{4}$/);
-    expect(data.deposits_this_year).toBe(4500);
-    expect(data.remaining).toBe(15500);
+    // 5000 (opening balance) + 4500 (test deposit) = 9500
+    expect(data.deposits_this_year).toBe(9500);
+    expect(data.remaining).toBe(10500);
   });
 
   test("GET /api/accounts/:id/isa-allowance returns 400 for non-ISA account", async () => {
@@ -397,5 +398,60 @@ describe("Cash Transactions Routes", () => {
   test("GET /api/accounts/:id/isa-allowance returns 404 for non-existent account", async () => {
     const response = await fetch(`${BASE_URL}/api/accounts/9999/isa-allowance`);
     expect(response.status).toBe(404);
+  });
+
+  // --- System-created transaction delete protection ---
+
+  test("DELETE returns 400 for buy-type cash transaction", async () => {
+    // Create an investment
+    const invResponse = await fetch(`${BASE_URL}/api/investments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        currencies_id: 1,
+        investment_type_id: 1,
+        description: "Test Share",
+      }),
+    });
+    const investment = await invResponse.json();
+
+    // Create a holding on the SIPP account
+    const holdResponse = await fetch(`${BASE_URL}/api/accounts/${sippAccountId}/holdings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        investment_id: investment.id,
+        quantity: 0,
+        average_cost: 0,
+      }),
+    });
+    const holding = await holdResponse.json();
+
+    // Record a buy movement (creates a system 'buy' cash transaction)
+    await fetch(`${BASE_URL}/api/holdings/${holding.id}/movements`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        movement_type: "buy",
+        movement_date: "2026-02-13",
+        quantity: 10,
+        total_consideration: 100,
+        deductible_costs: 0,
+      }),
+    });
+
+    // Find the buy cash transaction
+    const txResponse = await fetch(`${BASE_URL}/api/accounts/${sippAccountId}/cash-transactions`);
+    const transactions = await txResponse.json();
+    const buyTx = transactions.find((t) => t.transaction_type === "buy");
+    expect(buyTx).toBeDefined();
+
+    // Attempt to delete it — should be blocked
+    const deleteResponse = await fetch(`${BASE_URL}/api/cash-transactions/${buyTx.id}`, {
+      method: "DELETE",
+    });
+    expect(deleteResponse.status).toBe(400);
+    const deleteData = await deleteResponse.json();
+    expect(deleteData.error).toContain("Cannot delete");
   });
 });

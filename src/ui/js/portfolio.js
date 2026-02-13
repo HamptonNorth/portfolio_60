@@ -280,9 +280,9 @@ function renderDetailHeader(user, account) {
   html += formatAccountType(account.account_type) + "  Account " + escapeHtml(account.account_ref);
   html += "</h3>";
   html += '<div class="flex gap-6 text-base text-brand-600 mb-4">';
-  html += '<span>Investments <strong class="font-mono">' + formatGBP(account.investments_total) + "</strong></span>";
-  html += '<span>Cash <strong class="font-mono">' + formatGBP(account.cash_balance) + "</strong></span>";
-  html += '<span>Total <strong class="font-mono font-bold">' + formatGBP(account.account_total) + "</strong></span>";
+  html += '<span>Investments <strong class="font-mono">' + formatGBPWhole(account.investments_total) + "</strong></span>";
+  html += '<span>Cash <strong class="font-mono">' + formatGBPWhole(account.cash_balance) + "</strong></span>";
+  html += '<span>Total <strong class="font-mono font-bold">' + formatGBPWhole(account.account_total) + "</strong></span>";
   html += cashWarningHtml;
   html += "</div>";
 
@@ -326,7 +326,7 @@ function renderDetailHoldings(account) {
     const priceDate = h.price_date || "";
     const rateStr = h.rate ? h.rate.toFixed(4) : "";
     const valueLocalStr = h.value_local > 0 ? formatDetailValue(h.value_local) : "";
-    const valueGBPStr = h.value_gbp > 0 ? formatDetailValue(h.value_gbp) : h.price > 0 ? "£0" : "";
+    const valueGBPStr = h.value_gbp > 0 ? formatGBPWhole(h.value_gbp) : h.price > 0 ? "£0" : "";
 
     // For GBP holdings, show value only in Value GBP column (skip Value column)
     const showLocalValue = !isGBP && h.value_local > 0;
@@ -399,14 +399,23 @@ function formatDateUK(isoDate) {
 }
 
 /**
- * @description Format a price for the detail view (up to 4 decimal places, trailing zeros stripped).
- * @param {number} value - The price value
+ * @description Format a price for the detail view.
+ * Shows up to 4 decimal places; if the price has more precision, shows up to 6dp.
+ * Trailing zeros are stripped for cleaner display.
+ * @param {number} value - The price value in pounds
  * @returns {string} Formatted price string
  */
 function formatDetailPrice(value) {
-  if (value === 0) return "0";
+  if (value === 0) return "0.00";
+  const at4dp = parseFloat(value.toFixed(4));
+  const at6dp = parseFloat(value.toFixed(6));
+  if (at4dp !== at6dp) {
+    return value.toFixed(6).replace(/0+$/, "");
+  }
+  // Always show at least 2dp, strip zeros beyond that
   let formatted = value.toFixed(4);
-  formatted = formatted.replace(/\.?0+$/, "");
+  // Remove trailing zeros but keep at least 2 decimal places
+  formatted = formatted.replace(/(\.\d{2}\d*?)0+$/, "$1");
   return formatted;
 }
 
@@ -553,10 +562,51 @@ async function showAddAccountForm() {
   // Enable the type dropdown for new accounts
   document.getElementById("account-type").disabled = false;
 
+  // Reset ref dropdown
+  populateAccountRefDropdown("");
+
   document.getElementById("account-form-container").classList.remove("hidden");
   setTimeout(function () {
     document.getElementById("account-type").focus();
   }, 50);
+}
+
+/**
+ * @description Populate the account reference dropdown based on the selected account type.
+ * Uses the selected user's trading_ref, isa_ref, or sipp_ref field.
+ * @param {string} accountType - The account type ('trading', 'isa', 'sipp') or empty
+ * @param {string} [currentRef=""] - The current ref value to pre-select (for editing)
+ */
+function populateAccountRefDropdown(accountType, currentRef) {
+  const select = document.getElementById("account-ref");
+  select.innerHTML = "";
+
+  if (!accountType) {
+    select.innerHTML = '<option value="">Select account type first...</option>';
+    return;
+  }
+
+  const user = users.find(function (u) {
+    return u.id === selectedUserId;
+  });
+  if (!user) return;
+
+  const refMap = {
+    trading: user.trading_ref,
+    isa: user.isa_ref,
+    sipp: user.sipp_ref,
+  };
+  const ref = refMap[accountType];
+
+  if (ref) {
+    const option = document.createElement("option");
+    option.value = ref;
+    option.textContent = ref;
+    option.selected = true;
+    select.appendChild(option);
+  } else {
+    select.innerHTML = '<option value="">No ' + accountType.toUpperCase() + " reference set for this user</option>";
+  }
 }
 
 /**
@@ -604,7 +654,7 @@ async function editAccount(id) {
   document.getElementById("account-id").value = acct.id;
   document.getElementById("account-type").value = acct.account_type;
   document.getElementById("account-type").disabled = true; // Type cannot be changed
-  document.getElementById("account-ref").value = acct.account_ref;
+  populateAccountRefDropdown(acct.account_type, acct.account_ref);
   document.getElementById("cash-balance").value = acct.cash_balance;
   document.getElementById("warn-cash").value = acct.warn_cash || "";
   document.getElementById("account-form-errors").textContent = "";
@@ -1267,14 +1317,50 @@ async function loadCashTransactions(limit) {
     return;
   }
 
+  // Calculate running balance: transactions are newest-first, so work backwards
+  // to compute the balance after each transaction
+  let runningBalances = [];
+  if (selectedAccount && displayTx.length > 0) {
+    // Start from current account balance and work backwards through the displayed transactions
+    // Each transaction's balance = what the balance was AFTER that transaction
+    // We reconstruct by reversing the effect of newer transactions
+    let balance = selectedAccount.cash_balance;
+    // First, reverse any transactions beyond our display (those newer than page limit)
+    // Since displayTx is already sliced from the full newest-first list, balance is current
+    runningBalances = new Array(displayTx.length);
+    for (let i = 0; i < displayTx.length; i++) {
+      runningBalances[i] = balance;
+      // Reverse this transaction's effect to get the balance before it
+      const txType = displayTx[i].transaction_type;
+      if (txType === "deposit" || txType === "sell") {
+        balance -= displayTx[i].amount;
+      } else {
+        balance += displayTx[i].amount;
+      }
+    }
+  }
+
   let html = '<table class="w-full text-left border-collapse">';
   html += "<thead>";
+  html += "<tr>";
+  html += '<th class="pt-2 px-3 text-sm font-semibold text-brand-700">Date</th>';
+  html += '<th class="pt-2 px-3 text-sm font-semibold text-brand-700">Type</th>';
+  html += '<th class="pt-2 px-3 text-sm font-semibold text-brand-700 text-right">Quantity</th>';
+  html += '<th class="pt-2 px-3 text-sm font-semibold text-brand-700 text-right">Total</th>';
+  html += '<th class="pt-2 px-3 text-sm font-semibold text-brand-700 text-right">Deductible</th>';
+  html += '<th class="pt-2 px-3 text-sm font-semibold text-brand-700 text-right">Revised</th>';
+  html += '<th class="pt-2 px-3 text-sm font-semibold text-brand-700 text-right">Cash</th>';
+  html += '<th class="pt-2 px-3 text-sm font-semibold text-brand-700">Notes</th>';
+  html += "</tr>";
   html += '<tr class="border-b-2 border-brand-200">';
-  html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Date</th>';
-  html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Type</th>';
-  html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700 text-right">Amount</th>';
-  html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Notes</th>';
-  html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700"></th>';
+  html += '<th class="pb-2 px-3"></th>';
+  html += '<th class="pb-2 px-3"></th>';
+  html += '<th class="pb-2 px-3"></th>';
+  html += '<th class="pb-2 px-3"></th>';
+  html += '<th class="pb-2 px-3 text-sm font-semibold text-brand-700 text-right">Costs</th>';
+  html += '<th class="pb-2 px-3 text-sm font-semibold text-brand-700 text-right">Avg Cost</th>';
+  html += '<th class="pb-2 px-3 text-sm font-semibold text-brand-700 text-right">Balance</th>';
+  html += '<th class="pb-2 px-3"></th>';
   html += "</tr>";
   html += "</thead><tbody>";
 
@@ -1282,19 +1368,23 @@ async function loadCashTransactions(limit) {
     const tx = displayTx[i];
     const rowClass = i % 2 === 0 ? "bg-white" : "bg-brand-50";
     const typeLabel = tx.transaction_type.charAt(0).toUpperCase() + tx.transaction_type.slice(1);
-    const typeClass = tx.transaction_type === "deposit" ? "text-green-700" : tx.transaction_type === "withdrawal" ? "text-amber-700" : "text-brand-600";
-    const canDelete = tx.transaction_type !== "drawdown";
+    const typeClass = tx.transaction_type === "deposit" || tx.transaction_type === "sell" ? "text-green-700" : tx.transaction_type === "withdrawal" || tx.transaction_type === "buy" ? "text-amber-700" : "text-brand-600";
+    const hasMoveData = tx.quantity !== undefined && tx.quantity !== null;
+
+    // Total column: for buy/sell show total_consideration from movement; for deposits/withdrawals show the amount
+    const totalValue = hasMoveData ? tx.total_consideration : tx.amount;
+    const notesText = tx.notes || "";
+    const truncatedNotes = notesText.length > 40 ? notesText.substring(0, 40) + "..." : notesText;
 
     html += '<tr class="' + rowClass + ' border-b border-brand-100">';
     html += '<td class="py-2 px-3 text-sm">' + formatDateUK(tx.transaction_date) + "</td>";
     html += '<td class="py-2 px-3 text-sm font-medium ' + typeClass + '">' + escapeHtml(typeLabel) + "</td>";
-    html += '<td class="py-2 px-3 text-sm text-right font-mono">' + formatGBP(tx.amount) + "</td>";
-    html += '<td class="py-2 px-3 text-sm text-brand-500">' + escapeHtml(tx.notes || "") + "</td>";
-    html += '<td class="py-2 px-3 text-sm text-right">';
-    if (canDelete) {
-      html += '<button class="text-brand-400 hover:text-red-600 text-xs font-medium transition-colors" onclick="confirmCashTxDelete(' + tx.id + ", '" + escapeHtml(typeLabel) + "', " + tx.amount + ", '" + escapeHtml(tx.transaction_date) + "'" + ')">Delete</button>';
-    }
-    html += "</td>";
+    html += '<td class="py-2 px-3 text-sm text-right font-mono">' + (hasMoveData ? formatQuantity(tx.quantity) : "") + "</td>";
+    html += '<td class="py-2 px-3 text-sm text-right font-mono">' + formatGBP(totalValue) + "</td>";
+    html += '<td class="py-2 px-3 text-sm text-right font-mono">' + (hasMoveData && tx.deductible_costs > 0 ? formatGBP(tx.deductible_costs) : "") + "</td>";
+    html += '<td class="py-2 px-3 text-sm text-right font-mono">' + (tx.transaction_type === "buy" && tx.revised_avg_cost ? formatDetailPrice(tx.revised_avg_cost) : "") + "</td>";
+    html += '<td class="py-2 px-3 text-sm text-right font-mono">' + (runningBalances.length > 0 ? formatGBP(runningBalances[i]) : "") + "</td>";
+    html += '<td class="py-2 px-3 text-sm text-brand-500 max-w-xs truncate" title="' + escapeHtml(notesText) + '">' + escapeHtml(truncatedNotes) + "</td>";
     html += "</tr>";
   }
 
@@ -1881,6 +1971,9 @@ document.addEventListener("DOMContentLoaded", async function () {
   document.getElementById("add-account-btn").addEventListener("click", showAddAccountForm);
   document.getElementById("account-cancel-btn").addEventListener("click", hideAccountForm);
   document.getElementById("account-form").addEventListener("submit", handleAccountSubmit);
+  document.getElementById("account-type").addEventListener("change", function () {
+    populateAccountRefDropdown(this.value);
+  });
 
   // Holdings view
   document.getElementById("back-to-accounts-btn").addEventListener("click", backToAccounts);

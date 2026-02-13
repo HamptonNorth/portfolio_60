@@ -10,14 +10,8 @@ import { createInvestment } from "../../src/server/db/investments-db.js";
 import { getAllInvestmentTypes } from "../../src/server/db/investment-types-db.js";
 import { getAllCurrencies } from "../../src/server/db/currencies-db.js";
 import { createHolding, getHoldingById } from "../../src/server/db/holdings-db.js";
-import {
-  createBuyMovement,
-  createSellMovement,
-  getMovementById,
-  getMovementsByHoldingId,
-  scaleValue,
-  unscaleValue,
-} from "../../src/server/db/holding-movements-db.js";
+import { createBuyMovement, createSellMovement, getMovementById, getMovementsByHoldingId, scaleValue, unscaleValue } from "../../src/server/db/holding-movements-db.js";
+import { getCashTransactionsByAccountId } from "../../src/server/db/cash-transactions-db.js";
 
 const testDbPath = getDatabasePath();
 
@@ -248,7 +242,7 @@ describe("createSellMovement", () => {
       movement_date: "2026-02-11",
       quantity: 30,
       total_consideration: 200,
-      deductible_costs: 5.50,
+      deductible_costs: 5.5,
       notes: "Sold 30 shares",
     });
 
@@ -269,9 +263,9 @@ describe("createSellMovement", () => {
     // Average cost must NOT change on a sell
     expect(updatedHolding.average_cost).toBeCloseTo(preSellAvgCost, 4);
 
-    // Account cash increased by total_consideration
+    // Account cash increased by net proceeds (total_consideration - deductible_costs)
     const updatedAccount = getAccountById(testAccount.id);
-    expect(updatedAccount.cash_balance).toBe(preSellAccount.cash_balance + 200);
+    expect(updatedAccount.cash_balance).toBe(preSellAccount.cash_balance + 200 - 5.5);
   });
 
   test("sell with zero deductible costs", () => {
@@ -339,6 +333,109 @@ describe("createSellMovement", () => {
 });
 
 // --- Get movements ---
+
+// --- Cash transaction auto-creation ---
+
+describe("buy/sell movements create matching cash_transactions", () => {
+  /** @type {Object} Fresh account for isolated cash transaction tests */
+  let cashTestAccount;
+  /** @type {Object} Fresh holding for testing */
+  let cashTestHolding;
+
+  beforeAll(() => {
+    cashTestAccount = createAccount({
+      user_id: testUser.id,
+      account_type: "sipp",
+      account_ref: "SIPP001",
+      cash_balance: 20000,
+      warn_cash: 1000,
+    });
+    cashTestHolding = createHolding({
+      account_id: cashTestAccount.id,
+      investment_id: investment1.id,
+      quantity: 500,
+      average_cost: 3.0,
+    });
+  });
+
+  test("buy movement creates a cash_transaction with type 'buy'", () => {
+    const preTx = getCashTransactionsByAccountId(cashTestAccount.id);
+
+    createBuyMovement({
+      holding_id: cashTestHolding.id,
+      movement_date: "2026-02-12",
+      quantity: 10,
+      total_consideration: 60,
+      deductible_costs: 0,
+      notes: "Test buy note",
+    });
+
+    const postTx = getCashTransactionsByAccountId(cashTestAccount.id);
+    expect(postTx.length).toBe(preTx.length + 1);
+
+    const buyTx = postTx.find((t) => t.transaction_type === "buy");
+    expect(buyTx).not.toBeNull();
+    expect(buyTx.amount).toBe(60);
+    expect(buyTx.transaction_date).toBe("2026-02-12");
+    expect(buyTx.holding_movement_id).toBeGreaterThan(0);
+    expect(buyTx.notes).toContain("Buy: Raspberry Pi Holdings");
+    expect(buyTx.notes).toContain("Test buy note");
+  });
+
+  test("sell movement creates a cash_transaction with type 'sell'", () => {
+    const preTx = getCashTransactionsByAccountId(cashTestAccount.id);
+
+    createSellMovement({
+      holding_id: cashTestHolding.id,
+      movement_date: "2026-02-12",
+      quantity: 5,
+      total_consideration: 40,
+      deductible_costs: 0,
+      notes: "Test sell note",
+    });
+
+    const postTx = getCashTransactionsByAccountId(cashTestAccount.id);
+    expect(postTx.length).toBe(preTx.length + 1);
+
+    const sellTx = postTx.find((t) => t.transaction_type === "sell" && t.notes.includes("Test sell note"));
+    expect(sellTx).not.toBeNull();
+    expect(sellTx.amount).toBe(40);
+    expect(sellTx.transaction_date).toBe("2026-02-12");
+    expect(sellTx.holding_movement_id).toBeGreaterThan(0);
+    expect(sellTx.notes).toContain("Sell: Raspberry Pi Holdings");
+  });
+
+  test("buy cash_transaction does not double-deduct from account balance", () => {
+    const preAccount = getAccountById(cashTestAccount.id);
+
+    createBuyMovement({
+      holding_id: cashTestHolding.id,
+      movement_date: "2026-02-13",
+      quantity: 10,
+      total_consideration: 50,
+      deductible_costs: 0,
+    });
+
+    const postAccount = getAccountById(cashTestAccount.id);
+    // Balance should decrease by exactly 50, not 100 (double deduction)
+    expect(postAccount.cash_balance).toBe(preAccount.cash_balance - 50);
+  });
+
+  test("cash_transaction notes without user notes omits separator", () => {
+    createBuyMovement({
+      holding_id: cashTestHolding.id,
+      movement_date: "2026-02-13",
+      quantity: 5,
+      total_consideration: 25,
+      deductible_costs: 0,
+    });
+
+    const txList = getCashTransactionsByAccountId(cashTestAccount.id);
+    const latest = txList[0]; // newest first
+    expect(latest.notes).toBe("Buy: Raspberry Pi Holdings");
+    expect(latest.notes).not.toContain("—");
+  });
+});
 
 describe("getMovementsByHoldingId", () => {
   test("returns movements ordered by date desc, id desc", () => {

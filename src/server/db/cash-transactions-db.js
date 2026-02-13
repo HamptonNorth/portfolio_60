@@ -52,10 +52,7 @@ export function createCashTransaction(data) {
       [data.account_id, data.transaction_type, data.transaction_date, scaledAmount, data.notes || null],
     );
 
-    db.run(
-      `UPDATE accounts SET cash_balance = cash_balance + ? WHERE id = ?`,
-      [balanceChange, data.account_id],
-    );
+    db.run(`UPDATE accounts SET cash_balance = cash_balance + ? WHERE id = ?`, [balanceChange, data.account_id]);
 
     db.exec("COMMIT");
 
@@ -75,7 +72,7 @@ export function getCashTransactionById(id) {
   const db = getDatabase();
   const row = db
     .query(
-      `SELECT id, account_id, transaction_type, transaction_date, amount, notes
+      `SELECT id, account_id, holding_movement_id, transaction_type, transaction_date, amount, notes
        FROM cash_transactions
        WHERE id = ?`,
     )
@@ -95,10 +92,12 @@ export function getCashTransactionsByAccountId(accountId, limit = 50) {
   const db = getDatabase();
   const rows = db
     .query(
-      `SELECT id, account_id, transaction_type, transaction_date, amount, notes
-       FROM cash_transactions
-       WHERE account_id = ?
-       ORDER BY transaction_date DESC, id DESC
+      `SELECT ct.id, ct.account_id, ct.holding_movement_id, ct.transaction_type, ct.transaction_date, ct.amount, ct.notes,
+              hm.quantity AS movement_quantity, hm.movement_value AS movement_total_consideration, hm.deductible_costs AS movement_deductible_costs, hm.revised_avg_cost AS movement_revised_avg_cost
+       FROM cash_transactions ct
+       LEFT JOIN holding_movements hm ON ct.holding_movement_id = hm.id
+       WHERE ct.account_id = ?
+       ORDER BY ct.transaction_date DESC, ct.id DESC
        LIMIT ?`,
     )
     .all(accountId, limit);
@@ -117,15 +116,14 @@ export function deleteCashTransaction(id) {
   const db = getDatabase();
 
   // Load the transaction first to determine the balance reversal
-  const row = db
-    .query("SELECT id, account_id, transaction_type, amount FROM cash_transactions WHERE id = ?")
-    .get(id);
+  const row = db.query("SELECT id, account_id, transaction_type, amount FROM cash_transactions WHERE id = ?").get(id);
 
   if (!row) return false;
 
   // Reverse the original balance change
-  const isDeposit = row.transaction_type === "deposit";
-  const balanceReversal = isDeposit ? -row.amount : row.amount;
+  // Deposits and sells add to balance; withdrawals, drawdowns, adjustments and buys subtract
+  const addsToBalance = row.transaction_type === "deposit" || row.transaction_type === "sell";
+  const balanceReversal = addsToBalance ? -row.amount : row.amount;
 
   db.exec("BEGIN");
   try {
@@ -191,13 +189,24 @@ export function drawdownExistsForDate(accountId, transactionDate) {
  * @returns {Object} Row with amount as a decimal
  */
 function unscaleTransactionRow(row) {
-  return {
+  const result = {
     id: row.id,
     account_id: row.account_id,
+    holding_movement_id: row.holding_movement_id || null,
     transaction_type: row.transaction_type,
     transaction_date: row.transaction_date,
     amount: unscaleCashAmount(row.amount),
     amount_scaled: row.amount,
     notes: row.notes,
   };
+
+  // Include holding movement details when available (buy/sell transactions)
+  if (row.movement_quantity !== undefined && row.movement_quantity !== null) {
+    result.quantity = row.movement_quantity / CURRENCY_SCALE_FACTOR;
+    result.total_consideration = row.movement_total_consideration / CURRENCY_SCALE_FACTOR;
+    result.deductible_costs = row.movement_deductible_costs / CURRENCY_SCALE_FACTOR;
+    result.revised_avg_cost = row.movement_revised_avg_cost / CURRENCY_SCALE_FACTOR;
+  }
+
+  return result;
 }

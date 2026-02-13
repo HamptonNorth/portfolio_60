@@ -107,12 +107,12 @@ describe("processDrawdowns", () => {
     expect(result.skipped).toBe(0);
     expect(result.warnings).toEqual([]);
 
-    // Verify transactions were created
+    // Verify transactions were created (4 drawdowns + 1 opening balance deposit)
     const txList = getCashTransactionsByAccountId(sippAccount.id);
-    expect(txList.length).toBe(4);
-    // All should be drawdown type
-    for (const tx of txList) {
-      expect(tx.transaction_type).toBe("drawdown");
+    expect(txList.length).toBe(5);
+    const drawdowns = txList.filter((t) => t.transaction_type === "drawdown");
+    expect(drawdowns.length).toBe(4);
+    for (const tx of drawdowns) {
       expect(tx.amount).toBe(1200);
     }
 
@@ -258,8 +258,8 @@ describe("processDrawdowns", () => {
     // 2026-01-01 should be skipped (already exists), 2026-02-01 should be processed
     // (other schedules from previous tests also contribute to skipped count)
     const txList = getCashTransactionsByAccountId(account3.id);
-    // Should have 2 transactions: the manual one + the auto one for Feb
-    expect(txList.length).toBe(2);
+    // Should have 3 transactions: opening balance + the manual one + the auto one for Feb
+    expect(txList.length).toBe(3);
     expect(txList.some((t) => t.transaction_date === "2026-01-01")).toBe(true);
     expect(txList.some((t) => t.transaction_date === "2026-02-01")).toBe(true);
   });
@@ -318,9 +318,11 @@ describe("previewDrawdowns", () => {
     const balanceAfter = getAccountById(previewAccount.id).cash_balance;
     expect(balanceAfter).toBe(balanceBefore);
 
-    // No transactions should have been created for this account
+    // No drawdown transactions should have been created (only the opening balance deposit exists)
     const txList = getCashTransactionsByAccountId(previewAccount.id);
-    expect(txList.length).toBe(0);
+    expect(txList.length).toBe(1);
+    expect(txList[0].transaction_type).toBe("deposit");
+    expect(txList[0].notes).toBe("Opening balance");
 
     // total_amount should include amounts from this account's new items
     expect(result.total_amount).toBeGreaterThan(0);
@@ -377,8 +379,10 @@ describe("previewDrawdowns", () => {
     // Second drawdown: simulated balance is -400, also warning
     expect(warnItems[1].warning).not.toBeNull();
 
-    // Still no DB changes
+    // No drawdown transactions created (only the opening balance deposit exists)
     const txList = getCashTransactionsByAccountId(warnAccount.id);
-    expect(txList.length).toBe(0);
+    expect(txList.length).toBe(1);
+    expect(txList[0].transaction_type).toBe("deposit");
+    expect(txList[0].notes).toBe("Opening balance");
   });
 });

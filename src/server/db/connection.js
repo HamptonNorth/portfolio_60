@@ -369,6 +369,61 @@ function runMigrations(database) {
     `);
     database.exec("CREATE INDEX IF NOT EXISTS idx_drawdown_schedules_account ON drawdown_schedules(account_id)");
   }
+
+  // Migration 13: Expand cash_transactions CHECK constraint to allow 'buy', 'sell' types (v0.8.0)
+  // Buy/sell movements now auto-create matching cash_transaction records for audit trail.
+  // SQLite doesn't support ALTER CHECK, so we must recreate the table.
+  const ctTableInfo = database.query("SELECT sql FROM sqlite_master WHERE type='table' AND name='cash_transactions'").get();
+
+  if (ctTableInfo && ctTableInfo.sql && !ctTableInfo.sql.includes("'buy'")) {
+    database.exec("PRAGMA foreign_keys = OFF");
+    database.exec("BEGIN TRANSACTION");
+    try {
+      database.exec(`
+        CREATE TABLE cash_transactions_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          account_id INTEGER NOT NULL,
+          transaction_type TEXT NOT NULL CHECK(transaction_type IN ('deposit', 'withdrawal', 'drawdown', 'adjustment', 'buy', 'sell')),
+          transaction_date TEXT NOT NULL,
+          amount INTEGER NOT NULL,
+          notes TEXT CHECK(notes IS NULL OR length(notes) <= 255),
+          FOREIGN KEY (account_id) REFERENCES accounts(id)
+        )
+      `);
+      database.exec("INSERT INTO cash_transactions_new SELECT * FROM cash_transactions");
+      database.exec("DROP TABLE cash_transactions");
+      database.exec("ALTER TABLE cash_transactions_new RENAME TO cash_transactions");
+      database.exec("CREATE INDEX IF NOT EXISTS idx_cash_transactions_account ON cash_transactions(account_id, transaction_date DESC)");
+      database.exec("COMMIT");
+    } catch (err) {
+      database.exec("ROLLBACK");
+      throw err;
+    } finally {
+      database.exec("PRAGMA foreign_keys = ON");
+    }
+  }
+
+  // Migration 14: Add holding_movement_id FK column to cash_transactions (v0.8.0)
+  // Links buy/sell cash transactions to their originating holding movement.
+  const ctCols = database.query("PRAGMA table_info(cash_transactions)").all();
+  const hasHoldingMovementId = ctCols.some(function (col) {
+    return col.name === "holding_movement_id";
+  });
+
+  if (!hasHoldingMovementId) {
+    database.exec("ALTER TABLE cash_transactions ADD COLUMN holding_movement_id INTEGER REFERENCES holding_movements(id)");
+  }
+
+  // Migration 15: Add revised_avg_cost column to holding_movements (v0.8.0)
+  // Records the new average cost after a buy, for historical display in transactions.
+  const hmCols = database.query("PRAGMA table_info(holding_movements)").all();
+  const hasRevisedAvgCost = hmCols.some(function (col) {
+    return col.name === "revised_avg_cost";
+  });
+
+  if (!hasRevisedAvgCost) {
+    database.exec("ALTER TABLE holding_movements ADD COLUMN revised_avg_cost INTEGER NOT NULL DEFAULT 0");
+  }
 }
 
 /**
