@@ -86,14 +86,18 @@ export function updateAccount(id, data) {
 }
 
 /**
- * @description Delete an account by ID. Also deletes associated holdings.
+ * @description Delete an account by ID. Also deletes all associated child records
+ * (holding movements, holdings, cash transactions, drawdown schedules).
  * @param {number} id - The account ID to delete
  * @returns {boolean} True if the account was deleted, false if not found
  */
 export function deleteAccount(id) {
   const db = getDatabase();
-  // Delete child holdings first (no ON DELETE CASCADE in schema)
+  // Delete in dependency order (no ON DELETE CASCADE in schema)
+  db.run("DELETE FROM holding_movements WHERE holding_id IN (SELECT id FROM holdings WHERE account_id = ?)", [id]);
   db.run("DELETE FROM holdings WHERE account_id = ?", [id]);
+  db.run("DELETE FROM cash_transactions WHERE account_id = ?", [id]);
+  db.run("DELETE FROM drawdown_schedules WHERE account_id = ?", [id]);
   const result = db.run("DELETE FROM accounts WHERE id = ?", [id]);
   return result.changes > 0;
 }

@@ -233,9 +233,14 @@
 
             <!-- Delete confirmation dialog -->
             <div id="delete-dialog" class="hidden fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-                <div class="bg-white rounded-lg shadow-lg p-6 max-w-sm">
+                <div class="bg-white rounded-lg shadow-lg p-6 max-w-sm mx-4">
                     <h3 class="text-lg font-semibold text-brand-800 mb-3">Confirm Deletion</h3>
                     <p class="text-base text-brand-600 mb-4">Are you sure you want to delete <strong id="delete-item-name"></strong>?</p>
+                    <div id="delete-passphrase-section" class="hidden mb-4">
+                        <p class="text-sm text-red-600 mb-2">Deleting an account will also remove all its holdings, transactions and movements. Enter your passphrase to confirm.</p>
+                        <input type="password" id="delete-passphrase" class="w-full px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="Enter passphrase" />
+                        <p id="delete-passphrase-error" class="hidden text-sm text-red-600 mt-1"></p>
+                    </div>
                     <div class="flex gap-3 justify-end">
                         <button id="delete-cancel-btn" class="bg-brand-100 hover:bg-brand-200 text-brand-700 font-medium px-4 py-2 rounded-lg transition-colors">Cancel</button>
                         <button id="delete-confirm-btn" class="bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">Delete</button>

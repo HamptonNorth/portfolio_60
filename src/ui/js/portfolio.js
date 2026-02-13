@@ -1084,7 +1084,24 @@ async function handleHoldingSubmit(event) {
 function confirmDelete(type, id, name) {
   pendingDelete = { type: type, id: id, name: name };
   document.getElementById("delete-item-name").textContent = name;
+
+  // Show passphrase confirmation for account deletes (cascade through child tables)
+  const passphraseSection = document.getElementById("delete-passphrase-section");
+  const passphraseInput = document.getElementById("delete-passphrase");
+  const passphraseError = document.getElementById("delete-passphrase-error");
+  if (type === "account") {
+    passphraseSection.classList.remove("hidden");
+    passphraseInput.value = "";
+    passphraseError.classList.add("hidden");
+  } else {
+    passphraseSection.classList.add("hidden");
+  }
+
   document.getElementById("delete-dialog").classList.remove("hidden");
+
+  if (type === "account") {
+    passphraseInput.focus();
+  }
 }
 
 /**
@@ -1093,6 +1110,9 @@ function confirmDelete(type, id, name) {
 function hideDeleteDialog() {
   pendingDelete = null;
   document.getElementById("delete-dialog").classList.add("hidden");
+  document.getElementById("delete-passphrase").value = "";
+  document.getElementById("delete-passphrase-error").classList.add("hidden");
+  document.getElementById("delete-passphrase-section").classList.add("hidden");
 }
 
 /**
@@ -1104,14 +1124,40 @@ async function executeDelete() {
   const type = pendingDelete.type;
   const id = pendingDelete.id;
 
-  let url;
+  // For account deletes, require passphrase confirmation
+  let passphrase = null;
   if (type === "account") {
-    url = "/api/accounts/" + id;
-  } else {
-    url = "/api/holdings/" + id;
+    passphrase = document.getElementById("delete-passphrase").value;
+    const passphraseError = document.getElementById("delete-passphrase-error");
+    if (!passphrase) {
+      passphraseError.textContent = "Passphrase is required";
+      passphraseError.classList.remove("hidden");
+      return;
+    }
+    passphraseError.classList.add("hidden");
   }
 
-  const result = await apiRequest(url, { method: "DELETE" });
+  let url;
+  let options;
+  if (type === "account") {
+    url = "/api/accounts/" + id;
+    options = { method: "DELETE", body: JSON.stringify({ passphrase: passphrase }) };
+  } else {
+    url = "/api/holdings/" + id;
+    options = { method: "DELETE" };
+  }
+
+  const result = await apiRequest(url, options);
+
+  // If passphrase was wrong, show error but keep dialog open
+  if (!result.ok && type === "account" && result.error === "Incorrect passphrase") {
+    const passphraseError = document.getElementById("delete-passphrase-error");
+    passphraseError.textContent = "Incorrect passphrase";
+    passphraseError.classList.remove("hidden");
+    document.getElementById("delete-passphrase").value = "";
+    document.getElementById("delete-passphrase").focus();
+    return;
+  }
 
   hideDeleteDialog();
 

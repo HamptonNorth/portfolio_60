@@ -1,13 +1,8 @@
 import { Router } from "../router.js";
-import {
-  getAccountsByUserId,
-  getAccountById,
-  createAccount,
-  updateAccount,
-  deleteAccount,
-} from "../db/accounts-db.js";
+import { getAccountsByUserId, getAccountById, createAccount, updateAccount, deleteAccount } from "../db/accounts-db.js";
 import { getUserById } from "../db/users-db.js";
 import { validateAccount } from "../validation.js";
+import { verifyPassphrase, loadHashFromEnv } from "../auth.js";
 
 /**
  * @description Router instance for account API routes.
@@ -21,10 +16,7 @@ accountsRouter.get("/api/users/:userId/accounts", function (request, params) {
     const userId = Number(params.userId);
     const user = getUserById(userId);
     if (!user) {
-      return new Response(
-        JSON.stringify({ error: "User not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "User not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
     }
 
     const accounts = getAccountsByUserId(userId);
@@ -33,10 +25,7 @@ accountsRouter.get("/api/users/:userId/accounts", function (request, params) {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "Failed to fetch accounts", detail: err.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Failed to fetch accounts", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 
@@ -45,20 +34,14 @@ accountsRouter.get("/api/accounts/:id", function (request, params) {
   try {
     const account = getAccountById(Number(params.id));
     if (!account) {
-      return new Response(
-        JSON.stringify({ error: "Account not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Account not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
     }
     return new Response(JSON.stringify(account), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "Failed to fetch account", detail: err.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Failed to fetch account", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 
@@ -68,27 +51,18 @@ accountsRouter.post("/api/users/:userId/accounts", async function (request, para
   try {
     body = await request.json();
   } catch {
-    return new Response(
-      JSON.stringify({ error: "Invalid request", detail: "Request body must be valid JSON" }),
-      { status: 400, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Invalid request", detail: "Request body must be valid JSON" }), { status: 400, headers: { "Content-Type": "application/json" } });
   }
 
   const userId = Number(params.userId);
   const user = getUserById(userId);
   if (!user) {
-    return new Response(
-      JSON.stringify({ error: "User not found" }),
-      { status: 404, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "User not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
   }
 
   const errors = validateAccount(body);
   if (errors.length > 0) {
-    return new Response(
-      JSON.stringify({ error: "Validation failed", detail: errors.join("; ") }),
-      { status: 400, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Validation failed", detail: errors.join("; ") }), { status: 400, headers: { "Content-Type": "application/json" } });
   }
 
   try {
@@ -106,15 +80,9 @@ accountsRouter.post("/api/users/:userId/accounts", async function (request, para
   } catch (err) {
     // Handle unique constraint violation (duplicate account type for user)
     if (err.message && err.message.includes("UNIQUE constraint")) {
-      return new Response(
-        JSON.stringify({ error: "Validation failed", detail: "This user already has a " + body.account_type.toUpperCase() + " account" }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Validation failed", detail: "This user already has a " + body.account_type.toUpperCase() + " account" }), { status: 400, headers: { "Content-Type": "application/json" } });
     }
-    return new Response(
-      JSON.stringify({ error: "Failed to create account", detail: err.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Failed to create account", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 
@@ -124,10 +92,7 @@ accountsRouter.put("/api/accounts/:id", async function (request, params) {
   try {
     body = await request.json();
   } catch {
-    return new Response(
-      JSON.stringify({ error: "Invalid request", detail: "Request body must be valid JSON" }),
-      { status: 400, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Invalid request", detail: "Request body must be valid JSON" }), { status: 400, headers: { "Content-Type": "application/json" } });
   }
 
   // For updates, account_type is not changeable — only validate ref and cash fields
@@ -143,10 +108,7 @@ accountsRouter.put("/api/accounts/:id", async function (request, params) {
   }
 
   if (errors.length > 0) {
-    return new Response(
-      JSON.stringify({ error: "Validation failed", detail: errors.join("; ") }),
-      { status: 400, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Validation failed", detail: errors.join("; ") }), { status: 400, headers: { "Content-Type": "application/json" } });
   }
 
   try {
@@ -156,42 +118,52 @@ accountsRouter.put("/api/accounts/:id", async function (request, params) {
       warn_cash: Number(body.warn_cash) || 0,
     });
     if (!account) {
-      return new Response(
-        JSON.stringify({ error: "Account not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Account not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
     }
     return new Response(JSON.stringify(account), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "Failed to update account", detail: err.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Failed to update account", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 
-// DELETE /api/accounts/:id — delete an account
-accountsRouter.delete("/api/accounts/:id", function (request, params) {
+// DELETE /api/accounts/:id — delete an account (requires passphrase confirmation)
+accountsRouter.delete("/api/accounts/:id", async function (request, params) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return new Response(JSON.stringify({ error: "Invalid request", detail: "Request body must be valid JSON" }), { status: 400, headers: { "Content-Type": "application/json" } });
+  }
+
+  const passphrase = body.passphrase;
+  if (!passphrase || typeof passphrase !== "string") {
+    return new Response(JSON.stringify({ error: "Validation failed", detail: "Passphrase is required to delete an account" }), { status: 400, headers: { "Content-Type": "application/json" } });
+  }
+
+  const storedHash = loadHashFromEnv();
+  if (!storedHash) {
+    return new Response(JSON.stringify({ error: "No passphrase configured", detail: "No passphrase has been set" }), { status: 400, headers: { "Content-Type": "application/json" } });
+  }
+
+  const isValid = await verifyPassphrase(passphrase, storedHash);
+  if (!isValid) {
+    return new Response(JSON.stringify({ error: "Incorrect passphrase" }), { status: 401, headers: { "Content-Type": "application/json" } });
+  }
+
   try {
     const deleted = deleteAccount(Number(params.id));
     if (!deleted) {
-      return new Response(
-        JSON.stringify({ error: "Account not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Account not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
     }
     return new Response(JSON.stringify({ message: "Account deleted" }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "Failed to delete account", detail: err.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Failed to delete account", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 

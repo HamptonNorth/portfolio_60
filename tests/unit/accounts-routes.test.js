@@ -119,7 +119,7 @@ describe("Accounts Routes - CRUD", () => {
       body: JSON.stringify({
         account_type: "sipp",
         account_ref: "12345",
-        cash_balance: 23765.50,
+        cash_balance: 23765.5,
         warn_cash: 25000,
       }),
     });
@@ -275,9 +275,33 @@ describe("Accounts Routes - CRUD", () => {
     expect(data.detail).toContain("Cash balance");
   });
 
-  test("DELETE /api/accounts/:id deletes the account", async () => {
+  test("DELETE /api/accounts/:id rejects without passphrase", async () => {
     const response = await fetch(`${BASE_URL}/api/accounts/${createdAccountId}`, {
       method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data.detail).toContain("Passphrase is required");
+  });
+
+  test("DELETE /api/accounts/:id rejects wrong passphrase", async () => {
+    const response = await fetch(`${BASE_URL}/api/accounts/${createdAccountId}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passphrase: "wrongpassword" }),
+    });
+    expect(response.status).toBe(401);
+    const data = await response.json();
+    expect(data.error).toBe("Incorrect passphrase");
+  });
+
+  test("DELETE /api/accounts/:id deletes the account with correct passphrase", async () => {
+    const response = await fetch(`${BASE_URL}/api/accounts/${createdAccountId}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passphrase: "testpass1234" }),
     });
     expect(response.status).toBe(200);
     const data = await response.json();
@@ -287,6 +311,8 @@ describe("Accounts Routes - CRUD", () => {
   test("DELETE /api/accounts/:id returns 404 for non-existent account", async () => {
     const response = await fetch(`${BASE_URL}/api/accounts/9999`, {
       method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passphrase: "testpass1234" }),
     });
     expect(response.status).toBe(404);
   });
