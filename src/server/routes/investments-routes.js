@@ -127,7 +127,7 @@ investmentsRouter.put("/api/investments/:id", async function (request, params) {
   }
 });
 
-// DELETE /api/investments/:id — delete an investment
+// DELETE /api/investments/:id — delete an investment (blocked if held in any account)
 investmentsRouter.delete("/api/investments/:id", function (request, params) {
   try {
     const deleted = deleteInvestment(Number(params.id));
@@ -139,6 +139,9 @@ investmentsRouter.delete("/api/investments/:id", function (request, params) {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
+    if (err.message && err.message.startsWith("Cannot delete:")) {
+      return new Response(JSON.stringify({ error: "Investment in use", detail: err.message }), { status: 409, headers: { "Content-Type": "application/json" } });
+    }
     return new Response(JSON.stringify({ error: "Failed to delete investment", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });

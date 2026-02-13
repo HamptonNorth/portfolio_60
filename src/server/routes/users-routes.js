@@ -1,6 +1,7 @@
 import { Router } from "../router.js";
 import { getAllUsers, getUserById, createUser, updateUser, deleteUser } from "../db/users-db.js";
 import { validateUser } from "../validation.js";
+import { verifyPassphrase, loadHashFromEnv } from "../auth.js";
 
 /**
  * @description Router instance for user API routes.
@@ -17,10 +18,7 @@ usersRouter.get("/api/users", function () {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "Failed to fetch users", detail: err.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Failed to fetch users", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 
@@ -29,20 +27,14 @@ usersRouter.get("/api/users/:id", function (request, params) {
   try {
     const user = getUserById(Number(params.id));
     if (!user) {
-      return new Response(
-        JSON.stringify({ error: "User not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "User not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
     }
     return new Response(JSON.stringify(user), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "Failed to fetch user", detail: err.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Failed to fetch user", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 
@@ -52,18 +44,12 @@ usersRouter.post("/api/users", async function (request) {
   try {
     body = await request.json();
   } catch {
-    return new Response(
-      JSON.stringify({ error: "Invalid request", detail: "Request body must be valid JSON" }),
-      { status: 400, headers: { "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Invalid request", detail: "Request body must be valid JSON" }), { status: 400, headers: { "Content-Type": "application/json" } });
   }
 
   const errors = validateUser(body);
   if (errors.length > 0) {
-    return new Response(
-      JSON.stringify({ error: "Validation failed", detail: errors.join("; ") }),
-      { status: 400, headers: { "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Validation failed", detail: errors.join("; ") }), { status: 400, headers: { "Content-Type": "application/json" } });
   }
 
   try {
@@ -73,10 +59,7 @@ usersRouter.post("/api/users", async function (request) {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "Failed to create user", detail: err.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Failed to create user", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 
@@ -86,59 +69,63 @@ usersRouter.put("/api/users/:id", async function (request, params) {
   try {
     body = await request.json();
   } catch {
-    return new Response(
-      JSON.stringify({ error: "Invalid request", detail: "Request body must be valid JSON" }),
-      { status: 400, headers: { "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Invalid request", detail: "Request body must be valid JSON" }), { status: 400, headers: { "Content-Type": "application/json" } });
   }
 
   const errors = validateUser(body);
   if (errors.length > 0) {
-    return new Response(
-      JSON.stringify({ error: "Validation failed", detail: errors.join("; ") }),
-      { status: 400, headers: { "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Validation failed", detail: errors.join("; ") }), { status: 400, headers: { "Content-Type": "application/json" } });
   }
 
   try {
     const user = updateUser(Number(params.id), body);
     if (!user) {
-      return new Response(
-        JSON.stringify({ error: "User not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "User not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
     }
     return new Response(JSON.stringify(user), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "Failed to update user", detail: err.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Failed to update user", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 
-// DELETE /api/users/:id — delete a user
-usersRouter.delete("/api/users/:id", function (request, params) {
+// DELETE /api/users/:id — delete a user (requires passphrase confirmation)
+usersRouter.delete("/api/users/:id", async function (request, params) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return new Response(JSON.stringify({ error: "Invalid request", detail: "Request body must be valid JSON" }), { status: 400, headers: { "Content-Type": "application/json" } });
+  }
+
+  const passphrase = body.passphrase;
+  if (!passphrase || typeof passphrase !== "string") {
+    return new Response(JSON.stringify({ error: "Validation failed", detail: "Passphrase is required to delete a user" }), { status: 400, headers: { "Content-Type": "application/json" } });
+  }
+
+  const storedHash = loadHashFromEnv();
+  if (!storedHash) {
+    return new Response(JSON.stringify({ error: "No passphrase configured", detail: "No passphrase has been set" }), { status: 400, headers: { "Content-Type": "application/json" } });
+  }
+
+  const isValid = await verifyPassphrase(passphrase, storedHash);
+  if (!isValid) {
+    return new Response(JSON.stringify({ error: "Incorrect passphrase" }), { status: 401, headers: { "Content-Type": "application/json" } });
+  }
+
   try {
     const deleted = deleteUser(Number(params.id));
     if (!deleted) {
-      return new Response(
-        JSON.stringify({ error: "User not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "User not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
     }
     return new Response(JSON.stringify({ message: "User deleted" }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "Failed to delete user", detail: err.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Failed to delete user", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 

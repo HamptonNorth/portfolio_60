@@ -199,9 +199,33 @@ describe("Users Routes - CRUD", () => {
     expect(data.detail).toContain("Provider must be one of");
   });
 
-  test("DELETE /api/users/:id deletes the user", async () => {
+  test("DELETE /api/users/:id rejects without passphrase", async () => {
     const response = await fetch(`${BASE_URL}/api/users/${createdUserId}`, {
       method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data.detail).toContain("Passphrase is required");
+  });
+
+  test("DELETE /api/users/:id rejects wrong passphrase", async () => {
+    const response = await fetch(`${BASE_URL}/api/users/${createdUserId}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passphrase: "wrongpassword" }),
+    });
+    expect(response.status).toBe(401);
+    const data = await response.json();
+    expect(data.error).toBe("Incorrect passphrase");
+  });
+
+  test("DELETE /api/users/:id deletes the user with correct passphrase", async () => {
+    const response = await fetch(`${BASE_URL}/api/users/${createdUserId}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passphrase: "testpass1234" }),
     });
     expect(response.status).toBe(200);
     const data = await response.json();
@@ -211,6 +235,8 @@ describe("Users Routes - CRUD", () => {
   test("DELETE /api/users/:id returns 404 for non-existent user", async () => {
     const response = await fetch(`${BASE_URL}/api/users/9999`, {
       method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passphrase: "testpass1234" }),
     });
     expect(response.status).toBe(404);
   });

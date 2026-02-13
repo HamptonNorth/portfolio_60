@@ -601,13 +601,14 @@ async function executeDelete() {
   });
 
   hideDeleteDialog();
-  hideForm();
 
   if (result.ok) {
+    hideForm();
     await loadInvestments();
     showSuccess("page-messages", "Investment deleted successfully");
   } else {
-    showError("page-messages", "Failed to delete investment", result.detail || result.error);
+    // Show error on the edit form rather than closing it
+    document.getElementById("form-errors").textContent = result.detail || result.error;
   }
 }
 

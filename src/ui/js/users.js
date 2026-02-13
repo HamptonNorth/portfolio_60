@@ -256,7 +256,10 @@ function confirmDeleteUser(id, name) {
   deleteUserId = id;
   deleteUserName = name;
   document.getElementById("delete-user-name").textContent = name;
+  document.getElementById("delete-passphrase").value = "";
+  document.getElementById("delete-passphrase-error").classList.add("hidden");
   document.getElementById("delete-dialog").classList.remove("hidden");
+  document.getElementById("delete-passphrase").focus();
 }
 
 /**
@@ -265,6 +268,8 @@ function confirmDeleteUser(id, name) {
 function hideDeleteDialog() {
   deleteUserId = null;
   document.getElementById("delete-dialog").classList.add("hidden");
+  document.getElementById("delete-passphrase").value = "";
+  document.getElementById("delete-passphrase-error").classList.add("hidden");
 }
 
 /**
@@ -273,9 +278,29 @@ function hideDeleteDialog() {
 async function executeDelete() {
   if (!deleteUserId) return;
 
+  // Require passphrase confirmation
+  const passphrase = document.getElementById("delete-passphrase").value;
+  const passphraseError = document.getElementById("delete-passphrase-error");
+  if (!passphrase) {
+    passphraseError.textContent = "Passphrase is required";
+    passphraseError.classList.remove("hidden");
+    return;
+  }
+  passphraseError.classList.add("hidden");
+
   const result = await apiRequest("/api/users/" + deleteUserId, {
     method: "DELETE",
+    body: JSON.stringify({ passphrase: passphrase }),
   });
+
+  // If passphrase was wrong, show error but keep dialog open
+  if (!result.ok && result.error === "Incorrect passphrase") {
+    passphraseError.textContent = "Incorrect passphrase";
+    passphraseError.classList.remove("hidden");
+    document.getElementById("delete-passphrase").value = "";
+    document.getElementById("delete-passphrase").focus();
+    return;
+  }
 
   hideDeleteDialog();
   hideForm();

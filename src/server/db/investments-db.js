@@ -118,12 +118,40 @@ export function updateInvestmentScrapingSource(id, url, selector) {
 }
 
 /**
- * @description Delete an investment by ID.
+ * @description Check if an investment is held in any account.
+ * @param {number} id - The investment ID to check
+ * @returns {Object|null} Null if not held, or an object with holding count if in use
+ */
+export function getInvestmentUsage(id) {
+  const db = getDatabase();
+  const row = db
+    .query(
+      `SELECT COUNT(*) AS holding_count
+     FROM holdings
+     WHERE investment_id = ?`,
+    )
+    .get(id);
+
+  if (row.holding_count === 0) return null;
+  return { holdingCount: row.holding_count };
+}
+
+/**
+ * @description Delete an investment by ID. Also deletes associated price history.
+ * Throws an error if the investment is currently held in any account.
  * @param {number} id - The investment ID to delete
  * @returns {boolean} True if the investment was deleted, false if not found
+ * @throws {Error} If the investment is referenced by holdings
  */
 export function deleteInvestment(id) {
   const db = getDatabase();
+
+  const usage = getInvestmentUsage(id);
+  if (usage) {
+    const s = usage.holdingCount === 1 ? "" : "s";
+    throw new Error("Cannot delete: this investment is held in " + usage.holdingCount + " account" + s);
+  }
+
   db.run("DELETE FROM prices WHERE investment_id = ?", [id]);
   const result = db.run("DELETE FROM investments WHERE id = ?", [id]);
   return result.changes > 0;
