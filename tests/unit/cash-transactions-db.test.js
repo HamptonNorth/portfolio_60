@@ -325,6 +325,130 @@ describe("getIsaDepositsForTaxYear", () => {
   });
 });
 
+// --- Adjustment (fee) transactions ---
+
+describe("createCashTransaction — adjustments", () => {
+  /** @type {Object} Separate user for adjustment tests */
+  let adjUser;
+  /** @type {Object} Account for adjustment tests */
+  let adjAccount;
+
+  beforeAll(() => {
+    adjUser = createUser({
+      initials: "AJ",
+      first_name: "Adj",
+      last_name: "Tester",
+      provider: "hl",
+    });
+    adjAccount = createAccount({
+      user_id: adjUser.id,
+      account_type: "trading",
+      account_ref: "ADJ-001",
+      cash_balance: 5000,
+      warn_cash: 0,
+    });
+  });
+
+  test("debit adjustment decreases cash balance", () => {
+    const tx = createCashTransaction({
+      account_id: adjAccount.id,
+      transaction_type: "adjustment",
+      transaction_date: "2026-02-10",
+      amount: 150,
+      notes: "Platform fee",
+      direction: "debit",
+    });
+
+    expect(tx).not.toBeNull();
+    expect(tx.transaction_type).toBe("adjustment");
+    expect(tx.amount).toBe(150);
+    expect(tx.notes).toBe("Platform fee");
+
+    // Balance was 5000, now 4850
+    const account = getAccountById(adjAccount.id);
+    expect(account.cash_balance).toBe(4850);
+  });
+
+  test("debit adjustment defaults when direction omitted", () => {
+    const tx = createCashTransaction({
+      account_id: adjAccount.id,
+      transaction_type: "adjustment",
+      transaction_date: "2026-02-11",
+      amount: 50,
+      notes: "Admin charge",
+    });
+
+    expect(tx.transaction_type).toBe("adjustment");
+    expect(tx.amount).toBe(50);
+
+    // Balance was 4850, now 4800 (defaults to debit)
+    const account = getAccountById(adjAccount.id);
+    expect(account.cash_balance).toBe(4800);
+  });
+
+  test("credit adjustment increases cash balance", () => {
+    const tx = createCashTransaction({
+      account_id: adjAccount.id,
+      transaction_type: "adjustment",
+      transaction_date: "2026-02-12",
+      amount: 25,
+      notes: "Provider refund",
+      direction: "credit",
+    });
+
+    expect(tx).not.toBeNull();
+    expect(tx.transaction_type).toBe("adjustment");
+    expect(tx.amount).toBe(25);
+    // Notes should be prefixed with [Credit]
+    expect(tx.notes).toBe("[Credit] Provider refund");
+
+    // Balance was 4800, now 4825
+    const account = getAccountById(adjAccount.id);
+    expect(account.cash_balance).toBe(4825);
+  });
+
+  test("credit adjustment with no user notes stores [Credit] tag", () => {
+    const tx = createCashTransaction({
+      account_id: adjAccount.id,
+      transaction_type: "adjustment",
+      transaction_date: "2026-02-13",
+      amount: 10,
+      direction: "credit",
+    });
+
+    expect(tx.notes).toBe("[Credit]");
+
+    // Balance was 4825, now 4835
+    const account = getAccountById(adjAccount.id);
+    expect(account.cash_balance).toBe(4835);
+  });
+
+  test("delete credit adjustment reverses the balance increase", () => {
+    // Find the last credit adjustment (the one with notes "[Credit]")
+    const txList = getCashTransactionsByAccountId(adjAccount.id);
+    const creditTx = txList.find((t) => t.notes === "[Credit]");
+
+    const result = deleteCashTransaction(creditTx.id);
+    expect(result).toBe(true);
+
+    // Balance was 4835, removing a +10 credit reverses to 4825
+    const account = getAccountById(adjAccount.id);
+    expect(account.cash_balance).toBe(4825);
+  });
+
+  test("delete debit adjustment reverses the balance decrease", () => {
+    const txList = getCashTransactionsByAccountId(adjAccount.id);
+    const debitTx = txList.find((t) => t.notes === "Admin charge");
+
+    const result = deleteCashTransaction(debitTx.id);
+    expect(result).toBe(true);
+
+    // Balance was 4825, removing a -50 debit reverses to 4875
+    const account = getAccountById(adjAccount.id);
+    expect(account.cash_balance).toBe(4875);
+  });
+});
+
 // --- Drawdown exists check ---
 
 describe("drawdownExistsForDate", () => {

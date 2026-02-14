@@ -201,6 +201,75 @@ export function createSellMovement(data) {
 }
 
 /**
+ * @description Create a stock split adjustment and atomically update the holding.
+ *
+ * A stock split changes the quantity and average cost of a holding such that
+ * the total book cost remains constant. For example, a 1:100 forward split
+ * multiplies quantity by 100 and divides avg cost by 100. Reverse splits
+ * (consolidations) are also supported.
+ *
+ * No cash is involved — the account cash balance is not changed.
+ *
+ * @param {Object} data - The split movement data
+ * @param {number} data.holding_id - FK to holdings table
+ * @param {string} data.movement_date - ISO-8601 date (YYYY-MM-DD)
+ * @param {number} data.new_quantity - New quantity after split (decimal, unscaled)
+ * @param {string} [data.notes] - Optional notes (max 255 chars), e.g. "Stock split 1:100"
+ * @returns {Object} The created movement record with unscaled values
+ * @throws {Error} If holding not found, new_quantity is invalid, or unchanged
+ */
+export function createSplitMovement(data) {
+  const db = getDatabase();
+
+  if (!data.new_quantity || data.new_quantity <= 0) {
+    throw new Error("New quantity must be greater than zero");
+  }
+
+  db.exec("BEGIN");
+  try {
+    // Read the current holding (scaled values direct from DB)
+    const holding = db.query("SELECT id, account_id, quantity, average_cost FROM holdings WHERE id = ?").get(data.holding_id);
+
+    if (!holding) {
+      throw new Error("Holding not found");
+    }
+
+    // Work in unscaled decimals to avoid overflow
+    const oldQuantity = unscaleValue(holding.quantity);
+    const oldAvgCost = unscaleValue(holding.average_cost);
+    const bookCost = oldQuantity * oldAvgCost;
+
+    if (data.new_quantity === oldQuantity) {
+      throw new Error("New quantity is the same as the current quantity");
+    }
+
+    // New average cost is the inverse: preserve book cost
+    const newAvgCost = bookCost / data.new_quantity;
+
+    const scaledNewQuantity = scaleValue(data.new_quantity);
+    const scaledNewAvgCost = scaleValue(newAvgCost);
+    const scaledBookCost = scaleValue(bookCost);
+
+    // Insert the adjustment movement record
+    const result = db.run(
+      `INSERT INTO holding_movements (holding_id, movement_type, movement_date, quantity, movement_value, book_cost, deductible_costs, revised_avg_cost, notes)
+       VALUES (?, 'adjustment', ?, ?, 0, ?, 0, ?, ?)`,
+      [data.holding_id, data.movement_date, scaledNewQuantity, scaledBookCost, scaledNewAvgCost, data.notes || null],
+    );
+
+    // Update the holding quantity and average cost
+    db.run("UPDATE holdings SET quantity = ?, average_cost = ? WHERE id = ?", [scaledNewQuantity, scaledNewAvgCost, data.holding_id]);
+
+    db.exec("COMMIT");
+
+    return getMovementById(result.lastInsertRowid);
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
+}
+
+/**
  * @description Get a single holding movement by ID with unscaled values.
  * @param {number} id - The movement ID
  * @returns {Object|null} The movement object, or null if not found

@@ -67,13 +67,25 @@ cashTxRouter.post("/api/accounts/:accountId/cash-transactions", async function (
     return new Response(JSON.stringify({ error: "Validation failed", detail: errors.join("; ") }), { status: 400, headers: { "Content-Type": "application/json" } });
   }
 
-  // Hard check: withdrawals must not exceed available cash balance
+  // Hard check: withdrawals and adjustment debits must not exceed available cash balance
   const amount = Number(body.amount);
   if (body.transaction_type === "withdrawal" && amount > account.cash_balance) {
     return new Response(
       JSON.stringify({
         error: "Insufficient cash",
         detail: `Withdrawal of £${amount.toFixed(2)} exceeds available balance of £${account.cash_balance.toFixed(2)}`,
+      }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  // For adjustment debits, also check balance
+  const adjustmentDirection = body.transaction_type === "adjustment" ? body.direction || "debit" : null;
+  if (body.transaction_type === "adjustment" && adjustmentDirection === "debit" && amount > account.cash_balance) {
+    return new Response(
+      JSON.stringify({
+        error: "Insufficient cash",
+        detail: `Adjustment of £${amount.toFixed(2)} exceeds available balance of £${account.cash_balance.toFixed(2)}`,
       }),
       { status: 400, headers: { "Content-Type": "application/json" } },
     );
@@ -86,6 +98,7 @@ cashTxRouter.post("/api/accounts/:accountId/cash-transactions", async function (
       transaction_date: body.transaction_date,
       amount: amount,
       notes: body.notes || null,
+      direction: adjustmentDirection,
     });
     return new Response(JSON.stringify(tx), {
       status: 201,

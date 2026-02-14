@@ -41,15 +41,23 @@ export function createCashTransaction(data) {
 
   // Determine the balance change direction based on transaction type
   // Deposits add to balance; withdrawals, drawdowns and adjustments subtract
-  const isDeposit = data.transaction_type === "deposit";
-  const balanceChange = isDeposit ? scaledAmount : -scaledAmount;
+  // Exception: adjustment with direction='credit' adds to balance (rare provider refunds)
+  const addsToBalance = data.transaction_type === "deposit" || (data.transaction_type === "adjustment" && data.direction === "credit");
+  const balanceChange = addsToBalance ? scaledAmount : -scaledAmount;
+
+  // For credit adjustments, prefix notes with [Credit] so that running-balance
+  // calculations and display logic can detect the direction without a schema change
+  let storedNotes = data.notes || null;
+  if (data.transaction_type === "adjustment" && data.direction === "credit") {
+    storedNotes = storedNotes ? "[Credit] " + storedNotes : "[Credit]";
+  }
 
   db.exec("BEGIN");
   try {
     const result = db.run(
       `INSERT INTO cash_transactions (account_id, transaction_type, transaction_date, amount, notes)
        VALUES (?, ?, ?, ?, ?)`,
-      [data.account_id, data.transaction_type, data.transaction_date, scaledAmount, data.notes || null],
+      [data.account_id, data.transaction_type, data.transaction_date, scaledAmount, storedNotes],
     );
 
     db.run(`UPDATE accounts SET cash_balance = cash_balance + ? WHERE id = ?`, [balanceChange, data.account_id]);
@@ -116,13 +124,14 @@ export function deleteCashTransaction(id) {
   const db = getDatabase();
 
   // Load the transaction first to determine the balance reversal
-  const row = db.query("SELECT id, account_id, transaction_type, amount FROM cash_transactions WHERE id = ?").get(id);
+  const row = db.query("SELECT id, account_id, transaction_type, amount, notes FROM cash_transactions WHERE id = ?").get(id);
 
   if (!row) return false;
 
   // Reverse the original balance change
-  // Deposits and sells add to balance; withdrawals, drawdowns, adjustments and buys subtract
-  const addsToBalance = row.transaction_type === "deposit" || row.transaction_type === "sell";
+  // Deposits, sells, and credit adjustments add to balance; everything else subtracts
+  const isCreditAdjustment = row.transaction_type === "adjustment" && row.notes && row.notes.startsWith("[Credit]");
+  const addsToBalance = row.transaction_type === "deposit" || row.transaction_type === "sell" || isCreditAdjustment;
   const balanceReversal = addsToBalance ? -row.amount : row.amount;
 
   db.exec("BEGIN");

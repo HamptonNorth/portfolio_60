@@ -1,10 +1,5 @@
 import { Router } from "../router.js";
-import {
-  createBuyMovement,
-  createSellMovement,
-  getMovementById,
-  getMovementsByHoldingId,
-} from "../db/holding-movements-db.js";
+import { createBuyMovement, createSellMovement, createSplitMovement, getMovementById, getMovementsByHoldingId } from "../db/holding-movements-db.js";
 import { getHoldingById } from "../db/holdings-db.js";
 import { getAccountById } from "../db/accounts-db.js";
 import { validateHoldingMovement } from "../validation.js";
@@ -21,10 +16,7 @@ movementsRouter.get("/api/holdings/:holdingId/movements", function (request, par
     const holdingId = Number(params.holdingId);
     const holding = getHoldingById(holdingId);
     if (!holding) {
-      return new Response(
-        JSON.stringify({ error: "Holding not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Holding not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
     }
 
     const url = new URL(request.url);
@@ -35,10 +27,7 @@ movementsRouter.get("/api/holdings/:holdingId/movements", function (request, par
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "Failed to fetch movements", detail: err.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Failed to fetch movements", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 
@@ -47,20 +36,14 @@ movementsRouter.get("/api/holding-movements/:id", function (request, params) {
   try {
     const movement = getMovementById(Number(params.id));
     if (!movement) {
-      return new Response(
-        JSON.stringify({ error: "Movement not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Movement not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
     }
     return new Response(JSON.stringify(movement), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "Failed to fetch movement", detail: err.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Failed to fetch movement", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 
@@ -70,27 +53,47 @@ movementsRouter.post("/api/holdings/:holdingId/movements", async function (reque
   try {
     body = await request.json();
   } catch {
-    return new Response(
-      JSON.stringify({ error: "Invalid request", detail: "Request body must be valid JSON" }),
-      { status: 400, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Invalid request", detail: "Request body must be valid JSON" }), { status: 400, headers: { "Content-Type": "application/json" } });
   }
 
   const holdingId = Number(params.holdingId);
   const holding = getHoldingById(holdingId);
   if (!holding) {
-    return new Response(
-      JSON.stringify({ error: "Holding not found" }),
-      { status: 404, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Holding not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
   }
 
   const errors = validateHoldingMovement(body);
   if (errors.length > 0) {
-    return new Response(
-      JSON.stringify({ error: "Validation failed", detail: errors.join("; ") }),
-      { status: 400, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Validation failed", detail: errors.join("; ") }), { status: 400, headers: { "Content-Type": "application/json" } });
+  }
+
+  // Adjustment (stock split) has different fields from buy/sell
+  if (body.movement_type === "adjustment") {
+    try {
+      const movement = createSplitMovement({
+        holding_id: holdingId,
+        movement_date: body.movement_date,
+        new_quantity: Number(body.new_quantity),
+        notes: body.notes || null,
+      });
+
+      const updatedHolding = getHoldingById(holdingId);
+      const updatedAccount = getAccountById(updatedHolding.account_id);
+
+      return new Response(
+        JSON.stringify({
+          movement: movement,
+          holding: updatedHolding,
+          account: updatedAccount,
+        }),
+        { status: 201, headers: { "Content-Type": "application/json" } },
+      );
+    } catch (err) {
+      if (err.message === "New quantity must be greater than zero" || err.message === "New quantity is the same as the current quantity") {
+        return new Response(JSON.stringify({ error: err.message }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+      return new Response(JSON.stringify({ error: "Failed to create adjustment", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+    }
   }
 
   const quantity = Number(body.quantity);
@@ -102,10 +105,7 @@ movementsRouter.post("/api/holdings/:holdingId/movements", async function (reque
     // Buy: total consideration must not exceed available cash balance
     const account = getAccountById(holding.account_id);
     if (!account) {
-      return new Response(
-        JSON.stringify({ error: "Account not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Account not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
     }
     if (totalConsideration > account.cash_balance) {
       return new Response(
@@ -161,15 +161,9 @@ movementsRouter.post("/api/holdings/:holdingId/movements", async function (reque
   } catch (err) {
     // Map known business errors to 400
     if (err.message === "Insufficient cash balance" || err.message === "Insufficient holding quantity") {
-      return new Response(
-        JSON.stringify({ error: err.message }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: err.message }), { status: 400, headers: { "Content-Type": "application/json" } });
     }
-    return new Response(
-      JSON.stringify({ error: "Failed to create movement", detail: err.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Failed to create movement", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 

@@ -854,6 +854,17 @@ function formatPrice(value) {
 /** @type {Array<Object>} Filtered investments available for the current add/edit */
 let availableInvestments = [];
 
+// ─── Stock Split state ───────────────────────────────────────────────
+
+/** @type {number|null} Original quantity before a stock split edit */
+let splitOriginalQuantity = null;
+
+/** @type {number|null} Original book cost before a stock split edit (for inverse calc) */
+let splitBookCost = null;
+
+/** @type {Function|null} Reference to the live recalculation listener on quantity, for removal */
+let splitQuantityListener = null;
+
 /**
  * Tracks which cost field the user last manually edited: "avg" or "book".
  * Used to determine which field to auto-calculate from the other.
@@ -893,6 +904,99 @@ function recalculateCosts(sourceField) {
 }
 
 /**
+ * @description Handle the stock split checkbox being toggled on or off.
+ * When checked: disables avg cost and book cost fields, shows split date/notes,
+ * and attaches a live recalculation listener on the quantity field.
+ * When unchecked: restores fields and removes the listener.
+ */
+function onSplitCheckChanged() {
+  const isChecked = document.getElementById("holding-split-check").checked;
+  const avgCostInput = document.getElementById("holding-avg-cost");
+  const bookCostInput = document.getElementById("holding-book-cost");
+  const splitDetails = document.getElementById("holding-split-details");
+  const quantityInput = document.getElementById("holding-quantity");
+
+  if (isChecked) {
+    // Store original values
+    splitOriginalQuantity = Number(quantityInput.value) || 0;
+    const avgCost = Number(avgCostInput.value) || 0;
+    splitBookCost = splitOriginalQuantity * avgCost;
+
+    // Disable cost fields
+    avgCostInput.disabled = true;
+    avgCostInput.classList.add("bg-brand-100", "text-brand-400");
+    bookCostInput.disabled = true;
+    bookCostInput.classList.add("bg-brand-100", "text-brand-400");
+
+    // Show split date/notes and pre-fill date
+    splitDetails.classList.remove("hidden");
+    document.getElementById("holding-split-date").value = getTodayISO();
+
+    // Attach live recalculation on quantity change
+    splitQuantityListener = function () {
+      const newQty = Number(quantityInput.value) || 0;
+      if (newQty > 0 && splitBookCost > 0) {
+        const newAvgCost = splitBookCost / newQty;
+        avgCostInput.value = newAvgCost.toFixed(6);
+        bookCostInput.value = splitBookCost.toFixed(2);
+      }
+    };
+    quantityInput.addEventListener("input", splitQuantityListener);
+  } else {
+    // Re-enable cost fields
+    avgCostInput.disabled = false;
+    avgCostInput.classList.remove("bg-brand-100", "text-brand-400");
+    bookCostInput.disabled = false;
+    bookCostInput.classList.remove("bg-brand-100", "text-brand-400");
+
+    // Hide split date/notes
+    splitDetails.classList.add("hidden");
+
+    // Remove live recalculation listener
+    if (splitQuantityListener) {
+      quantityInput.removeEventListener("input", splitQuantityListener);
+      splitQuantityListener = null;
+    }
+
+    // Restore original values if quantity was changed
+    if (splitOriginalQuantity !== null) {
+      quantityInput.value = splitOriginalQuantity;
+      if (splitOriginalQuantity > 0 && splitBookCost > 0) {
+        avgCostInput.value = (splitBookCost / splitOriginalQuantity).toFixed(6);
+        bookCostInput.value = splitBookCost.toFixed(2);
+      }
+    }
+
+    splitOriginalQuantity = null;
+    splitBookCost = null;
+  }
+}
+
+/**
+ * @description Reset the stock split UI state. Called when opening the holding form.
+ */
+function resetSplitState() {
+  splitOriginalQuantity = null;
+  splitBookCost = null;
+  if (splitQuantityListener) {
+    document.getElementById("holding-quantity").removeEventListener("input", splitQuantityListener);
+    splitQuantityListener = null;
+  }
+  document.getElementById("holding-split-check").checked = false;
+  document.getElementById("holding-split-details").classList.add("hidden");
+  document.getElementById("holding-split-date").value = "";
+  document.getElementById("holding-split-notes").value = "";
+
+  // Ensure cost fields are enabled
+  const avgCostInput = document.getElementById("holding-avg-cost");
+  const bookCostInput = document.getElementById("holding-book-cost");
+  avgCostInput.disabled = false;
+  avgCostInput.classList.remove("bg-brand-100", "text-brand-400");
+  bookCostInput.disabled = false;
+  bookCostInput.classList.remove("bg-brand-100", "text-brand-400");
+}
+
+/**
  * @description Load all investments and show the add holding form.
  * Only shows investments not already held in this account.
  */
@@ -903,6 +1007,8 @@ async function showAddHoldingForm() {
   document.getElementById("holding-book-cost").value = "";
   document.getElementById("holding-form-errors").textContent = "";
   document.getElementById("holding-delete-btn").classList.add("hidden");
+  document.getElementById("holding-split-section").classList.add("hidden");
+  resetSplitState();
   lastCostFieldEdited = null;
 
   // Clear and enable the search input
@@ -1037,6 +1143,10 @@ async function editHolding(id) {
 
   document.getElementById("holding-form-errors").textContent = "";
 
+  // Show stock split section and reset its state for editing
+  resetSplitState();
+  document.getElementById("holding-split-section").classList.remove("hidden");
+
   const deleteBtn = document.getElementById("holding-delete-btn");
   deleteBtn.classList.remove("hidden");
   deleteBtn.onclick = function () {
@@ -1068,6 +1178,47 @@ async function handleHoldingSubmit(event) {
 
   const holdingId = document.getElementById("holding-id").value;
   const isEditing = holdingId !== "";
+  const isSplit = document.getElementById("holding-split-check").checked;
+
+  // Stock split path: POST an adjustment movement instead of PUT holding
+  if (isEditing && isSplit) {
+    const newQuantity = Number(document.getElementById("holding-quantity").value) || 0;
+    const splitDate = document.getElementById("holding-split-date").value;
+    const splitNotes = document.getElementById("holding-split-notes").value.trim();
+
+    if (!splitDate) {
+      errorsDiv.textContent = "Split date is required";
+      return;
+    }
+    if (newQuantity <= 0) {
+      errorsDiv.textContent = "Quantity must be greater than zero";
+      return;
+    }
+    if (newQuantity === splitOriginalQuantity) {
+      errorsDiv.textContent = "Quantity has not changed — enter the new post-split quantity";
+      return;
+    }
+
+    // Find the holding_id from the current holdings (the form holds the holding record ID)
+    const result = await apiRequest("/api/holdings/" + holdingId + "/movements", {
+      method: "POST",
+      body: {
+        movement_type: "adjustment",
+        movement_date: splitDate,
+        new_quantity: newQuantity,
+        notes: splitNotes || null,
+      },
+    });
+
+    if (result.ok) {
+      hideHoldingForm();
+      await loadHoldings();
+      showSuccess("holdings-messages", "Stock split recorded successfully");
+    } else {
+      errorsDiv.textContent = result.detail || result.error;
+    }
+    return;
+  }
 
   const investmentValue = document.getElementById("holding-investment").value;
   if (!isEditing && !investmentValue) {
@@ -1332,7 +1483,8 @@ async function loadCashTransactions(limit) {
       runningBalances[i] = balance;
       // Reverse this transaction's effect to get the balance before it
       const txType = displayTx[i].transaction_type;
-      if (txType === "deposit" || txType === "sell") {
+      const isCreditAdjustment = txType === "adjustment" && displayTx[i].notes && displayTx[i].notes.startsWith("[Credit]");
+      if (txType === "deposit" || txType === "sell" || isCreditAdjustment) {
         balance -= displayTx[i].amount;
       } else {
         balance += displayTx[i].amount;
@@ -1367,13 +1519,25 @@ async function loadCashTransactions(limit) {
   for (let i = 0; i < displayTx.length; i++) {
     const tx = displayTx[i];
     const rowClass = i % 2 === 0 ? "bg-white" : "bg-brand-50";
-    const typeLabel = tx.transaction_type.charAt(0).toUpperCase() + tx.transaction_type.slice(1);
-    const typeClass = tx.transaction_type === "deposit" || tx.transaction_type === "sell" ? "text-green-700" : tx.transaction_type === "withdrawal" || tx.transaction_type === "buy" ? "text-amber-700" : "text-brand-600";
+    const isCreditAdj = tx.transaction_type === "adjustment" && tx.notes && tx.notes.startsWith("[Credit]");
+    let typeLabel;
+    if (tx.transaction_type === "adjustment") {
+      typeLabel = isCreditAdj ? "Adjustment (credit)" : "Adjustment (debit)";
+    } else {
+      typeLabel = tx.transaction_type.charAt(0).toUpperCase() + tx.transaction_type.slice(1);
+    }
+    const typeClass = tx.transaction_type === "deposit" || tx.transaction_type === "sell" || isCreditAdj ? "text-green-700" : tx.transaction_type === "withdrawal" || tx.transaction_type === "buy" ? "text-amber-700" : tx.transaction_type === "adjustment" ? "text-red-700" : "text-brand-600";
     const hasMoveData = tx.quantity !== undefined && tx.quantity !== null;
 
     // Total column: for buy/sell show total_consideration from movement; for deposits/withdrawals show the amount
     const totalValue = hasMoveData ? tx.total_consideration : tx.amount;
-    const notesText = tx.notes || "";
+    // Strip internal [Credit] prefix from displayed notes
+    let notesText = tx.notes || "";
+    if (notesText.startsWith("[Credit] ")) {
+      notesText = notesText.substring(9);
+    } else if (notesText === "[Credit]") {
+      notesText = "";
+    }
     const truncatedNotes = notesText.length > 40 ? notesText.substring(0, 40) + "..." : notesText;
 
     html += '<tr class="' + rowClass + ' border-b border-brand-100">';
@@ -1429,11 +1593,42 @@ function showDepositForm() {
   document.getElementById("cash-tx-date").value = getTodayISO();
   document.getElementById("cash-tx-form-errors").textContent = "";
   document.getElementById("cash-tx-available").classList.add("hidden");
+  document.getElementById("cash-tx-direction-row").classList.add("hidden");
 
   // Green submit button for deposit
   const submitBtn = document.getElementById("cash-tx-submit-btn");
   submitBtn.className = "bg-green-600 hover:bg-green-700 text-white font-medium px-5 py-2 rounded-lg transition-colors";
   submitBtn.textContent = "Deposit";
+
+  document.getElementById("cash-tx-form-container").classList.remove("hidden");
+  setTimeout(function () {
+    document.getElementById("cash-tx-amount").focus();
+  }, 50);
+}
+
+/**
+ * @description Show the fees/adjustment form modal. Shows available balance and direction toggle.
+ */
+function showFeesForm() {
+  document.getElementById("cash-tx-form-title").textContent = "Fees / Adjustment";
+  document.getElementById("cash-tx-type").value = "adjustment";
+  document.getElementById("cash-tx-form").reset();
+  document.getElementById("cash-tx-date").value = getTodayISO();
+  document.getElementById("cash-tx-form-errors").textContent = "";
+
+  // Show available balance
+  const availableDiv = document.getElementById("cash-tx-available");
+  availableDiv.classList.remove("hidden");
+  document.getElementById("cash-tx-available-amount").textContent = formatGBP(selectedAccount.cash_balance);
+
+  // Show direction toggle (default: debit)
+  document.getElementById("cash-tx-direction-row").classList.remove("hidden");
+  document.getElementById("cash-tx-direction").value = "debit";
+
+  // Red submit button for fees
+  const submitBtn = document.getElementById("cash-tx-submit-btn");
+  submitBtn.className = "bg-red-600 hover:bg-red-700 text-white font-medium px-5 py-2 rounded-lg transition-colors";
+  submitBtn.textContent = "Record Fees";
 
   document.getElementById("cash-tx-form-container").classList.remove("hidden");
   setTimeout(function () {
@@ -1450,6 +1645,7 @@ function showWithdrawForm() {
   document.getElementById("cash-tx-form").reset();
   document.getElementById("cash-tx-date").value = getTodayISO();
   document.getElementById("cash-tx-form-errors").textContent = "";
+  document.getElementById("cash-tx-direction-row").classList.add("hidden");
 
   // Show available balance
   const availableDiv = document.getElementById("cash-tx-available");
@@ -1489,9 +1685,15 @@ async function handleCashTxSubmit(event) {
   const transactionDate = document.getElementById("cash-tx-date").value;
   const notes = document.getElementById("cash-tx-notes").value.trim();
 
-  // Client-side withdrawal check
+  // Client-side balance check for withdrawals and adjustment debits
   if (transactionType === "withdrawal" && amount > selectedAccount.cash_balance) {
     errorsDiv.textContent = "Withdrawal amount exceeds available balance of " + formatGBP(selectedAccount.cash_balance);
+    return;
+  }
+
+  const direction = document.getElementById("cash-tx-direction").value;
+  if (transactionType === "adjustment" && direction === "debit" && amount > selectedAccount.cash_balance) {
+    errorsDiv.textContent = "Adjustment amount exceeds available balance of " + formatGBP(selectedAccount.cash_balance);
     return;
   }
 
@@ -1501,6 +1703,11 @@ async function handleCashTxSubmit(event) {
     amount: amount,
     notes: notes || null,
   };
+
+  // For adjustments, include the direction so the backend knows whether to add or subtract
+  if (transactionType === "adjustment") {
+    data.direction = direction;
+  }
 
   const result = await apiRequest("/api/accounts/" + selectedAccount.id + "/cash-transactions", {
     method: "POST",
@@ -1515,7 +1722,15 @@ async function handleCashTxSubmit(event) {
       await loadCashTransactions();
     }
     const msgContainer = cashViewContext === "detail" ? "detail-header" : "holdings-messages";
-    showSuccess(msgContainer, transactionType === "deposit" ? "Deposit recorded successfully" : "Withdrawal recorded successfully");
+    let successMsg;
+    if (transactionType === "deposit") {
+      successMsg = "Deposit recorded successfully";
+    } else if (transactionType === "withdrawal") {
+      successMsg = "Withdrawal recorded successfully";
+    } else {
+      successMsg = "Adjustment recorded successfully";
+    }
+    showSuccess(msgContainer, successMsg);
   } else {
     errorsDiv.textContent = result.detail || result.error;
   }
@@ -1981,6 +2196,9 @@ document.addEventListener("DOMContentLoaded", async function () {
   document.getElementById("holding-cancel-btn").addEventListener("click", hideHoldingForm);
   document.getElementById("holding-form").addEventListener("submit", handleHoldingSubmit);
 
+  // Stock split checkbox
+  document.getElementById("holding-split-check").addEventListener("change", onSplitCheckChanged);
+
   // Cost auto-calculation — recalculate when quantity, avg cost, or book cost changes
   document.getElementById("holding-quantity").addEventListener("input", function () {
     recalculateCosts("quantity");
@@ -2026,6 +2244,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   // Cash movements — holdings view
   document.getElementById("deposit-btn").addEventListener("click", showDepositForm);
   document.getElementById("withdraw-btn").addEventListener("click", showWithdrawForm);
+  document.getElementById("fees-btn").addEventListener("click", showFeesForm);
   document.getElementById("cash-tx-toggle").addEventListener("click", toggleCashTransactions);
   document.getElementById("cash-tx-more-btn").addEventListener("click", function () {
     cashTxLimit += 20;
@@ -2035,6 +2254,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   // Cash movements — detail view
   document.getElementById("detail-deposit-btn").addEventListener("click", showDepositForm);
   document.getElementById("detail-withdraw-btn").addEventListener("click", showWithdrawForm);
+  document.getElementById("detail-fees-btn").addEventListener("click", showFeesForm);
   document.getElementById("detail-cash-tx-toggle").addEventListener("click", toggleCashTransactions);
   document.getElementById("detail-cash-tx-more-btn").addEventListener("click", function () {
     cashTxLimit += 20;

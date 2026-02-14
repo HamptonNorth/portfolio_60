@@ -400,6 +400,132 @@ describe("Cash Transactions Routes", () => {
     expect(response.status).toBe(404);
   });
 
+  // --- Adjustment (fee) transactions ---
+
+  test("POST adjustment (debit) decreases cash balance", async () => {
+    const response = await fetch(`${BASE_URL}/api/accounts/${sippAccountId}/cash-transactions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        transaction_type: "adjustment",
+        transaction_date: "2026-02-10",
+        amount: 75,
+        notes: "Platform fee",
+        direction: "debit",
+      }),
+    });
+    expect(response.status).toBe(201);
+    const tx = await response.json();
+    expect(tx.transaction_type).toBe("adjustment");
+    expect(tx.amount).toBe(75);
+    expect(tx.notes).toBe("Platform fee");
+
+    // Verify cash balance decreased: 11500 - 75 = 11425
+    const accountRes = await fetch(`${BASE_URL}/api/accounts/${sippAccountId}`);
+    const account = await accountRes.json();
+    expect(account.cash_balance).toBe(11425);
+  });
+
+  test("POST adjustment (credit) increases cash balance", async () => {
+    const response = await fetch(`${BASE_URL}/api/accounts/${sippAccountId}/cash-transactions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        transaction_type: "adjustment",
+        transaction_date: "2026-02-11",
+        amount: 20,
+        notes: "Provider refund",
+        direction: "credit",
+      }),
+    });
+    expect(response.status).toBe(201);
+    const tx = await response.json();
+    expect(tx.transaction_type).toBe("adjustment");
+    expect(tx.amount).toBe(20);
+    expect(tx.notes).toBe("[Credit] Provider refund");
+
+    // Verify cash balance increased: 11425 + 20 = 11445
+    const accountRes = await fetch(`${BASE_URL}/api/accounts/${sippAccountId}`);
+    const account = await accountRes.json();
+    expect(account.cash_balance).toBe(11445);
+  });
+
+  test("POST adjustment debit exceeding balance returns 400", async () => {
+    const response = await fetch(`${BASE_URL}/api/accounts/${sippAccountId}/cash-transactions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        transaction_type: "adjustment",
+        transaction_date: "2026-02-12",
+        amount: 999999,
+        direction: "debit",
+      }),
+    });
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data.error).toBe("Insufficient cash");
+    expect(data.detail).toContain("exceeds available balance");
+  });
+
+  test("POST adjustment credit does NOT check balance", async () => {
+    // Credit adjustments should always succeed regardless of balance
+    const response = await fetch(`${BASE_URL}/api/accounts/${sippAccountId}/cash-transactions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        transaction_type: "adjustment",
+        transaction_date: "2026-02-12",
+        amount: 5,
+        direction: "credit",
+      }),
+    });
+    expect(response.status).toBe(201);
+    const tx = await response.json();
+    expect(tx.transaction_type).toBe("adjustment");
+  });
+
+  test("POST adjustment with invalid direction returns 400", async () => {
+    const response = await fetch(`${BASE_URL}/api/accounts/${sippAccountId}/cash-transactions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        transaction_type: "adjustment",
+        transaction_date: "2026-02-12",
+        amount: 10,
+        direction: "sideways",
+      }),
+    });
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data.detail).toContain("Direction");
+  });
+
+  test("POST adjustment defaults to debit when direction omitted", async () => {
+    // Get current balance first
+    const beforeRes = await fetch(`${BASE_URL}/api/accounts/${sippAccountId}`);
+    const beforeAccount = await beforeRes.json();
+    const balanceBefore = beforeAccount.cash_balance;
+
+    const response = await fetch(`${BASE_URL}/api/accounts/${sippAccountId}/cash-transactions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        transaction_type: "adjustment",
+        transaction_date: "2026-02-13",
+        amount: 30,
+        notes: "Misc fee",
+      }),
+    });
+    expect(response.status).toBe(201);
+    const tx = await response.json();
+    expect(tx.notes).toBe("Misc fee"); // No [Credit] prefix
+
+    // Balance should decrease by 30
+    const afterRes = await fetch(`${BASE_URL}/api/accounts/${sippAccountId}`);
+    const afterAccount = await afterRes.json();
+    expect(afterAccount.cash_balance).toBe(balanceBefore - 30);
+  });
+
   // --- System-created transaction delete protection ---
 
   test("DELETE returns 400 for buy-type cash transaction", async () => {

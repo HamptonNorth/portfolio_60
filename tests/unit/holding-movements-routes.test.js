@@ -293,7 +293,7 @@ describe("Holding Movements Routes", () => {
     });
     expect(response.status).toBe(400);
     const data = await response.json();
-    expect(data.detail).toContain("Movement type must be either 'buy' or 'sell'");
+    expect(data.detail).toContain("Movement type must be 'buy', 'sell', or 'adjustment'");
   });
 
   test("POST buy movement: holding not found returns 404", async () => {
@@ -400,5 +400,115 @@ describe("Holding Movements Routes", () => {
     expect(response.status).toBe(200);
     const movements = await response.json();
     expect(movements).toEqual([]);
+  });
+
+  // --- Adjustment (stock split) movements ---
+
+  test("POST adjustment (split): success — forward split", async () => {
+    // First set up a holding with known quantity for split testing
+    // holdingId currently has 120 shares at ~5.27 avg cost
+    const preResponse = await fetch(`${BASE_URL}/api/holdings/${holdingId}`);
+    const preHolding = await preResponse.json();
+    const preBookCost = preHolding.quantity * preHolding.average_cost;
+
+    const response = await fetch(`${BASE_URL}/api/holdings/${holdingId}/movements`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        movement_type: "adjustment",
+        movement_date: "2026-02-12",
+        new_quantity: 1200,
+        notes: "Stock split 1:10",
+      }),
+    });
+    expect(response.status).toBe(201);
+    const data = await response.json();
+
+    // Movement record
+    expect(data.movement.movement_type).toBe("adjustment");
+    expect(data.movement.quantity).toBe(1200);
+    expect(data.movement.movement_value).toBe(0);
+    expect(data.movement.notes).toBe("Stock split 1:10");
+
+    // Holding updated: quantity changed, book cost preserved
+    expect(data.holding.quantity).toBe(1200);
+    const postBookCost = data.holding.quantity * data.holding.average_cost;
+    expect(postBookCost).toBeCloseTo(preBookCost, 0);
+
+    // Cash balance unchanged
+    expect(data.account.cash_balance).toBeCloseTo(49894.5, 1);
+  });
+
+  test("POST adjustment (split): missing new_quantity returns 400", async () => {
+    const response = await fetch(`${BASE_URL}/api/holdings/${holdingId}/movements`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        movement_type: "adjustment",
+        movement_date: "2026-02-12",
+      }),
+    });
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data.detail).toContain("New quantity is required");
+  });
+
+  test("POST adjustment (split): missing date returns 400", async () => {
+    const response = await fetch(`${BASE_URL}/api/holdings/${holdingId}/movements`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        movement_type: "adjustment",
+        new_quantity: 500,
+      }),
+    });
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data.detail).toContain("Date is required");
+  });
+
+  test("POST adjustment (split): zero new_quantity returns 400", async () => {
+    const response = await fetch(`${BASE_URL}/api/holdings/${holdingId}/movements`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        movement_type: "adjustment",
+        movement_date: "2026-02-12",
+        new_quantity: 0,
+      }),
+    });
+    expect(response.status).toBe(400);
+  });
+
+  test("POST adjustment (split): same quantity returns 400", async () => {
+    // Get current quantity
+    const holdingResponse = await fetch(`${BASE_URL}/api/holdings/${holdingId}`);
+    const holding = await holdingResponse.json();
+
+    const response = await fetch(`${BASE_URL}/api/holdings/${holdingId}/movements`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        movement_type: "adjustment",
+        movement_date: "2026-02-12",
+        new_quantity: holding.quantity,
+      }),
+    });
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data.error).toContain("same as the current quantity");
+  });
+
+  test("POST adjustment (split): holding not found returns 404", async () => {
+    const response = await fetch(`${BASE_URL}/api/holdings/99999/movements`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        movement_type: "adjustment",
+        movement_date: "2026-02-12",
+        new_quantity: 500,
+      }),
+    });
+    expect(response.status).toBe(404);
   });
 });

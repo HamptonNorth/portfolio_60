@@ -352,11 +352,19 @@ export function validateCashTransaction(data) {
     if (error) errors.push(error);
   }
 
-  // transaction_type must be 'deposit' or 'withdrawal' (drawdowns/adjustments are system-created)
+  // transaction_type must be 'deposit', 'withdrawal', or 'adjustment' (drawdowns are system-created)
   if (data.transaction_type !== undefined && data.transaction_type !== null) {
     const txType = String(data.transaction_type).trim();
-    if (txType !== "" && txType !== "deposit" && txType !== "withdrawal") {
-      errors.push("Transaction type must be either 'deposit' or 'withdrawal'");
+    if (txType !== "" && txType !== "deposit" && txType !== "withdrawal" && txType !== "adjustment") {
+      errors.push("Transaction type must be 'deposit', 'withdrawal', or 'adjustment'");
+    }
+  }
+
+  // For adjustments, direction must be 'debit' or 'credit' if provided
+  if (data.transaction_type === "adjustment" && data.direction !== undefined && data.direction !== null) {
+    const dir = String(data.direction).trim();
+    if (dir !== "" && dir !== "debit" && dir !== "credit") {
+      errors.push("Direction must be 'debit' or 'credit'");
     }
   }
 
@@ -393,7 +401,9 @@ export function validateCashTransaction(data) {
 }
 
 /**
- * @description Validate holding movement data for buy or sell operations.
+ * @description Validate holding movement data for buy, sell, or adjustment operations.
+ * Adjustment movements (stock splits) require new_quantity and movement_date but
+ * not quantity or total_consideration.
  * Returns an array of error messages (empty if all valid).
  * @param {Object} data - The holding movement data to validate
  * @returns {string[]} Array of validation error messages
@@ -401,20 +411,23 @@ export function validateCashTransaction(data) {
 export function validateHoldingMovement(data) {
   const errors = [];
 
-  // Required fields
-  const requiredChecks = [validateRequired(data.movement_type, "Movement type"), validateRequired(data.movement_date, "Date"), validateRequired(data.quantity, "Quantity"), validateRequired(data.total_consideration, "Total consideration")];
+  // movement_type is always required
+  const typeError = validateRequired(data.movement_type, "Movement type");
+  if (typeError) errors.push(typeError);
 
-  for (const error of requiredChecks) {
-    if (error) errors.push(error);
-  }
-
-  // movement_type must be 'buy' or 'sell'
+  // movement_type must be 'buy', 'sell', or 'adjustment'
   if (data.movement_type !== undefined && data.movement_type !== null) {
     const movType = String(data.movement_type).trim();
-    if (movType !== "" && movType !== "buy" && movType !== "sell") {
-      errors.push("Movement type must be either 'buy' or 'sell'");
+    if (movType !== "" && movType !== "buy" && movType !== "sell" && movType !== "adjustment") {
+      errors.push("Movement type must be 'buy', 'sell', or 'adjustment'");
     }
   }
+
+  const isAdjustment = data.movement_type === "adjustment";
+
+  // movement_date always required
+  const dateError = validateRequired(data.movement_date, "Date");
+  if (dateError) errors.push(dateError);
 
   // movement_date must be ISO-8601 format (YYYY-MM-DD)
   if (data.movement_date !== undefined && data.movement_date !== null && String(data.movement_date).trim() !== "") {
@@ -430,27 +443,47 @@ export function validateHoldingMovement(data) {
     }
   }
 
-  // quantity must be a positive number
-  if (data.quantity !== undefined && data.quantity !== null) {
-    const quantity = Number(data.quantity);
-    if (isNaN(quantity) || quantity <= 0) {
-      errors.push("Quantity must be greater than zero");
-    }
-  }
+  if (isAdjustment) {
+    // Adjustment (stock split): requires new_quantity, not quantity/total_consideration
+    const newQtyError = validateRequired(data.new_quantity, "New quantity");
+    if (newQtyError) errors.push(newQtyError);
 
-  // total_consideration must be a positive number
-  if (data.total_consideration !== undefined && data.total_consideration !== null) {
-    const consideration = Number(data.total_consideration);
-    if (isNaN(consideration) || consideration <= 0) {
-      errors.push("Total consideration must be greater than zero");
+    if (data.new_quantity !== undefined && data.new_quantity !== null) {
+      const newQty = Number(data.new_quantity);
+      if (isNaN(newQty) || newQty <= 0) {
+        errors.push("New quantity must be greater than zero");
+      }
     }
-  }
+  } else {
+    // Buy/Sell: requires quantity and total_consideration
+    const qtyError = validateRequired(data.quantity, "Quantity");
+    if (qtyError) errors.push(qtyError);
 
-  // deductible_costs is optional, must be non-negative
-  if (data.deductible_costs !== undefined && data.deductible_costs !== null) {
-    const costs = Number(data.deductible_costs);
-    if (isNaN(costs) || costs < 0) {
-      errors.push("Deductible costs must be zero or a positive number");
+    const considerationError = validateRequired(data.total_consideration, "Total consideration");
+    if (considerationError) errors.push(considerationError);
+
+    // quantity must be a positive number
+    if (data.quantity !== undefined && data.quantity !== null) {
+      const quantity = Number(data.quantity);
+      if (isNaN(quantity) || quantity <= 0) {
+        errors.push("Quantity must be greater than zero");
+      }
+    }
+
+    // total_consideration must be a positive number
+    if (data.total_consideration !== undefined && data.total_consideration !== null) {
+      const consideration = Number(data.total_consideration);
+      if (isNaN(consideration) || consideration <= 0) {
+        errors.push("Total consideration must be greater than zero");
+      }
+    }
+
+    // deductible_costs is optional, must be non-negative
+    if (data.deductible_costs !== undefined && data.deductible_costs !== null) {
+      const costs = Number(data.deductible_costs);
+      if (isNaN(costs) || costs < 0) {
+        errors.push("Deductible costs must be zero or a positive number");
+      }
     }
   }
 

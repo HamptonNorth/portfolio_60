@@ -10,7 +10,7 @@ import { createInvestment } from "../../src/server/db/investments-db.js";
 import { getAllInvestmentTypes } from "../../src/server/db/investment-types-db.js";
 import { getAllCurrencies } from "../../src/server/db/currencies-db.js";
 import { createHolding, getHoldingById } from "../../src/server/db/holdings-db.js";
-import { createBuyMovement, createSellMovement, getMovementById, getMovementsByHoldingId, scaleValue, unscaleValue } from "../../src/server/db/holding-movements-db.js";
+import { createBuyMovement, createSellMovement, createSplitMovement, getMovementById, getMovementsByHoldingId, scaleValue, unscaleValue } from "../../src/server/db/holding-movements-db.js";
 import { getCashTransactionsByAccountId } from "../../src/server/db/cash-transactions-db.js";
 
 const testDbPath = getDatabasePath();
@@ -422,6 +422,8 @@ describe("buy/sell movements create matching cash_transactions", () => {
   });
 
   test("cash_transaction notes without user notes omits separator", () => {
+    const preCount = getCashTransactionsByAccountId(cashTestAccount.id).length;
+
     createBuyMovement({
       holding_id: cashTestHolding.id,
       movement_date: "2026-02-13",
@@ -431,9 +433,12 @@ describe("buy/sell movements create matching cash_transactions", () => {
     });
 
     const txList = getCashTransactionsByAccountId(cashTestAccount.id);
-    const latest = txList[0]; // newest first
-    expect(latest.notes).toBe("Buy: Raspberry Pi Holdings");
-    expect(latest.notes).not.toContain("—");
+    expect(txList.length).toBe(preCount + 1);
+    // Find the newly created buy transaction (opening balance may sort first if dated today)
+    const buyTx = txList.find((t) => t.transaction_type === "buy" && t.amount === 25);
+    expect(buyTx).toBeDefined();
+    expect(buyTx.notes).toBe("Buy: Raspberry Pi Holdings");
+    expect(buyTx.notes).not.toContain("—");
   });
 });
 
@@ -499,5 +504,163 @@ describe("getMovementById", () => {
   test("returns null for non-existent ID", () => {
     const result = getMovementById(99999);
     expect(result).toBeNull();
+  });
+});
+
+// --- Stock Split (adjustment) movements ---
+
+describe("createSplitMovement", () => {
+  /** @type {Object} Fresh account for isolated split tests */
+  let splitAccount;
+  /** @type {Object} Holding for split testing */
+  let splitHolding;
+
+  /** @type {Object} Separate user for split tests to avoid account type conflicts */
+  let splitUser;
+
+  beforeAll(() => {
+    splitUser = createUser({
+      initials: "SP",
+      first_name: "Split",
+      last_name: "Tester",
+      provider: "ii",
+    });
+    splitAccount = createAccount({
+      user_id: splitUser.id,
+      account_type: "trading",
+      account_ref: "SPLIT01",
+      cash_balance: 10000,
+      warn_cash: 500,
+    });
+    splitHolding = createHolding({
+      account_id: splitAccount.id,
+      investment_id: investment1.id,
+      quantity: 35,
+      average_cost: 248.0,
+    });
+  });
+
+  test("forward split: quantity increases, avg cost decreases, book cost constant", () => {
+    const preSplitHolding = getHoldingById(splitHolding.id);
+    const preSplitBookCost = preSplitHolding.quantity * preSplitHolding.average_cost;
+    const preSplitAccount = getAccountById(splitAccount.id);
+
+    const movement = createSplitMovement({
+      holding_id: splitHolding.id,
+      movement_date: "2026-01-15",
+      new_quantity: 3500,
+      notes: "Stock split 1:100",
+    });
+
+    expect(movement).not.toBeNull();
+    expect(movement.movement_type).toBe("adjustment");
+    expect(movement.movement_date).toBe("2026-01-15");
+    expect(movement.quantity).toBe(3500);
+    expect(movement.movement_value).toBe(0);
+    expect(movement.notes).toBe("Stock split 1:100");
+
+    // Holding updated
+    const updatedHolding = getHoldingById(splitHolding.id);
+    expect(updatedHolding.quantity).toBe(3500);
+    expect(updatedHolding.average_cost).toBeCloseTo(2.48, 2);
+
+    // Book cost remains constant
+    const postSplitBookCost = updatedHolding.quantity * updatedHolding.average_cost;
+    expect(postSplitBookCost).toBeCloseTo(preSplitBookCost, 1);
+
+    // revised_avg_cost in the movement record
+    expect(movement.revised_avg_cost).toBeCloseTo(2.48, 2);
+
+    // Cash balance must NOT change
+    const postSplitAccount = getAccountById(splitAccount.id);
+    expect(postSplitAccount.cash_balance).toBe(preSplitAccount.cash_balance);
+  });
+
+  test("reverse split: quantity decreases, avg cost increases, book cost constant", () => {
+    const preSplitHolding = getHoldingById(splitHolding.id);
+    const preSplitBookCost = preSplitHolding.quantity * preSplitHolding.average_cost;
+
+    const movement = createSplitMovement({
+      holding_id: splitHolding.id,
+      movement_date: "2026-02-01",
+      new_quantity: 350,
+      notes: "Reverse split 10:1",
+    });
+
+    expect(movement.movement_type).toBe("adjustment");
+    expect(movement.quantity).toBe(350);
+
+    const updatedHolding = getHoldingById(splitHolding.id);
+    expect(updatedHolding.quantity).toBe(350);
+    expect(updatedHolding.average_cost).toBeCloseTo(24.8, 1);
+
+    // Book cost constant
+    const postSplitBookCost = updatedHolding.quantity * updatedHolding.average_cost;
+    expect(postSplitBookCost).toBeCloseTo(preSplitBookCost, 1);
+  });
+
+  test("split does not create a cash_transaction", () => {
+    const preTx = getCashTransactionsByAccountId(splitAccount.id);
+
+    createSplitMovement({
+      holding_id: splitHolding.id,
+      movement_date: "2026-02-02",
+      new_quantity: 700,
+    });
+
+    const postTx = getCashTransactionsByAccountId(splitAccount.id);
+    expect(postTx.length).toBe(preTx.length);
+  });
+
+  test("fails if new quantity is zero", () => {
+    expect(() => {
+      createSplitMovement({
+        holding_id: splitHolding.id,
+        movement_date: "2026-02-03",
+        new_quantity: 0,
+      });
+    }).toThrow("New quantity must be greater than zero");
+  });
+
+  test("fails if new quantity is negative", () => {
+    expect(() => {
+      createSplitMovement({
+        holding_id: splitHolding.id,
+        movement_date: "2026-02-03",
+        new_quantity: -10,
+      });
+    }).toThrow("New quantity must be greater than zero");
+  });
+
+  test("fails if new quantity equals current quantity", () => {
+    const current = getHoldingById(splitHolding.id);
+
+    expect(() => {
+      createSplitMovement({
+        holding_id: splitHolding.id,
+        movement_date: "2026-02-03",
+        new_quantity: current.quantity,
+      });
+    }).toThrow("New quantity is the same as the current quantity");
+  });
+
+  test("fails if holding not found", () => {
+    expect(() => {
+      createSplitMovement({
+        holding_id: 99999,
+        movement_date: "2026-02-03",
+        new_quantity: 100,
+      });
+    }).toThrow("Holding not found");
+  });
+
+  test("notes are optional (defaults to null)", () => {
+    const movement = createSplitMovement({
+      holding_id: splitHolding.id,
+      movement_date: "2026-02-04",
+      new_quantity: 1400,
+    });
+
+    expect(movement.notes).toBeNull();
   });
 });
