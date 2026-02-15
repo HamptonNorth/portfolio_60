@@ -35,6 +35,11 @@ logs
 # Portfolio 60 specific
 data/
 backups/
+docs/*
+!docs/.gitkeep
+!docs/media/
+docs/media/*
+!docs/media/.gitkeep
 src/ui/css/output.css
 *.db
 *.db-wal

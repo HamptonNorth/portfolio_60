@@ -12,7 +12,7 @@ import { getAuthStatus } from "../auth.js";
  * - /pages/passphrase.html — the passphrase page itself
  * @type {string[]}
  */
-const UNPROTECTED_PREFIXES = ["/api/auth/", "/api/scraper/", "/api/backfill/", "/css/", "/js/", "/images/", "/pages/passphrase.html"];
+const UNPROTECTED_PREFIXES = ["/api/auth/", "/api/scraper/", "/api/backfill/", "/api/docs/", "/css/", "/js/", "/images/", "/docs/media/", "/pages/passphrase.html"];
 
 /**
  * @description Check whether a given URL path requires authentication.

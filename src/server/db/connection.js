@@ -424,6 +424,16 @@ function runMigrations(database) {
   if (!hasRevisedAvgCost) {
     database.exec("ALTER TABLE holding_movements ADD COLUMN revised_avg_cost INTEGER NOT NULL DEFAULT 0");
   }
+
+  // Migration 16: Add docs_search FTS5 table and metadata table (v0.11.0)
+  // Full-text search index for the documentation subsystem.
+  try {
+    database.query("SELECT * FROM docs_search LIMIT 0").all();
+  } catch (e) {
+    database.exec("CREATE VIRTUAL TABLE IF NOT EXISTS docs_search USING fts5(" + "category UNINDEXED, slug UNINDEXED, published UNINDEXED, lapse_date UNINDEXED, " + "title, description, h1_content, h2_content, h3_content, h4_h6_content, " + "bold_content, link_text, blockquote_content, body_text, code_content, " + "tokenize='porter unicode61'" + ")");
+  }
+
+  database.exec("CREATE TABLE IF NOT EXISTS docs_search_meta (" + "key TEXT PRIMARY KEY, value TEXT" + ")");
 }
 
 /**

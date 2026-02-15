@@ -149,6 +149,13 @@ export function loadConfig() {
     items: Array.isArray(rawLists.items) ? rawLists.items : [],
   };
 
+  // docs — documentation subsystem categories
+  var rawDocs = rawConfig.docs || {};
+  config.docs = {
+    _readme: rawDocs._readme || "",
+    categories: typeof rawDocs.categories === "object" && rawDocs.categories !== null ? rawDocs.categories : {},
+  };
+
   // scraperTesting — feature flag for the scraper testing sandbox
   const rawScraperTesting = rawConfig.scraperTesting || {};
   const stalestLimit = parseInt(rawScraperTesting.stalestLimit, 10);
@@ -245,6 +252,18 @@ export function getStalestRetries() {
 export function getListItems() {
   const config = loadConfig();
   return config.lists ? config.lists.items : [];
+}
+
+/**
+ * @description Get the docs configuration with defaults applied.
+ * Returns the categories object from the docs config section.
+ * @returns {{ categories: Object.<string, {style: string, label: string}> }}
+ */
+export function getDocsConfig() {
+  var config = loadConfig();
+  var rawDocs = config.docs || {};
+  var categories = rawDocs.categories || {};
+  return { categories: categories };
 }
 
 /**

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en-GB">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Portfolio 60 — Document</title>
+        <link rel="stylesheet" href="/css/output.css" />
+        <link rel="icon" type="image/svg+xml" href="/images/favicon.svg" />
+        <!-- highlight.js for code syntax highlighting -->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+        <style>
+            /* =================================================================
+               CODE COPY BUTTON STYLES
+               ================================================================= */
+            .code-wrapper {
+                position: relative;
+            }
+            .code-wrapper .copy-btn {
+                display: none;
+            }
+            .code-wrapper:hover .copy-btn {
+                display: block;
+            }
+
+            /* =================================================================
+               PRINT STYLES — Hide UI chrome, reset layout for A4
+               ================================================================= */
+            @media print {
+                /* Hide navigation, footer, and controls */
+                app-navbar,
+                app-footer,
+                #btn-print,
+                #edit-btn,
+                #back-link,
+                #page-messages,
+                .code-wrapper .copy-btn {
+                    display: none !important;
+                }
+
+                /* Reset body and layout */
+                body {
+                    background: white !important;
+                    min-height: auto;
+                }
+
+                main {
+                    max-width: 100% !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                }
+
+                /* Remove card styling from content container */
+                #markdown-content {
+                    border: none !important;
+                    border-radius: 0 !important;
+                    padding: 0 !important;
+                    box-shadow: none !important;
+                }
+
+                /* Code blocks: wrap long lines */
+                pre,
+                code {
+                    white-space: pre-wrap !important;
+                    word-wrap: break-word !important;
+                }
+            }
+        </style>
+    </head>
+    <body class="bg-brand-25 text-brand-900 min-h-screen flex flex-col">
+        <app-navbar></app-navbar>
+        <main class="max-w-7xl mx-auto px-6 py-8 flex-1 w-full" id="main-content">
+            <!-- Back link and title bar -->
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <a id="back-link" href="#" class="text-sm text-brand-500 hover:text-brand-700 transition-colors mb-2 inline-block">&larr; Back to list</a>
+                    <h2 class="text-2xl font-semibold text-brand-800" id="page-title">Loading...</h2>
+                    <p class="text-sm text-brand-400 mt-1" id="page-date"></p>
+                </div>
+                <div class="flex gap-3">
+                    <button id="btn-print" onclick="window.print()" class="text-sm bg-white hover:bg-brand-50 text-brand-500 hover:text-brand-700 border border-brand-200 px-3 py-2 rounded-lg shadow-sm transition-colors inline-flex items-center gap-1.5" title="Print this page">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                        </svg>
+                        <span>Print</span>
+                    </button>
+                    <button id="edit-btn" class="text-sm bg-brand-100 hover:bg-brand-200 text-brand-700 px-4 py-2 rounded-lg transition-colors">Edit</button>
+                </div>
+            </div>
+
+            <div id="page-messages"></div>
+
+            <!-- Markdown content container -->
+            <div id="markdown-content" class="bg-white rounded-lg border border-brand-200 p-8">
+                <p class="text-brand-500">Loading document...</p>
+            </div>
+        </main>
+
+        <app-footer></app-footer>
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+        <script src="/js/app.js"></script>
+        <script src="/js/components.bundle.js"></script>
+        <script src="/js/docs-page.js"></script>
+    </body>
+</html>

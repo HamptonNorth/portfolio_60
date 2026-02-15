@@ -1,0 +1,308 @@
+/* =============================================================================
+ * md-modest.css - Modest Markdown Styling
+ * =============================================================================
+ * A rather modest sans-serif style with Open Sans font.
+ * Requires Open Sans from Google Fonts (loaded by server).
+ *
+ * Based on: https://markdowncss.github.io/modest/
+ * License: MIT
+ * ============================================================================= */
+
+/* =============================================================================
+ * CSS VARIABLES
+ * ============================================================================= */
+
+:root {
+    --md-modest-text: #333;
+    --md-modest-heading: #1a1a1a;
+    --md-modest-link: #4a90d9;
+    --md-modest-border: #ddd;
+    --md-modest-code-bg: #f5f5f5;
+    --md-modest-quote-bg: #f9f9f9;
+}
+
+/* =============================================================================
+ * BASE STYLES
+ * ============================================================================= */
+
+.md-modest {
+    font-family: "Open Sans", Helvetica, Arial, sans-serif;
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.75;
+    color: var(--md-modest-text);
+    max-width: 40em;
+    margin: 0 auto;
+}
+
+/* =============================================================================
+ * TYPOGRAPHY
+ * ============================================================================= */
+
+.md-modest h1,
+.md-modest h2,
+.md-modest h3,
+.md-modest h4,
+.md-modest h5,
+.md-modest h6 {
+    font-family: "Open Sans", Helvetica, Arial, sans-serif;
+    font-weight: 600;
+    line-height: 1.25;
+    margin-top: 1.75em;
+    margin-bottom: 0.5em;
+    color: var(--md-modest-heading);
+}
+
+.md-modest h1 {
+    font-size: 2em;
+    font-weight: 700;
+    margin-top: 0;
+    padding-bottom: 0.2em;
+    border-bottom: 1px solid var(--md-modest-border);
+}
+
+.md-modest h2 {
+    font-size: 1.5em;
+    padding-bottom: 0.15em;
+    border-bottom: 1px solid var(--md-modest-border);
+}
+
+.md-modest h3 {
+    font-size: 1.25em;
+}
+
+.md-modest h4 {
+    font-size: 1.1em;
+}
+
+.md-modest h5 {
+    font-size: 1em;
+}
+
+.md-modest h6 {
+    font-size: 0.9em;
+    color: #666;
+}
+
+.md-modest p {
+    margin-top: 0;
+    margin-bottom: 1.25em;
+}
+
+.md-modest strong {
+    font-weight: 700;
+}
+
+.md-modest em {
+    font-style: italic;
+}
+
+/* =============================================================================
+ * LINKS
+ * ============================================================================= */
+
+.md-modest a {
+    color: var(--md-modest-link);
+    text-decoration: none;
+}
+
+.md-modest a:hover {
+    text-decoration: underline;
+}
+
+.md-modest a:visited {
+    color: #7c5295;
+}
+
+/* =============================================================================
+ * LISTS
+ * ============================================================================= */
+
+.md-modest ul,
+.md-modest ol {
+    margin-top: 0;
+    margin-bottom: 1.25em;
+    padding-left: 1.75em;
+}
+
+.md-modest ul {
+    list-style-type: disc;
+}
+
+.md-modest ol {
+    list-style-type: decimal;
+}
+
+.md-modest ul ul,
+.md-modest ul ol,
+.md-modest ol ul,
+.md-modest ol ol {
+    margin-bottom: 0;
+}
+
+.md-modest li {
+    margin-bottom: 0.35em;
+}
+
+/* =============================================================================
+ * CODE
+ * ============================================================================= */
+
+.md-modest code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.875em;
+    padding: 0.15em 0.35em;
+    background-color: var(--md-modest-code-bg);
+    border-radius: 3px;
+}
+
+.md-modest pre {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.875em;
+    line-height: 1.6;
+    padding: 1em;
+    overflow-x: auto;
+    background-color: var(--md-modest-code-bg);
+    border-radius: 4px;
+    margin: 1.25em 0;
+}
+
+.md-modest pre code {
+    padding: 0;
+    background-color: transparent;
+    font-size: 100%;
+}
+
+/* =============================================================================
+ * BLOCKQUOTES
+ * ============================================================================= */
+
+.md-modest blockquote {
+    margin: 1.25em 0;
+    padding: 0.5em 1.25em;
+    color: #555;
+    border-left: 3px solid var(--md-modest-border);
+    background-color: var(--md-modest-quote-bg);
+}
+
+.md-modest blockquote > :first-child {
+    margin-top: 0;
+}
+
+.md-modest blockquote > :last-child {
+    margin-bottom: 0;
+}
+
+/* =============================================================================
+ * TABLES
+ * ============================================================================= */
+
+.md-modest table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.25em 0;
+    font-size: 0.9em;
+}
+
+.md-modest th,
+.md-modest td {
+    padding: 0.5em 0.75em;
+    border: 1px solid var(--md-modest-border);
+    text-align: left;
+}
+
+.md-modest th {
+    font-weight: 600;
+    background-color: var(--md-modest-code-bg);
+}
+
+.md-modest tbody tr:nth-child(even) {
+    background-color: #fafafa;
+}
+
+/* =============================================================================
+ * HORIZONTAL RULES
+ * ============================================================================= */
+
+.md-modest hr {
+    margin: 1.75em 0;
+    border: none;
+    height: 1px;
+    background-color: var(--md-modest-border);
+}
+
+/* =============================================================================
+ * IMAGES & FIGURES
+ * ============================================================================= */
+
+.md-modest img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 3px;
+}
+
+.md-modest figure {
+    margin: 1.25em 0;
+}
+
+.md-modest figcaption {
+    font-size: 0.875em;
+    color: #666;
+    text-align: center;
+    margin-top: 0.5em;
+}
+
+/* =============================================================================
+ * PRINT STYLES
+ * ============================================================================= */
+
+@media print {
+    .md-modest {
+        font-size: 11pt;
+        max-width: 100%;
+    }
+
+    .md-modest a {
+        color: inherit;
+        text-decoration: underline;
+    }
+
+    .md-modest h1,
+    .md-modest h2,
+    .md-modest h3 {
+        page-break-after: avoid;
+    }
+
+    .md-modest pre,
+    .md-modest blockquote,
+    .md-modest table,
+    .md-modest figure {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+
+    .md-modest pre {
+        background: #f5f5f5 !important;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        overflow-wrap: break-word;
+        white-space: pre-wrap;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .md-modest code {
+        font-size: 9pt;
+    }
+
+    .md-modest img {
+        max-width: 100% !important;
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+}
+
+@page {
+    size: A4;
+    margin: 2cm 2.5cm;
+}

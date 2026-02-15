@@ -31,20 +31,27 @@
         "spreadsheet": "google",
         "iframe": "<iframe src=\"https://docs.google.com/spreadsheets/d/e/2PACX-1vT0tY4WKwEdvPZM61Gt_DoyuUsmysmuA2sAPa-tVmtCie-s2RVB49BQ7ETHRH7wps58_u94e2ICR1PD/pubhtml?gid=2045542612&amp;single=true&amp;widget=true&amp;headers=false\"></iframe>",
         "range": "A2:F14"
-      }, 
+      },
       {
         "title": "Base Costs",
         "spreadsheet": "google",
         "iframe": "<iframe src='https://docs.google.com/spreadsheets/d/e/2PACX-1vSZEUR829SHD4LcQBwsJMDtms5r76oyd6QqDsOrPZe5rdZjM9rzsOk9VKuW_TGsmH667ueufflwrtja/pubhtml?gid=1550914488&amp;single=true&amp;widget=true&amp;headers=false'></iframe>",
         "range": ""
       },
-{
-"title": "Charity Giving",
-"spreadsheet": "google",
-"iframe":"<iframe src=\"https://docs.google.com/spreadsheets/d/e/2PACX-1vRiacahHMJPFlzQzmlyPn37jTNIuywUiCtt393fzTdgIZZR2Xr4rLLu--b5-Vnwi29CKrQneTWduPSb/pubhtml?gid=284599303&amp;single=true&amp;widget=true&amp;headers=false\"></iframe>",
-"range": ""
-}
+      {
+        "title": "Charity Giving",
+        "spreadsheet": "google",
+        "iframe": "<iframe src=\"https://docs.google.com/spreadsheets/d/e/2PACX-1vRiacahHMJPFlzQzmlyPn37jTNIuywUiCtt393fzTdgIZZR2Xr4rLLu--b5-Vnwi29CKrQneTWduPSb/pubhtml?gid=284599303&amp;single=true&amp;widget=true&amp;headers=false\"></iframe>",
+        "range": ""
+      }
     ]
+  },
+  "docs": {
+    "_readme": "Documentation subsystem categories. Each key under 'categories' is a folder name under docs/. The 'style' sets the default markdown CSS (github or modest), and 'label' is the display name in the Docs menu.",
+    "categories": {
+      "guide": { "style": "github", "label": "User Guide" },
+      "notes": { "style": "modest", "label": "Financial Notes" }
+    }
   },
   "scraperSites": {
     "_readme": "Known website patterns for price/benchmark scraping. Tech-savvy users can edit this section to add new sites or fix broken selectors. The app matches URLs against these patterns and auto-fills the selector.",

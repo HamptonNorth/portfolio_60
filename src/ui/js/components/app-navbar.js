@@ -1,4 +1,5 @@
 import { LitElement, html } from "lit";
+import "./docs-search-modal.js";
 
 /**
  * @description Shared navigation bar component for Portfolio 60.
@@ -47,6 +48,12 @@ class AppNavbar extends LitElement {
               </div>
             </li>
             <li><span class="text-brand-400 cursor-not-allowed select-none">Reports</span></li>
+            <li class="relative group" id="nav-docs-item" style="display:none">
+              <span class="hover:text-brand-200 transition-colors cursor-pointer select-none" data-nav-parent="docs">Docs <span class="text-xs">&#9662;</span></span>
+              <div class="hidden group-hover:block absolute left-0 top-full pt-1 z-50">
+                <div class="bg-white text-brand-800 rounded-md shadow-lg border border-brand-200 py-1 min-w-48" id="nav-docs-dropdown"></div>
+              </div>
+            </li>
             <li class="relative group" id="nav-lists-item" style="display:none">
               <span class="hover:text-brand-200 transition-colors cursor-pointer select-none" data-nav-parent="lists">Lists <span class="text-xs">&#9662;</span></span>
               <div class="hidden group-hover:block absolute left-0 top-full pt-1 z-50">
@@ -101,6 +108,7 @@ class AppNavbar extends LitElement {
       checkScraperTestingNav();
     }
     this._loadLists();
+    this._loadDocs();
   }
 
   /**
@@ -135,6 +143,65 @@ class AppNavbar extends LitElement {
       });
     } catch {
       // Lists menu stays hidden if fetch fails
+    }
+  }
+
+  /**
+   * @description Fetch docs categories from the config API and populate the Docs dropdown.
+   * Shows the Docs menu item only if there are categories configured.
+   * Adds a "Search Docs" button at the bottom.
+   */
+  async _loadDocs() {
+    try {
+      const response = await fetch("/api/docs/config");
+      if (!response.ok) {
+        return;
+      }
+      const data = await response.json();
+      const categories = data.categories || {};
+      const categoryNames = Object.keys(categories);
+      const docsItem = this.querySelector("#nav-docs-item");
+      const dropdown = this.querySelector("#nav-docs-dropdown");
+
+      if (categoryNames.length === 0 || !docsItem || !dropdown) {
+        return;
+      }
+
+      docsItem.style.display = "";
+      dropdown.innerHTML = "";
+
+      categoryNames.forEach(function (name) {
+        const cat = categories[name];
+        const link = document.createElement("a");
+        link.href = "/pages/docs-list.html?category=" + encodeURIComponent(name);
+        link.className = "block px-4 py-2 hover:bg-brand-50 transition-colors";
+        link.setAttribute("data-nav", "docs-" + name);
+        link.textContent = cat.label || name;
+        dropdown.appendChild(link);
+      });
+
+      // Separator and search button
+      const hr = document.createElement("hr");
+      hr.className = "my-1 border-brand-200";
+      dropdown.appendChild(hr);
+
+      const searchBtn = document.createElement("button");
+      searchBtn.className = "block w-full text-left px-4 py-2 hover:bg-brand-50 transition-colors text-brand-600";
+      searchBtn.textContent = "Search Docs";
+      searchBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        // Find or create the search modal
+        var modal = document.querySelector("docs-search-modal");
+        if (!modal) {
+          modal = document.createElement("docs-search-modal");
+          document.body.appendChild(modal);
+        }
+        modal.open();
+      });
+      dropdown.appendChild(searchBtn);
+    } catch {
+      // Docs menu stays hidden if fetch fails
     }
   }
 }

@@ -19,6 +19,7 @@ import { handlePortfolioRoute } from "./routes/portfolio-routes.js";
 import { handleCashTransactionsRoute } from "./routes/cash-transactions-routes.js";
 import { handleDrawdownSchedulesRoute } from "./routes/drawdown-schedules-routes.js";
 import { handleHoldingMovementsRoute } from "./routes/holding-movements-routes.js";
+import { handleDocsRoute } from "./routes/docs-routes.js";
 import { initScheduledScraper, stopScheduledScraper } from "./services/scheduled-scraper.js";
 import { launchBrowser } from "./scrapers/browser-utils.js";
 import { processDrawdowns } from "./services/drawdown-processor.js";
@@ -135,6 +136,28 @@ const server = Bun.serve({
     // Image files
     if (path.startsWith("/images/")) {
       return serveStaticFile(path);
+    }
+
+    // Markdown style CSS files (for docs subsystem)
+    if (path.startsWith("/css/md-styles/")) {
+      return serveStaticFile(path);
+    }
+
+    // Docs media files (uploaded images) — served from docs/media/ on disk
+    if (path.startsWith("/docs/media/")) {
+      var safePath = path.replace(/\.\./g, "");
+      var mediaPath = safePath.replace(/^\/docs\/media\//, "");
+      var fullMediaPath = join(resolve("docs/media"), mediaPath);
+      if (!fullMediaPath.startsWith(resolve("docs/media"))) {
+        return new Response("Forbidden", { status: 403 });
+      }
+      var mediaFile = Bun.file(fullMediaPath);
+      if (!(await mediaFile.exists())) {
+        return new Response("Not found", { status: 404 });
+      }
+      return new Response(mediaFile, {
+        headers: { "Content-Type": getMimeType(fullMediaPath) },
+      });
     }
 
     // Page HTML files
@@ -308,6 +331,14 @@ const server = Bun.serve({
       const benchmarksResult = await handleBenchmarksRoute(method, path, request);
       if (benchmarksResult) {
         return benchmarksResult;
+      }
+    }
+
+    // Docs routes (documentation subsystem — unprotected)
+    if (path.startsWith("/api/docs/") || path.startsWith("/api/docs?")) {
+      const docsResult = await handleDocsRoute(method, path, request);
+      if (docsResult) {
+        return docsResult;
       }
     }
 
