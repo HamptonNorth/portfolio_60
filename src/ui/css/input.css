@@ -26,17 +26,15 @@
     --color-warning: #e09f3e;
 }
 
-/* Responsive container for embedded Google Sheets / Excel Online iframes */
+/* Responsive container for embedded Google Sheets / Excel Online iframes.
+   Uses viewport height minus navbar (~64px), heading+padding (~88px),
+   and footer (~52px) to fill available space. */
 .responsive-sheet-container {
-    position: relative;
-    overflow: hidden;
-    padding-top: 56.25%; /* 16:9 Aspect Ratio */
+    height: calc(100vh - 210px);
+    min-height: 400px;
 }
 
 .responsive-sheet-container iframe {
-    position: absolute;
-    top: 0;
-    left: 0;
     width: 100%;
     height: 100%;
     border: 0;

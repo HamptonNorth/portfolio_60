@@ -218,6 +218,43 @@ function escapeHtml(text) {
 }
 
 /**
+ * @description Auto-fix unescaped double quotes inside "iframe" JSON string values.
+ * When a user pastes an iframe tag from Google Sheets or Excel into config.json,
+ * the inner quotes (e.g. src="...") break JSON parsing. This function finds
+ * "iframe": "..." lines and escapes the inner double quotes so the JSON is valid.
+ * Already-escaped quotes (\") are left unchanged.
+ * @param {string} jsonText - The raw JSON text to fix
+ * @returns {string} The JSON text with iframe quotes escaped
+ */
+function fixIframeQuotes(jsonText) {
+  // Match "iframe": "..." capturing the value between the outer quotes.
+  // The value starts after ": " and runs to the line's trailing quote before
+  // optional comma/whitespace. We use a line-by-line approach for clarity.
+  const lines = jsonText.split("\n");
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Look for lines containing "iframe": "..."
+    const match = line.match(/^(\s*"iframe"\s*:\s*")(.*)("\s*,?\s*)$/);
+    if (!match) {
+      continue;
+    }
+
+    let value = match[2];
+
+    // Undo any existing escapes so we can re-escape uniformly
+    value = value.replace(/\\"/g, '"');
+
+    // Now escape all double quotes inside the value
+    value = value.replace(/"/g, '\\"');
+
+    lines[i] = match[1] + value + match[3];
+  }
+
+  return lines.join("\n");
+}
+
+/**
  * @description Load and display the build time in the footer.
  * Fetches from /api/config/build-time and updates the element with id="build-time".
  */
@@ -449,7 +486,13 @@ async function showEditSettingsModal() {
   // Save handler — validate JSON and send to server
   saveBtn.addEventListener("click", async function () {
     errorDiv.classList.add("hidden");
-    const content = editor.value;
+    let content = editor.value;
+
+    // Auto-fix unescaped quotes in iframe values pasted from Google Sheets / Excel.
+    // The user pastes e.g. "<iframe src="https://...">" but JSON needs the inner
+    // quotes escaped as \". This finds "iframe": "..." lines and escapes inner quotes.
+    content = fixIframeQuotes(content);
+    editor.value = content;
 
     // Client-side JSON validation
     try {
