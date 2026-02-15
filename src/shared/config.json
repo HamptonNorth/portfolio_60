@@ -23,6 +23,17 @@
     "_readme": "Enable the Scraper Testing page — a sandbox for testing scraper configurations without affecting live portfolio data. Disabled by default; set enabled to true via Edit Settings to show the page.",
     "enabled": true
   },
+  "lists": {
+    "_readme": "Embedded spreadsheet lists displayed under the Lists menu. Each entry has a title (shown in the menu), an iframe (the full embed HTML from Google Sheets or Excel Online 'Publish to Web'), a spreadsheet type ('google' or 'microsoft'), and an optional range. For Google Sheets, range is a cell range e.g. 'A3:F14'. For Microsoft Excel, range is a named range defined in the workbook e.g. 'MyTable'.",
+    "items": [
+      {
+        "title": "Non-SIPP Pensions",
+        "spreadsheet": "google",
+        "iframe": "<iframe src=\"https://docs.google.com/spreadsheets/d/e/2PACX-1vT0tY4WKwEdvPZM61Gt_DoyuUsmysmuA2sAPa-tVmtCie-s2RVB49BQ7ETHRH7wps58_u94e2ICR1PD/pubhtml?gid=2045542612&amp;single=true&amp;widget=true&amp;headers=false\"></iframe>",
+        "range": "A2:F14"
+      }
+    ]
+  },
   "scraperSites": {
     "_readme": "Known website patterns for price/benchmark scraping. Tech-savvy users can edit this section to add new sites or fix broken selectors. The app matches URLs against these patterns and auto-fills the selector.",
     "_format": {

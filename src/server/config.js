@@ -142,6 +142,13 @@ export function loadConfig() {
     sites: Array.isArray(rawScraperSites.sites) ? rawScraperSites.sites : DEFAULTS.scraperSites.sites,
   };
 
+  // lists — embedded spreadsheet lists for the Lists menu
+  const rawLists = rawConfig.lists || {};
+  config.lists = {
+    _readme: rawLists._readme || "",
+    items: Array.isArray(rawLists.items) ? rawLists.items : [],
+  };
+
   // scraperTesting — feature flag for the scraper testing sandbox
   const rawScraperTesting = rawConfig.scraperTesting || {};
   const stalestLimit = parseInt(rawScraperTesting.stalestLimit, 10);
@@ -228,6 +235,16 @@ export function getStalestLimit() {
 export function getStalestRetries() {
   const config = loadConfig();
   return config.scraperTesting ? config.scraperTesting.stalestRetries : 1;
+}
+
+/**
+ * @description Get the list items for embedded spreadsheet lists.
+ * Returns an array of { title, spreadsheet, iframe } objects.
+ * @returns {Array<{title: string, spreadsheet: string, iframe: string}>}
+ */
+export function getListItems() {
+  const config = loadConfig();
+  return config.lists ? config.lists.items : [];
 }
 
 /**
