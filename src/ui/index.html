@@ -16,6 +16,25 @@
             <h2 class="text-2xl font-semibold mb-4 text-brand-800">Welcome to Portfolio 60</h2>
             <p class="text-lg text-brand-600 mb-6">UK Family Investment Portfolio Tracker</p>
 
+            <div class="bg-white rounded-lg border border-brand-200 p-6 mb-6 text-brand-700 leading-relaxed">
+                <p class="mb-4">Portfolio 60 is a desktop application for UK families to track investments across multiple people and account types. It supports shares, mutual funds, investment trusts, savings accounts and other instruments. All valuations and reports are in GBP, with automatic currency conversion for foreign-currency investments.</p>
+                <p class="mb-4">The application runs on your desktop and stores all data locally in a SQLite database. It connects to the internet to fetch current prices, currency exchange rates and benchmark index values from public financial websites.</p>
+                <p class="font-semibold text-brand-800 mb-2">Key features:</p>
+                <ul class="list-disc list-inside space-y-1 ml-2 mb-4">
+                    <li>Track investments across multiple family members and account types (Trading, ISA, SIPP)</li>
+                    <li>Automatic price fetching from public financial websites</li>
+                    <li>Currency conversion for non-GBP investments</li>
+                    <li>Portfolio valuation with drill-down to individual holdings</li>
+                    <li>Buy/sell transaction recording with automatic cash balance updates</li>
+                    <li>Scheduled price fetching on a configurable timetable</li>
+                    <li>Library of reports comparing performance by holdings against benchmarks over time</li>
+                    <li>Database backup and restore</li>
+                    <li>Built-in documentation system for notes and guides</li>
+                    <li>Embedded spreadsheet lists via Google Sheets or Excel Online</li>
+                </ul>
+                <p>Portfolio 60 is a UK-only application due to the complexity of UK tax rules and account types.</p>
+            </div>
+
             <!-- Database status area (populated by JS) -->
             <div id="db-status" class="mt-6"></div>
         </main>
