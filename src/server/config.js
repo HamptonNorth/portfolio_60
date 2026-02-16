@@ -65,7 +65,7 @@ export function setConfigPath(path) {
  * @description Get the resolved path to the config file.
  * @returns {string} Absolute path to config.json
  */
-function getConfigFilePath() {
+export function getConfigFilePath() {
   if (configPathOverride) {
     return configPathOverride;
   }

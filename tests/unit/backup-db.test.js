@@ -32,13 +32,13 @@ function cleanupDatabase() {
 
 /**
  * @description Remove all test backup files from the backups directory.
- * Only removes files matching portfolio60_*.db to be safe.
+ * Removes both zip (portfolio_60_backup_*.zip) and legacy db (portfolio60_*.db) files.
  */
 function cleanupBackups() {
   if (!existsSync(backupDir)) return;
   const files = readdirSync(backupDir);
   for (const f of files) {
-    if (f.startsWith("portfolio60_") && f.endsWith(".db")) {
+    if ((f.startsWith("portfolio60_") && f.endsWith(".db")) || (f.startsWith("portfolio_60_backup_") && f.endsWith(".zip"))) {
       unlinkSync(join(backupDir, f));
     }
   }
@@ -58,19 +58,23 @@ afterAll(() => {
 // --- createBackup ---
 
 describe("createBackup", () => {
-  test("creates a backup file with timestamped name", () => {
-    const result = createBackup();
+  test("creates a backup zip file with timestamped name", async () => {
+    const result = await createBackup();
     expect(result.success).toBe(true);
-    expect(result.filename).toMatch(/^portfolio60_\d{8}_\d{6}\.db$/);
+    expect(result.filename).toMatch(/^portfolio_60_backup_\d{8}_\d{6}\.zip$/);
     expect(result.size).toBeGreaterThan(0);
     expect(existsSync(result.path)).toBe(true);
   });
 
-  test("backup file is a valid copy of the database", () => {
+  test("backup zip file contains database", async () => {
     // Add some data to the live database
-    createCurrency({ code: "USD", description: "US Dollar" });
+    try {
+      createCurrency({ code: "USD", description: "US Dollar" });
+    } catch {
+      // May already exist
+    }
 
-    const result = createBackup();
+    const result = await createBackup();
     expect(result.success).toBe(true);
 
     // The backup file should exist and be non-empty
@@ -78,10 +82,8 @@ describe("createBackup", () => {
     expect(result.size).toBeGreaterThan(0);
   });
 
-  test("creates backups directory if it does not exist", () => {
-    // This test relies on beforeAll having already created it,
-    // but createBackup should handle missing dir gracefully
-    const result = createBackup();
+  test("creates backups directory if it does not exist", async () => {
+    const result = await createBackup();
     expect(result.success).toBe(true);
     expect(existsSync(backupDir)).toBe(true);
   });
@@ -103,13 +105,13 @@ describe("listBackups", () => {
 
   test("lists backup files sorted by newest first", async () => {
     // Create two backups with a small delay
-    const first = createBackup();
+    const first = await createBackup();
     expect(first.success).toBe(true);
 
     // Tiny delay to ensure different timestamps
     await new Promise((resolve) => setTimeout(resolve, 1100));
 
-    const second = createBackup();
+    const second = await createBackup();
     expect(second.success).toBe(true);
 
     const result = listBackups();
@@ -119,8 +121,8 @@ describe("listBackups", () => {
     expect(result.backups[0].filename).toBe(second.filename);
   });
 
-  test("each backup entry has filename, size, and modified", () => {
-    createBackup();
+  test("each backup entry has filename, size, modified and format", async () => {
+    await createBackup();
     const result = listBackups();
     expect(result.success).toBe(true);
     expect(result.backups.length).toBeGreaterThanOrEqual(1);
@@ -129,6 +131,7 @@ describe("listBackups", () => {
     expect(b.filename).toBeDefined();
     expect(b.size).toBeGreaterThan(0);
     expect(b.modified).toBeDefined();
+    expect(b.format).toBe("zip");
   });
 
   test("ignores non-portfolio files in backups directory", () => {
@@ -157,9 +160,9 @@ describe("restoreBackup", () => {
     cleanupBackups();
   });
 
-  test("restores database from a backup", () => {
+  test("restores database from a zip backup", async () => {
     // Create initial backup with USD currency
-    const backup = createBackup();
+    const backup = await createBackup();
     expect(backup.success).toBe(true);
 
     // Add a new currency to the live DB
@@ -177,6 +180,7 @@ describe("restoreBackup", () => {
     // Restore the backup (which was taken before EUR was added)
     const result = restoreBackup(backup.filename);
     expect(result.success).toBe(true);
+    expect(result.format).toBe("zip");
     expect(result.message).toContain(backup.filename);
   });
 
@@ -186,20 +190,20 @@ describe("restoreBackup", () => {
     expect(result.message).toBe("Invalid backup filename");
   });
 
-  test("rejects filename that does not start with portfolio60_", () => {
+  test("rejects filename that does not match expected patterns", () => {
     const result = restoreBackup("other-file.db");
     expect(result.success).toBe(false);
     expect(result.message).toBe("Invalid backup filename");
   });
 
   test("rejects non-existent backup file", () => {
-    const result = restoreBackup("portfolio60_99990101_000000.db");
+    const result = restoreBackup("portfolio_60_backup_99990101_000000.zip");
     expect(result.success).toBe(false);
     expect(result.message).toBe("Backup file not found");
   });
 
-  test("database is accessible after restore", () => {
-    const backup = createBackup();
+  test("database is accessible after restore", async () => {
+    const backup = await createBackup();
     expect(backup.success).toBe(true);
 
     const result = restoreBackup(backup.filename);
@@ -220,8 +224,8 @@ describe("deleteBackup", () => {
     cleanupBackups();
   });
 
-  test("deletes an existing backup file", () => {
-    const backup = createBackup();
+  test("deletes an existing backup file", async () => {
+    const backup = await createBackup();
     expect(backup.success).toBe(true);
     expect(existsSync(backup.path)).toBe(true);
 
@@ -237,13 +241,13 @@ describe("deleteBackup", () => {
   });
 
   test("rejects non-existent backup file", () => {
-    const result = deleteBackup("portfolio60_99990101_000000.db");
+    const result = deleteBackup("portfolio_60_backup_99990101_000000.zip");
     expect(result.success).toBe(false);
     expect(result.message).toBe("Backup file not found");
   });
 
-  test("backup list shrinks after delete", () => {
-    const backup = createBackup();
+  test("backup list shrinks after delete", async () => {
+    const backup = await createBackup();
     expect(backup.success).toBe(true);
 
     const beforeDelete = listBackups();
