@@ -121,18 +121,25 @@ function renderPages() {
     }
 
     html += '<div class="bg-white rounded-lg border border-brand-200 p-5 mb-3 hover:shadow-md transition-shadow">';
-    html += '<div class="flex items-start justify-between">';
-    html += '<div class="flex-1 min-w-0 cursor-pointer" data-nav-slug="' + escapeHtml(page.slug) + '">';
+    html += '<div class="flex items-center justify-between">';
 
-    // Title with badges
+    // Left side: title + inline action links
+    html += '<div class="flex-1 min-w-0">';
+    html += '<div class="flex items-baseline gap-3">';
     html += '<h3 class="text-lg font-semibold text-brand-800">';
     if (isSticky) {
-      html += '<span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded mr-2">Pinned</span>';
+      html += '<span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded mr-2 align-middle">Pinned</span>';
     }
     if (isUnpublished) {
-      html += '<span class="text-xs bg-brand-100 text-brand-500 px-2 py-0.5 rounded mr-2">Draft</span>';
+      html += '<span class="text-xs bg-brand-100 text-brand-500 px-2 py-0.5 rounded mr-2 align-middle">Draft</span>';
     }
     html += escapeHtml(page.title) + "</h3>";
+    html += '<span class="text-sm text-brand-400">';
+    html += '<button class="text-brand-500 hover:text-brand-700 transition-colors edit-btn" data-slug="' + escapeHtml(page.slug) + '">edit</button>';
+    html += ' <span class="text-brand-300">|</span> ';
+    html += '<button class="text-brand-400 hover:text-red-600 transition-colors delete-btn" data-slug="' + escapeHtml(page.slug) + '" data-title="' + escapeHtml(page.title) + '">delete</button>';
+    html += "</span>";
+    html += "</div>";
 
     // Summary and date
     if (page.summary) {
@@ -141,14 +148,10 @@ function renderPages() {
     if (dateStr) {
       html += '<p class="text-sm text-brand-400 mt-1">' + dateStr + "</p>";
     }
-
     html += "</div>";
 
-    // Action buttons
-    html += '<div class="flex gap-2 ml-4 flex-shrink-0">';
-    html += '<button class="text-sm text-brand-500 hover:text-brand-700 transition-colors edit-btn" data-slug="' + escapeHtml(page.slug) + '">Edit</button>';
-    html += '<button class="text-sm text-brand-400 hover:text-red-600 transition-colors delete-btn" data-slug="' + escapeHtml(page.slug) + '" data-title="' + escapeHtml(page.title) + '">Delete</button>';
-    html += "</div>";
+    // Right side: Read button
+    html += '<a class="text-blue-500 hover:text-blue-700 font-medium text-sm ml-4 flex-shrink-0 transition-colors cursor-pointer inline-flex items-center gap-1" data-nav-slug="' + escapeHtml(page.slug) + '">Read <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg></a>';
 
     html += "</div></div>";
   }
@@ -173,16 +176,14 @@ function renderPages() {
 
   // Attach edit button handlers
   container.querySelectorAll(".edit-btn").forEach(function (btn) {
-    btn.addEventListener("click", function (e) {
-      e.stopPropagation();
+    btn.addEventListener("click", function () {
       openEditor(btn.getAttribute("data-slug"));
     });
   });
 
   // Attach delete button handlers
   container.querySelectorAll(".delete-btn").forEach(function (btn) {
-    btn.addEventListener("click", function (e) {
-      e.stopPropagation();
+    btn.addEventListener("click", function () {
       openDeleteModal(btn.getAttribute("data-slug"), btn.getAttribute("data-title"));
     });
   });
