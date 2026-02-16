@@ -1,0 +1,17 @@
+{
+  "version": "0.2",
+  "words": [],
+  "language": "en-GB",
+  "dictionaries": [
+    "en-gb",
+    "softwareTerms",
+    "typescript",
+    "node",
+    "html",
+    "css",
+    "bash",
+    "markdown"
+  ],
+  "enabledLanguageIds": ["markdown"],
+  "ignorePaths": ["node_modules/**"]
+}

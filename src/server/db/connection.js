@@ -434,6 +434,21 @@ function runMigrations(database) {
   }
 
   database.exec("CREATE TABLE IF NOT EXISTS docs_search_meta (" + "key TEXT PRIMARY KEY, value TEXT" + ")");
+
+  // Migration 17: Add custom_dictionary table (v0.11.0)
+  // User-maintained dictionary of words that CSpell should treat as correct.
+  // Words are added via the docs editor right-click context menu.
+  const customDictTable = database.query("SELECT name FROM sqlite_master WHERE type='table' AND name='custom_dictionary'").get();
+
+  if (!customDictTable) {
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS custom_dictionary (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        word TEXT NOT NULL UNIQUE,
+        added_date TEXT NOT NULL
+      )
+    `);
+  }
 }
 
 /**

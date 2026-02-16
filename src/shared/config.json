@@ -43,6 +43,12 @@
         "spreadsheet": "google",
         "iframe": "<iframe src=\"https://docs.google.com/spreadsheets/d/e/2PACX-1vRiacahHMJPFlzQzmlyPn37jTNIuywUiCtt393fzTdgIZZR2Xr4rLLu--b5-Vnwi29CKrQneTWduPSb/pubhtml?gid=284599303&amp;single=true&amp;widget=true&amp;headers=false\"></iframe>",
         "range": ""
+      },
+      {
+        "title": "Test Excel",
+        "spreadsheet": "microsoft",
+        "iframe": "<iframe width=\"402\" height=\"346\" frameborder=\"0\" scrolling=\"no\" src=\"https://1drv.ms/x/c/b7bf8885da4911af/IQSWkWXIieaHTZ9Zk7g9sFNvAU4q65xIrWDw01XnX9t0QWU?wdAllowInteractivity=False&wdHideGridlines=True&wdHideHeaders=True&wdDownloadButton=True&wdInConfigurator=True&wdInConfigurator=True\"></iframe>",
+        "range": ""
       }
     ]
   },

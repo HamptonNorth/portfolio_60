@@ -14,6 +14,7 @@ import { getStyleConfig, getFontLinks, STYLE_REGISTRY } from "../services/style-
 import { parseFrontMatter, ensureUnpublishedFrontMatter, isLapsed } from "../services/docs-frontmatter.js";
 import { getDatabase } from "../db/connection.js";
 import { initSearchIndex, reindexAllPages, searchPages, getSearchMeta } from "../services/docs-search.js";
+import { spellCheckContent, getCustomDictionary, addCustomWord } from "../services/spellcheck-service.js";
 
 /** @type {string[]} Allowed file extensions for markdown uploads */
 var ALLOWED_MARKDOWN_EXTENSIONS = [".md"];
@@ -71,13 +72,16 @@ var docsRouter = new Router();
 // GET /api/docs/config — returns docs categories and available styles
 docsRouter.get("/api/docs/config", function () {
   var docsConfig = getDocsConfig();
-  return new Response(JSON.stringify({
-    categories: docsConfig.categories,
-    styles: STYLE_REGISTRY,
-  }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return new Response(
+    JSON.stringify({
+      categories: docsConfig.categories,
+      styles: STYLE_REGISTRY,
+    }),
+    {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    },
+  );
 });
 
 // GET /api/docs/list/:category — list all pages in a category
@@ -188,15 +192,18 @@ docsRouter.get("/api/docs/content/:category/:slug", async function (request, par
   var readModeValue = meta["read-mode"];
   meta.readMode = readModeValue === true || readModeValue === "true";
 
-  return new Response(JSON.stringify({
-    meta: meta,
-    html: htmlContent,
-    style: styleConfig,
-    fontLinks: getFontLinks(styleConfig),
-  }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return new Response(
+    JSON.stringify({
+      meta: meta,
+      html: htmlContent,
+      style: styleConfig,
+      fontLinks: getFontLinks(styleConfig),
+    }),
+    {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    },
+  );
 });
 
 // GET /api/docs/raw/:category/:slug — raw markdown for editing
@@ -224,16 +231,19 @@ docsRouter.get("/api/docs/raw/:category/:slug", async function (request, params)
   var content = await mdFile.text();
   var parsed = parseFrontMatter(content);
 
-  return new Response(JSON.stringify({
-    raw: content,
-    meta: parsed.attributes,
-    body: parsed.body,
-    category: category,
-    slug: slug,
-  }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return new Response(
+    JSON.stringify({
+      raw: content,
+      meta: parsed.attributes,
+      body: parsed.body,
+      category: category,
+      slug: slug,
+    }),
+    {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    },
+  );
 });
 
 // PUT /api/docs/raw/:category/:slug — save edited markdown
@@ -268,13 +278,16 @@ docsRouter.put("/api/docs/raw/:category/:slug", async function (request, params)
   var mdPath = "./" + DOCS_DIR + "/" + category + "/" + slug + ".md";
   await Bun.write(mdPath, body.content);
 
-  return new Response(JSON.stringify({
-    success: true,
-    message: "File saved successfully",
-  }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return new Response(
+    JSON.stringify({
+      success: true,
+      message: "File saved successfully",
+    }),
+    {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    },
+  );
 });
 
 // POST /api/docs/upload/:category — upload a new markdown file
@@ -309,12 +322,15 @@ docsRouter.post("/api/docs/upload/:category", async function (request, params) {
 
   var ext = getFileExtension(file.name);
   if (!ALLOWED_MARKDOWN_EXTENSIONS.includes(ext)) {
-    return new Response(JSON.stringify({
-      error: "Invalid file type. Allowed: " + ALLOWED_MARKDOWN_EXTENSIONS.join(", "),
-    }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        error: "Invalid file type. Allowed: " + ALLOWED_MARKDOWN_EXTENSIONS.join(", "),
+      }),
+      {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 
   var sanitizedName = sanitizeFilename(file.name);
@@ -332,12 +348,15 @@ docsRouter.post("/api/docs/upload/:category", async function (request, params) {
 
   var targetFile = Bun.file(targetPath);
   if (await targetFile.exists()) {
-    return new Response(JSON.stringify({
-      error: '"' + sanitizedName + '" already exists in ' + category,
-    }), {
-      status: 409,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        error: '"' + sanitizedName + '" already exists in ' + category,
+      }),
+      {
+        status: 409,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 
   var content = await file.text();
@@ -346,14 +365,17 @@ docsRouter.post("/api/docs/upload/:category", async function (request, params) {
 
   await Bun.write(targetPath, content);
 
-  return new Response(JSON.stringify({
-    success: true,
-    message: 'File "' + sanitizedName + '" uploaded successfully',
-    filename: sanitizedName,
-  }), {
-    status: 201,
-    headers: { "Content-Type": "application/json" },
-  });
+  return new Response(
+    JSON.stringify({
+      success: true,
+      message: 'File "' + sanitizedName + '" uploaded successfully',
+      filename: sanitizedName,
+    }),
+    {
+      status: 201,
+      headers: { "Content-Type": "application/json" },
+    },
+  );
 });
 
 // POST /api/docs/media/:category — upload an image file
@@ -388,12 +410,15 @@ docsRouter.post("/api/docs/media/:category", async function (request, params) {
 
   var ext = getFileExtension(file.name);
   if (!ALLOWED_IMAGE_EXTENSIONS.includes(ext)) {
-    return new Response(JSON.stringify({
-      error: "Invalid file type. Allowed: " + ALLOWED_IMAGE_EXTENSIONS.join(", "),
-    }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        error: "Invalid file type. Allowed: " + ALLOWED_IMAGE_EXTENSIONS.join(", "),
+      }),
+      {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 
   var sanitizedName = sanitizeFilename(file.name);
@@ -411,12 +436,15 @@ docsRouter.post("/api/docs/media/:category", async function (request, params) {
 
   var targetFile = Bun.file(targetPath);
   if (await targetFile.exists()) {
-    return new Response(JSON.stringify({
-      error: '"' + sanitizedName + '" already exists in ' + category,
-    }), {
-      status: 409,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        error: '"' + sanitizedName + '" already exists in ' + category,
+      }),
+      {
+        status: 409,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 
   var buffer = await file.arrayBuffer();
@@ -424,15 +452,18 @@ docsRouter.post("/api/docs/media/:category", async function (request, params) {
 
   var markdownPath = "/docs/media/" + category + "/" + sanitizedName;
 
-  return new Response(JSON.stringify({
-    success: true,
-    message: 'Image "' + sanitizedName + '" uploaded successfully',
-    filename: sanitizedName,
-    markdownUsage: "![" + sanitizedName + "](" + markdownPath + ")",
-  }), {
-    status: 201,
-    headers: { "Content-Type": "application/json" },
-  });
+  return new Response(
+    JSON.stringify({
+      success: true,
+      message: 'Image "' + sanitizedName + '" uploaded successfully',
+      filename: sanitizedName,
+      markdownUsage: "![" + sanitizedName + "](" + markdownPath + ")",
+    }),
+    {
+      status: 201,
+      headers: { "Content-Type": "application/json" },
+    },
+  );
 });
 
 // DELETE /api/docs/:category/:slug — delete a page
@@ -468,13 +499,16 @@ docsRouter.delete("/api/docs/:category/:slug", async function (request, params) 
 
   await unlink(mdPath);
 
-  return new Response(JSON.stringify({
-    success: true,
-    message: "Page deleted successfully",
-  }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return new Response(
+    JSON.stringify({
+      success: true,
+      message: "Page deleted successfully",
+    }),
+    {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    },
+  );
 });
 
 // GET /api/docs/search?q=term — full-text search
@@ -520,6 +554,63 @@ docsRouter.get("/api/docs/search-meta", function () {
     status: 200,
     headers: { "Content-Type": "application/json" },
   });
+});
+
+// POST /api/docs/spellcheck — spellcheck markdown content
+docsRouter.post("/api/docs/spellcheck", async function (request) {
+  try {
+    var body = await request.json();
+    var content = body.content;
+
+    if (typeof content !== "string") {
+      return new Response(JSON.stringify({ error: "content is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    var db = getDatabase();
+    var customWords = getCustomDictionary(db);
+    var errors = await spellCheckContent(content, customWords);
+
+    return new Response(JSON.stringify({ errors: errors }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: "Spellcheck failed", detail: err.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+});
+
+// POST /api/docs/dictionary — add a word to the custom dictionary
+docsRouter.post("/api/docs/dictionary", async function (request) {
+  try {
+    var body = await request.json();
+    var word = body.word;
+
+    if (typeof word !== "string" || word.trim().length === 0) {
+      return new Response(JSON.stringify({ error: "word is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    var db = getDatabase();
+    addCustomWord(db, word.trim());
+
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: "Failed to add word", detail: err.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 });
 
 /**

@@ -21,6 +21,18 @@ var editingSlug = null;
 /** @type {string|null} Slug of the page pending deletion */
 var deletingSlug = null;
 
+/** @type {Array<{word: string, offset: number, length: number}>} Current spell errors */
+var spellErrors = [];
+
+/** @type {boolean} Whether spellcheck is active for this editor session */
+var spellActive = false;
+
+/** @type {number|null} Debounce timer for auto-rerun on edit */
+var spellDebounceTimer = null;
+
+/** @type {string|null} Word targeted by the right-click context menu */
+var contextMenuWord = null;
+
 /**
  * @description Initialise the page on load. Reads the category from the
  * URL query string and loads the page list.
@@ -30,8 +42,7 @@ function init() {
   currentCategory = params.get("category") || "";
 
   if (!currentCategory) {
-    document.getElementById("pages-container").innerHTML =
-      '<p class="text-brand-500">No category specified. Use the Docs menu to select a category.</p>';
+    document.getElementById("pages-container").innerHTML = '<p class="text-brand-500">No category specified. Use the Docs menu to select a category.</p>';
     return;
   }
 
@@ -88,11 +99,7 @@ function renderPages() {
   var container = document.getElementById("pages-container");
 
   if (allPages.length === 0) {
-    container.innerHTML =
-      '<div class="bg-white rounded-lg border border-brand-200 p-8 text-center">' +
-      '<p class="text-brand-500 text-lg mb-2">No documents yet</p>' +
-      '<p class="text-brand-400">Upload a markdown file to get started.</p>' +
-      "</div>";
+    container.innerHTML = '<div class="bg-white rounded-lg border border-brand-200 p-8 text-center">' + '<p class="text-brand-500 text-lg mb-2">No documents yet</p>' + '<p class="text-brand-400">Upload a markdown file to get started.</p>' + "</div>";
     document.getElementById("load-more-container").classList.add("hidden");
     return;
   }
@@ -253,6 +260,37 @@ function setupEventListeners() {
       closeUploadModal();
       closeEditor();
       closeDeleteModal();
+      hideContextMenu();
+    }
+  });
+
+  // Spellcheck button
+  document.getElementById("editor-spell-btn").addEventListener("click", function () {
+    spellActive = true;
+    runSpellCheck();
+  });
+
+  // Auto-rerun spellcheck on edit (debounced)
+  document.getElementById("editor-textarea").addEventListener("input", function () {
+    if (!spellActive) return;
+    clearTimeout(spellDebounceTimer);
+    spellDebounceTimer = setTimeout(runSpellCheck, 800);
+  });
+
+  // Sync scroll between textarea and highlights overlay
+  document.getElementById("editor-textarea").addEventListener("scroll", syncScroll);
+
+  // Right-click context menu on textarea
+  document.getElementById("editor-textarea").addEventListener("contextmenu", handleContextMenu);
+
+  // Add to dictionary from context menu
+  document.getElementById("spell-add-word-btn").addEventListener("click", addWordToDictionary);
+
+  // Hide context menu on click elsewhere
+  document.addEventListener("click", function (e) {
+    var menu = document.getElementById("spell-context-menu");
+    if (!menu.contains(e.target)) {
+      hideContextMenu();
     }
   });
 }
@@ -351,6 +389,7 @@ async function openEditor(slug) {
 function closeEditor() {
   document.getElementById("editor-modal").classList.add("hidden");
   editingSlug = null;
+  resetSpellCheck();
 }
 
 /**
@@ -364,14 +403,11 @@ async function saveEditor() {
   errorsEl.textContent = "";
 
   try {
-    var response = await fetch(
-      "/api/docs/raw/" + encodeURIComponent(currentCategory) + "/" + encodeURIComponent(editingSlug),
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: content }),
-      }
-    );
+    var response = await fetch("/api/docs/raw/" + encodeURIComponent(currentCategory) + "/" + encodeURIComponent(editingSlug), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: content }),
+    });
 
     var data = await response.json();
 
@@ -455,10 +491,7 @@ async function confirmDelete() {
   if (!deletingSlug) return;
 
   try {
-    var response = await fetch(
-      "/api/docs/" + encodeURIComponent(currentCategory) + "/" + encodeURIComponent(deletingSlug),
-      { method: "DELETE" }
-    );
+    var response = await fetch("/api/docs/" + encodeURIComponent(currentCategory) + "/" + encodeURIComponent(deletingSlug), { method: "DELETE" });
 
     var data = await response.json();
 
@@ -475,6 +508,201 @@ async function confirmDelete() {
     showError("page-messages", "Delete failed", err.message);
     closeDeleteModal();
   }
+}
+
+// =============================================================================
+// Spellcheck
+// =============================================================================
+
+/**
+ * @description Run a spellcheck on the current editor content by calling
+ * the server API. Updates the highlights overlay and error count display.
+ */
+async function runSpellCheck() {
+  var textarea = document.getElementById("editor-textarea");
+  var content = textarea.value;
+
+  if (!content.trim()) {
+    spellErrors = [];
+    updateHighlights();
+    updateSpellCount();
+    return;
+  }
+
+  try {
+    var response = await fetch("/api/docs/spellcheck", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: content }),
+    });
+
+    if (!response.ok) {
+      return;
+    }
+
+    var data = await response.json();
+    spellErrors = data.errors || [];
+    updateHighlights();
+    updateSpellCount();
+  } catch (err) {
+    // Silently fail — spellcheck is non-critical
+  }
+}
+
+/**
+ * @description Update the mirror-div overlay to show red wavy underlines
+ * under misspelt words. The overlay text is transparent so only the
+ * underline decorations are visible beneath the textarea.
+ */
+function updateHighlights() {
+  var textarea = document.getElementById("editor-textarea");
+  var highlights = document.getElementById("editor-highlights");
+  var text = textarea.value;
+
+  if (spellErrors.length === 0) {
+    // Show plain escaped text to maintain layout synchronisation
+    highlights.innerHTML = escapeHtml(text) + "\n";
+    syncScroll();
+    return;
+  }
+
+  // Sort errors by offset so we can process left-to-right
+  var sorted = spellErrors.slice().sort(function (a, b) {
+    return a.offset - b.offset;
+  });
+
+  // Build highlighted HTML by inserting <mark> tags at error positions
+  var html = "";
+  var lastIndex = 0;
+
+  for (var i = 0; i < sorted.length; i++) {
+    var err = sorted[i];
+    // Skip overlapping or out-of-range errors
+    if (err.offset < lastIndex || err.offset + err.length > text.length) {
+      continue;
+    }
+    // Text before this error
+    html += escapeHtml(text.substring(lastIndex, err.offset));
+    // The misspelt word wrapped in a mark tag
+    html += '<mark class="spell-error">' + escapeHtml(text.substring(err.offset, err.offset + err.length)) + "</mark>";
+    lastIndex = err.offset + err.length;
+  }
+
+  // Remaining text after last error
+  html += escapeHtml(text.substring(lastIndex));
+  // Trailing newline ensures the overlay height matches the textarea
+  highlights.innerHTML = html + "\n";
+  syncScroll();
+}
+
+/**
+ * @description Update the spell error count display in the editor footer.
+ */
+function updateSpellCount() {
+  var countEl = document.getElementById("editor-spell-count");
+  if (spellErrors.length === 0) {
+    countEl.textContent = "No errors";
+    countEl.classList.remove("hidden", "text-red-500");
+    countEl.classList.add("text-green-600");
+  } else {
+    countEl.textContent = spellErrors.length + (spellErrors.length === 1 ? " error" : " errors");
+    countEl.classList.remove("hidden", "text-green-600");
+    countEl.classList.add("text-red-500");
+  }
+}
+
+/**
+ * @description Keep the highlights overlay scroll position in sync with
+ * the textarea so underlines stay aligned with the text.
+ */
+function syncScroll() {
+  var textarea = document.getElementById("editor-textarea");
+  var highlights = document.getElementById("editor-highlights");
+  highlights.scrollTop = textarea.scrollTop;
+  highlights.scrollLeft = textarea.scrollLeft;
+}
+
+/**
+ * @description Handle right-click on the textarea. If the cursor is over
+ * a misspelt word, show a custom context menu with "Add to dictionary".
+ * @param {MouseEvent} e - The contextmenu event
+ */
+function handleContextMenu(e) {
+  if (!spellActive || spellErrors.length === 0) return;
+
+  var textarea = document.getElementById("editor-textarea");
+  var cursorPos = textarea.selectionStart;
+
+  // Find if cursor is within a misspelt word
+  var matchedError = null;
+  for (var i = 0; i < spellErrors.length; i++) {
+    var err = spellErrors[i];
+    if (cursorPos >= err.offset && cursorPos <= err.offset + err.length) {
+      matchedError = err;
+      break;
+    }
+  }
+
+  if (!matchedError) return;
+
+  e.preventDefault();
+  contextMenuWord = matchedError.word;
+
+  var menu = document.getElementById("spell-context-menu");
+  menu.style.left = e.clientX + "px";
+  menu.style.top = e.clientY + "px";
+  menu.classList.remove("hidden");
+}
+
+/**
+ * @description Hide the spellcheck context menu.
+ */
+function hideContextMenu() {
+  document.getElementById("spell-context-menu").classList.add("hidden");
+  contextMenuWord = null;
+}
+
+/**
+ * @description Add the context-menu word to the custom dictionary and
+ * re-run spellcheck so the word is no longer flagged.
+ */
+async function addWordToDictionary() {
+  if (!contextMenuWord) return;
+
+  var word = contextMenuWord;
+  hideContextMenu();
+
+  try {
+    await fetch("/api/docs/dictionary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ word: word }),
+    });
+
+    // Re-run spellcheck to remove the word from errors
+    runSpellCheck();
+  } catch (err) {
+    // Silently fail
+  }
+}
+
+/**
+ * @description Reset all spellcheck state when the editor is closed.
+ */
+function resetSpellCheck() {
+  spellErrors = [];
+  spellActive = false;
+  clearTimeout(spellDebounceTimer);
+  spellDebounceTimer = null;
+  contextMenuWord = null;
+  hideContextMenu();
+
+  var highlights = document.getElementById("editor-highlights");
+  highlights.innerHTML = "";
+
+  var countEl = document.getElementById("editor-spell-count");
+  countEl.classList.add("hidden");
+  countEl.classList.remove("text-red-500", "text-green-600");
 }
 
 // =============================================================================

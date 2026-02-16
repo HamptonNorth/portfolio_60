@@ -18,6 +18,7 @@
     "@tailwindcss/cli": "^4.1.18",
     "concurrently": "^9.2.1",
     "croner": "^10.0.1",
+    "cspell-lib": "^9.6.4",
     "lit": "^3.3.2",
     "marked": "^17.0.2",
     "tailwindcss": "^4.1.18",

@@ -5,7 +5,7 @@
  */
 
 /** @type {string[]} Allowed iframe source domains for security */
-const ALLOWED_IFRAME_DOMAINS = ["docs.google.com", "onedrive.live.com"];
+const ALLOWED_IFRAME_DOMAINS = ["docs.google.com", "onedrive.live.com", "1drv.ms"];
 
 /**
  * @description Extract the src URL from an iframe HTML string.

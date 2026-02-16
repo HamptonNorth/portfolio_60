@@ -6,6 +6,17 @@
         <title>Portfolio 60 — Docs</title>
         <link rel="stylesheet" href="/css/output.css" />
         <link rel="icon" type="image/svg+xml" href="/images/favicon.svg" />
+        <style>
+            .spell-error {
+                background-color: transparent;
+                text-decoration: underline wavy red;
+                text-decoration-skip-ink: none;
+            }
+            #editor-highlights {
+                color: transparent;
+                caret-color: transparent;
+            }
+        </style>
     </head>
     <body class="bg-brand-25 text-brand-900 min-h-screen flex flex-col">
         <app-navbar></app-navbar>
@@ -51,13 +62,20 @@
                         <h3 class="text-xl font-semibold text-brand-800" id="editor-title">Edit Document</h3>
                         <button id="editor-media-btn" class="text-sm bg-brand-100 hover:bg-brand-200 text-brand-700 px-3 py-1 rounded transition-colors">Upload Image</button>
                     </div>
-                    <textarea id="editor-textarea" class="w-full h-96 px-3 py-2 border border-brand-300 rounded-md font-mono text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y" spellcheck="true"></textarea>
+                    <div id="editor-container" class="relative w-full h-96 border border-brand-300 rounded-md overflow-hidden focus-within:ring-2 focus-within:ring-brand-500">
+                        <div id="editor-highlights" class="absolute inset-0 px-3 py-2 font-mono text-sm overflow-auto whitespace-pre-wrap break-words pointer-events-none"></div>
+                        <textarea id="editor-textarea" class="absolute inset-0 w-full h-full px-3 py-2 font-mono text-sm focus:outline-none resize-none bg-transparent" spellcheck="false"></textarea>
+                    </div>
                     <div id="editor-errors" class="text-error text-sm mt-2"></div>
                     <div id="editor-media-result" class="text-sm text-brand-500 mt-2 hidden"></div>
                     <div class="flex items-center justify-between pt-4">
                         <div class="flex gap-3">
                             <button id="editor-save-btn" class="bg-brand-700 hover:bg-brand-800 text-white font-medium px-5 py-2 rounded-lg transition-colors">Save</button>
                             <button id="editor-cancel-btn" class="bg-brand-100 hover:bg-brand-200 text-brand-700 font-medium px-5 py-2 rounded-lg transition-colors">Cancel</button>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span id="editor-spell-count" class="text-sm text-brand-400 hidden"></span>
+                            <button id="editor-spell-btn" class="text-sm bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-300 px-3 py-1.5 rounded transition-colors">Spell Check</button>
                         </div>
                     </div>
                 </div>
@@ -76,6 +94,10 @@
                         <button id="delete-confirm-btn" class="bg-red-600 hover:bg-red-700 text-white font-medium px-5 py-2 rounded-lg transition-colors">Delete</button>
                     </div>
                 </div>
+            </div>
+            <!-- Spellcheck context menu -->
+            <div id="spell-context-menu" class="hidden fixed bg-white border border-brand-300 rounded shadow-lg py-1 z-[60]">
+                <button id="spell-add-word-btn" class="w-full text-left px-4 py-1.5 text-sm text-brand-700 hover:bg-brand-50">Add to dictionary</button>
             </div>
         </main>
 
