@@ -2,6 +2,7 @@ import { Router } from "../router.js";
 import { getAllUsers, getUserById, createUser, updateUser, deleteUser } from "../db/users-db.js";
 import { validateUser } from "../validation.js";
 import { verifyPassphrase, loadHashFromEnv } from "../auth.js";
+import { isTestMode } from "../test-mode.js";
 
 /**
  * @description Router instance for user API routes.
@@ -105,12 +106,23 @@ usersRouter.delete("/api/users/:id", async function (request, params) {
     return new Response(JSON.stringify({ error: "Validation failed", detail: "Passphrase is required to delete a user" }), { status: 400, headers: { "Content-Type": "application/json" } });
   }
 
-  const storedHash = loadHashFromEnv();
-  if (!storedHash) {
-    return new Response(JSON.stringify({ error: "No passphrase configured", detail: "No passphrase has been set" }), { status: 400, headers: { "Content-Type": "application/json" } });
+  // Passphrase confirmation isolation: test mode accepts only "test",
+  // live mode accepts only the real passphrase (never "test")
+  let isValid = false;
+  if (isTestMode()) {
+    isValid = passphrase.toLowerCase() === "test";
+  } else {
+    if (passphrase.toLowerCase() === "test") {
+      isValid = false;
+    } else {
+      const storedHash = loadHashFromEnv();
+      if (!storedHash) {
+        return new Response(JSON.stringify({ error: "No passphrase configured", detail: "No passphrase has been set" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+      isValid = await verifyPassphrase(passphrase, storedHash);
+    }
   }
 
-  const isValid = await verifyPassphrase(passphrase, storedHash);
   if (!isValid) {
     return new Response(JSON.stringify({ error: "Incorrect passphrase" }), { status: 401, headers: { "Content-Type": "application/json" } });
   }

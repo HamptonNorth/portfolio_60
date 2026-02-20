@@ -17,11 +17,30 @@ export const DB_PATH = "data/portfolio60.db";
 /** @type {string} Directory for database backups */
 export const BACKUP_DIR = "backups";
 
-/** @type {string} Root directory for documentation markdown files */
+/** @type {string} Default root directory for documentation markdown files */
 export const DOCS_DIR = "docs";
 
-/** @type {string} Subdirectory under DOCS_DIR for uploaded media (images) */
+/** @type {string} Default subdirectory under DOCS_DIR for uploaded media (images) */
 export const DOCS_MEDIA_DIR = "docs/media";
+
+/**
+ * @description Get the effective docs directory. Returns the DOCS_DIR
+ * environment variable if set (e.g. for test mode pointing at test reference
+ * docs), otherwise returns the default DOCS_DIR constant.
+ * @returns {string} The docs directory path
+ */
+export function getDocsDir() {
+  return process.env.DOCS_DIR || DOCS_DIR;
+}
+
+/**
+ * @description Get the effective docs media directory. Derived from
+ * getDocsDir() with "/media" appended.
+ * @returns {string} The docs media directory path
+ */
+export function getDocsMediaDir() {
+  return getDocsDir() + "/media";
+}
 
 /** @type {number} Multiplier for storing currency rates as integers (e.g. 1.2543 stored as 12543) */
 export const CURRENCY_SCALE_FACTOR = 10000;

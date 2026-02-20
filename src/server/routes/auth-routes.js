@@ -1,5 +1,15 @@
 import { isFirstRun, getAuthStatus, setAuthStatus, hashPassphrase, verifyPassphrase, loadHashFromEnv, saveHashToEnv } from "../auth.js";
 import { databaseExists, createDatabase } from "../db/connection.js";
+import { isTestMode, activateTestMode, testReferenceExists } from "../test-mode.js";
+
+/**
+ * @description Check if a passphrase value is the test mode trigger.
+ * @param {string} passphrase - The passphrase to check
+ * @returns {boolean} True if the passphrase is "test" (case-insensitive)
+ */
+function isTestPassphrase(passphrase) {
+  return typeof passphrase === "string" && passphrase.toLowerCase() === "test";
+}
 
 /**
  * @description Handle authentication API routes.
@@ -17,6 +27,19 @@ export async function handleAuthRoute(method, path, request) {
       JSON.stringify({
         isFirstRun: isFirstRun(),
         isAuthenticated: getAuthStatus(),
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  // GET /api/auth/test-mode — returns whether the current session is in test mode
+  if (method === "GET" && path === "/api/auth/test-mode") {
+    return new Response(
+      JSON.stringify({
+        testMode: isTestMode(),
       }),
       {
         status: 200,
@@ -49,6 +72,24 @@ export async function handleAuthRoute(method, path, request) {
     }
 
     const passphrase = body.passphrase;
+
+    // Test mode bypass — enter test mode without setting a hash
+    if (isTestPassphrase(passphrase)) {
+      if (!testReferenceExists()) {
+        return new Response(
+          JSON.stringify({
+            error: "Test mode not available",
+            detail: "No test reference data found. The test database has not been set up yet.",
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+
+      activateTestMode();
+      setAuthStatus(true);
+      return new Response(JSON.stringify({ success: true, testMode: true, message: "Test mode activated" }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+
     if (!passphrase || typeof passphrase !== "string" || passphrase.length < 8) {
       return new Response(
         JSON.stringify({
@@ -112,6 +153,23 @@ export async function handleAuthRoute(method, path, request) {
     const passphrase = body.passphrase;
     if (!passphrase || typeof passphrase !== "string") {
       return new Response(JSON.stringify({ error: "Validation failed", detail: "Passphrase is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+
+    // Test mode bypass — enter test mode without verifying hash
+    if (isTestPassphrase(passphrase)) {
+      if (!testReferenceExists()) {
+        return new Response(
+          JSON.stringify({
+            error: "Test mode not available",
+            detail: "No test reference data found. The test database has not been set up yet.",
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+
+      activateTestMode();
+      setAuthStatus(true);
+      return new Response(JSON.stringify({ success: true, testMode: true, message: "Test mode activated" }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
     const storedHash = loadHashFromEnv();

@@ -7,7 +7,7 @@
 
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { DOCS_DIR } from "../../shared/constants.js";
+import { getDocsDir } from "../../shared/constants.js";
 import { parseFrontMatter } from "./docs-frontmatter.js";
 
 /** @type {number} Maximum results returned from a search */
@@ -44,20 +44,9 @@ var WEIGHTS = {
  * @param {import("bun:sqlite").Database} db - Database instance
  */
 export function initSearchIndex(db) {
-  db.run(
-    "CREATE VIRTUAL TABLE IF NOT EXISTS docs_search USING fts5(" +
-      "category UNINDEXED, slug UNINDEXED, published UNINDEXED, lapse_date UNINDEXED, " +
-      "title, description, h1_content, h2_content, h3_content, h4_h6_content, " +
-      "bold_content, link_text, blockquote_content, body_text, code_content, " +
-      "tokenize='porter unicode61'" +
-    ")"
-  );
+  db.run("CREATE VIRTUAL TABLE IF NOT EXISTS docs_search USING fts5(" + "category UNINDEXED, slug UNINDEXED, published UNINDEXED, lapse_date UNINDEXED, " + "title, description, h1_content, h2_content, h3_content, h4_h6_content, " + "bold_content, link_text, blockquote_content, body_text, code_content, " + "tokenize='porter unicode61'" + ")");
 
-  db.run(
-    "CREATE TABLE IF NOT EXISTS docs_search_meta (" +
-      "key TEXT PRIMARY KEY, value TEXT" +
-    ")"
-  );
+  db.run("CREATE TABLE IF NOT EXISTS docs_search_meta (" + "key TEXT PRIMARY KEY, value TEXT" + ")");
 }
 
 /**
@@ -200,31 +189,9 @@ function indexPage(db, category, slug, content) {
 
   var regions = extractContentRegions(body);
 
-  var insertStmt = db.prepare(
-    "INSERT INTO docs_search (" +
-      "category, slug, published, lapse_date, " +
-      "title, description, h1_content, h2_content, h3_content, h4_h6_content, " +
-      "bold_content, link_text, blockquote_content, body_text, code_content" +
-    ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-  );
+  var insertStmt = db.prepare("INSERT INTO docs_search (" + "category, slug, published, lapse_date, " + "title, description, h1_content, h2_content, h3_content, h4_h6_content, " + "bold_content, link_text, blockquote_content, body_text, code_content" + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-  insertStmt.run(
-    category,
-    slug,
-    meta.published || "y",
-    meta.lapse || null,
-    meta.title || "",
-    meta.summary || meta.description || "",
-    regions.h1.join(" "),
-    regions.h2.join(" "),
-    regions.h3.join(" "),
-    regions.h4_h6.join(" "),
-    regions.bold.join(" "),
-    regions.link_text.join(" "),
-    regions.blockquote.join(" "),
-    regions.body.join(" "),
-    regions.code.join(" ")
-  );
+  insertStmt.run(category, slug, meta.published || "y", meta.lapse || null, meta.title || "", meta.summary || meta.description || "", regions.h1.join(" "), regions.h2.join(" "), regions.h3.join(" "), regions.h4_h6.join(" "), regions.bold.join(" "), regions.link_text.join(" "), regions.blockquote.join(" "), regions.body.join(" "), regions.code.join(" "));
 
   return true;
 }
@@ -259,7 +226,7 @@ export async function reindexAllPages(db, categories) {
 
     for (var i = 0; i < categoryNames.length; i++) {
       var category = categoryNames[i];
-      var dirPath = "./" + DOCS_DIR + "/" + category;
+      var dirPath = "./" + getDocsDir() + "/" + category;
 
       try {
         var files = await readdir(dirPath);
@@ -306,7 +273,7 @@ export async function reindexAllPages(db, categories) {
       error: err.message,
       indexed: indexedCount,
       categories: categoriesProcessed,
-      duration: (Date.now() - startTime) + "ms",
+      duration: Date.now() - startTime + "ms",
     };
   }
 }
@@ -394,17 +361,9 @@ export function searchPages(db, query, options) {
     // category(0), slug(0), published(0), lapse_date(0),
     // title(10), description(8), h1(6), h2(5), h3(4), h4_h6(2),
     // bold(2), link_text(2), blockquote(1.5), body(1), code(0.5)
-    var bm25Weights = "0, 0, 0, 0, " +
-      WEIGHTS.title + ", " + WEIGHTS.description + ", " +
-      WEIGHTS.h1 + ", " + WEIGHTS.h2 + ", " + WEIGHTS.h3 + ", " + WEIGHTS.h4_h6 + ", " +
-      WEIGHTS.bold + ", " + WEIGHTS.link_text + ", " + WEIGHTS.blockquote + ", " +
-      WEIGHTS.body + ", " + WEIGHTS.code;
+    var bm25Weights = "0, 0, 0, 0, " + WEIGHTS.title + ", " + WEIGHTS.description + ", " + WEIGHTS.h1 + ", " + WEIGHTS.h2 + ", " + WEIGHTS.h3 + ", " + WEIGHTS.h4_h6 + ", " + WEIGHTS.bold + ", " + WEIGHTS.link_text + ", " + WEIGHTS.blockquote + ", " + WEIGHTS.body + ", " + WEIGHTS.code;
 
-    var searchSql =
-      "SELECT category, slug, title, description, published, lapse_date, " +
-      "h1_content, h2_content, body_text, " +
-      "bm25(docs_search, " + bm25Weights + ") as score " +
-      "FROM docs_search WHERE docs_search MATCH ? ORDER BY score LIMIT ?";
+    var searchSql = "SELECT category, slug, title, description, published, lapse_date, " + "h1_content, h2_content, body_text, " + "bm25(docs_search, " + bm25Weights + ") as score " + "FROM docs_search WHERE docs_search MATCH ? ORDER BY score LIMIT ?";
 
     var rawResults = db.query(searchSql).all(ftsQuery, limit * 2);
 
@@ -469,7 +428,7 @@ export function searchPages(db, query, options) {
       query: cleanQuery,
       results: [],
       total: 0,
-      duration: (Date.now() - startTime) + "ms",
+      duration: Date.now() - startTime + "ms",
       error: err.message,
     };
   }

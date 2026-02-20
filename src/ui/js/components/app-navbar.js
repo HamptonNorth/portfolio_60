@@ -18,7 +18,7 @@ class AppNavbar extends LitElement {
         <div class="flex items-center justify-between max-w-7xl mx-auto">
           <h1 class="text-xl font-semibold tracking-wide flex items-center gap-2">
             <img src="/images/redmug-logo.svg" alt="Red Mug logo" class="h-8 w-8" />
-            Portfolio 60
+            <span id="nav-app-title">Portfolio 60</span>
           </h1>
           <ul class="flex gap-6 text-base items-center">
             <li><a href="/" class="hover:text-brand-200 transition-colors" data-nav="home">Home</a></li>
@@ -109,6 +109,33 @@ class AppNavbar extends LitElement {
     }
     this._loadLists();
     this._loadDocs();
+    this._checkTestMode();
+  }
+
+  /**
+   * @description Check whether the current session is in test mode.
+   * If so, update the navbar title and add a visual indicator.
+   */
+  async _checkTestMode() {
+    try {
+      const response = await fetch("/api/auth/test-mode");
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!data.testMode) return;
+
+      const titleSpan = this.querySelector("#nav-app-title");
+      if (titleSpan) {
+        titleSpan.textContent = "Portfolio 60 - Test";
+      }
+
+      const nav = this.querySelector("nav");
+      if (nav) {
+        nav.classList.remove("bg-brand-800");
+        nav.classList.add("bg-amber-700");
+      }
+    } catch {
+      // Ignore fetch errors — navbar stays in normal mode
+    }
   }
 
   /**

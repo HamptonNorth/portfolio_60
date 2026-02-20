@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, copyFileSync, readdirSync, statSync, unlinkSync,
 import { resolve, join, basename } from "node:path";
 import archiver from "archiver";
 import AdmZip from "adm-zip";
-import { BACKUP_DIR, DOCS_DIR } from "../../shared/constants.js";
+import { BACKUP_DIR, getDocsDir } from "../../shared/constants.js";
 import { getDatabasePath, closeDatabase, getDatabase } from "./connection.js";
 import { getConfigFilePath } from "../config.js";
 
@@ -130,7 +130,7 @@ export async function createBackup() {
     db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
 
     const configPath = getConfigFilePath();
-    const docsDir = resolve(DOCS_DIR);
+    const docsDir = resolve(getDocsDir());
     const filename = generateZipFilename();
     const outputPath = join(backupDir, filename);
 
@@ -345,7 +345,7 @@ export function restoreBackup(filename) {
     if (validation.format === "zip") {
       // Zip restore: database + config + docs
       const configPath = getConfigFilePath();
-      const docsDir = resolve(DOCS_DIR);
+      const docsDir = resolve(getDocsDir());
       restoreFromZip(backupPath, dbPath, configPath, docsDir);
     } else {
       // Legacy .db restore: database only

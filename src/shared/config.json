@@ -55,7 +55,7 @@
   "docs": {
     "_readme": "Documentation subsystem categories. Each key under 'categories' is a folder name under docs/. The 'style' sets the default markdown CSS (github or modest), and 'label' is the display name in the Docs menu.",
     "categories": {
-      "guide": { "style": "github", "label": "User Guide" },
+      "guide": { "style": "github", "label": "User Guides" },
       "notes": { "style": "modest", "label": "Financial Notes" }
     }
   },

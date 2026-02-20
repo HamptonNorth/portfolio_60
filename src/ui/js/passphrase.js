@@ -49,8 +49,8 @@ function showSetPassphraseForm(contentDiv, messagesDiv) {
         <input type="password" id="passphrase" name="passphrase"
           class="w-full px-3 py-2 border border-brand-300 rounded-md text-base
                  focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-          minlength="8" required
-          placeholder="Minimum 8 characters">
+          required
+          placeholder="Minimum 8 characters (or 'test' for demo mode)">
       </div>
       <div>
         <label for="confirm-passphrase" class="block text-sm font-medium text-brand-700 mb-1">
@@ -59,7 +59,7 @@ function showSetPassphraseForm(contentDiv, messagesDiv) {
         <input type="password" id="confirm-passphrase" name="confirm-passphrase"
           class="w-full px-3 py-2 border border-brand-300 rounded-md text-base
                  focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-          minlength="8" required
+          required
           placeholder="Enter passphrase again">
       </div>
       <div id="form-errors" class="text-error text-sm"></div>
@@ -80,15 +80,20 @@ function showSetPassphraseForm(contentDiv, messagesDiv) {
     const errorsDiv = document.getElementById("form-errors");
     errorsDiv.textContent = "";
 
-    // Client-side validation
-    if (passphrase.length < 8) {
-      errorsDiv.textContent = "Passphrase must be at least 8 characters long.";
-      return;
-    }
+    // Allow "test" to pass through to the server for test mode activation
+    const isTestEntry = passphrase.toLowerCase() === "test";
 
-    if (passphrase !== confirm) {
-      errorsDiv.textContent = "Passphrases do not match.";
-      return;
+    // Client-side validation (skip for test mode entry)
+    if (!isTestEntry) {
+      if (passphrase.length < 8) {
+        errorsDiv.textContent = "Passphrase must be at least 8 characters long.";
+        return;
+      }
+
+      if (passphrase !== confirm) {
+        errorsDiv.textContent = "Passphrases do not match.";
+        return;
+      }
     }
 
     // Send to server
@@ -98,6 +103,11 @@ function showSetPassphraseForm(contentDiv, messagesDiv) {
     });
 
     if (result.ok) {
+      // Test mode — redirect immediately
+      if (result.data.testMode) {
+        window.location.href = "/";
+        return;
+      }
       // Show a brief confirmation before redirecting
       const msg = result.data.databaseCreated ? "Passphrase set and database created. Redirecting..." : "Passphrase set. Redirecting...";
       showSuccess("passphrase-messages", msg);
@@ -130,7 +140,7 @@ function showVerifyPassphraseForm(contentDiv, messagesDiv) {
           class="w-full px-3 py-2 border border-brand-300 rounded-md text-base
                  focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
           required autofocus
-          placeholder="Enter your passphrase">
+          placeholder="Enter your passphrase (or 'test' for demo mode)">
       </div>
       <div id="form-errors" class="text-error text-sm"></div>
       <button type="submit"

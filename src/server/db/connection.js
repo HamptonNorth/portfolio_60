@@ -507,3 +507,13 @@ export function closeDatabase() {
 export function getDatabasePath() {
   return getResolvedDbPath();
 }
+
+/**
+ * @description Reset the cached database path so it will be re-evaluated
+ * on next access. Used by test mode to switch between live and test
+ * reference databases after changing process.env.DB_PATH.
+ * Does not close or reopen the database — call closeDatabase() first.
+ */
+export function resetDatabasePath() {
+  resolvedDbPath = null;
+}

@@ -8,7 +8,7 @@ import { Router } from "../router.js";
 import { readdir, mkdir, unlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { marked } from "marked";
-import { DOCS_DIR, DOCS_MEDIA_DIR } from "../../shared/constants.js";
+import { getDocsDir, getDocsMediaDir } from "../../shared/constants.js";
 import { getDocsConfig } from "../config.js";
 import { getStyleConfig, getFontLinks, STYLE_REGISTRY } from "../services/style-registry.js";
 import { parseFrontMatter, ensureUnpublishedFrontMatter, isLapsed } from "../services/docs-frontmatter.js";
@@ -95,7 +95,7 @@ docsRouter.get("/api/docs/list/:category", async function (request, params) {
     });
   }
 
-  var dirPath = "./" + DOCS_DIR + "/" + category;
+  var dirPath = "./" + getDocsDir() + "/" + category;
   var files;
 
   try {
@@ -160,7 +160,7 @@ docsRouter.get("/api/docs/content/:category/:slug", async function (request, par
     });
   }
 
-  var mdPath = "./" + DOCS_DIR + "/" + category + "/" + slug + ".md";
+  var mdPath = "./" + getDocsDir() + "/" + category + "/" + slug + ".md";
   var mdFile = Bun.file(mdPath);
 
   if (!(await mdFile.exists())) {
@@ -218,7 +218,7 @@ docsRouter.get("/api/docs/raw/:category/:slug", async function (request, params)
     });
   }
 
-  var mdPath = "./" + DOCS_DIR + "/" + category + "/" + slug + ".md";
+  var mdPath = "./" + getDocsDir() + "/" + category + "/" + slug + ".md";
   var mdFile = Bun.file(mdPath);
 
   if (!(await mdFile.exists())) {
@@ -275,7 +275,7 @@ docsRouter.put("/api/docs/raw/:category/:slug", async function (request, params)
     });
   }
 
-  var mdPath = "./" + DOCS_DIR + "/" + category + "/" + slug + ".md";
+  var mdPath = "./" + getDocsDir() + "/" + category + "/" + slug + ".md";
   await Bun.write(mdPath, body.content);
 
   return new Response(
@@ -341,7 +341,7 @@ docsRouter.post("/api/docs/upload/:category", async function (request, params) {
     });
   }
 
-  var targetDir = "./" + DOCS_DIR + "/" + category;
+  var targetDir = "./" + getDocsDir() + "/" + category;
   var targetPath = targetDir + "/" + sanitizedName;
 
   await mkdir(targetDir, { recursive: true });
@@ -429,7 +429,7 @@ docsRouter.post("/api/docs/media/:category", async function (request, params) {
     });
   }
 
-  var targetDir = "./" + DOCS_MEDIA_DIR + "/" + category;
+  var targetDir = "./" + getDocsMediaDir() + "/" + category;
   var targetPath = targetDir + "/" + sanitizedName;
 
   await mkdir(targetDir, { recursive: true });
@@ -478,10 +478,10 @@ docsRouter.delete("/api/docs/:category/:slug", async function (request, params) 
     });
   }
 
-  var mdPath = resolve(DOCS_DIR, category, slug + ".md");
+  var mdPath = resolve(getDocsDir(), category, slug + ".md");
 
   // Verify the path is within the docs directory
-  var docsRoot = resolve(DOCS_DIR);
+  var docsRoot = resolve(getDocsDir());
   if (!mdPath.startsWith(docsRoot)) {
     return new Response(JSON.stringify({ error: "Invalid path" }), {
       status: 400,

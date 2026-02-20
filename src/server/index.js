@@ -1,4 +1,4 @@
-import { SERVER_PORT } from "../shared/constants.js";
+import { SERVER_PORT, getDocsMediaDir } from "../shared/constants.js";
 import { resolve, join } from "node:path";
 import { checkAuth } from "./middleware/auth-middleware.js";
 import { handleAuthRoute } from "./routes/auth-routes.js";
@@ -147,8 +147,9 @@ const server = Bun.serve({
     if (path.startsWith("/docs/media/")) {
       var safePath = path.replace(/\.\./g, "");
       var mediaPath = safePath.replace(/^\/docs\/media\//, "");
-      var fullMediaPath = join(resolve("docs/media"), mediaPath);
-      if (!fullMediaPath.startsWith(resolve("docs/media"))) {
+      var mediaRoot = resolve(getDocsMediaDir());
+      var fullMediaPath = join(mediaRoot, mediaPath);
+      if (!fullMediaPath.startsWith(mediaRoot)) {
         return new Response("Forbidden", { status: 403 });
       }
       var mediaFile = Bun.file(fullMediaPath);
