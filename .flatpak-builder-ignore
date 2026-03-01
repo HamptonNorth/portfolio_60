@@ -1,4 +1,0 @@
-build-dir/
-.flatpak-builder/
-src-tauri/target/
-node_modules/

@@ -1,7 +1,7 @@
 # Portfolio 60 - UK Family Investment Portfolio Tracker
 
 ## Project Overview
-A desktop application for UK families to track investments across multiple people and account types. Investments may include shares, mutual funds, investment trusts, savings accounts and other instruments. All valuations and reports are in GBP, with support for foreign-currency-priced investments via currency conversion.
+A browser-based application for UK families to track investments across multiple people and account types. Investments may include shares, mutual funds, investment trusts, savings accounts and other instruments. All valuations and reports are in GBP, with support for foreign-currency-priced investments via currency conversion.
 
 This is a UK-only application due to tax rule complexity.
 
@@ -23,12 +23,11 @@ Future versions will add portfolio holdings per person, valuations, performance 
 
 ## Tech Stack
 - **Runtime/Server**: Bun with Bun.serve for the backend HTTP server
-- **Frontend**: HTML, vanilla JS, TailwindCSS v4
-- **Desktop wrapper**: Tauri v2 (Rust-based, wraps the Bun server + web frontend)
+- **Frontend**: HTML, vanilla JS, TailwindCSS v4, served by Bun and accessed via browser
 - **Database**: SQLite (persistent local storage)
 - **Testing**: Bun's built-in test runner for unit tests; Playwright for UI tests
 - **Web scraping**: Playwright for scraping live prices and currency rates
-- **Target display**: Desktop only, designed for 1920x1080 monitor at ~80% viewport (effective ~1536x864)
+- **Target display**: Desktop browser, designed for 1920x1080 monitor at ~80% viewport (effective ~1536x864)
 - **Internet**: Required (for price/currency scraping)
 
 ## Security
@@ -48,7 +47,6 @@ portfolio_60/
 ├── .gitignore
 ├── package.json
 ├── bunfig.toml
-├── src-tauri/          # Tauri v2 Rust shell
 ├── src/
 │   ├── server/         # Bun.serve backend
 │   │   ├── index.js    # Server entry point
@@ -216,7 +214,7 @@ One holding per investment per account (UNIQUE on account_id + investment_id).
 
 ## Development Milestones (v0.1.0)
 
-1. Project scaffolding: Bun project, Tauri v2, TailwindCSS v4 setup
+1. Project scaffolding: Bun project, TailwindCSS v4 setup
 2. Bun.serve server with static file serving for the frontend
 3. Security: .env setup, passphrase set/verify flow, protect UI/data routes (scraper routes unprotected)
 4. SQLite database: check existence, prompt user, create tables + indexes, seed investment_types
@@ -249,7 +247,7 @@ One holding per investment per account (UNIQUE on account_id + investment_id).
 ## Coding Conventions
 
 - **Language**: Vanilla JavaScript (latest ES features) throughout — no TypeScript. Use JSDoc comments on all functions, including `@param`, `@returns`, and `@description` tags.
-- **Code clarity**: Favour easy-to-understand code over concise or clever code. The target maintainers will have 2-3 years experience with JS/HTML/CSS and only limited Rust/Tauri experience. Write code and comments with that audience in mind. If a choice exists between a clever one-liner and a clear multi-line version, choose the clear version.
+- **Code clarity**: Favour easy-to-understand code over concise or clever code. The target maintainers will have 2-3 years experience with JS/HTML/CSS. Write code and comments with that audience in mind. If a choice exists between a clever one-liner and a clear multi-line version, choose the clear version.
 - **API style**: REST-like JSON API served by Bun.serve, consumed by frontend fetch calls.
 - **SQL**: Raw SQL via bun:sqlite (no ORM). Parameterised queries for all user input.
 - **Error handling**: Return structured JSON errors from API `{ error: string, detail?: string }`
@@ -260,16 +258,14 @@ One holding per investment per account (UNIQUE on account_id + investment_id).
 
 ## Ports
 
-- **Application server**: Port 1420 (`src/shared/constants.js` → `SERVER_PORT`). Used by the user for manual testing and by Tauri dev mode.
+- **Application server**: Port 1420 (`src/shared/constants.js` → `SERVER_PORT`). Used by the user via browser.
 - **Automated testing (Claude)**: Ports 1430+ (each test file uses a unique port). All test files must spawn the server with `env: { PORT: "<unique_port>" }` to avoid conflicts with the user's running application on port 1420 and with each other. The server reads the `PORT` environment variable and falls back to `SERVER_PORT` (1420) if not set. Current allocations: server.test.js=1430, auth-routes.test.js=1431, accounts-db.test.js=1440, holdings-db.test.js=1441, accounts-routes.test.js=1442, holdings-routes.test.js=1443, portfolio-routes.test.js=1444. New test files should increment from there.
 
 ## Commands
 ```bash
 bun install          # Install dependencies
-bun run dev          # Start Bun dev server (port 1429)
+bun run dev          # Start Bun dev server (port 1420)
 bun test             # Run unit tests
-bun run tauri dev    # Start Tauri dev mode (wraps Bun server)
-bun run tauri build  # Build distributable desktop app
 npx playwright test  # Run Playwright e2e/UI tests
 ```
 

@@ -47,6 +47,5 @@ src/ui/css/output.css
 *.db-wal
 *.db-shm
 !data/test_reference/*.db
-
-# Tauri
-src-tauri/target/
+# Remove all PLAN_* markdown files
+PLAN_*
