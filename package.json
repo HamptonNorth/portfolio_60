@@ -6,7 +6,7 @@
   "private": true,
   "scripts": {
     "dev": "concurrently \"bun run dev:css\" \"bun run dev:server\"",
-    "dev:server": "fuser -k 1420/tcp 2>/dev/null; bun --hot run src/server/index.js",
+    "dev:server": "fuser -k 1420/tcp 2>/dev/null; PORTFOLIO60_DATA_DIR=$HOME/.config/portfolio_60 bun --hot run src/server/index.js",
     "dev:css": "bunx @tailwindcss/cli -i ./src/ui/css/input.css -o ./src/ui/css/output.css --watch",
     "build:css": "bunx @tailwindcss/cli -i ./src/ui/css/input.css -o ./src/ui/css/output.css --minify",
     "test": "bun test",

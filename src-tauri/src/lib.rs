@@ -81,25 +81,64 @@ pub fn run() {
         // Server already running (e.g. via beforeDevCommand in tauri dev)
         None
     } else {
-        // Production mode: spawn the Bun server
-        let project_dir = env::var("PORTFOLIO60_DIR").unwrap_or_else(|_| {
+        // Detect Flatpak environment
+        let is_flatpak = env::var("FLATPAK_ID").is_ok();
+
+        let (project_dir, bun_path, data_dir) = if is_flatpak {
+            // Flatpak mode: app source bundled at /app/share/portfolio_60,
+            // bun at /app/bin/bun, writable data at ~/.config/portfolio_60
             let home = env::var("HOME").unwrap_or_else(|_| "/home/rcollins".to_string());
-            format!("{}/code/portfolio_60", home)
-        });
+            let data = format!("{}/.config/portfolio_60", home);
 
-        let bun_path = find_bun();
+            // Ensure writable data directory exists
+            let _ = std::fs::create_dir_all(&data);
 
-        let child = Command::new(&bun_path)
-            .arg("run")
-            .arg("src/server/index.js")
-            .current_dir(&project_dir)
-            .spawn()
-            .unwrap_or_else(|e| {
-                panic!(
-                    "Failed to start Bun server.\n  Bun path: {}\n  Project dir: {}\n  Error: {}",
-                    bun_path, project_dir, e
-                )
+            // Copy bundled config.json to data dir on first run
+            let data_config = format!("{}/config.json", data);
+            if !std::path::Path::new(&data_config).exists() {
+                let bundled_config = "/app/share/portfolio_60/src/shared/config.json";
+                if std::path::Path::new(bundled_config).exists() {
+                    let _ = std::fs::copy(bundled_config, &data_config);
+                }
+            }
+
+            (
+                "/app/share/portfolio_60".to_string(),
+                "/app/bin/bun".to_string(),
+                Some(data),
+            )
+        } else {
+            // Normal mode: use PORTFOLIO60_DIR or default to ~/code/portfolio_60
+            let home = env::var("HOME").unwrap_or_else(|_| "/home/rcollins".to_string());
+            let project = env::var("PORTFOLIO60_DIR").unwrap_or_else(|_| {
+                format!("{}/code/portfolio_60", home)
             });
+            let bun = find_bun();
+
+            // Use the same data directory as Flatpak mode for consistency
+            let data = format!("{}/.config/portfolio_60", home);
+            let _ = std::fs::create_dir_all(&data);
+
+            (project, bun, Some(data))
+        };
+
+        let mut cmd = Command::new(&bun_path);
+        cmd.arg("run")
+            .arg("src/server/index.js")
+            .current_dir(&project_dir);
+
+        // In Flatpak mode, set PORTFOLIO60_DATA_DIR so the server writes
+        // database, backups, docs, .env, and config to a writable location
+        if let Some(ref data) = data_dir {
+            cmd.env("PORTFOLIO60_DATA_DIR", data);
+        }
+
+        let child = cmd.spawn().unwrap_or_else(|e| {
+            panic!(
+                "Failed to start Bun server.\n  Bun path: {}\n  Project dir: {}\n  Error: {}",
+                bun_path, project_dir, e
+            )
+        });
 
         // Wait for the server to be ready before opening the window
         if !wait_for_server(1420, 15) {

@@ -1,46 +1,61 @@
 #!/bin/bash
-# Build and install Portfolio 60
-# Builds the latest version and installs the .deb package
+set -e
 
-set -e  # Exit on any error
-
+APP_ID="com.rcollins.portfolio_60"
+MANIFEST="$APP_ID.json"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
 
-# Kill any existing Portfolio 60 processes
-echo "Stopping any running Portfolio 60 processes..."
-pkill -f "portfolio-60" 2>/dev/null || true
-pkill -f "bun.*src/server/index.js" 2>/dev/null || true
-sleep 1
+# --- PHASE 1: TOOLBOX (COMPILATION) ---
+if [ -f "/run/.containerenv" ]; then
+    echo "=========================================="
+    echo "📦 [Phase 1] Compiling in Toolbox"
+    echo "=========================================="
 
-# Build the CSS first
-echo "Building CSS..."
-bun run build:css
+    # Setup Environment
+    [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
+    export PATH="$HOME/.bun/bin:$PATH"
 
-# Capture build time BEFORE building - this gets bundled into the app
-BUILD_TIME=$(date "+%Y-%m-%d %H:%M:%S")
-echo "$BUILD_TIME" > "$SCRIPT_DIR/src/shared/build-time.txt"
+    # Update Build Time
+    BUILD_TIME=$(date "+%Y-%m-%d %H:%M:%S")
+    echo "$BUILD_TIME" > "$SCRIPT_DIR/src/config/build-time.txt"
 
-echo "=========================================="
-echo "Building Portfolio 60"
-echo "Build timestamp: $BUILD_TIME"
-echo "=========================================="
+    # Run Rust/Bun Build
+    cd "$SCRIPT_DIR"
+    bun install
+    bun tauri build --no-bundle
 
-cd "$SCRIPT_DIR/src-tauri"
-cargo tauri build --bundles deb --debug
+    # Copy bun binary for Flatpak bundling
+    cp "$(which bun)" "$SCRIPT_DIR/src-tauri/target/release/bun"
 
-# Find the latest .deb file (debug builds go to target/debug/bundle/deb/)
-DEB_FILE=$(ls -t "$SCRIPT_DIR/src-tauri/target/debug/bundle/deb/"*.deb 2>/dev/null | head -1)
+    echo "✅ Compilation successful."
+    echo "🚀 Handing off to Host for Flatpak Bundling..."
 
-if [ -z "$DEB_FILE" ]; then
-    echo "Error: No .deb file found after build"
-    exit 1
+    # Trigger Phase 2 on the Host
+    flatpak-spawn --host "$SCRIPT_DIR/build-and-install.sh" --host-phase
+    exit 0
 fi
 
-echo "Installing: $DEB_FILE"
-sudo dpkg -i "$DEB_FILE"
+# --- PHASE 2: HOST (PACKAGING & RUNNING) ---
+if [ "$1" == "--host-phase" ]; then
+    echo "=========================================="
+    echo "🖥️  [Phase 2] Packaging on Host"
+    echo "=========================================="
 
-echo "=========================================="
-echo "Done! Portfolio 60 has been updated."
-echo "Build timestamp: $BUILD_TIME"
-echo "=========================================="
+    cd "$SCRIPT_DIR"
+
+    # Ensure Host has builder installed
+    if ! command -v flatpak-builder &> /dev/null; then
+        echo "❌ flatpak-builder not found on Host. Please run: sudo rpm-ostree install flatpak-builder && reboot"
+        exit 1
+    fi
+
+    # Build the Flatpak
+    flatpak-builder --user --install --force-clean build-dir "$MANIFEST"
+
+    echo "🎉 Build Complete! Launching..."
+    flatpak run "$APP_ID" &
+    exit 0
+fi
+
+echo "❌ Please start this script from INSIDE your toolbox."
+exit 1

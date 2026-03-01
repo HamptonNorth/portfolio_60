@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, copyFileSync, readdirSync, statSync, unlinkSync, readFileSync, writeFileSync, createWriteStream } from "node:fs";
+import { existsSync, mkdirSync, copyFileSync, readdirSync, statSync, unlinkSync, readFileSync, writeFileSync, createWriteStream, chmodSync } from "node:fs";
 import { resolve, join, basename } from "node:path";
 import archiver from "archiver";
 import AdmZip from "adm-zip";
@@ -351,6 +351,9 @@ export function restoreBackup(filename) {
       // Legacy .db restore: database only
       copyFileSync(backupPath, dbPath);
     }
+
+    // Restrict restored database file to owner read/write only
+    chmodSync(dbPath, 0o600);
 
     // Reopen the database connection
     getDatabase();

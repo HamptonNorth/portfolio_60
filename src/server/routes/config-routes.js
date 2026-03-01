@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { getAllSiteConfigs, findSiteConfig, loadConfig, getAllowedProviders, getSchedulingConfig, reloadConfig, getScraperTestingEnabled, getStalestLimit, getListItems } from "../config.js";
+import { getAllSiteConfigs, findSiteConfig, loadConfig, getAllowedProviders, getSchedulingConfig, reloadConfig, getScraperTestingEnabled, getStalestLimit, getListItems, getConfigFilePath, getWritableConfigPath } from "../config.js";
+import { DB_PATH, BACKUP_DIR } from "../../shared/constants.js";
 
 /**
  * @description Get the list of allowed provider codes.
@@ -81,7 +82,7 @@ export function handleConfigRoute(method, path) {
   // GET /api/config/raw — return the raw config.json content as a string for editing
   if (method === "GET" && path === "/api/config/raw") {
     try {
-      const configPath = resolve("src/shared/config.json");
+      const configPath = getConfigFilePath();
       const raw = readFileSync(configPath, "utf-8");
       return new Response(JSON.stringify({ content: raw, path: configPath }), {
         status: 200,
@@ -107,9 +108,9 @@ export function handleConfigRoute(method, path) {
       platform: process.platform,
       arch: process.arch,
       os: getOsDescription(),
-      configPath: resolve("src/shared/config.json"),
-      dbPath: resolve("data/portfolio60.db"),
-      backupPath: resolve("backups"),
+      configPath: getConfigFilePath(),
+      dbPath: resolve(DB_PATH),
+      backupPath: resolve(BACKUP_DIR),
     };
     return new Response(JSON.stringify(info), {
       status: 200,
@@ -291,7 +292,7 @@ export async function handleConfigRouteAsync(method, path, request) {
         });
       }
 
-      const configPath = resolve("src/shared/config.json");
+      const configPath = getWritableConfigPath();
       writeFileSync(configPath, content, "utf-8");
 
       // Reload the cached config so changes take effect immediately

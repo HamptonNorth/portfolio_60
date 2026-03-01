@@ -2,6 +2,8 @@
  * @description Application-wide constants for Portfolio 60
  */
 
+import { join } from "node:path";
+
 /** @type {string} Application display name */
 export const APP_NAME = "Portfolio 60";
 
@@ -11,17 +13,25 @@ export const APP_VERSION = "0.11.0";
 /** @type {number} Port the Bun HTTP server listens on */
 export const SERVER_PORT = 1420;
 
+/**
+ * @description Base directory for writable data files (database, backups, docs, .env, config).
+ * Defaults to "." (project root) for normal development. Set to an absolute path
+ * (e.g. ~/.config/portfolio_60) in Flatpak mode via the PORTFOLIO60_DATA_DIR env var.
+ * @type {string}
+ */
+export const DATA_DIR = process.env.PORTFOLIO60_DATA_DIR || ".";
+
 /** @type {string} Path to the SQLite database file */
-export const DB_PATH = "data/portfolio60.db";
+export const DB_PATH = process.env.DB_PATH || join(DATA_DIR, "data", "portfolio60.db");
 
 /** @type {string} Directory for database backups */
-export const BACKUP_DIR = "backups";
+export const BACKUP_DIR = join(DATA_DIR, "backups");
 
 /** @type {string} Default root directory for documentation markdown files */
-export const DOCS_DIR = "docs";
+export const DOCS_DIR = join(DATA_DIR, "docs");
 
 /** @type {string} Default subdirectory under DOCS_DIR for uploaded media (images) */
-export const DOCS_MEDIA_DIR = "docs/media";
+export const DOCS_MEDIA_DIR = join(DATA_DIR, "docs", "media");
 
 /**
  * @description Get the effective docs directory. Returns the DOCS_DIR

@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, chmodSync, accessSync, constants as fsConstants } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { DB_PATH } from "../../shared/constants.js";
 
@@ -58,7 +58,20 @@ export function getDatabase() {
     throw new Error("Database does not exist. Call createDatabase() first.");
   }
 
-  db = new Database(getResolvedDbPath());
+  const dbPath = getResolvedDbPath();
+
+  // Verify the file is readable and writable before attempting to open it
+  try {
+    accessSync(dbPath, fsConstants.R_OK | fsConstants.W_OK);
+  } catch (err) {
+    throw new Error(
+      `Database file is not readable/writable: ${dbPath}. ` +
+      `Check file permissions (expected owner read/write, i.e. chmod 600). ` +
+      `Original error: ${err.message}`
+    );
+  }
+
+  db = new Database(dbPath);
   db.exec("PRAGMA journal_mode = WAL");
   db.exec("PRAGMA foreign_keys = ON");
 
@@ -467,11 +480,17 @@ export function createDatabase() {
   const dbPath = getResolvedDbPath();
   const dbDir = dirname(dbPath);
   if (!existsSync(dbDir)) {
-    mkdirSync(dbDir, { recursive: true });
+    mkdirSync(dbDir, { recursive: true, mode: 0o700 });
+  } else {
+    // Ensure existing directory has restrictive permissions
+    chmodSync(dbDir, 0o700);
   }
 
   // Create the database file and configure it
   db = new Database(dbPath);
+
+  // Restrict database file to owner read/write only
+  chmodSync(dbPath, 0o600);
   db.exec("PRAGMA journal_mode = WAL");
   db.exec("PRAGMA foreign_keys = ON");
 

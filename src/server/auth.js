@@ -1,11 +1,14 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { resolve, join } from "node:path";
+import { DATA_DIR } from "../shared/constants.js";
 
 /**
- * @description Path to the .env file in the project root
+ * @description Path to the .env file. Uses the DATA_DIR base directory so that
+ * in Flatpak mode the .env file is written to the writable data location
+ * (~/.config/portfolio_60/.env) rather than the read-only app bundle.
  * @type {string}
  */
-const ENV_PATH = resolve(".env");
+const ENV_PATH = resolve(join(DATA_DIR, ".env"));
 
 /**
  * @description In-memory flag tracking whether the user has authenticated
