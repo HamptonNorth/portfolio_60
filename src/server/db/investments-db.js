@@ -1,4 +1,5 @@
 import { getDatabase } from "./connection.js";
+import { CURRENCY_SCALE_FACTOR } from "../../shared/constants.js";
 
 /**
  * @description Get all investments with their currency and investment type details,
@@ -17,6 +18,7 @@ export function getAllInvestments() {
         i.public_id,
         i.investment_url,
         i.selector,
+        i.auto_scrape,
         c.code AS currency_code,
         c.description AS currency_description,
         it.short_description AS type_short,
@@ -46,6 +48,7 @@ export function getInvestmentById(id) {
         i.public_id,
         i.investment_url,
         i.selector,
+        i.auto_scrape,
         c.code AS currency_code,
         c.description AS currency_description,
         it.short_description AS type_short,
@@ -155,4 +158,77 @@ export function deleteInvestment(id) {
   db.run("DELETE FROM prices WHERE investment_id = ?", [id]);
   const result = db.run("DELETE FROM investments WHERE id = ?", [id]);
   return result.changes > 0;
+}
+
+/**
+ * @description Update the auto_scrape flag on an investment.
+ * When set to 0, the investment is excluded from automatic price fetching.
+ * @param {number} id - The investment ID
+ * @param {boolean} autoScrape - True to enable auto-scrape, false to disable
+ * @returns {Object|null} The updated investment, or null if not found
+ */
+export function updateAutoScrape(id, autoScrape) {
+  const db = getDatabase();
+  const value = autoScrape ? 1 : 0;
+  const result = db.run("UPDATE investments SET auto_scrape = ? WHERE id = ?", [value, id]);
+
+  if (result.changes === 0) {
+    return null;
+  }
+
+  return getInvestmentById(id);
+}
+
+/**
+ * @description Get all manually-priced investments (auto_scrape = 0) with their
+ * latest price date and how the last price was obtained.
+ * Used by the home page alert table to show investments that need manual price updates.
+ * @returns {Object[]} Array of investment objects with price and history details
+ */
+export function getManuallyPricedInvestments() {
+  const db = getDatabase();
+  const rows = db
+    .query(
+      `SELECT
+        i.id,
+        i.description,
+        it.description AS type_description,
+        c.code AS currency_code,
+        i.public_id,
+        p.price_date AS last_price_date,
+        p.price AS last_price,
+        sh.started_by AS how_priced
+      FROM investments i
+      JOIN investment_types it ON i.investment_type_id = it.id
+      JOIN currencies c ON i.currencies_id = c.id
+      LEFT JOIN prices p ON p.investment_id = i.id
+        AND p.price_date = (
+          SELECT MAX(p2.price_date) FROM prices p2 WHERE p2.investment_id = i.id
+        )
+      LEFT JOIN scraping_history sh ON sh.reference_id = i.id
+        AND sh.scrape_type = 'investment'
+        AND sh.success = 1
+        AND sh.id = (
+          SELECT MAX(sh2.id) FROM scraping_history sh2
+          WHERE sh2.reference_id = i.id
+          AND sh2.scrape_type = 'investment'
+          AND sh2.success = 1
+        )
+      WHERE i.auto_scrape = 0
+      ORDER BY i.description`,
+    )
+    .all();
+
+  return rows.map(function (row) {
+    return {
+      id: row.id,
+      description: row.description,
+      type_description: row.type_description,
+      currency_code: row.currency_code,
+      public_id: row.public_id,
+      last_price_date: row.last_price_date || null,
+      last_price: row.last_price !== null ? row.last_price / CURRENCY_SCALE_FACTOR : null,
+      how_priced: row.how_priced !== null ? row.how_priced : null,
+    };
+  });
 }

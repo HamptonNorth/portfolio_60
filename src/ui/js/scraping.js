@@ -429,16 +429,16 @@ function updatePriceRow(price) {
   const cells = row.querySelectorAll("td");
   if (cells.length < 5) return;
 
-  // Status cell - show attempt info if retries were needed
+  // Status cell - show pass info if retries were needed
   if (price.success) {
     if (price.attemptNumber && price.attemptNumber > 1) {
-      cells[2].innerHTML = '<span class="text-sm text-success font-medium">OK (attempt ' + price.attemptNumber + ")</span>";
+      cells[2].innerHTML = '<span class="text-sm text-success font-medium">OK (pass ' + price.attemptNumber + ")</span>";
     } else {
       cells[2].innerHTML = '<span class="text-sm text-success font-medium">OK</span>';
     }
   } else {
     if (price.attemptNumber && price.maxAttempts) {
-      cells[2].innerHTML = '<span class="text-sm text-error font-medium">Failed (' + price.attemptNumber + "/" + price.maxAttempts + " attempts)</span>";
+      cells[2].innerHTML = '<span class="text-sm text-error font-medium">Failed (pass ' + price.attemptNumber + " of " + price.maxAttempts + ")</span>";
     } else {
       cells[2].innerHTML = '<span class="text-sm text-error font-medium">Failed</span>';
     }
@@ -449,21 +449,6 @@ function updatePriceRow(price) {
 
   // Parsed price cell
   cells[4].textContent = formatPrice(price.priceMinorUnit);
-}
-
-/**
- * @description Update a price row to show retry status.
- * @param {Object} retryInfo - The retry event data
- */
-function updatePriceRowRetrying(retryInfo) {
-  const row = document.getElementById("price-row-" + retryInfo.investmentId);
-  if (!row) return;
-
-  const cells = row.querySelectorAll("td");
-  if (cells.length < 5) return;
-
-  // Status cell - show retrying status
-  cells[2].innerHTML = '<span class="text-sm text-amber-600 font-medium">' + spinnerHtml() + " Retry " + (retryInfo.attemptNumber + 1) + "/" + retryInfo.maxAttempts + "</span>";
 }
 
 /**
@@ -496,16 +481,16 @@ function updateBenchmarkRow(benchmark) {
   const cells = row.querySelectorAll("td");
   if (cells.length < 5) return;
 
-  // Status cell - show attempt info if retries were needed
+  // Status cell - show pass info if retries were needed
   if (benchmark.success) {
     if (benchmark.attemptNumber && benchmark.attemptNumber > 1) {
-      cells[2].innerHTML = '<span class="text-sm text-success font-medium">OK (attempt ' + benchmark.attemptNumber + ")</span>";
+      cells[2].innerHTML = '<span class="text-sm text-success font-medium">OK (pass ' + benchmark.attemptNumber + ")</span>";
     } else {
       cells[2].innerHTML = '<span class="text-sm text-success font-medium">OK</span>';
     }
   } else {
     if (benchmark.attemptNumber && benchmark.maxAttempts) {
-      cells[2].innerHTML = '<span class="text-sm text-error font-medium">Failed (' + benchmark.attemptNumber + "/" + benchmark.maxAttempts + " attempts)</span>";
+      cells[2].innerHTML = '<span class="text-sm text-error font-medium">Failed (pass ' + benchmark.attemptNumber + " of " + benchmark.maxAttempts + ")</span>";
     } else {
       cells[2].innerHTML = '<span class="text-sm text-error font-medium">Failed</span>';
     }
@@ -516,21 +501,6 @@ function updateBenchmarkRow(benchmark) {
 
   // Parsed value cell
   cells[4].textContent = formatBenchmarkValue(benchmark.parsedValue);
-}
-
-/**
- * @description Update a benchmark row to show retry status.
- * @param {Object} retryInfo - The retry event data
- */
-function updateBenchmarkRowRetrying(retryInfo) {
-  const row = document.getElementById("benchmark-row-" + retryInfo.benchmarkId);
-  if (!row) return;
-
-  const cells = row.querySelectorAll("td");
-  if (cells.length < 5) return;
-
-  // Status cell - show retrying status
-  cells[2].innerHTML = '<span class="text-sm text-amber-600 font-medium">' + spinnerHtml() + " Retry " + (retryInfo.attemptNumber + 1) + "/" + retryInfo.maxAttempts + "</span>";
 }
 
 /**
@@ -681,7 +651,11 @@ function fetchPricesStream() {
     let tableHtml = "";
     let totalCount = 0;
     let successCount = 0;
-    let scrapedCount = 0;
+    let passItemCount = 0;
+    let passSuccessCount = 0;
+    let passFailCount = 0;
+    let passTotal = 0;
+    let currentPass = 1;
     let investments = [];
 
     // Create a temporary container to hold the streaming table
@@ -691,6 +665,7 @@ function fetchPricesStream() {
     source.addEventListener("init", function (event) {
       const data = JSON.parse(event.data);
       totalCount = data.total;
+      passTotal = data.total;
       investments = data.investments;
 
       if (totalCount === 0) {
@@ -726,18 +701,52 @@ function fetchPricesStream() {
       sectionContainer.appendChild(tempContainer);
     });
 
-    source.addEventListener("retry", function (event) {
-      const retryInfo = JSON.parse(event.data);
-      updatePriceRowRetrying(retryInfo);
-      setProgress("Retrying " + retryInfo.description + " (attempt " + (retryInfo.attemptNumber + 1) + "/" + retryInfo.maxAttempts + ")...");
+    source.addEventListener("retry_pass", function (event) {
+      const passInfo = JSON.parse(event.data);
+      currentPass = passInfo.pass;
+      passItemCount = 0;
+      passSuccessCount = 0;
+      passFailCount = 0;
+      passTotal = passInfo.retryCount;
+      setProgress("Pass " + passInfo.pass + " of " + passInfo.maxPasses + ": re-trying " + passInfo.retryCount + " failed investment" + (passInfo.retryCount === 1 ? "" : "s") + "...");
+
+      // Reset the status of failed rows to show they are being retried
+      for (const inv of investments) {
+        const row = document.getElementById("price-row-" + inv.investmentId);
+        if (!row) continue;
+        const cells = row.querySelectorAll("td");
+        if (cells.length < 3) continue;
+        const statusText = cells[2].textContent || "";
+        if (statusText.indexOf("Failed") !== -1) {
+          cells[2].innerHTML = '<span class="text-sm text-amber-600 font-medium">' + spinnerHtml() + " Retrying (pass " + passInfo.pass + ")</span>";
+        }
+      }
     });
 
     source.addEventListener("price", function (event) {
       const price = JSON.parse(event.data);
-      scrapedCount++;
-      if (price.success) successCount++;
+      passItemCount++;
+      if (price.success) {
+        successCount++;
+        passSuccessCount++;
+      } else {
+        passFailCount++;
+      }
       updatePriceRow(price);
-      setProgress("Fetching investment prices... " + scrapedCount + " of " + totalCount);
+
+      // Build a progress message showing pass progress and success/fail counts
+      let progressMsg = "";
+      if (currentPass === 1) {
+        progressMsg = "Fetching investment prices... " + passItemCount + " of " + passTotal;
+      } else {
+        progressMsg = "Pass " + currentPass + ": re-trying failed prices... " + passItemCount + " of " + passTotal;
+      }
+      progressMsg += " (" + passSuccessCount + " OK";
+      if (passFailCount > 0) {
+        progressMsg += ", " + passFailCount + " failed";
+      }
+      progressMsg += ")";
+      setProgress(progressMsg);
     });
 
     source.addEventListener("done", function (event) {
@@ -788,8 +797,8 @@ function fetchPricesStream() {
       if (source.readyState === EventSource.CLOSED) {
         errorMsg += " Connection was closed unexpectedly.";
       }
-      if (scrapedCount > 0) {
-        errorMsg += " (" + scrapedCount + " of " + totalCount + " fetched before error)";
+      if (passItemCount > 0) {
+        errorMsg += " (" + passItemCount + " of " + passTotal + " fetched before error)";
       }
 
       html += '<p class="text-error">' + errorMsg + "</p>";
@@ -816,7 +825,11 @@ function fetchBenchmarksStream() {
     let tableHtml = "";
     let totalCount = 0;
     let successCount = 0;
-    let scrapedCount = 0;
+    let passItemCount = 0;
+    let passSuccessCount = 0;
+    let passFailCount = 0;
+    let passTotal = 0;
+    let currentPass = 1;
     let benchmarks = [];
 
     // Create a temporary container to hold the streaming table
@@ -826,6 +839,7 @@ function fetchBenchmarksStream() {
     source.addEventListener("init", function (event) {
       const data = JSON.parse(event.data);
       totalCount = data.total;
+      passTotal = data.total;
       benchmarks = data.benchmarks;
 
       if (totalCount === 0) {
@@ -861,18 +875,52 @@ function fetchBenchmarksStream() {
       sectionContainer.appendChild(tempContainer);
     });
 
-    source.addEventListener("retry", function (event) {
-      const retryInfo = JSON.parse(event.data);
-      updateBenchmarkRowRetrying(retryInfo);
-      setProgress("Retrying " + retryInfo.description + " (attempt " + (retryInfo.attemptNumber + 1) + "/" + retryInfo.maxAttempts + ")...");
+    source.addEventListener("retry_pass", function (event) {
+      const passInfo = JSON.parse(event.data);
+      currentPass = passInfo.pass;
+      passItemCount = 0;
+      passSuccessCount = 0;
+      passFailCount = 0;
+      passTotal = passInfo.retryCount;
+      setProgress("Pass " + passInfo.pass + " of " + passInfo.maxPasses + ": re-trying " + passInfo.retryCount + " failed benchmark" + (passInfo.retryCount === 1 ? "" : "s") + "...");
+
+      // Reset the status of failed rows to show they are being retried
+      for (const bm of benchmarks) {
+        const row = document.getElementById("benchmark-row-" + bm.benchmarkId);
+        if (!row) continue;
+        const cells = row.querySelectorAll("td");
+        if (cells.length < 3) continue;
+        const statusText = cells[2].textContent || "";
+        if (statusText.indexOf("Failed") !== -1) {
+          cells[2].innerHTML = '<span class="text-sm text-amber-600 font-medium">' + spinnerHtml() + " Retrying (pass " + passInfo.pass + ")</span>";
+        }
+      }
     });
 
     source.addEventListener("benchmark", function (event) {
       const benchmark = JSON.parse(event.data);
-      scrapedCount++;
-      if (benchmark.success) successCount++;
+      passItemCount++;
+      if (benchmark.success) {
+        successCount++;
+        passSuccessCount++;
+      } else {
+        passFailCount++;
+      }
       updateBenchmarkRow(benchmark);
-      setProgress("Fetching benchmark values... " + scrapedCount + " of " + totalCount);
+
+      // Build a progress message showing pass progress and success/fail counts
+      let progressMsg = "";
+      if (currentPass === 1) {
+        progressMsg = "Fetching benchmark values... " + passItemCount + " of " + passTotal;
+      } else {
+        progressMsg = "Pass " + currentPass + ": re-trying failed benchmarks... " + passItemCount + " of " + passTotal;
+      }
+      progressMsg += " (" + passSuccessCount + " OK";
+      if (passFailCount > 0) {
+        progressMsg += ", " + passFailCount + " failed";
+      }
+      progressMsg += ")";
+      setProgress(progressMsg);
     });
 
     source.addEventListener("done", function (event) {
@@ -923,8 +971,8 @@ function fetchBenchmarksStream() {
       if (source.readyState === EventSource.CLOSED) {
         errorMsg += " Connection was closed unexpectedly.";
       }
-      if (scrapedCount > 0) {
-        errorMsg += " (" + scrapedCount + " of " + totalCount + " fetched before error)";
+      if (passItemCount > 0) {
+        errorMsg += " (" + passItemCount + " of " + passTotal + " fetched before error)";
       }
 
       html += '<p class="text-error">' + errorMsg + "</p>";

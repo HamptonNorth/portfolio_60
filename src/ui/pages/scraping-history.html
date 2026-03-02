@@ -39,6 +39,14 @@
                         </select>
                     </div>
                     <div>
+                        <label for="filter-auto-scrape" class="block text-sm font-medium text-brand-600 mb-1">Auto-fetch</label>
+                        <select id="filter-auto-scrape" class="px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500">
+                            <option value="">All investments</option>
+                            <option value="true">Auto-fetched only</option>
+                            <option value="false">Manual only (auto-fetch disabled)</option>
+                        </select>
+                    </div>
+                    <div>
                         <label for="filter-start-date" class="block text-sm font-medium text-brand-600 mb-1">From date</label>
                         <input type="date" id="filter-start-date" class="px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500" />
                     </div>

@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS investments (
     public_id TEXT CHECK(public_id IS NULL OR length(public_id) <= 20),
     investment_url TEXT CHECK(investment_url IS NULL OR length(investment_url) <= 255),
     selector TEXT CHECK(selector IS NULL OR length(selector) <= 255),
+    auto_scrape INTEGER NOT NULL DEFAULT 1,
     FOREIGN KEY (currencies_id) REFERENCES currencies(id),
     FOREIGN KEY (investment_type_id) REFERENCES investment_types(id)
 );

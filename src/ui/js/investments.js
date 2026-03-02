@@ -345,7 +345,8 @@ async function loadInvestments() {
     const selectorDisplay = inv.selector ? (inv.selector.length > 30 ? inv.selector.substring(0, 30) + "..." : inv.selector) : "";
 
     html += '<tr data-id="' + inv.id + '" class="' + rowClass + ' border-b border-brand-100 hover:bg-brand-100 transition-colors cursor-pointer" ondblclick="viewInvestment(' + inv.id + ')">';
-    html += '<td class="py-3 px-3 text-base">' + escapeHtml(inv.description) + "</td>";
+    const manualBadge = inv.auto_scrape === 0 ? ' <span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">Manually Priced</span>' : "";
+    html += '<td class="py-3 px-3 text-base">' + escapeHtml(inv.description) + manualBadge + "</td>";
     html += '<td class="py-3 px-3 text-base">' + escapeHtml(getTypeDisplayName(inv.type_short, inv.type_description)) + "</td>";
     html += '<td class="py-3 px-3 text-base">' + escapeHtml(inv.currency_code) + "</td>";
     html += '<td class="py-3 px-3 text-sm text-brand-500 font-mono">' + escapeHtml(inv.public_id || "—") + "</td>";
@@ -457,6 +458,10 @@ function showAddForm() {
   document.getElementById("selector-optional").classList.add("hidden");
   document.getElementById("site-select").value = "";
   matchedSiteConfig = null;
+  // Hide manual price section (not applicable when adding new investments)
+  document.getElementById("manual-price-section").classList.add("hidden");
+  document.getElementById("manual-price-input").value = "";
+  document.getElementById("manual-price-messages").innerHTML = "";
   document.getElementById("investment-view-container").classList.add("hidden");
   document.getElementById("investment-form-container").classList.remove("hidden");
   // Focus the first field after a brief delay to ensure modal is visible
@@ -486,6 +491,7 @@ async function editInvestment(id) {
   document.getElementById("public_id").value = inv.public_id || "";
   document.getElementById("investment_url").value = inv.investment_url || "";
   document.getElementById("selector").value = inv.selector || "";
+  document.getElementById("auto-scrape").checked = inv.auto_scrape !== 0;
   document.getElementById("form-errors").textContent = "";
 
   // Check public ID format and show status
@@ -510,6 +516,9 @@ async function editInvestment(id) {
   // Highlight the corresponding table row
   highlightRow(inv.id);
 
+  // Show/hide manual price section based on auto_scrape state
+  toggleManualPriceSection();
+
   document.getElementById("investment-view-container").classList.add("hidden");
   document.getElementById("investment-form-container").classList.remove("hidden");
   // Focus the first field after a brief delay to ensure modal is visible
@@ -523,6 +532,9 @@ async function editInvestment(id) {
  */
 function hideForm() {
   document.getElementById("investment-form-container").classList.add("hidden");
+  document.getElementById("manual-price-section").classList.add("hidden");
+  document.getElementById("manual-price-input").value = "";
+  document.getElementById("manual-price-messages").innerHTML = "";
   clearRowHighlight();
 }
 
@@ -562,6 +574,17 @@ async function handleFormSubmit(event) {
   }
 
   if (result.ok) {
+    // Update auto_scrape flag separately
+    const autoScrapeChecked = document.getElementById("auto-scrape").checked;
+    const savedId = isEditing ? investmentId : result.data.id;
+    if (savedId) {
+      await fetch("/api/investments/" + savedId + "/auto-scrape", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ autoScrape: autoScrapeChecked }),
+      });
+    }
+
     hideForm();
     await loadInvestments();
     showSuccess("page-messages", isEditing ? "Investment updated successfully" : "Investment added successfully");
@@ -796,6 +819,91 @@ function updateLoadBadge(id) {
   }
 }
 
+/**
+ * @description Show or hide the manual price entry section based on the
+ * auto-scrape checkbox state and whether an investment is being edited.
+ * Only shown when editing an existing investment with auto_scrape unchecked.
+ */
+function toggleManualPriceSection() {
+  const section = document.getElementById("manual-price-section");
+  const autoScrapeChecked = document.getElementById("auto-scrape").checked;
+  const investmentId = document.getElementById("investment-id").value;
+
+  if (!autoScrapeChecked && investmentId) {
+    section.classList.remove("hidden");
+    loadLatestPriceForEdit(investmentId);
+  } else {
+    section.classList.add("hidden");
+  }
+}
+
+/**
+ * @description Fetch and display the latest price for an investment in the
+ * manual price entry section of the edit form.
+ * @param {number|string} investmentId - The investment ID
+ */
+async function loadLatestPriceForEdit(investmentId) {
+  const lastPriceEl = document.getElementById("manual-price-last");
+  lastPriceEl.textContent = "Loading last price...";
+
+  const result = await apiRequest("/api/investments/" + investmentId + "/latest-price");
+
+  if (!result.ok) {
+    lastPriceEl.textContent = "Could not load last price.";
+    return;
+  }
+
+  const data = result.data;
+  if (data.price !== null) {
+    lastPriceEl.textContent = "Last price: " + data.price.toFixed(2) + "p (" + data.currencyCode + ") on " + data.priceDate;
+  } else {
+    lastPriceEl.textContent = "No previous price recorded for this investment.";
+  }
+}
+
+/**
+ * @description Save a manually entered price for the currently edited investment.
+ * Calls POST /api/investments/manual-price with the investment ID and price value.
+ */
+async function handleSaveManualPrice() {
+  const investmentId = document.getElementById("investment-id").value;
+  const input = document.getElementById("manual-price-input");
+  const messagesDiv = document.getElementById("manual-price-messages");
+
+  if (!investmentId) return;
+
+  const priceValue = parseFloat(input.value);
+  if (isNaN(priceValue) || priceValue < 0) {
+    messagesDiv.innerHTML = '<p class="text-sm text-error">Please enter a valid price in pence (e.g. 1234.56)</p>';
+    return;
+  }
+
+  const btn = document.getElementById("save-manual-price-btn");
+  btn.disabled = true;
+  btn.textContent = "Saving...";
+
+  const result = await apiRequest("/api/investments/manual-price", {
+    method: "POST",
+    body: { investmentId: Number(investmentId), price: priceValue },
+  });
+
+  btn.disabled = false;
+  btn.textContent = "Save Price";
+
+  if (result.ok) {
+    messagesDiv.innerHTML = '<p class="text-sm text-success">' + escapeHtml(result.data.message) + "</p>";
+    input.value = "";
+    // Refresh the "Last price" display
+    loadLatestPriceForEdit(investmentId);
+    // Auto-clear success message after 5 seconds
+    setTimeout(function () {
+      messagesDiv.innerHTML = "";
+    }, 5000);
+  } else {
+    messagesDiv.innerHTML = '<p class="text-sm text-error">' + escapeHtml(result.error || "Failed to save price") + "</p>";
+  }
+}
+
 // Initialise the page
 document.addEventListener("DOMContentLoaded", async function () {
   await loadInvestmentTypes();
@@ -834,6 +942,14 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   // Handle known site dropdown selection
   document.getElementById("site-select").addEventListener("change", handleSiteSelect);
+
+  // Show/hide manual price section based on auto-scrape checkbox
+  document.getElementById("auto-scrape").addEventListener("change", function () {
+    toggleManualPriceSection();
+  });
+
+  // Wire the Save Price button
+  document.getElementById("save-manual-price-btn").addEventListener("click", handleSaveManualPrice);
 
   // Close modals when clicking on the backdrop (outside the modal content)
   document.getElementById("investment-form-container").addEventListener("click", function (event) {

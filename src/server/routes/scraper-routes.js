@@ -1,13 +1,13 @@
 import { Router } from "../router.js";
 import { fetchCurrencyRates } from "../scrapers/currency-scraper.js";
 import { getLatestRates } from "../db/currency-rates-db.js";
-import { getAllInvestments } from "../db/investments-db.js";
+import { getAllInvestments, getInvestmentById, updateAutoScrape } from "../db/investments-db.js";
 import { getLatestPrice } from "../db/prices-db.js";
 import { getAllBenchmarks } from "../db/benchmarks-db.js";
 import { getLatestBenchmarkData } from "../db/benchmark-data-db.js";
 import { scrapeAllPrices, scrapePriceById, getScrapeableInvestments, scrapeSingleInvestmentPrice, extractDomain, calculateDelay } from "../scrapers/price-scraper.js";
 import { scrapeAllBenchmarks, scrapeBenchmarkById, getScrapeableBenchmarks, scrapeSingleBenchmarkValue, extractDomain as extractBenchmarkDomain, calculateDelay as calculateBenchmarkDelay } from "../scrapers/benchmark-scraper.js";
-import { getScrapingHistoryWithDescriptions, getScrapingHistoryCount, getLastSuccessfulScrapeByType } from "../db/scraping-history-db.js";
+import { getScrapingHistoryWithDescriptions, getScrapingHistoryCount, getLastSuccessfulScrapeByType, recordScrapingAttempt } from "../db/scraping-history-db.js";
 import { launchBrowser } from "../scrapers/browser-utils.js";
 import { SCRAPE_RETRY_CONFIG } from "../../shared/constants.js";
 import { getSchedulerStatus } from "../services/scheduled-scraper.js";
@@ -210,72 +210,73 @@ scraperRouter.get("/api/scraper/prices/stream", async function () {
               failedIds: [],
             });
           } else {
-            // Step 3: Launch browser and scrape each investment, streaming results
+            // Step 3: Launch browser and scrape investments using breadth-first retry.
+            // Pass 1 attempts every investment once. Subsequent passes retry only
+            // the failures from the previous pass, avoiding the delay of retrying
+            // a single broken investment multiple times before moving on.
             browser = await launchBrowser();
             let successCount = 0;
-            let failCount = 0;
             let previousDomain = "";
-            const failedIds = [];
+            let failedInvestments = [...investments];
+            const finalFailedIds = [];
 
-            for (const investment of investments) {
-              // Random delay between requests to avoid rate-limiting/blocking
-              const currentDomain = extractDomain(investment.investment_url);
-              const delayMs = calculateDelay(previousDomain, currentDomain);
-              if (delayMs > 0) {
-                await sleep(delayMs);
+            for (let pass = 1; pass <= SCRAPE_RETRY_CONFIG.maxAttempts; pass++) {
+              // On retry passes, notify the UI and wait before retrying
+              if (pass > 1) {
+                if (failedInvestments.length === 0) {
+                  break;
+                }
+                const retryDelay = SCRAPE_RETRY_CONFIG.retryDelays[pass - 2] || 2000;
+                sendEvent("retry_pass", {
+                  pass: pass,
+                  maxPasses: SCRAPE_RETRY_CONFIG.maxAttempts,
+                  retryCount: failedInvestments.length,
+                  delay: retryDelay,
+                });
+                await sleep(retryDelay);
+                previousDomain = "";
               }
 
-              // Try scraping with retry logic
-              let priceResult = null;
-              let attemptNumber = 1;
+              const stillFailed = [];
 
-              while (attemptNumber <= SCRAPE_RETRY_CONFIG.maxAttempts) {
-                priceResult = await scrapeSingleInvestmentPrice(investment, browser, {
+              for (const investment of failedInvestments) {
+                const currentDomain = extractDomain(investment.investment_url);
+                const delayMs = calculateDelay(previousDomain, currentDomain);
+                if (delayMs > 0) {
+                  await sleep(delayMs);
+                }
+
+                const priceResult = await scrapeSingleInvestmentPrice(investment, browser, {
                   scrapeTime: scrapeTime,
-                  attemptNumber: attemptNumber,
+                  attemptNumber: pass,
                 });
 
+                previousDomain = currentDomain;
+                priceResult.attemptNumber = pass;
+                priceResult.maxAttempts = SCRAPE_RETRY_CONFIG.maxAttempts;
+                sendEvent("price", priceResult);
+
                 if (priceResult.success) {
-                  break; // Success, no need to retry
+                  successCount++;
+                } else {
+                  stillFailed.push(investment);
                 }
-
-                // Check if we should retry
-                if (attemptNumber < SCRAPE_RETRY_CONFIG.maxAttempts) {
-                  const retryDelay = SCRAPE_RETRY_CONFIG.retryDelays[attemptNumber - 1] || 2000;
-                  // Send a retry event so UI can show retry status
-                  sendEvent("retry", {
-                    investmentId: investment.id,
-                    description: investment.description,
-                    attemptNumber: attemptNumber,
-                    maxAttempts: SCRAPE_RETRY_CONFIG.maxAttempts,
-                    error: priceResult.error,
-                    retryingIn: retryDelay,
-                  });
-                  await sleep(retryDelay);
-                }
-
-                attemptNumber++;
               }
 
-              previousDomain = currentDomain;
-              // Add attempt info to result for UI display
-              priceResult.attemptNumber = attemptNumber > SCRAPE_RETRY_CONFIG.maxAttempts ? SCRAPE_RETRY_CONFIG.maxAttempts : attemptNumber;
-              priceResult.maxAttempts = SCRAPE_RETRY_CONFIG.maxAttempts;
-              sendEvent("price", priceResult);
+              failedInvestments = stillFailed;
+            }
 
-              if (priceResult.success) {
-                successCount++;
-              } else {
-                failCount++;
-                failedIds.push(investment.id);
-              }
+            // Collect final failures after all passes
+            const failCount = failedInvestments.length;
+            for (const inv of failedInvestments) {
+              finalFailedIds.push(inv.id);
             }
 
             // Step 4: Send done event with summary
             const total = successCount + failCount;
             let message = "Scraped " + successCount + " of " + total + " investment price" + (total === 1 ? "" : "s");
             if (failCount > 0) {
-              message += " (" + failCount + " failed after " + SCRAPE_RETRY_CONFIG.maxAttempts + " attempts each)";
+              message += " (" + failCount + " failed after " + SCRAPE_RETRY_CONFIG.maxAttempts + " pass" + (SCRAPE_RETRY_CONFIG.maxAttempts === 1 ? "" : "es") + ")";
             }
 
             sendEvent("done", {
@@ -284,7 +285,7 @@ scraperRouter.get("/api/scraper/prices/stream", async function () {
               total: total,
               successCount: successCount,
               failCount: failCount,
-              failedIds: failedIds,
+              failedIds: finalFailedIds,
             });
           }
         } catch (err) {
@@ -468,72 +469,72 @@ scraperRouter.get("/api/scraper/benchmarks/stream", async function () {
               failedIds: [],
             });
           } else {
-            // Launch browser and scrape each benchmark, streaming results
+            // Launch browser and scrape benchmarks using breadth-first retry.
+            // Pass 1 attempts every benchmark once. Subsequent passes retry only
+            // the failures from the previous pass.
             browser = await launchBrowser();
             let successCount = 0;
-            let failCount = 0;
             let previousDomain = "";
-            const failedIds = [];
+            let failedBenchmarks = [...benchmarks];
+            const finalFailedIds = [];
 
-            for (const benchmark of benchmarks) {
-              // Random delay between requests to avoid rate-limiting/blocking
-              const currentDomain = extractBenchmarkDomain(benchmark.benchmark_url);
-              const delayMs = calculateBenchmarkDelay(previousDomain, currentDomain);
-              if (delayMs > 0) {
-                await sleep(delayMs);
+            for (let pass = 1; pass <= SCRAPE_RETRY_CONFIG.maxAttempts; pass++) {
+              // On retry passes, notify the UI and wait before retrying
+              if (pass > 1) {
+                if (failedBenchmarks.length === 0) {
+                  break;
+                }
+                const retryDelay = SCRAPE_RETRY_CONFIG.retryDelays[pass - 2] || 2000;
+                sendEvent("retry_pass", {
+                  pass: pass,
+                  maxPasses: SCRAPE_RETRY_CONFIG.maxAttempts,
+                  retryCount: failedBenchmarks.length,
+                  delay: retryDelay,
+                });
+                await sleep(retryDelay);
+                previousDomain = "";
               }
 
-              // Try scraping with retry logic
-              let benchmarkResult = null;
-              let attemptNumber = 1;
+              const stillFailed = [];
 
-              while (attemptNumber <= SCRAPE_RETRY_CONFIG.maxAttempts) {
-                benchmarkResult = await scrapeSingleBenchmarkValue(benchmark, browser, {
+              for (const benchmark of failedBenchmarks) {
+                const currentDomain = extractBenchmarkDomain(benchmark.benchmark_url);
+                const delayMs = calculateBenchmarkDelay(previousDomain, currentDomain);
+                if (delayMs > 0) {
+                  await sleep(delayMs);
+                }
+
+                const benchmarkResult = await scrapeSingleBenchmarkValue(benchmark, browser, {
                   scrapeTime: scrapeTime,
-                  attemptNumber: attemptNumber,
+                  attemptNumber: pass,
                 });
 
+                previousDomain = currentDomain;
+                benchmarkResult.attemptNumber = pass;
+                benchmarkResult.maxAttempts = SCRAPE_RETRY_CONFIG.maxAttempts;
+                sendEvent("benchmark", benchmarkResult);
+
                 if (benchmarkResult.success) {
-                  break; // Success, no need to retry
+                  successCount++;
+                } else {
+                  stillFailed.push(benchmark);
                 }
-
-                // Check if we should retry
-                if (attemptNumber < SCRAPE_RETRY_CONFIG.maxAttempts) {
-                  const retryDelay = SCRAPE_RETRY_CONFIG.retryDelays[attemptNumber - 1] || 2000;
-                  // Send a retry event so UI can show retry status
-                  sendEvent("retry", {
-                    benchmarkId: benchmark.id,
-                    description: benchmark.description,
-                    attemptNumber: attemptNumber,
-                    maxAttempts: SCRAPE_RETRY_CONFIG.maxAttempts,
-                    error: benchmarkResult.error,
-                    retryingIn: retryDelay,
-                  });
-                  await sleep(retryDelay);
-                }
-
-                attemptNumber++;
               }
 
-              previousDomain = currentDomain;
-              // Add attempt info to result for UI display
-              benchmarkResult.attemptNumber = attemptNumber > SCRAPE_RETRY_CONFIG.maxAttempts ? SCRAPE_RETRY_CONFIG.maxAttempts : attemptNumber;
-              benchmarkResult.maxAttempts = SCRAPE_RETRY_CONFIG.maxAttempts;
-              sendEvent("benchmark", benchmarkResult);
+              failedBenchmarks = stillFailed;
+            }
 
-              if (benchmarkResult.success) {
-                successCount++;
-              } else {
-                failCount++;
-                failedIds.push(benchmark.id);
-              }
+            // Collect final failures after all passes
+            const failCount = failedBenchmarks.length;
+            for (const bm of failedBenchmarks) {
+              finalFailedIds.push(bm.id);
             }
 
             // Send done event with summary
             const total = successCount + failCount;
             let message = "Scraped " + successCount + " of " + total + " benchmark value" + (total === 1 ? "" : "s");
             if (failCount > 0) {
-              message += " (" + failCount + " failed after " + SCRAPE_RETRY_CONFIG.maxAttempts + " attempts each)";
+              message += " (" + failCount + " failed after " + SCRAPE_RETRY_CONFIG.maxAttempts + " pass" + (SCRAPE_RETRY_CONFIG.maxAttempts === 1 ? "" : "es") + ")";
             }
 
             sendEvent("done", {
@@ -542,7 +543,7 @@ scraperRouter.get("/api/scraper/benchmarks/stream", async function () {
               total: total,
               successCount: successCount,
               failCount: failCount,
-              failedIds: failedIds,
+              failedIds: finalFailedIds,
             });
           }
         } catch (err) {
@@ -689,6 +690,11 @@ scraperRouter.get("/api/scraper/history", function (request) {
       filters.offset = parseInt(offset, 10);
     }
 
+    const autoScrapeOnly = url.searchParams.get("autoScrapeOnly");
+    if (autoScrapeOnly !== null) {
+      filters.autoScrapeOnly = autoScrapeOnly === "true";
+    }
+
     const history = getScrapingHistoryWithDescriptions(filters);
     const totalCount = getScrapingHistoryCount(filters);
 
@@ -736,6 +742,30 @@ scraperRouter.get("/api/scraper/scheduler-status", function () {
     });
   } catch (err) {
     return new Response(JSON.stringify({ error: "Failed to get scheduler status", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+  }
+});
+
+// PATCH /api/investments/:id/auto-scrape — toggle auto-scrape flag
+scraperRouter.patch("/api/investments/:id/auto-scrape", async function (request, params) {
+  try {
+    const id = parseInt(params.id, 10);
+    if (isNaN(id)) {
+      return new Response(JSON.stringify({ error: "Invalid investment ID" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+
+    const body = await request.json();
+    if (body.autoScrape === undefined) {
+      return new Response(JSON.stringify({ error: "autoScrape field is required (true or false)" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+
+    const updated = updateAutoScrape(id, body.autoScrape);
+    if (!updated) {
+      return new Response(JSON.stringify({ error: "Investment not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
+    }
+
+    return new Response(JSON.stringify(updated), { status: 200, headers: { "Content-Type": "application/json" } });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: "Failed to update auto-scrape setting", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 

@@ -142,30 +142,39 @@ export function getScrapingHistoryCount(filters = {}) {
   const db = getDatabase();
   const conditions = [];
   const params = [];
+  let joinClause = "";
 
   if (filters.scrapeType) {
-    conditions.push("scrape_type = ?");
+    conditions.push("h.scrape_type = ?");
     params.push(filters.scrapeType);
   }
 
   if (filters.success !== undefined) {
-    conditions.push("success = ?");
+    conditions.push("h.success = ?");
     params.push(filters.success ? 1 : 0);
   }
 
   if (filters.startDate) {
-    conditions.push("scrape_datetime >= ?");
+    conditions.push("h.scrape_datetime >= ?");
     params.push(filters.startDate + "T00:00:00");
   }
 
   if (filters.endDate) {
-    conditions.push("scrape_datetime <= ?");
+    conditions.push("h.scrape_datetime <= ?");
     params.push(filters.endDate + "T23:59:59");
+  }
+
+  // Filter by auto_scrape status on investments. Requires a JOIN to investments.
+  if (filters.autoScrapeOnly !== undefined) {
+    joinClause = " JOIN investments i ON h.scrape_type = 'investment' AND h.reference_id = i.id";
+    conditions.push("h.scrape_type = 'investment'");
+    conditions.push("i.auto_scrape = ?");
+    params.push(filters.autoScrapeOnly ? 1 : 0);
   }
 
   const whereClause = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
 
-  const row = db.query(`SELECT COUNT(*) as count FROM scraping_history ${whereClause}`).get(...params);
+  const row = db.query(`SELECT COUNT(*) as count FROM scraping_history h${joinClause} ${whereClause}`).get(...params);
 
   return row ? row.count : 0;
 }
@@ -199,6 +208,14 @@ export function getScrapingHistoryWithDescriptions(filters = {}) {
   if (filters.endDate) {
     conditions.push("h.scrape_datetime <= ?");
     params.push(filters.endDate + "T23:59:59");
+  }
+
+  // Filter by auto_scrape status on investments. When set, this implicitly
+  // restricts results to investment-type history entries only.
+  if (filters.autoScrapeOnly !== undefined) {
+    conditions.push("h.scrape_type = 'investment'");
+    conditions.push("i.auto_scrape = ?");
+    params.push(filters.autoScrapeOnly ? 1 : 0);
   }
 
   const whereClause = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";

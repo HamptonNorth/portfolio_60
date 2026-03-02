@@ -1,5 +1,7 @@
 import { Router } from "../router.js";
-import { getAllInvestments, getInvestmentById, createInvestment, updateInvestment, deleteInvestment } from "../db/investments-db.js";
+import { getAllInvestments, getInvestmentById, createInvestment, updateInvestment, deleteInvestment, getManuallyPricedInvestments } from "../db/investments-db.js";
+import { getLatestPrice, upsertPrice } from "../db/prices-db.js";
+import { recordScrapingAttempt } from "../db/scraping-history-db.js";
 import { getAllInvestmentTypes } from "../db/investment-types-db.js";
 import { validateInvestment } from "../validation.js";
 
@@ -32,6 +34,94 @@ investmentsRouter.get("/api/investments", function () {
     });
   } catch (err) {
     return new Response(JSON.stringify({ error: "Failed to fetch investments", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+  }
+});
+
+// GET /api/investments/manually-priced — list investments with auto_scrape=0 and their latest price info
+investmentsRouter.get("/api/investments/manually-priced", function () {
+  try {
+    const investments = getManuallyPricedInvestments();
+    return new Response(JSON.stringify(investments), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: "Failed to fetch manually-priced investments", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+  }
+});
+
+// POST /api/investments/manual-price — manually enter a price for an investment
+investmentsRouter.post("/api/investments/manual-price", async function (request) {
+  try {
+    const body = await request.json();
+    const { investmentId, price } = body;
+
+    if (!investmentId || price === undefined || price === null) {
+      return new Response(JSON.stringify({ error: "investmentId and price are required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+
+    const parsedPrice = parseFloat(price);
+    if (isNaN(parsedPrice) || parsedPrice < 0) {
+      return new Response(JSON.stringify({ error: "Price must be a valid non-negative number" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+
+    const investment = getInvestmentById(investmentId);
+    if (!investment) {
+      return new Response(JSON.stringify({ error: "Investment not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const now = new Date().toTimeString().slice(0, 8);
+
+    // Store the price (parsedPrice is in pence/minor units, same as scraped prices)
+    upsertPrice(investmentId, today, now, parsedPrice);
+
+    // Record in scraping history (started_by 2 = manual entry)
+    recordScrapingAttempt({
+      scrapeType: "investment",
+      referenceId: investmentId,
+      startedBy: 2,
+      attemptNumber: 1,
+      success: true,
+      errorCode: null,
+      errorMessage: null,
+    });
+
+    return new Response(JSON.stringify({
+      success: true,
+      investmentId: investmentId,
+      description: investment.description,
+      price: parsedPrice,
+      priceDate: today,
+      priceTime: now,
+      message: "Price saved for " + investment.description,
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: "Failed to save manual price", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+  }
+});
+
+// GET /api/investments/:id/latest-price — get the latest price for an investment
+investmentsRouter.get("/api/investments/:id/latest-price", function (request, params) {
+  try {
+    const id = Number(params.id);
+    const investment = getInvestmentById(id);
+    if (!investment) {
+      return new Response(JSON.stringify({ error: "Investment not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
+    }
+    const latestPrice = getLatestPrice(id);
+    return new Response(JSON.stringify({
+      investmentId: id,
+      currencyCode: investment.currency_code,
+      price: latestPrice ? latestPrice.price : null,
+      priceDate: latestPrice ? latestPrice.price_date : null,
+      priceTime: latestPrice ? latestPrice.price_time : null,
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: "Failed to fetch latest price", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 

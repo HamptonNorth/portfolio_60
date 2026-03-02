@@ -31,6 +31,7 @@ async function checkDatabaseStatus() {
       '<div class="bg-green-50 border border-green-300 text-success rounded-lg px-4 py-3">' +
       '<p class="text-base">Database is ready.</p>' +
       "</div>";
+    loadManualPriceAlert();
   } else {
     container.innerHTML =
       '<div class="bg-amber-50 border border-amber-300 text-warning rounded-lg px-5 py-5">' +
@@ -86,6 +87,74 @@ async function handleCreateDatabase() {
     btn.textContent = "Create Database";
     btn.classList.remove("opacity-50", "cursor-not-allowed");
   }
+}
+
+/**
+ * @description Format the started_by value into a human-readable label for
+ * the "How Priced" column.
+ * @param {number|null} startedBy - 0=Manual scrape, 1=Scheduled, 2=Manual entry, 3=Test
+ * @returns {string} Display label
+ */
+function formatHowPriced(startedBy) {
+  if (startedBy === null || startedBy === undefined) return "Unknown";
+  if (startedBy === 0) return "Manual scrape";
+  if (startedBy === 1) return "Scheduled";
+  if (startedBy === 2) return "Manual entry";
+  if (startedBy === 3) return "Test";
+  return "Unknown";
+}
+
+/**
+ * @description Fetch manually-priced investments and display an alert table
+ * on the home page if any exist. Only called when the database is ready.
+ */
+async function loadManualPriceAlert() {
+  const container = document.getElementById("manual-price-alert");
+  if (!container) return;
+
+  const result = await apiRequest("/api/investments/manually-priced");
+
+  if (!result.ok || !result.data || result.data.length === 0) {
+    container.innerHTML = "";
+    return;
+  }
+
+  const investments = result.data;
+
+  let html = '<div class="bg-amber-50 border border-amber-300 rounded-lg p-4">';
+  html += '<h3 class="text-lg font-semibold text-amber-800 mb-3">Manually-Priced Investments</h3>';
+  html += '<p class="text-sm text-amber-700 mb-3">These investments are not included in automatic price fetching. Their prices need to be entered manually via the investment edit form (Setup &gt; Investments).</p>';
+  html += '<div class="overflow-x-auto">';
+  html += '<table class="w-full text-left border-collapse">';
+  html += "<thead>";
+  html += '<tr class="border-b-2 border-amber-200">';
+  html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Investment Description</th>';
+  html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Type</th>';
+  html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Currency</th>';
+  html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Public ID</th>';
+  html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Date of Last Price</th>';
+  html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">How Priced</th>';
+  html += "</tr>";
+  html += "</thead><tbody>";
+
+  for (let i = 0; i < investments.length; i++) {
+    const inv = investments[i];
+    const rowClass = i % 2 === 0 ? "bg-white" : "bg-amber-50/50";
+    const howPriced = formatHowPriced(inv.how_priced);
+    const lastDate = inv.last_price_date || "No price yet";
+
+    html += '<tr class="' + rowClass + ' border-b border-amber-100">';
+    html += '<td class="py-2 px-3 text-base">' + escapeHtml(inv.description) + "</td>";
+    html += '<td class="py-2 px-3 text-base">' + escapeHtml(inv.type_description) + "</td>";
+    html += '<td class="py-2 px-3 text-base">' + escapeHtml(inv.currency_code) + "</td>";
+    html += '<td class="py-2 px-3 text-sm text-brand-500 font-mono">' + escapeHtml(inv.public_id || "\u2014") + "</td>";
+    html += '<td class="py-2 px-3 text-base">' + escapeHtml(lastDate) + "</td>";
+    html += '<td class="py-2 px-3 text-base">' + escapeHtml(howPriced) + "</td>";
+    html += "</tr>";
+  }
+
+  html += "</tbody></table></div></div>";
+  container.innerHTML = html;
 }
 
 // Check database status when the page loads

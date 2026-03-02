@@ -462,6 +462,18 @@ function runMigrations(database) {
       )
     `);
   }
+
+  // Migration 18: Add auto_scrape column to investments (v0.12.0)
+  // Allows excluding investments from automatic price fetching.
+  // Default 1 (auto-scrape enabled). Set to 0 for manual-only pricing.
+  const invCols18 = database.query("PRAGMA table_info(investments)").all();
+  const hasAutoScrape = invCols18.some(function (col) {
+    return col.name === "auto_scrape";
+  });
+
+  if (!hasAutoScrape) {
+    database.exec("ALTER TABLE investments ADD COLUMN auto_scrape INTEGER NOT NULL DEFAULT 1");
+  }
 }
 
 /**

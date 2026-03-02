@@ -12,6 +12,7 @@ import {
   calculateDelay as calculateBenchmarkDelay,
 } from "../scrapers/benchmark-scraper.js";
 import { launchBrowser } from "../scrapers/browser-utils.js";
+import { SCRAPE_RETRY_CONFIG } from "../../shared/constants.js";
 
 /**
  * @description Sleep for a given number of milliseconds.
@@ -90,39 +91,59 @@ export async function runFullScrape(options = {}) {
       onCurrencyRates(currencyResult);
     }
 
-    // Step 2: Scrape investment prices
+    // Step 2: Scrape investment prices using breadth-first retry.
+    // Pass 1 attempts every investment. Subsequent passes retry only failures.
     const investments = getScrapeableInvestments();
 
     if (investments.length > 0) {
       browser = await launchBrowser();
-      let previousDomain = "";
+      let failedInvestments = [...investments];
 
-      for (const investment of investments) {
-        // Domain-aware delay between requests
-        const currentDomain = extractPriceDomain(investment.investment_url);
-        const delayMs = calculatePriceDelay(previousDomain, currentDomain);
-        if (delayMs > 0) {
-          await sleep(delayMs);
+      for (let pass = 1; pass <= SCRAPE_RETRY_CONFIG.maxAttempts; pass++) {
+        if (pass > 1) {
+          if (failedInvestments.length === 0) {
+            break;
+          }
+          const retryDelay = SCRAPE_RETRY_CONFIG.retryDelays[pass - 2] || 2000;
+          await sleep(retryDelay);
         }
 
-        const priceResult = await scrapeSingleInvestmentPrice(investment, browser, {
-          scrapeTime: scrapeTime,
-          startedBy: startedBy,
-          attemptNumber: 1,
-        });
+        let previousDomain = "";
+        const stillFailed = [];
 
-        if (priceResult.success) {
-          summary.priceSuccessCount++;
-        } else {
-          summary.priceFailCount++;
-          summary.failedInvestmentIds.push(investment.id);
+        for (const investment of failedInvestments) {
+          const currentDomain = extractPriceDomain(investment.investment_url);
+          const delayMs = calculatePriceDelay(previousDomain, currentDomain);
+          if (delayMs > 0) {
+            await sleep(delayMs);
+          }
+
+          const priceResult = await scrapeSingleInvestmentPrice(investment, browser, {
+            scrapeTime: scrapeTime,
+            startedBy: startedBy,
+            attemptNumber: pass,
+          });
+
+          if (priceResult.success) {
+            summary.priceSuccessCount++;
+          } else {
+            stillFailed.push(investment);
+          }
+
+          if (onPriceResult) {
+            onPriceResult(priceResult);
+          }
+
+          previousDomain = currentDomain;
         }
 
-        if (onPriceResult) {
-          onPriceResult(priceResult);
-        }
+        failedInvestments = stillFailed;
+      }
 
-        previousDomain = currentDomain;
+      // Record final failures
+      summary.priceFailCount = failedInvestments.length;
+      for (const inv of failedInvestments) {
+        summary.failedInvestmentIds.push(inv.id);
       }
     }
 

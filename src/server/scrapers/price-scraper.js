@@ -783,6 +783,10 @@ export async function scrapeAllPrices(onProgress = null, options = {}) {
 export function getScrapeableInvestments() {
   const allInvestments = getAllInvestments();
   return allInvestments.filter(function (inv) {
+    // Skip investments excluded from automatic price fetching
+    if (inv.auto_scrape === 0) {
+      return false;
+    }
     // Option 1: has a manual URL with a resolvable selector
     if (inv.investment_url) {
       const selectorInfo = getSelector(inv.investment_url, inv.selector);

@@ -66,6 +66,15 @@ export class Router {
   }
 
   /**
+   * @description Convenience method to register a PATCH route.
+   * @param {string} path - URL pattern
+   * @param {Function} handler - Route handler
+   */
+  patch(path, handler) {
+    this.add("PATCH", path, handler);
+  }
+
+  /**
    * @description Convenience method to register a DELETE route.
    * @param {string} path - URL pattern
    * @param {Function} handler - Route handler

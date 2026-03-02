@@ -77,6 +77,11 @@ function getFilters() {
     filters.success = success;
   }
 
+  const autoScrape = document.getElementById("filter-auto-scrape").value;
+  if (autoScrape !== "") {
+    filters.autoScrapeOnly = autoScrape;
+  }
+
   const startDate = document.getElementById("filter-start-date").value;
   if (startDate) {
     filters.startDate = startDate;
@@ -104,6 +109,9 @@ function buildQueryString(filters, offset) {
   }
   if (filters.success !== undefined) {
     params.set("success", filters.success);
+  }
+  if (filters.autoScrapeOnly !== undefined) {
+    params.set("autoScrapeOnly", filters.autoScrapeOnly);
   }
   if (filters.startDate) {
     params.set("startDate", filters.startDate);
@@ -257,6 +265,7 @@ function applyFilters() {
 function clearFilters() {
   document.getElementById("filter-type").value = "";
   document.getElementById("filter-success").value = "";
+  document.getElementById("filter-auto-scrape").value = "";
   document.getElementById("filter-start-date").value = "";
   document.getElementById("filter-end-date").value = "";
   currentOffset = 0;
