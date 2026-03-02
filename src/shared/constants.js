@@ -3,12 +3,10 @@
  */
 
 import { join } from "node:path";
+import { APP_NAME, APP_VERSION } from "../../config.js";
 
-/** @type {string} Application display name */
-export const APP_NAME = "Portfolio 60";
-
-/** @type {string} Current application version */
-export const APP_VERSION = "0.11.0";
+// Re-export from root config.js (single source of truth)
+export { APP_NAME, APP_VERSION };
 
 /** @type {number} Port the Bun HTTP server listens on */
 export const SERVER_PORT = 1420;

@@ -1,4 +1,5 @@
 import { LitElement, html } from "lit";
+import { APP_NAME, APP_VERSION } from "../../../../config.js";
 
 /**
  * @description Shared footer component for Portfolio 60.
@@ -13,7 +14,7 @@ class AppFooter extends LitElement {
   render() {
     return html`
       <footer class="text-brand-400 text-sm py-4 border-t border-brand-100 flex justify-between px-6 max-w-7xl mx-auto w-full">
-        <span>Portfolio 60 v0.1.0</span>
+        <span>${APP_NAME} v${APP_VERSION}</span>
         <span id="build-time"></span>
       </footer>
     `;

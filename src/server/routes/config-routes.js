@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { getAllSiteConfigs, findSiteConfig, loadConfig, getAllowedProviders, getSchedulingConfig, reloadConfig, getScraperTestingEnabled, getStalestLimit, getListItems, getConfigFilePath, getWritableConfigPath } from "../config.js";
-import { DB_PATH, BACKUP_DIR } from "../../shared/constants.js";
+import { DB_PATH, BACKUP_DIR, APP_NAME, APP_VERSION } from "../../shared/constants.js";
 
 /**
  * @description Get the list of allowed provider codes.
@@ -101,8 +101,8 @@ export function handleConfigRoute(method, path) {
     const buildTime = getBuildTime();
     const runtime = typeof Bun !== "undefined" ? "Bun v" + Bun.version : "Node.js " + process.version;
     const info = {
-      appName: "Portfolio 60",
-      version: "0.1.0",
+      appName: APP_NAME,
+      version: APP_VERSION,
       buildTime: buildTime,
       runtime: runtime,
       platform: process.platform,
