@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 /**
  * @description Tests for the central config loader (src/server/config.js).
  * Uses temporary config files to test various scenarios without
- * modifying the real config.json.
+ * modifying the real user-settings.json.
  */
 
 const TEMP_DIR = resolve("data/portfolio_60_test");

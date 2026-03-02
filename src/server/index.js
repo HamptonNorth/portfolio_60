@@ -1,4 +1,4 @@
-import { SERVER_PORT, getDocsMediaDir } from "../shared/constants.js";
+import { SERVER_PORT, getDocsMediaDir } from "../shared/server-constants.js";
 import { resolve, join } from "node:path";
 import { checkAuth } from "./middleware/auth-middleware.js";
 import { handleAuthRoute } from "./routes/auth-routes.js";

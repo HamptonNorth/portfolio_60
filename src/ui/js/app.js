@@ -219,7 +219,7 @@ function escapeHtml(text) {
 
 /**
  * @description Auto-fix unescaped double quotes inside "iframe" JSON string values.
- * When a user pastes an iframe tag from Google Sheets or Excel into config.json,
+ * When a user pastes an iframe tag from Google Sheets or Excel into user-settings.json,
  * the inner quotes (e.g. src="...") break JSON parsing. This function finds
  * "iframe": "..." lines and escapes the inner double quotes so the JSON is valid.
  * Already-escaped quotes (\") are left unchanged.
@@ -399,7 +399,7 @@ function showModalHtml(title, htmlContent) {
 }
 
 /**
- * @description Show the Edit Settings modal. Loads the raw config.json into
+ * @description Show the Edit Settings modal. Loads the raw user-settings.json into
  * a textarea for editing, with Save and Cancel buttons.
  */
 async function showEditSettingsModal() {
@@ -442,7 +442,7 @@ async function showEditSettingsModal() {
         <h3 class="text-lg font-semibold">Edit Settings</h3>
       </div>
       <div class="p-4">
-        <p class="text-sm text-brand-600 mb-2">Edit config.json configuration. Changes take effect immediately on save.</p>
+        <p class="text-sm text-brand-600 mb-2">Edit user settings. Changes take effect immediately on save.</p>
         <p class="text-xs text-brand-400 mb-3">Save location: ${escapeHtml(configPath)}</p>
         <div id="settings-error" class="hidden mb-3 bg-red-50 border border-red-300 text-error rounded-lg px-3 py-2 text-sm"></div>
         <textarea id="settings-editor" class="w-full font-mono text-sm border-2 border-brand-300 rounded-lg p-3 focus:outline-none focus:border-brand-500 bg-brand-25 text-brand-800" rows="20" spellcheck="false">${escapeHtml(configContent)}</textarea>

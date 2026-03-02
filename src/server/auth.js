@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolve, join } from "node:path";
-import { DATA_DIR } from "../shared/constants.js";
+import { DATA_DIR } from "../shared/server-constants.js";
 
 /**
  * @description Path to the .env file. Uses the DATA_DIR base directory so that

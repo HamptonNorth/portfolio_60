@@ -1,7 +1,7 @@
 import { getAllBenchmarks, getBenchmarkById } from "../db/benchmarks-db.js";
 import { upsertBenchmarkData } from "../db/benchmark-data-db.js";
 import { recordScrapingAttempt } from "../db/scraping-history-db.js";
-import { SCRAPE_DELAY_PROFILES, DEFAULT_SCRAPE_DELAY_PROFILE } from "../../shared/constants.js";
+import { SCRAPE_DELAY_PROFILES, DEFAULT_SCRAPE_DELAY_PROFILE } from "../../shared/server-constants.js";
 import { launchBrowser, createStealthContext, createStealthPage, navigateTo, isBrowserAlive } from "./browser-utils.js";
 import { getSelector } from "../config.js";
 

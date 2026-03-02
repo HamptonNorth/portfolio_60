@@ -258,7 +258,7 @@ One holding per investment per account (UNIQUE on account_id + investment_id).
 
 ## Ports
 
-- **Application server**: Port 1420 (`src/shared/constants.js` → `SERVER_PORT`). Used by the user via browser.
+- **Application server**: Port 1420 (`src/shared/server-constants.js` → `SERVER_PORT`). Used by the user via browser.
 - **Automated testing (Claude)**: Ports 1430+ (each test file uses a unique port). All test files must spawn the server with `env: { PORT: "<unique_port>" }` to avoid conflicts with the user's running application on port 1420 and with each other. The server reads the `PORT` environment variable and falls back to `SERVER_PORT` (1420) if not set. Current allocations: server.test.js=1430, auth-routes.test.js=1431, accounts-db.test.js=1440, holdings-db.test.js=1441, accounts-routes.test.js=1442, holdings-routes.test.js=1443, portfolio-routes.test.js=1444. New test files should increment from there.
 
 ## Commands

@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync, readFileSync, chmodSync, accessSync, constants as fsConstants } from "node:fs";
 import { resolve, dirname } from "node:path";
-import { DB_PATH } from "../../shared/constants.js";
+import { DB_PATH } from "../../shared/server-constants.js";
 
 /**
  * @description Cached resolved path to the database file. Set on first

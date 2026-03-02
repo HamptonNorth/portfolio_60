@@ -6,7 +6,7 @@ import { getAllInvestmentTypes } from "../db/investment-types-db.js";
 import { validateTestInvestment } from "../validation.js";
 import { getScraperTestingEnabled, getStalestLimit, getStalestRetries } from "../config.js";
 import { scrapeSingleInvestmentPrice, extractDomain, calculateDelay, parsePrice, normaliseToMinorUnit, resolveScrapingConfig } from "../scrapers/price-scraper.js";
-import { SCRAPE_RETRY_CONFIG, SCRAPE_DELAY_PROFILES } from "../../shared/constants.js";
+import { SCRAPE_RETRY_CONFIG, SCRAPE_DELAY_PROFILES } from "../../shared/server-constants.js";
 import { testBackfillTestInvestment } from "../services/historic-backfill.js";
 
 /**

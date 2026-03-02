@@ -8,4 +8,4 @@
 export const APP_NAME = "Portfolio 60";
 
 /** @type {string} Current application version */
-export const APP_VERSION = "0.1.1";
+export const APP_VERSION = "0.1.2";

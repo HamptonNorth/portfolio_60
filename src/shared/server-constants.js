@@ -3,9 +3,9 @@
  */
 
 import { join } from "node:path";
-import { APP_NAME, APP_VERSION } from "../../config.js";
+import { APP_NAME, APP_VERSION } from "../../app-identity.js";
 
-// Re-export from root config.js (single source of truth)
+// Re-export from root app-identity.js (single source of truth)
 export { APP_NAME, APP_VERSION };
 
 /** @type {number} Port the Bun HTTP server listens on */

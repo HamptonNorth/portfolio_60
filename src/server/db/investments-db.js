@@ -1,5 +1,5 @@
 import { getDatabase } from "./connection.js";
-import { CURRENCY_SCALE_FACTOR } from "../../shared/constants.js";
+import { CURRENCY_SCALE_FACTOR } from "../../shared/server-constants.js";
 
 /**
  * @description Get all investments with their currency and investment type details,

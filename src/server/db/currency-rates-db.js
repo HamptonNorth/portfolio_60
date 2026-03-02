@@ -1,5 +1,5 @@
 import { getDatabase } from "./connection.js";
-import { CURRENCY_SCALE_FACTOR } from "../../shared/constants.js";
+import { CURRENCY_SCALE_FACTOR } from "../../shared/server-constants.js";
 
 /**
  * @description Insert or replace a currency rate for a given currency and date.

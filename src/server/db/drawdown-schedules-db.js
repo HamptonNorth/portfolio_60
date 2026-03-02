@@ -1,5 +1,5 @@
 import { getDatabase } from "./connection.js";
-import { CURRENCY_SCALE_FACTOR } from "../../shared/constants.js";
+import { CURRENCY_SCALE_FACTOR } from "../../shared/server-constants.js";
 
 /**
  * @description Scale a monetary value for storage (multiply by CURRENCY_SCALE_FACTOR).

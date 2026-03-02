@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { getAllSiteConfigs, findSiteConfig, loadConfig, getAllowedProviders, getSchedulingConfig, reloadConfig, getScraperTestingEnabled, getStalestLimit, getListItems, getConfigFilePath, getWritableConfigPath } from "../config.js";
-import { DB_PATH, BACKUP_DIR, APP_NAME, APP_VERSION } from "../../shared/constants.js";
+import { DB_PATH, BACKUP_DIR, APP_NAME, APP_VERSION } from "../../shared/server-constants.js";
 
 /**
  * @description Get the list of allowed provider codes.
@@ -79,7 +79,7 @@ export function handleConfigRoute(method, path) {
     });
   }
 
-  // GET /api/config/raw — return the raw config.json content as a string for editing
+  // GET /api/config/raw — return the raw user-settings.json content as a string for editing
   if (method === "GET" && path === "/api/config/raw") {
     try {
       const configPath = getConfigFilePath();
@@ -269,7 +269,7 @@ function convertMarkdownToHtml(markdown) {
  * @returns {Promise<Response|null>} Response if matched, null otherwise
  */
 export async function handleConfigRouteAsync(method, path, request) {
-  // PUT /api/config/raw — save edited config.json content
+  // PUT /api/config/raw — save edited user-settings.json content
   if (method === "PUT" && path === "/api/config/raw") {
     try {
       const body = await request.json();

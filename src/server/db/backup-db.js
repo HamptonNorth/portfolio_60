@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, copyFileSync, readdirSync, statSync, unlinkSync,
 import { resolve, join, basename } from "node:path";
 import archiver from "archiver";
 import AdmZip from "adm-zip";
-import { BACKUP_DIR, getDocsDir } from "../../shared/constants.js";
+import { BACKUP_DIR, getDocsDir } from "../../shared/server-constants.js";
 import { getDatabasePath, closeDatabase, getDatabase } from "./connection.js";
 import { getConfigFilePath } from "../config.js";
 
@@ -57,10 +57,10 @@ function generateTestZipFilename() {
 }
 
 /**
- * @description Create a zip archive containing the database, config.json, and docs directory.
+ * @description Create a zip archive containing the database, user-settings.json, and docs directory.
  * The archive is written to the specified output path.
  * @param {string} dbPath - Absolute path to the database file to include
- * @param {string} configPath - Absolute path to the config.json to include
+ * @param {string} configPath - Absolute path to the user-settings.json to include
  * @param {string} docsDir - Absolute path to the docs directory to include
  * @param {string} outputPath - Absolute path for the output zip file
  * @returns {Promise<{success: boolean, size: number, error?: string}>}
@@ -88,9 +88,9 @@ function createZipArchive(dbPath, configPath, docsDir, outputPath) {
       archive.file(dbPath, { name: "portfolio60.db" });
     }
 
-    // Add config.json
+    // Add user-settings.json
     if (existsSync(configPath)) {
-      archive.file(configPath, { name: "config.json" });
+      archive.file(configPath, { name: "user-settings.json" });
     }
 
     // Add the docs directory tree
@@ -152,7 +152,7 @@ export async function createBackup() {
         const testBackupDir = getTestBackupDir();
         ensureDir(testBackupDir);
 
-        const testConfigPath = join(testRefDir, "config.json");
+        const testConfigPath = join(testRefDir, "user-settings.json");
         const testDocsDir = join(testRefDir, "docs");
         const testFilename = generateTestZipFilename();
         const testOutputPath = join(testBackupDir, testFilename);
@@ -257,11 +257,12 @@ function validateFilename(filename) {
 }
 
 /**
- * @description Restore from a zip backup. Extracts the database, config, and docs
- * from the zip file, replacing the live data.
+ * @description Restore from a zip backup. Extracts the database, settings, and docs
+ * from the zip file, replacing the live data. Accepts both user-settings.json (current)
+ * and config.json (legacy backups) entry names.
  * @param {string} zipPath - Absolute path to the zip file
  * @param {string} dbPath - Absolute path to the live database
- * @param {string} configPath - Absolute path to the live config.json
+ * @param {string} configPath - Absolute path to the live user-settings.json
  * @param {string} docsDir - Absolute path to the live docs directory
  */
 function restoreFromZip(zipPath, dbPath, configPath, docsDir) {
@@ -274,8 +275,8 @@ function restoreFromZip(zipPath, dbPath, configPath, docsDir) {
     if (entryName === "portfolio60.db") {
       // Extract database — write directly to the DB path
       writeFileSync(dbPath, entry.getData());
-    } else if (entryName === "config.json") {
-      // Extract config
+    } else if (entryName === "user-settings.json" || entryName === "config.json") {
+      // Extract settings (accept legacy "config.json" name from older backups)
       writeFileSync(configPath, entry.getData());
     } else if (entryName.startsWith("docs/")) {
       // Extract docs files — preserve directory structure under docsDir
@@ -298,7 +299,7 @@ function restoreFromZip(zipPath, dbPath, configPath, docsDir) {
 /**
  * @description Restore the database (and optionally config/docs) from a backup file.
  * Backups are always read from the project-local backups/ directory.
- * For zip files: restores database, config.json, and docs directory.
+ * For zip files: restores database, user-settings.json, and docs directory.
  * For legacy .db files: restores database only.
  * @param {string} filename - The backup filename to restore
  * @returns {{success: boolean, filename: string, format: string, message: string, error?: string}}

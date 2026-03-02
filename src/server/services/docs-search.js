@@ -7,7 +7,7 @@
 
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { getDocsDir } from "../../shared/constants.js";
+import { getDocsDir } from "../../shared/server-constants.js";
 import { parseFrontMatter } from "./docs-frontmatter.js";
 
 /** @type {number} Maximum results returned from a search */

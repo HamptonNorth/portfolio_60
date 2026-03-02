@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve, join } from "node:path";
-import { DATA_DIR } from "../shared/constants.js";
+import { DATA_DIR } from "../shared/server-constants.js";
 
 /**
  * @description Default configuration values. Used when keys are missing
@@ -66,40 +66,40 @@ export function setConfigPath(path) {
  * @description Get the resolved path to the config file for reading.
  * In Flatpak mode (DATA_DIR set), checks the writable data directory first
  * and falls back to the bundled config in the app bundle.
- * @returns {string} Absolute path to config.json
+ * @returns {string} Absolute path to user-settings.json
  */
 export function getConfigFilePath() {
   if (configPathOverride) {
     return configPathOverride;
   }
   if (DATA_DIR !== ".") {
-    const dataConfig = resolve(join(DATA_DIR, "config.json"));
+    const dataConfig = resolve(join(DATA_DIR, "user-settings.json"));
     if (existsSync(dataConfig)) {
       return dataConfig;
     }
   }
-  return resolve("src/shared/config.json");
+  return resolve("src/shared/user-settings.json");
 }
 
 /**
  * @description Get the writable path for saving config changes.
  * In Flatpak mode, always returns the DATA_DIR location so writes go to the
  * writable data directory. In normal mode, returns the project source path.
- * @returns {string} Absolute path to the writable config.json
+ * @returns {string} Absolute path to the writable user-settings.json
  */
 export function getWritableConfigPath() {
   if (configPathOverride) {
     return configPathOverride;
   }
   if (DATA_DIR !== ".") {
-    return resolve(join(DATA_DIR, "config.json"));
+    return resolve(join(DATA_DIR, "user-settings.json"));
   }
-  return resolve("src/shared/config.json");
+  return resolve("src/shared/user-settings.json");
 }
 
 /**
  * @description Load, validate, and cache the application configuration
- * from src/shared/config.json. Missing or invalid values are replaced
+ * from src/shared/user-settings.json. Missing or invalid values are replaced
  * with defaults. The result is cached until reloadConfig() is called.
  * @returns {Object} The validated config object
  */
@@ -115,7 +115,7 @@ export function loadConfig() {
     const raw = readFileSync(configPath, "utf-8");
     rawConfig = JSON.parse(raw);
   } catch (err) {
-    console.warn("Failed to load config.json, using defaults:", err.message);
+    console.warn("Failed to load user-settings.json, using defaults:", err.message);
     rawConfig = {};
   }
 

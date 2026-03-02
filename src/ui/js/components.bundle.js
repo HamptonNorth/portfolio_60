@@ -1801,9 +1801,9 @@ class AppNavbar extends LitElement {
 }
 customElements.define("app-navbar", AppNavbar);
 
-// config.js
+// app-identity.js
 var APP_NAME = "Portfolio 60";
-var APP_VERSION = "0.1.1";
+var APP_VERSION = "0.1.2";
 
 // src/ui/js/components/app-footer.js
 class AppFooter extends LitElement {

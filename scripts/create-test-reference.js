@@ -15,7 +15,7 @@ import { existsSync, mkdirSync, copyFileSync, readdirSync, statSync } from "node
 import { resolve, join, relative } from "node:path";
 
 const LIVE_DB = "data/portfolio60.db";
-const LIVE_CONFIG = "src/shared/config.json";
+const LIVE_CONFIG = "src/shared/user-settings.json";
 const LIVE_DOCS = "docs";
 const TEST_REF_DIR = "data/test_reference";
 
@@ -87,7 +87,7 @@ const shmPath = destDb + "-shm";
 // Don't copy WAL/SHM — the reference DB should be a clean standalone file
 
 // 2. Copy config
-const destConfig = join(TEST_REF_DIR, "config.json");
+const destConfig = join(TEST_REF_DIR, "user-settings.json");
 copyFileSync(resolve(LIVE_CONFIG), destConfig);
 console.log("  Config:    " + LIVE_CONFIG + " -> " + destConfig);
 

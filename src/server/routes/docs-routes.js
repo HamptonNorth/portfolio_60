@@ -8,7 +8,7 @@ import { Router } from "../router.js";
 import { readdir, mkdir, unlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { marked } from "marked";
-import { getDocsDir, getDocsMediaDir } from "../../shared/constants.js";
+import { getDocsDir, getDocsMediaDir } from "../../shared/server-constants.js";
 import { getDocsConfig } from "../config.js";
 import { getStyleConfig, getFontLinks, STYLE_REGISTRY } from "../services/style-registry.js";
 import { parseFrontMatter, ensureUnpublishedFrontMatter, isLapsed } from "../services/docs-frontmatter.js";

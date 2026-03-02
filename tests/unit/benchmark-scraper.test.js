@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { parseBenchmarkValue, extractDomain, calculateDelay, getDelayProfile } from "../../src/server/scrapers/benchmark-scraper.js";
-import { SCRAPE_DELAY_PROFILES } from "../../src/shared/constants.js";
+import { SCRAPE_DELAY_PROFILES } from "../../src/shared/server-constants.js";
 
 // --- parseBenchmarkValue: basic values ---
 

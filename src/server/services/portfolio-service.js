@@ -3,7 +3,7 @@ import { getAccountsByUserId } from "../db/accounts-db.js";
 import { getHoldingsByAccountId } from "../db/holdings-db.js";
 import { getLatestPrice } from "../db/prices-db.js";
 import { getLatestRates, unscaleRate } from "../db/currency-rates-db.js";
-import { CURRENCY_SCALE_FACTOR } from "../../shared/constants.js";
+import { CURRENCY_SCALE_FACTOR } from "../../shared/server-constants.js";
 
 /**
  * @description Build a portfolio summary for a single user, including all accounts,

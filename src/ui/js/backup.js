@@ -163,7 +163,7 @@ function showRestoreDialog(filename, format) {
   // Update the warning text based on format
   const warningEl = document.getElementById("restore-warning");
   if (pendingRestoreFormat === "zip") {
-    warningEl.textContent = "This will overwrite the current database, config.json and docs folder. Any data added since this backup was created will be lost.";
+    warningEl.textContent = "This will overwrite the current database, settings and docs folder. Any data added since this backup was created will be lost.";
   } else {
     warningEl.textContent = "This will overwrite the current database only (legacy format). Any data added since this backup was created will be lost.";
   }

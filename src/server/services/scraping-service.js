@@ -12,7 +12,7 @@ import {
   calculateDelay as calculateBenchmarkDelay,
 } from "../scrapers/benchmark-scraper.js";
 import { launchBrowser } from "../scrapers/browser-utils.js";
-import { SCRAPE_RETRY_CONFIG } from "../../shared/constants.js";
+import { SCRAPE_RETRY_CONFIG } from "../../shared/server-constants.js";
 
 /**
  * @description Sleep for a given number of milliseconds.

@@ -1,7 +1,7 @@
 import { getAllInvestments, getInvestmentById, updateInvestmentScrapingSource } from "../db/investments-db.js";
 import { updateTestInvestmentScrapingSource } from "../db/test-investments-db.js";
 import { fetchCurrencyRates } from "./currency-scraper.js";
-import { SCRAPE_DELAY_PROFILES, DEFAULT_SCRAPE_DELAY_PROFILE } from "../../shared/constants.js";
+import { SCRAPE_DELAY_PROFILES, DEFAULT_SCRAPE_DELAY_PROFILE } from "../../shared/server-constants.js";
 import { upsertPrice } from "../db/prices-db.js";
 import { recordScrapingAttempt } from "../db/scraping-history-db.js";
 import { launchBrowser, createStealthContext, createStealthPage, navigateTo, isBrowserAlive } from "./browser-utils.js";

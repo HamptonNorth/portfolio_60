@@ -1,5 +1,5 @@
 import { LitElement, html } from "lit";
-import { APP_NAME, APP_VERSION } from "../../../../config.js";
+import { APP_NAME, APP_VERSION } from "../../../../app-identity.js";
 
 /**
  * @description Shared footer component for Portfolio 60.

@@ -1,5 +1,5 @@
 import { getDatabase } from "./connection.js";
-import { CURRENCY_SCALE_FACTOR } from "../../shared/constants.js";
+import { CURRENCY_SCALE_FACTOR } from "../../shared/server-constants.js";
 
 /**
  * @description Store or update a value for a benchmark on a given date.

@@ -42,7 +42,7 @@ let activeEventSource = null;
 /** @type {number} Maximum number of auto-retries when a stream dies mid-way */
 const MAX_STREAM_RETRIES = 3;
 
-/** @type {number} Configured stalest limit from config.json (default 20) */
+/** @type {number} Configured stalest limit from user-settings.json (default 20) */
 let stalestLimit = 20;
 
 /** @type {Object.<number, {success: boolean, rows: Array, error?: string, currency?: string, description?: string}>} Cached history results by test investment ID */

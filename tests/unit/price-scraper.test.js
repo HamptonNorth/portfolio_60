@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { parsePrice, normaliseToMinorUnit, extractDomain, calculateDelay, getDelayProfile } from "../../src/server/scrapers/price-scraper.js";
-import { SCRAPE_DELAY_PROFILES } from "../../src/shared/constants.js";
+import { SCRAPE_DELAY_PROFILES } from "../../src/shared/server-constants.js";
 
 // --- parsePrice: basic values (no unit indicator = assume minor units) ---
 

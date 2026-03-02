@@ -48,7 +48,7 @@ export function activateTestMode() {
   process.env.DOCS_DIR = resolve(TEST_REF_DIR, "docs");
 
   // Load test reference config
-  const testConfigPath = resolve(TEST_REF_DIR, "config.json");
+  const testConfigPath = resolve(TEST_REF_DIR, "user-settings.json");
   if (existsSync(testConfigPath)) {
     setConfigPath(testConfigPath);
   }
