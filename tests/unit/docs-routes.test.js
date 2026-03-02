@@ -11,8 +11,21 @@ var PORT = 1445;
 var BASE_URL = "http://localhost:" + PORT;
 var serverProcess;
 var testDocsDir = resolve("docs");
+var testDbDir = resolve("data/portfolio_60_test");
+var testDbPath = join(testDbDir, "docs-routes-test.db");
 
 beforeAll(async function () {
+  // Create a dedicated test database so DB-dependent routes (search, reindex) work.
+  // The real database lives in ~/.config/portfolio_60/data/ and is not available
+  // when bun test runs without PORTFOLIO60_DATA_DIR set.
+  mkdirSync(testDbDir, { recursive: true });
+  if (!existsSync(testDbPath)) {
+    process.env.DB_PATH = testDbPath;
+    var { createDatabase, closeDatabase } = await import("../../src/server/db/connection.js");
+    createDatabase();
+    closeDatabase();
+  }
+
   // Create test docs directories and sample files
   mkdirSync(join(testDocsDir, "guide"), { recursive: true });
   mkdirSync(join(testDocsDir, "notes"), { recursive: true });
@@ -32,9 +45,9 @@ beforeAll(async function () {
     "---\ntitle: Expired Doc\nsummary: This has lapsed\ncreated: 2025-01-01\npublished: y\nlapse: 2025-06-01\n---\n\nExpired content.\n"
   );
 
-  // Start the server
+  // Start the server with the test database
   serverProcess = Bun.spawn(["bun", "run", "src/server/index.js"], {
-    env: { ...process.env, PORT: String(PORT) },
+    env: { ...process.env, PORT: String(PORT), DB_PATH: testDbPath },
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -83,7 +96,7 @@ describe("GET /api/docs/config", function () {
     var data = await res.json();
     expect(data.categories).toBeDefined();
     expect(data.categories.guide).toBeDefined();
-    expect(data.categories.guide.label).toBe("User Guide");
+    expect(data.categories.guide.label).toBe("User Guides");
     expect(data.categories.notes).toBeDefined();
     expect(data.styles).toBeDefined();
     expect(data.styles.github).toBeDefined();

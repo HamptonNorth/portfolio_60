@@ -10,6 +10,9 @@ import { createDrawdownSchedule, updateDrawdownSchedule } from "../../src/server
 import { getCashTransactionsByAccountId, createCashTransaction } from "../../src/server/db/cash-transactions-db.js";
 import { processDrawdowns, previewDrawdowns } from "../../src/server/services/drawdown-processor.js";
 
+/** @type {string} Fixed date for all tests — keeps assertions deterministic regardless of when tests run */
+const TEST_TODAY = "2026-02-11";
+
 const testDbPath = getDatabasePath();
 
 /**
@@ -80,7 +83,7 @@ afterAll(() => {
 
 describe("processDrawdowns", () => {
   test("returns zero counts when no active schedules exist", () => {
-    const result = processDrawdowns();
+    const result = processDrawdowns(TEST_TODAY);
     expect(result.processed).toBe(0);
     expect(result.skipped).toBe(0);
     expect(result.warnings).toEqual([]);
@@ -99,7 +102,7 @@ describe("processDrawdowns", () => {
       notes: "Monthly pension",
     });
 
-    const result = processDrawdowns();
+    const result = processDrawdowns(TEST_TODAY);
 
     // Should have processed drawdowns for months up to today (2026-02-11):
     // 2025-11-01, 2025-12-01, 2026-01-01, 2026-02-01 = 4 dates
@@ -123,7 +126,7 @@ describe("processDrawdowns", () => {
 
   test("skips already-processed dates (idempotent)", () => {
     // Run processor again — all 4 drawdowns should be skipped
-    const result = processDrawdowns();
+    const result = processDrawdowns(TEST_TODAY);
     expect(result.processed).toBe(0);
     expect(result.skipped).toBe(4);
     expect(result.warnings).toEqual([]);
@@ -155,7 +158,7 @@ describe("processDrawdowns", () => {
       active: 0,
     });
 
-    const result = processDrawdowns();
+    const result = processDrawdowns(TEST_TODAY);
     // Only the original schedule's 4 dates should be skipped, nothing new processed
     expect(result.processed).toBe(0);
     expect(result.skipped).toBe(4);
@@ -172,7 +175,7 @@ describe("processDrawdowns", () => {
       notes: "Quarterly drawdown",
     });
 
-    const result = processDrawdowns();
+    const result = processDrawdowns(TEST_TODAY);
 
     // Quarterly from July 2025: 2025-07-05, 2025-10-05, 2026-01-05 = 3 dates
     // (2026-04-05 is in the future relative to 2026-02-11)
@@ -197,7 +200,7 @@ describe("processDrawdowns", () => {
       notes: "Pension that will exhaust cash",
     });
 
-    const result = processDrawdowns();
+    const result = processDrawdowns(TEST_TODAY);
 
     // Should process 2026-01-01 and 2026-02-01
     // First: 500 - 400 = 100 (no warning)
@@ -253,7 +256,7 @@ describe("processDrawdowns", () => {
       notes: "Auto pension",
     });
 
-    const result = processDrawdowns();
+    const result = processDrawdowns(TEST_TODAY);
 
     // 2026-01-01 should be skipped (already exists), 2026-02-01 should be processed
     // (other schedules from previous tests also contribute to skipped count)
@@ -299,7 +302,7 @@ describe("previewDrawdowns", () => {
     // Capture balance before preview
     const balanceBefore = getAccountById(previewAccount.id).cash_balance;
 
-    const result = previewDrawdowns();
+    const result = previewDrawdowns(TEST_TODAY);
 
     // Should show items that would be created for this new schedule
     // (2026-01-01 and 2026-02-01, since today is 2026-02-11)
@@ -330,7 +333,7 @@ describe("previewDrawdowns", () => {
   });
 
   test("includes warnings when balance would go negative", () => {
-    const result = previewDrawdowns();
+    const result = previewDrawdowns(TEST_TODAY);
 
     // The SIPP-PREV account has £5000 and 2 drawdowns of £2000 each
     // First: 5000 - 2000 = 3000 (ok)
@@ -367,7 +370,7 @@ describe("previewDrawdowns", () => {
       notes: "Will go negative",
     });
 
-    const result2 = previewDrawdowns();
+    const result2 = previewDrawdowns(TEST_TODAY);
     const warnItems = result2.would_process.filter(function (item) {
       return item.account_id === warnAccount.id;
     });

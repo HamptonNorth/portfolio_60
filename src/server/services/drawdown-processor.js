@@ -12,12 +12,15 @@ import { getAccountById } from "../db/accounts-db.js";
  * silently skipped. If a drawdown would cause the cash balance to go
  * negative, a warning is logged but the drawdown is still processed.
  *
+ * @param {string} [todayStr] - Optional ISO-8601 date string (YYYY-MM-DD) to
+ *   use as "today". Defaults to the current date. Useful for testing.
  * @returns {{ processed: number, skipped: number, warnings: string[] }}
  *   Summary of what happened during processing
  */
-export function processDrawdowns() {
-  const today = new Date();
-  const todayStr = formatDate(today);
+export function processDrawdowns(todayStr) {
+  if (!todayStr) {
+    todayStr = formatDate(new Date());
+  }
 
   const activeSchedules = getActiveDrawdownSchedules();
 
@@ -73,12 +76,15 @@ export function processDrawdowns() {
  * database changes. Same logic as processDrawdowns() but collects results
  * into an array instead of creating transactions. Used by the UI test button.
  *
+ * @param {string} [todayStr] - Optional ISO-8601 date string (YYYY-MM-DD) to
+ *   use as "today". Defaults to the current date. Useful for testing.
  * @returns {{ would_process: Object[], already_exist: number, total_amount: number }}
  *   Detailed preview of what would happen
  */
-export function previewDrawdowns() {
-  const today = new Date();
-  const todayStr = formatDate(today);
+export function previewDrawdowns(todayStr) {
+  if (!todayStr) {
+    todayStr = formatDate(new Date());
+  }
 
   const activeSchedules = getActiveDrawdownSchedules();
 

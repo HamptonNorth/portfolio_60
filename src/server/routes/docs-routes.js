@@ -518,29 +518,43 @@ docsRouter.get("/api/docs/search", function (request) {
   var limitParam = url.searchParams.get("limit");
   var limit = limitParam ? Math.min(parseInt(limitParam, 10), 50) : undefined;
 
-  var db = getDatabase();
-  var results = searchPages(db, query, { limit: limit });
+  try {
+    var db = getDatabase();
+    var results = searchPages(db, query, { limit: limit });
 
-  return new Response(JSON.stringify(results), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+    return new Response(JSON.stringify(results), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: "Search unavailable", detail: err.message }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 });
 
 // POST /api/docs/reindex — rebuild search index
 docsRouter.post("/api/docs/reindex", async function () {
-  var db = getDatabase();
-  var docsConfig = getDocsConfig();
-  var result = await reindexAllPages(db, docsConfig.categories);
+  try {
+    var db = getDatabase();
+    var docsConfig = getDocsConfig();
+    var result = await reindexAllPages(db, docsConfig.categories);
 
-  if (result.success) {
-    return new Response(JSON.stringify(result), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  } else {
-    return new Response(JSON.stringify(result), {
-      status: 500,
+    if (result.success) {
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } else {
+      return new Response(JSON.stringify(result), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  } catch (err) {
+    return new Response(JSON.stringify({ error: "Reindex unavailable", detail: err.message }), {
+      status: 503,
       headers: { "Content-Type": "application/json" },
     });
   }
@@ -548,12 +562,19 @@ docsRouter.post("/api/docs/reindex", async function () {
 
 // GET /api/docs/search-meta — search index metadata
 docsRouter.get("/api/docs/search-meta", function () {
-  var db = getDatabase();
-  var meta = getSearchMeta(db);
-  return new Response(JSON.stringify(meta), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  try {
+    var db = getDatabase();
+    var meta = getSearchMeta(db);
+    return new Response(JSON.stringify(meta), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: "Search metadata unavailable", detail: err.message }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 });
 
 // POST /api/docs/spellcheck — spellcheck markdown content
