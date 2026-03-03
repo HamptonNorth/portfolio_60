@@ -1,6 +1,6 @@
 import { isFirstRun, getAuthStatus, setAuthStatus, hashPassphrase, verifyPassphrase, loadHashFromEnv, saveHashToEnv } from "../auth.js";
 import { databaseExists, createDatabase } from "../db/connection.js";
-import { isTestMode, activateTestMode, testReferenceExists } from "../test-mode.js";
+import { isTestMode, activateTestMode, isTestDatabaseFresh } from "../test-mode.js";
 
 /**
  * @description Check if a passphrase value is the test mode trigger.
@@ -75,19 +75,22 @@ export async function handleAuthRoute(method, path, request) {
 
     // Test mode bypass — enter test mode without setting a hash
     if (isTestPassphrase(passphrase)) {
-      if (!testReferenceExists()) {
+      if (!activateTestMode()) {
         return new Response(
           JSON.stringify({
-            error: "Test mode not available",
-            detail: "No test reference data found. The test database has not been set up yet.",
+            error: "Test mode failed",
+            detail: "Could not create or activate the test database.",
           }),
-          { status: 400, headers: { "Content-Type": "application/json" } },
+          { status: 500, headers: { "Content-Type": "application/json" } },
         );
       }
 
-      activateTestMode();
       setAuthStatus(true);
-      return new Response(JSON.stringify({ success: true, testMode: true, message: "Test mode activated" }), { status: 200, headers: { "Content-Type": "application/json" } });
+      const fresh = isTestDatabaseFresh();
+      const message = fresh
+        ? "Test mode activated. New database created — run Fetch All to populate prices."
+        : "Test mode activated";
+      return new Response(JSON.stringify({ success: true, testMode: true, freshDatabase: fresh, message: message }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
     if (!passphrase || typeof passphrase !== "string" || passphrase.length < 8) {
@@ -157,19 +160,22 @@ export async function handleAuthRoute(method, path, request) {
 
     // Test mode bypass — enter test mode without verifying hash
     if (isTestPassphrase(passphrase)) {
-      if (!testReferenceExists()) {
+      if (!activateTestMode()) {
         return new Response(
           JSON.stringify({
-            error: "Test mode not available",
-            detail: "No test reference data found. The test database has not been set up yet.",
+            error: "Test mode failed",
+            detail: "Could not create or activate the test database.",
           }),
-          { status: 400, headers: { "Content-Type": "application/json" } },
+          { status: 500, headers: { "Content-Type": "application/json" } },
         );
       }
 
-      activateTestMode();
       setAuthStatus(true);
-      return new Response(JSON.stringify({ success: true, testMode: true, message: "Test mode activated" }), { status: 200, headers: { "Content-Type": "application/json" } });
+      const fresh = isTestDatabaseFresh();
+      const message = fresh
+        ? "Test mode activated. New database created — run Fetch All to populate prices."
+        : "Test mode activated";
+      return new Response(JSON.stringify({ success: true, testMode: true, freshDatabase: fresh, message: message }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
     const storedHash = loadHashFromEnv();

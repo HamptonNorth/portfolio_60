@@ -525,6 +525,7 @@ export function createDatabase() {
  */
 export function closeDatabase() {
   if (db) {
+    try { db.exec("PRAGMA wal_checkpoint(TRUNCATE)"); } catch (_) { /* best effort */ }
     db.close();
     db = null;
   }

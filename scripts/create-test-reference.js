@@ -2,7 +2,7 @@
 /**
  * @description One-off developer script to create the test reference data.
  * Copies the live database, config, and docs directory into
- * data/test_reference/ for use as the "gold master" test data set.
+ * DATA_DIR/data/test_reference/ for use as the test data set.
  *
  * After running, the developer should prune and anonymise the copied
  * database manually (see PLAN_v0.12.0.md for SQL steps).
@@ -13,11 +13,13 @@
 
 import { existsSync, mkdirSync, copyFileSync, readdirSync, statSync } from "node:fs";
 import { resolve, join, relative } from "node:path";
+import { DATA_DIR, DB_PATH, DOCS_DIR } from "../src/shared/server-constants.js";
+import { getConfigFilePath } from "../src/server/config.js";
 
-const LIVE_DB = "data/portfolio60.db";
-const LIVE_CONFIG = "src/shared/user-settings.json";
-const LIVE_DOCS = "docs";
-const TEST_REF_DIR = "data/test_reference";
+const LIVE_DB = DB_PATH;
+const LIVE_CONFIG = getConfigFilePath();
+const LIVE_DOCS = DOCS_DIR;
+const TEST_REF_DIR = join(DATA_DIR, "data", "test_reference");
 
 /**
  * @description Recursively copy a directory tree from src to dest.
@@ -113,6 +115,6 @@ console.log("  3. Set up example portfolio holdings");
 console.log("  4. Clear sensitive notes and surplus history");
 console.log("  5. Prune test docs and config");
 console.log("  6. Run a price fetch against the test database");
-console.log("  7. Commit: git add data/test_reference/ && git commit");
+console.log("  7. Verify test mode works (enter 'test' as passphrase)");
 console.log("");
 console.log("See PLAN_v0.12.0.md Phase 2, Step 2.1 for detailed SQL.");

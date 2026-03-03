@@ -4,6 +4,48 @@
  * verifying an existing passphrase (subsequent runs).
  */
 
+/**
+ * @description Show a "Creating new test database" progress message with
+ * animated dots while the server creates the test database.
+ * @param {HTMLElement} contentDiv - The container to show the message in
+ * @returns {number} The setInterval ID (clear it when done)
+ */
+function showTestDbProgress(contentDiv) {
+  contentDiv.innerHTML =
+    '<div class="text-center py-6">' +
+    '<p class="text-base text-brand-700 font-medium">Creating new test database<span id="progress-dots"></span></p>' +
+    '<div class="mt-3 flex justify-center gap-1.5">' +
+    '<span class="inline-block w-2.5 h-2.5 bg-brand-500 rounded-full animate-bounce" style="animation-delay: 0ms"></span>' +
+    '<span class="inline-block w-2.5 h-2.5 bg-brand-500 rounded-full animate-bounce" style="animation-delay: 150ms"></span>' +
+    '<span class="inline-block w-2.5 h-2.5 bg-brand-500 rounded-full animate-bounce" style="animation-delay: 300ms"></span>' +
+    '</div>' +
+    '</div>';
+
+  var dotCount = 0;
+  var dotsSpan = document.getElementById("progress-dots");
+  return setInterval(function () {
+    dotCount = (dotCount + 1) % 4;
+    dotsSpan.textContent = ".".repeat(dotCount);
+  }, 400);
+}
+
+/**
+ * @description Show test database creation complete, then redirect after a pause.
+ * @param {HTMLElement} contentDiv - The container to show the message in
+ * @param {number} dotsInterval - The interval ID from showTestDbProgress
+ */
+function showTestDbComplete(contentDiv, dotsInterval) {
+  clearInterval(dotsInterval);
+  contentDiv.innerHTML =
+    '<div class="text-center py-6 space-y-2">' +
+    '<p class="text-base text-success font-medium">Creation of new test database complete.</p>' +
+    '<p class="text-base text-success">Database is ready.</p>' +
+    '</div>';
+  setTimeout(function () {
+    window.location.href = "/";
+  }, 2000);
+}
+
 document.addEventListener("DOMContentLoaded", async function () {
   const messagesDiv = document.getElementById("passphrase-messages");
   const contentDiv = document.getElementById("passphrase-content");
@@ -96,6 +138,12 @@ function showSetPassphraseForm(contentDiv, messagesDiv) {
       }
     }
 
+    // Show progress indicator for test mode while the server creates the database
+    var dotsInterval = null;
+    if (isTestEntry) {
+      dotsInterval = showTestDbProgress(contentDiv);
+    }
+
     // Send to server
     const result = await apiRequest("/api/auth/set-passphrase", {
       method: "POST",
@@ -103,9 +151,14 @@ function showSetPassphraseForm(contentDiv, messagesDiv) {
     });
 
     if (result.ok) {
-      // Test mode — redirect immediately
+      // Test mode — show completion message if fresh DB, otherwise redirect
       if (result.data.testMode) {
-        window.location.href = "/";
+        if (result.data.freshDatabase) {
+          showTestDbComplete(contentDiv, dotsInterval);
+        } else {
+          clearInterval(dotsInterval);
+          window.location.href = "/";
+        }
         return;
       }
       // Show a brief confirmation before redirecting
@@ -115,6 +168,7 @@ function showSetPassphraseForm(contentDiv, messagesDiv) {
         window.location.href = "/";
       }, 1500);
     } else {
+      clearInterval(dotsInterval);
       errorsDiv.textContent = result.error + (result.detail ? " — " + result.detail : "");
     }
   });
@@ -164,14 +218,33 @@ function showVerifyPassphraseForm(contentDiv, messagesDiv) {
       return;
     }
 
+    // Show progress indicator for test mode while the server creates the database
+    var isTestEntry = passphrase.toLowerCase() === "test";
+    var dotsInterval = null;
+    if (isTestEntry) {
+      dotsInterval = showTestDbProgress(contentDiv);
+    }
+
     const result = await apiRequest("/api/auth/verify", {
       method: "POST",
       body: { passphrase: passphrase },
     });
 
     if (result.ok && result.data.success) {
+      // Test mode — show completion message if fresh DB, otherwise redirect
+      if (result.data.testMode) {
+        if (result.data.freshDatabase) {
+          showTestDbComplete(contentDiv, dotsInterval);
+        } else {
+          clearInterval(dotsInterval);
+          window.location.href = "/";
+        }
+        return;
+      }
+      clearInterval(dotsInterval);
       window.location.href = "/";
     } else {
+      clearInterval(dotsInterval);
       errorsDiv.textContent = result.error || "Incorrect passphrase. Please try again.";
     }
   });

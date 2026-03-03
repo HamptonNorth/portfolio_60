@@ -23,7 +23,7 @@ import { handleDocsRoute } from "./routes/docs-routes.js";
 import { initScheduledScraper, stopScheduledScraper } from "./services/scheduled-scraper.js";
 import { launchBrowser } from "./scrapers/browser-utils.js";
 import { processDrawdowns } from "./services/drawdown-processor.js";
-import { databaseExists } from "./db/connection.js";
+import { databaseExists, closeDatabase } from "./db/connection.js";
 
 /**
  * @description The port the server listens on.
@@ -414,8 +414,9 @@ launchBrowser()
     // Non-fatal — browser will launch on first scrape instead
   });
 
-// Graceful shutdown: stop the scheduler before exiting
+// Graceful shutdown: checkpoint WAL and stop the scheduler before exiting
 process.on("SIGINT", function () {
   stopScheduledScraper();
+  closeDatabase();
   process.exit(0);
 });

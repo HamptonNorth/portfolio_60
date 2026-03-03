@@ -13,7 +13,7 @@ Future versions will add portfolio holdings per person, valuations, performance 
 ## Future Enhancements (post v0.1.0)
 
 - **Scraping history viewer**: UI page to browse/filter past scrape attempts. Backend API already exists (`GET /api/scraper/history` with filtering by scrapeType, success, date range). Useful for diagnosing recurring failures and confirming scheduled scrapes ran correctly.
-- **Cron-scheduled automated scraping**: Run price/benchmark scrapes on a schedule without user interaction.
+- **Cron-scheduled automated scraping**: Run price/benchmark scrapes on a schedule without user interaction. Currently disabled (`scheduling.enabled: false` in user-settings.json) due to disk I/O errors during scheduled scrapes. Needs: (1) UI settings page for managing cron schedule (enable/disable, cron expression, startup delay), (2) investigate and fix disk I/O error that occurs when the scheduler runs a scrape.
 - **YubiKey HMAC-SHA1 challenge-response**: Hardware-bound authentication.
 - **SQLCipher database encryption**: Encrypt database at rest.
 - **Buy/Sell transactions**: Record investment purchases and sales in `holding_movements` table. Buys increase holding quantity and debit account cash; sells decrease quantity and credit cash. Average cost recalculated on each buy. Book cost recorded on sell.

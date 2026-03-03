@@ -75,7 +75,7 @@ export function createAccount(data) {
     db.exec("COMMIT");
     return getAccountById(result.lastInsertRowid);
   } catch (err) {
-    db.exec("ROLLBACK");
+    try { db.exec("ROLLBACK"); } catch (_) { /* already rolled back */ }
     throw err;
   }
 }

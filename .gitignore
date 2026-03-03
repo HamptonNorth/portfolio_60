@@ -34,8 +34,6 @@ logs
 
 # Portfolio 60 specific
 data/
-!data/test_reference/
-!data/test_reference/**
 backups/
 docs/*
 !docs/.gitkeep
@@ -46,6 +44,5 @@ src/ui/css/output.css
 *.db
 *.db-wal
 *.db-shm
-!data/test_reference/*.db
 # Remove all PLAN_* markdown files
 PLAN_*
