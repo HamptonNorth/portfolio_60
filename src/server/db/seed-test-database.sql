@@ -56,8 +56,7 @@ INSERT INTO investments (currencies_id, investment_type_id, description, public_
 -- ============================================================================
 
 INSERT INTO investments (currencies_id, investment_type_id, description, public_id) VALUES
-    (1, 3, 'Polar Capital Technology Trust', 'LSE:PCT'),
-    (1, 3, 'Smithson Investment Trust', 'LSE:SSON');
+    (1, 3, 'Polar Capital Technology Trust', 'LSE:PCT');
 
 -- ============================================================================
 -- INVESTMENTS — USD Shares (FT Markets via ticker)
@@ -87,9 +86,7 @@ INSERT INTO benchmarks (currencies_id, benchmark_type, description, benchmark_ur
     (1, 'index', 'FTSE 100',
      'https://markets.ft.com/data/indices/tearsheet/summary?s=FTSE:FSI', NULL),
     (1, 'index', 'FTSE 250',
-     'https://markets.ft.com/data/indices/tearsheet/summary?s=MCX:FSI', NULL),
-    (1, 'index', 'FTSE All-Share',
-     'https://markets.ft.com/data/indices/tearsheet/summary?s=ASX:FSI', NULL),
+     'https://www.google.com/finance/quote/MCX:INDEXFTSE', NULL),
     (2, 'index', 'S&P 500',
      'https://markets.ft.com/data/indices/tearsheet/summary?s=INX:IOM', NULL),
     (2, 'index', 'Nasdaq Composite',
@@ -141,50 +138,49 @@ INSERT INTO accounts (user_id, account_type, account_ref, cash_balance, warn_cas
 --  14  = Barclays PLC
 --  15  = Legal & General Group PLC
 --  16  = Polar Capital Technology Trust
---  17  = Smithson Investment Trust
---  18  = NVIDIA Corp
---  19  = Microsoft Corp
---  20  = Alphabet Inc Class C
---  21  = Amazon.com Inc
---  22  = Berkshire Hathaway Class B
---  23  = ASML Holding NV
+--  17  = NVIDIA Corp
+--  18  = Microsoft Corp
+--  19  = Alphabet Inc Class C
+--  20  = Amazon.com Inc
+--  21  = Berkshire Hathaway Class B
+--  22  = ASML Holding NV
 -- ============================================================================
 
 -- Ben SIPP (account 1): VG Global All Cap, VG LifeStrategy, Rathbone, BG American
 INSERT INTO holdings (account_id, investment_id, quantity, average_cost) VALUES
     (1,  3,   6250000,  372600),
-    (1,  2,   7000000,  294500),
+    (1,  2,   3500000,  294500),
     (1,  6, 137500000,   19100),
     (1,  7,  27500000,  132700);
 
 -- Ben ISA (account 2): Fidelity Index World, Jupiter Gold & Silver, Polar Capital Tech
 INSERT INTO holdings (account_id, investment_id, quantity, average_cost) VALUES
-    (2,  4,  62500000,  31500),
+    (2,  4,  13750000000000,  31500),
     (2,  8,   4550000, 357200),
     (2, 16,  59000000,  49200);
 
 -- Ben Trading (account 3): Alphabet, NVIDIA, Microsoft
 INSERT INTO holdings (account_id, investment_id, quantity, average_cost) VALUES
-    (3, 20,  3600000,  649870),
-    (3, 18,  4250000,  150990),
-    (3, 19,  2250000, 1045100);
+    (3, 19,  1800000,  649870),
+    (3, 17,  1050000,  150990),
+    (3, 18, 1250000, 1045100);
 
 -- Alexis SIPP (account 4): VG LifeStrategy, L&G Tech, Fidelity Index World
 INSERT INTO holdings (account_id, investment_id, quantity, average_cost) VALUES
-    (4,  2,   8250000,  263500),
+    (4,  2,   4150000,  163500),
     (4,  5, 132400000,   16480),
     (4,  4, 114550000,   31100);
 
 -- Alexis Trading (account 5): Polar Capital Tech, Amazon, BG American
 INSERT INTO holdings (account_id, investment_id, quantity, average_cost) VALUES
-    (5, 16, 235650000,  35100),
-    (5, 21,   5150000, 359280),
+    (5, 16, 75650000,  35100),
+    (5, 20,   5150000, 359280),
     (5,  7,  36000000, 118500);
 
 -- Alexis ISA (account 6): Jupiter Gold & Silver, Rathbone, VG Global All Cap
 INSERT INTO holdings (account_id, investment_id, quantity, average_cost) VALUES
     (6,  8,   4170000, 363700),
-    (6,  6, 165000000,  19300),
+    (6,  6, 65000000,  19300),
     (6,  3,   4900000, 352800);
 
 -- ============================================================================

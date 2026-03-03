@@ -23,12 +23,12 @@ portfolioRouter.get("/api/portfolio/summary", function () {
 
     return new Response(JSON.stringify(summaries), {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-cache, no-store" },
     });
   } catch (err) {
     return new Response(
       JSON.stringify({ error: "Failed to load portfolio summaries", detail: err.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
+      { status: 500, headers: { "Content-Type": "application/json", "Cache-Control": "no-cache, no-store" } },
     );
   }
 });
@@ -54,12 +54,12 @@ portfolioRouter.get("/api/portfolio/summary/:userId", function (request, params)
 
     return new Response(JSON.stringify(summary), {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-cache, no-store" },
     });
   } catch (err) {
     return new Response(
       JSON.stringify({ error: "Failed to load portfolio summary", detail: err.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
+      { status: 500, headers: { "Content-Type": "application/json", "Cache-Control": "no-cache, no-store" } },
     );
   }
 });

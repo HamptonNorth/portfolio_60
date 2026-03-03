@@ -1,5 +1,5 @@
 import { resolve, join } from "node:path";
-import { existsSync, readFileSync, mkdirSync } from "node:fs";
+Will now test manuaaly be deletimport { existsSync, readFileSync, mkdirSync } from "node:fs";
 import { DATA_DIR } from "../shared/server-constants.js";
 import { closeDatabase, createDatabase, getDatabase, resetDatabasePath } from "./db/connection.js";
 import { setConfigPath, reloadConfig } from "./config.js";
