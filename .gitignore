@@ -36,7 +36,8 @@ logs
 data/
 backups/
 docs/*
-!docs/guide/user*.md
+!docs/guide/
+!docs/guide/user_*.md
 !docs/.gitkeep
 !docs/media/
 docs/media/*
