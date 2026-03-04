@@ -1,6 +1,18 @@
 # dependencies
 node_modules
 
+# Claude / plan files (local only)
+CLAUDE.md
+PLAN_*.md
+Claude_accepted*.md
+
+# Scratch / reference files (local only)
+fees.png
+stock_split.png
+Top 50 *.csv
+.env_old
+temp1.sql
+
 # output
 out
 dist
@@ -36,7 +48,7 @@ logs
 data/
 backups/
 docs/*
-!docs/guide/
+!docs/guide/user_prices.md
 !docs/guide/user_*.md
 !docs/.gitkeep
 !docs/media/
@@ -48,3 +60,4 @@ src/ui/css/output.css
 *.db-shm
 # Remove all PLAN_* markdown files
 PLAN_*
+docs/guide/create_test_database.md
