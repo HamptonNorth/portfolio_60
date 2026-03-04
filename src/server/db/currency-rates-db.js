@@ -89,7 +89,7 @@ export function getRatesForDate(rateDate) {
  * @param {number} [limit=30] - Maximum number of records to return
  * @returns {Object[]} Array of rate objects ordered by date descending
  */
-export function getRateHistory(currenciesId, limit = 30) {
+export function getRateHistory(currenciesId, limit = 30, offset = 0) {
   const db = getDatabase();
 
   const rows = db
@@ -106,12 +106,23 @@ export function getRateHistory(currenciesId, limit = 30) {
     JOIN currencies c ON c.id = cr.currencies_id
     WHERE cr.currencies_id = ?
     ORDER BY cr.rate_date DESC
-    LIMIT ?
+    LIMIT ? OFFSET ?
   `,
     )
-    .all(currenciesId, limit);
+    .all(currenciesId, limit, offset);
 
   return rows;
+}
+
+/**
+ * @description Get total number of rate records for a currency.
+ * @param {number} currenciesId - The currency ID
+ * @returns {number} Total count of rate records
+ */
+export function getRateCount(currenciesId) {
+  const db = getDatabase();
+  const row = db.query("SELECT COUNT(*) AS count FROM currency_rates WHERE currencies_id = ?").get(currenciesId);
+  return row.count;
 }
 
 /**

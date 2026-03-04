@@ -57,7 +57,7 @@ export function getLatestBenchmarkData(benchmarkId) {
  * @param {number} [limit=100] - Maximum number of records to return
  * @returns {Object[]} Array of benchmark data records with unscaled values
  */
-export function getBenchmarkDataHistory(benchmarkId, limit = 100) {
+export function getBenchmarkDataHistory(benchmarkId, limit = 100, offset = 0) {
   const db = getDatabase();
   const rows = db
     .query(
@@ -65,9 +65,9 @@ export function getBenchmarkDataHistory(benchmarkId, limit = 100) {
        FROM benchmark_data
        WHERE benchmark_id = ?
        ORDER BY benchmark_date DESC
-       LIMIT ?`,
+       LIMIT ? OFFSET ?`,
     )
-    .all(benchmarkId, limit);
+    .all(benchmarkId, limit, offset);
 
   return rows.map(function (row) {
     return {
@@ -79,6 +79,17 @@ export function getBenchmarkDataHistory(benchmarkId, limit = 100) {
       value_scaled: row.value,
     };
   });
+}
+
+/**
+ * @description Get total number of value records for a benchmark.
+ * @param {number} benchmarkId - The benchmark ID
+ * @returns {number} Total count of benchmark data records
+ */
+export function getBenchmarkDataCount(benchmarkId) {
+  const db = getDatabase();
+  const row = db.query("SELECT COUNT(*) AS count FROM benchmark_data WHERE benchmark_id = ?").get(benchmarkId);
+  return row.count;
 }
 
 /**

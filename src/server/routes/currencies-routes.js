@@ -6,7 +6,7 @@ import {
   updateCurrency,
   deleteCurrency,
 } from "../db/currencies-db.js";
-import { getRateHistory } from "../db/currency-rates-db.js";
+import { getRateHistory, getRateCount } from "../db/currency-rates-db.js";
 import { validateCurrency } from "../validation.js";
 
 /**
@@ -32,6 +32,7 @@ currenciesRouter.get("/api/currencies", function () {
 });
 
 // GET /api/currencies/:id/rates — get rate history for a currency
+// Query params: limit (default 100), offset (default 0)
 currenciesRouter.get("/api/currencies/:id/rates", function (request, params) {
   try {
     const id = Number(params.id);
@@ -42,8 +43,12 @@ currenciesRouter.get("/api/currencies/:id/rates", function (request, params) {
         { status: 404, headers: { "Content-Type": "application/json" } }
       );
     }
-    const rates = getRateHistory(id, 100);
-    return Response.json({ rates: rates, totalCount: rates.length });
+    const url = new URL(request.url);
+    const limit = Math.min(Number(url.searchParams.get("limit")) || 100, 500);
+    const offset = Number(url.searchParams.get("offset")) || 0;
+    const rates = getRateHistory(id, limit, offset);
+    const totalCount = getRateCount(id);
+    return Response.json({ rates: rates, totalCount: totalCount });
   } catch (err) {
     return new Response(
       JSON.stringify({ error: "Failed to fetch rate history", detail: err.message }),

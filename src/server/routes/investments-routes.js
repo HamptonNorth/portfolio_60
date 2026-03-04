@@ -1,6 +1,6 @@
 import { Router } from "../router.js";
 import { getAllInvestments, getInvestmentById, createInvestment, updateInvestment, deleteInvestment, getManuallyPricedInvestments } from "../db/investments-db.js";
-import { getLatestPrice, getPriceHistory, upsertPrice } from "../db/prices-db.js";
+import { getLatestPrice, getPriceHistory, getPriceCount, upsertPrice } from "../db/prices-db.js";
 import { recordScrapingAttempt } from "../db/scraping-history-db.js";
 import { getAllInvestmentTypes } from "../db/investment-types-db.js";
 import { validateInvestment } from "../validation.js";
@@ -126,6 +126,7 @@ investmentsRouter.get("/api/investments/:id/latest-price", function (request, pa
 });
 
 // GET /api/investments/:id/prices — get price history for an investment
+// Query params: limit (default 100), offset (default 0)
 investmentsRouter.get("/api/investments/:id/prices", function (request, params) {
   try {
     const id = Number(params.id);
@@ -133,8 +134,12 @@ investmentsRouter.get("/api/investments/:id/prices", function (request, params) 
     if (!investment) {
       return new Response(JSON.stringify({ error: "Investment not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
     }
-    const prices = getPriceHistory(id);
-    return Response.json({ prices: prices, totalCount: prices.length });
+    const url = new URL(request.url);
+    const limit = Math.min(Number(url.searchParams.get("limit")) || 100, 500);
+    const offset = Number(url.searchParams.get("offset")) || 0;
+    const prices = getPriceHistory(id, limit, offset);
+    const totalCount = getPriceCount(id);
+    return Response.json({ prices: prices, totalCount: totalCount });
   } catch (err) {
     return new Response(JSON.stringify({ error: "Failed to fetch price history", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }

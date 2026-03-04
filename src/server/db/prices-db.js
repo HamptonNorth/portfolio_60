@@ -59,7 +59,7 @@ export function getLatestPrice(investmentId) {
  * @param {number} [limit=100] - Maximum number of records to return
  * @returns {Object[]} Array of price records with unscaled prices
  */
-export function getPriceHistory(investmentId, limit = 100) {
+export function getPriceHistory(investmentId, limit = 100, offset = 0) {
   const db = getDatabase();
   const rows = db
     .query(
@@ -67,9 +67,9 @@ export function getPriceHistory(investmentId, limit = 100) {
        FROM prices
        WHERE investment_id = ?
        ORDER BY price_date DESC
-       LIMIT ?`,
+       LIMIT ? OFFSET ?`,
     )
-    .all(investmentId, limit);
+    .all(investmentId, limit, offset);
 
   return rows.map(function (row) {
     return {
@@ -81,6 +81,17 @@ export function getPriceHistory(investmentId, limit = 100) {
       price_scaled: row.price,
     };
   });
+}
+
+/**
+ * @description Get total number of price records for an investment.
+ * @param {number} investmentId - The investment ID
+ * @returns {number} Total count of price records
+ */
+export function getPriceCount(investmentId) {
+  const db = getDatabase();
+  const row = db.query("SELECT COUNT(*) AS count FROM prices WHERE investment_id = ?").get(investmentId);
+  return row.count;
 }
 
 /**

@@ -471,36 +471,75 @@ function hideView() {
  * Fetches prices from the API on first show, then toggles visibility.
  * @param {number} investmentId - The investment ID to fetch prices for
  */
-async function toggleViewPrices(investmentId) {
+/**
+ * @description Load and display price history for an investment.
+ * Fetches a page of prices and renders them in a scrollable table.
+ * Supports "Load more" pagination to fetch additional rows.
+ * @param {number} investmentId - The investment ID
+ * @param {boolean} [append=false] - If true, append rows to existing table
+ */
+async function toggleViewPrices(investmentId, append) {
   const container = document.getElementById("view-prices-container");
   const checkbox = document.getElementById("view-show-prices");
+  const PAGE_SIZE = 100;
 
-  if (!checkbox.checked) {
+  if (!append && !checkbox.checked) {
     container.classList.add("hidden");
     return;
   }
 
-  // Show loading state
-  container.classList.remove("hidden");
-  container.innerHTML = '<p class="text-sm text-brand-500">Loading prices...</p>';
+  // Work out the current offset from rows already loaded
+  const existingRows = append ? container.querySelectorAll("tbody tr").length : 0;
 
-  const result = await apiRequest("/api/investments/" + investmentId + "/prices");
+  if (!append) {
+    container.classList.remove("hidden");
+    container.innerHTML = '<p class="text-sm text-brand-500">Loading prices...</p>';
+  }
+
+  const result = await apiRequest("/api/investments/" + investmentId + "/prices?limit=" + PAGE_SIZE + "&offset=" + existingRows);
 
   if (!result.ok) {
-    container.innerHTML = '<p class="text-sm text-error">Failed to load prices.</p>';
+    if (!append) {
+      container.innerHTML = '<p class="text-sm text-error">Failed to load prices.</p>';
+    }
     return;
   }
 
   const prices = result.data.prices;
   const totalCount = result.data.totalCount;
 
-  if (prices.length === 0) {
+  if (!append && prices.length === 0) {
     container.innerHTML = '<p class="text-sm text-brand-500">No prices recorded.</p>';
     return;
   }
 
-  // Build a compact scrollable table showing up to 10 rows
-  let html = '<p class="text-xs text-brand-500 mb-1">' + totalCount + " price" + (totalCount !== 1 ? "s" : "") + " recorded</p>";
+  if (append) {
+    // Append rows to the existing table body
+    const tbody = container.querySelector("tbody");
+    for (let i = 0; i < prices.length; i++) {
+      const rowIndex = existingRows + i;
+      const rowClass = rowIndex % 2 === 0 ? "bg-white" : "bg-brand-50";
+      tbody.insertAdjacentHTML("beforeend",
+        '<tr class="' + rowClass + ' border-b border-brand-100">' +
+        '<td class="py-1 px-2 text-xs font-mono">' + escapeHtml(prices[i].price_date) + "</td>" +
+        '<td class="py-1 px-2 text-xs font-mono text-right">' + escapeHtml(String(prices[i].price.toFixed(2))) + "</td>" +
+        "</tr>"
+      );
+    }
+
+    // Update count display and Load more button
+    const loadedCount = existingRows + prices.length;
+    container.querySelector("[data-count]").textContent = totalCount + " price" + (totalCount !== 1 ? "s" : "") + " recorded (showing " + loadedCount + ")";
+    const moreBtn = container.querySelector("[data-load-more]");
+    if (loadedCount >= totalCount) {
+      if (moreBtn) moreBtn.remove();
+    }
+    return;
+  }
+
+  // Build the initial table
+  const loadedCount = prices.length;
+  let html = '<p class="text-xs text-brand-500 mb-1" data-count>' + totalCount + " price" + (totalCount !== 1 ? "s" : "") + " recorded" + (loadedCount < totalCount ? " (showing " + loadedCount + ")" : "") + "</p>";
   html += '<div class="max-h-[16rem] overflow-y-auto border border-brand-200 rounded">';
   html += '<table class="w-full text-left border-collapse">';
   html += '<thead class="sticky top-0 bg-brand-100"><tr>';
@@ -508,17 +547,29 @@ async function toggleViewPrices(investmentId) {
   html += '<th class="py-1 px-2 text-xs font-semibold text-brand-700 text-right">Price (pence)</th>';
   html += '</tr></thead><tbody>';
 
-  const displayRows = prices.slice(0, 10);
-  for (let i = 0; i < displayRows.length; i++) {
+  for (let i = 0; i < prices.length; i++) {
     const rowClass = i % 2 === 0 ? "bg-white" : "bg-brand-50";
     html += '<tr class="' + rowClass + ' border-b border-brand-100">';
-    html += '<td class="py-1 px-2 text-xs font-mono">' + escapeHtml(displayRows[i].price_date) + "</td>";
-    html += '<td class="py-1 px-2 text-xs font-mono text-right">' + escapeHtml(String(displayRows[i].price.toFixed(2))) + "</td>";
+    html += '<td class="py-1 px-2 text-xs font-mono">' + escapeHtml(prices[i].price_date) + "</td>";
+    html += '<td class="py-1 px-2 text-xs font-mono text-right">' + escapeHtml(String(prices[i].price.toFixed(2))) + "</td>";
     html += "</tr>";
   }
 
   html += "</tbody></table></div>";
+
+  if (loadedCount < totalCount) {
+    html += '<button type="button" data-load-more class="text-xs text-brand-600 hover:text-brand-800 mt-1 underline">Load more</button>';
+  }
+
   container.innerHTML = html;
+
+  // Wire Load more button
+  const moreBtn = container.querySelector("[data-load-more]");
+  if (moreBtn) {
+    moreBtn.addEventListener("click", function () {
+      toggleViewPrices(investmentId, true);
+    });
+  }
 }
 
 /**

@@ -169,34 +169,72 @@ function hideView() {
  * Fetches rates from the API on first show, then toggles visibility.
  * @param {number} currencyId - The currency ID to fetch rates for
  */
-async function toggleViewRates(currencyId) {
+/**
+ * @description Load and display rate history for a currency.
+ * Fetches a page of rates and renders them in a scrollable table.
+ * Supports "Load more" pagination to fetch additional rows.
+ * @param {number} currencyId - The currency ID
+ * @param {boolean} [append=false] - If true, append rows to existing table
+ */
+async function toggleViewRates(currencyId, append) {
   const container = document.getElementById("view-rates-container");
   const checkbox = document.getElementById("view-show-rates");
+  const PAGE_SIZE = 100;
 
-  if (!checkbox.checked) {
+  if (!append && !checkbox.checked) {
     container.classList.add("hidden");
     return;
   }
 
-  container.classList.remove("hidden");
-  container.innerHTML = '<p class="text-sm text-brand-500">Loading rates...</p>';
+  const existingRows = append ? container.querySelectorAll("tbody tr").length : 0;
 
-  const result = await apiRequest("/api/currencies/" + currencyId + "/rates");
+  if (!append) {
+    container.classList.remove("hidden");
+    container.innerHTML = '<p class="text-sm text-brand-500">Loading rates...</p>';
+  }
+
+  const result = await apiRequest("/api/currencies/" + currencyId + "/rates?limit=" + PAGE_SIZE + "&offset=" + existingRows);
 
   if (!result.ok) {
-    container.innerHTML = '<p class="text-sm text-error">Failed to load rates.</p>';
+    if (!append) {
+      container.innerHTML = '<p class="text-sm text-error">Failed to load rates.</p>';
+    }
     return;
   }
 
   const rates = result.data.rates;
   const totalCount = result.data.totalCount;
 
-  if (rates.length === 0) {
+  if (!append && rates.length === 0) {
     container.innerHTML = '<p class="text-sm text-brand-500">No rates recorded.</p>';
     return;
   }
 
-  let html = '<p class="text-xs text-brand-500 mb-1">' + totalCount + " rate" + (totalCount !== 1 ? "s" : "") + " recorded</p>";
+  if (append) {
+    const tbody = container.querySelector("tbody");
+    for (let i = 0; i < rates.length; i++) {
+      const rowIndex = existingRows + i;
+      const rowClass = rowIndex % 2 === 0 ? "bg-white" : "bg-brand-50";
+      const rateValue = rates[i].rate / 10000;
+      tbody.insertAdjacentHTML("beforeend",
+        '<tr class="' + rowClass + ' border-b border-brand-100">' +
+        '<td class="py-1 px-2 text-xs font-mono">' + escapeHtml(rates[i].rate_date) + "</td>" +
+        '<td class="py-1 px-2 text-xs font-mono text-right">' + escapeHtml(rateValue.toFixed(4)) + "</td>" +
+        "</tr>"
+      );
+    }
+
+    const loadedCount = existingRows + rates.length;
+    container.querySelector("[data-count]").textContent = totalCount + " rate" + (totalCount !== 1 ? "s" : "") + " recorded (showing " + loadedCount + ")";
+    const moreBtn = container.querySelector("[data-load-more]");
+    if (loadedCount >= totalCount) {
+      if (moreBtn) moreBtn.remove();
+    }
+    return;
+  }
+
+  const loadedCount = rates.length;
+  let html = '<p class="text-xs text-brand-500 mb-1" data-count>' + totalCount + " rate" + (totalCount !== 1 ? "s" : "") + " recorded" + (loadedCount < totalCount ? " (showing " + loadedCount + ")" : "") + "</p>";
   html += '<div class="max-h-[16rem] overflow-y-auto border border-brand-200 rounded">';
   html += '<table class="w-full text-left border-collapse">';
   html += '<thead class="sticky top-0 bg-brand-100"><tr>';
@@ -204,18 +242,29 @@ async function toggleViewRates(currencyId) {
   html += '<th class="py-1 px-2 text-xs font-semibold text-brand-700 text-right">Rate (per 1 GBP)</th>';
   html += '</tr></thead><tbody>';
 
-  const displayRows = rates.slice(0, 10);
-  for (let i = 0; i < displayRows.length; i++) {
+  for (let i = 0; i < rates.length; i++) {
     const rowClass = i % 2 === 0 ? "bg-white" : "bg-brand-50";
     const rateValue = rates[i].rate / 10000;
     html += '<tr class="' + rowClass + ' border-b border-brand-100">';
-    html += '<td class="py-1 px-2 text-xs font-mono">' + escapeHtml(displayRows[i].rate_date) + "</td>";
+    html += '<td class="py-1 px-2 text-xs font-mono">' + escapeHtml(rates[i].rate_date) + "</td>";
     html += '<td class="py-1 px-2 text-xs font-mono text-right">' + escapeHtml(rateValue.toFixed(4)) + "</td>";
     html += "</tr>";
   }
 
   html += "</tbody></table></div>";
+
+  if (loadedCount < totalCount) {
+    html += '<button type="button" data-load-more class="text-xs text-brand-600 hover:text-brand-800 mt-1 underline">Load more</button>';
+  }
+
   container.innerHTML = html;
+
+  const moreBtn = container.querySelector("[data-load-more]");
+  if (moreBtn) {
+    moreBtn.addEventListener("click", function () {
+      toggleViewRates(currencyId, true);
+    });
+  }
 }
 
 /**

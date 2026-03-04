@@ -7,7 +7,7 @@ import {
   deleteBenchmark,
   getGbpCurrencyId,
 } from "../db/benchmarks-db.js";
-import { getBenchmarkDataHistory } from "../db/benchmark-data-db.js";
+import { getBenchmarkDataHistory, getBenchmarkDataCount } from "../db/benchmark-data-db.js";
 import { validateBenchmark } from "../validation.js";
 
 /**
@@ -67,6 +67,7 @@ benchmarksRouter.get("/api/benchmarks/gbp-id", function () {
 });
 
 // GET /api/benchmarks/:id/values — get value history for a benchmark
+// Query params: limit (default 100), offset (default 0)
 benchmarksRouter.get("/api/benchmarks/:id/values", function (request, params) {
   try {
     const id = Number(params.id);
@@ -77,8 +78,12 @@ benchmarksRouter.get("/api/benchmarks/:id/values", function (request, params) {
         { status: 404, headers: { "Content-Type": "application/json" } },
       );
     }
-    const values = getBenchmarkDataHistory(id);
-    return Response.json({ values: values, totalCount: values.length });
+    const url = new URL(request.url);
+    const limit = Math.min(Number(url.searchParams.get("limit")) || 100, 500);
+    const offset = Number(url.searchParams.get("offset")) || 0;
+    const values = getBenchmarkDataHistory(id, limit, offset);
+    const totalCount = getBenchmarkDataCount(id);
+    return Response.json({ values: values, totalCount: totalCount });
   } catch (err) {
     return new Response(
       JSON.stringify({ error: "Failed to fetch value history", detail: err.message }),
