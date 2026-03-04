@@ -1,6 +1,6 @@
 import { Router } from "../router.js";
 import { getAllInvestments, getInvestmentById, createInvestment, updateInvestment, deleteInvestment, getManuallyPricedInvestments } from "../db/investments-db.js";
-import { getLatestPrice, upsertPrice } from "../db/prices-db.js";
+import { getLatestPrice, getPriceHistory, upsertPrice } from "../db/prices-db.js";
 import { recordScrapingAttempt } from "../db/scraping-history-db.js";
 import { getAllInvestmentTypes } from "../db/investment-types-db.js";
 import { validateInvestment } from "../validation.js";
@@ -122,6 +122,21 @@ investmentsRouter.get("/api/investments/:id/latest-price", function (request, pa
     });
   } catch (err) {
     return new Response(JSON.stringify({ error: "Failed to fetch latest price", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+  }
+});
+
+// GET /api/investments/:id/prices — get price history for an investment
+investmentsRouter.get("/api/investments/:id/prices", function (request, params) {
+  try {
+    const id = Number(params.id);
+    const investment = getInvestmentById(id);
+    if (!investment) {
+      return new Response(JSON.stringify({ error: "Investment not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
+    }
+    const prices = getPriceHistory(id);
+    return Response.json({ prices: prices, totalCount: prices.length });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: "Failed to fetch price history", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 

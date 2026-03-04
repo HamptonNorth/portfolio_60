@@ -7,6 +7,7 @@ import {
   deleteBenchmark,
   getGbpCurrencyId,
 } from "../db/benchmarks-db.js";
+import { getBenchmarkDataHistory } from "../db/benchmark-data-db.js";
 import { validateBenchmark } from "../validation.js";
 
 /**
@@ -60,6 +61,27 @@ benchmarksRouter.get("/api/benchmarks/gbp-id", function () {
   } catch (err) {
     return new Response(
       JSON.stringify({ error: "Failed to fetch GBP currency ID", detail: err.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+});
+
+// GET /api/benchmarks/:id/values — get value history for a benchmark
+benchmarksRouter.get("/api/benchmarks/:id/values", function (request, params) {
+  try {
+    const id = Number(params.id);
+    const benchmark = getBenchmarkById(id);
+    if (!benchmark) {
+      return new Response(
+        JSON.stringify({ error: "Benchmark not found" }),
+        { status: 404, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    const values = getBenchmarkDataHistory(id);
+    return Response.json({ values: values, totalCount: values.length });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Failed to fetch value history", detail: err.message }),
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }

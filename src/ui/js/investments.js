@@ -12,6 +12,21 @@ let deleteInvestmentName = "";
 /** @type {Object<number, number>} Track Load History click counts per investment ID */
 let loadHistoryCounts = {};
 
+/** @type {Array<Object>} Cached investments data from last API load */
+let cachedInvestments = [];
+
+/** @type {Set<number>} Investment IDs that have been successfully loaded in this session */
+let loadedInSession = new Set();
+
+/** @type {number|null} ID of the investment pending history replacement */
+let replaceHistoryId = null;
+
+/** @type {string} Name of the investment pending history replacement */
+let replaceHistoryName = "";
+
+/** @type {HTMLElement|null} Reference to the button that triggered the replacement */
+let replaceHistoryButton = null;
+
 /** @type {Array<{id: number, short_description: string, description: string, usage_notes: string|null}>} Cached investment types */
 let investmentTypes = [];
 
@@ -313,6 +328,7 @@ async function loadInvestments() {
   }
 
   const investments = result.data;
+  cachedInvestments = investments;
 
   if (investments.length === 0) {
     container.innerHTML = '<p class="text-brand-500">No investments yet. Click "Add Investment" to create one.</p>';
@@ -354,10 +370,12 @@ async function loadInvestments() {
     html += '<td class="py-3 px-3 text-sm text-brand-500 font-mono">' + escapeHtml(selectorDisplay) + "</td>";
     html += '<td class="py-3 px-3 text-base flex gap-2">';
     html += '<button class="bg-brand-100 hover:bg-brand-200 text-brand-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="viewInvestment(' + inv.id + ')">View</button>';
-    // Show Test and Load History buttons if scrapeable (has URL or public_id)
+    // Show Test and Load/Replace History buttons if scrapeable (has URL or public_id)
     if (inv.investment_url || inv.public_id) {
+      const hasHistory = investmentHasHistory(inv);
+      const loadBtnLabel = hasHistory ? "Replace History" : "Load History";
       html += '<button id="test-btn-' + inv.id + '" class="bg-green-100 hover:bg-green-200 text-green-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="testScrapeInvestment(' + inv.id + ', this)">Test</button>';
-      html += '<button id="load-btn-' + inv.id + '" class="bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="loadHistoryInvestment(' + inv.id + ", this, '" + escapeHtml(inv.description).replace(/'/g, "\\'") + "')\">Load History</button>";
+      html += '<button id="load-btn-' + inv.id + '" class="bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="loadHistoryInvestment(' + inv.id + ", this, '" + escapeHtml(inv.description).replace(/'/g, "\\'") + "')\">" + loadBtnLabel + "</button>";
     }
     html += "</td>";
     html += "</tr>";
@@ -416,6 +434,15 @@ async function viewInvestment(id) {
   document.getElementById("view-url").textContent = inv.investment_url || "—";
   document.getElementById("view-selector").textContent = inv.selector || "—";
 
+  // Reset price history toggle
+  const priceCheckbox = document.getElementById("view-show-prices");
+  priceCheckbox.checked = false;
+  document.getElementById("view-prices-container").classList.add("hidden");
+  document.getElementById("view-prices-container").innerHTML = "";
+  priceCheckbox.onchange = function () {
+    toggleViewPrices(inv.id);
+  };
+
   // Wire the Edit button to switch to edit mode for this investment
   const editBtn = document.getElementById("view-edit-btn");
   editBtn.onclick = function () {
@@ -437,6 +464,61 @@ async function viewInvestment(id) {
 function hideView() {
   document.getElementById("investment-view-container").classList.add("hidden");
   clearRowHighlight();
+}
+
+/**
+ * @description Toggle the price history display in the view modal.
+ * Fetches prices from the API on first show, then toggles visibility.
+ * @param {number} investmentId - The investment ID to fetch prices for
+ */
+async function toggleViewPrices(investmentId) {
+  const container = document.getElementById("view-prices-container");
+  const checkbox = document.getElementById("view-show-prices");
+
+  if (!checkbox.checked) {
+    container.classList.add("hidden");
+    return;
+  }
+
+  // Show loading state
+  container.classList.remove("hidden");
+  container.innerHTML = '<p class="text-sm text-brand-500">Loading prices...</p>';
+
+  const result = await apiRequest("/api/investments/" + investmentId + "/prices");
+
+  if (!result.ok) {
+    container.innerHTML = '<p class="text-sm text-error">Failed to load prices.</p>';
+    return;
+  }
+
+  const prices = result.data.prices;
+  const totalCount = result.data.totalCount;
+
+  if (prices.length === 0) {
+    container.innerHTML = '<p class="text-sm text-brand-500">No prices recorded.</p>';
+    return;
+  }
+
+  // Build a compact scrollable table showing up to 10 rows
+  let html = '<p class="text-xs text-brand-500 mb-1">' + totalCount + " price" + (totalCount !== 1 ? "s" : "") + " recorded</p>";
+  html += '<div class="max-h-[16rem] overflow-y-auto border border-brand-200 rounded">';
+  html += '<table class="w-full text-left border-collapse">';
+  html += '<thead class="sticky top-0 bg-brand-100"><tr>';
+  html += '<th class="py-1 px-2 text-xs font-semibold text-brand-700">Date</th>';
+  html += '<th class="py-1 px-2 text-xs font-semibold text-brand-700 text-right">Price (pence)</th>';
+  html += '</tr></thead><tbody>';
+
+  const displayRows = prices.slice(0, 10);
+  for (let i = 0; i < displayRows.length; i++) {
+    const rowClass = i % 2 === 0 ? "bg-white" : "bg-brand-50";
+    html += '<tr class="' + rowClass + ' border-b border-brand-100">';
+    html += '<td class="py-1 px-2 text-xs font-mono">' + escapeHtml(displayRows[i].price_date) + "</td>";
+    html += '<td class="py-1 px-2 text-xs font-mono text-right">' + escapeHtml(String(displayRows[i].price.toFixed(2))) + "</td>";
+    html += "</tr>";
+  }
+
+  html += "</tbody></table></div>";
+  container.innerHTML = html;
 }
 
 /**
@@ -768,13 +850,78 @@ async function testScrapeInvestment(id, button) {
 }
 
 /**
+ * @description Determine if an investment has existing price history (older than 6 days).
+ * An investment "has history" if it was loaded during this session, or if its
+ * oldest_price_date is at least 7 days before today (indicating backfill data
+ * rather than just recent live-scraped prices).
+ * @param {Object} inv - The investment object from the API (must have oldest_price_date)
+ * @returns {boolean} True if history exists
+ */
+function investmentHasHistory(inv) {
+  if (loadedInSession.has(inv.id)) {
+    return true;
+  }
+
+  if (!inv.oldest_price_date) {
+    return false;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const cutoff = new Date(today);
+  cutoff.setDate(cutoff.getDate() - 6);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+  return inv.oldest_price_date <= cutoffStr;
+}
+
+/**
+ * @description Check if an investment has history by its ID, using cached data
+ * and session state.
+ * @param {number} id - The investment ID
+ * @returns {boolean} True if the investment has existing history
+ */
+function investmentHasHistoryById(id) {
+  if (loadedInSession.has(id)) return true;
+  const inv = cachedInvestments.find(function (i) { return i.id === id; });
+  return inv ? investmentHasHistory(inv) : false;
+}
+
+/**
  * @description Load historic prices for a single investment.
- * Shows a confirmation dialog first, then calls the backfill load endpoint.
+ * If the investment already has price history, shows a confirmation dialog
+ * before proceeding. Otherwise proceeds directly with the load.
  * @param {number} id - The investment ID
  * @param {HTMLElement} button - The button element that was clicked
  * @param {string} name - The investment description for the confirmation message
  */
 async function loadHistoryInvestment(id, button, name) {
+  const hasHistory = investmentHasHistoryById(id);
+
+  if (hasHistory) {
+    // Show confirmation dialog instead of proceeding directly
+    replaceHistoryId = id;
+    replaceHistoryName = name;
+    replaceHistoryButton = button;
+    document.getElementById("replace-history-name").textContent = name;
+    document.getElementById("replace-history-dialog").classList.remove("hidden");
+    // Focus the "No" button as the safe default
+    document.getElementById("replace-history-no-btn").focus();
+    return;
+  }
+
+  // No existing history — proceed directly
+  await executeLoadHistory(id, button, name);
+}
+
+/**
+ * @description Execute the actual history load for an investment.
+ * Called directly for first-time loads, or after confirmation for replacements.
+ * @param {number} id - The investment ID
+ * @param {HTMLElement} button - The button element that was clicked
+ * @param {string} name - The investment description
+ */
+async function executeLoadHistory(id, button, name) {
   button.disabled = true;
   button.textContent = "Loading...";
 
@@ -785,13 +932,16 @@ async function loadHistoryInvestment(id, button, name) {
     });
 
     button.disabled = false;
-    button.textContent = "Load History";
 
     if (result.ok && result.data.success) {
       loadHistoryCounts[id] = (loadHistoryCounts[id] || 0) + 1;
+      loadedInSession.add(id);
+      // Update button text to "Replace History" since it now has history
+      button.textContent = "Replace History";
       updateLoadBadge(id);
       showModal("History Loaded", "Investment: " + result.data.description + "\nPrices loaded: " + result.data.count);
     } else {
+      button.textContent = investmentHasHistoryById(id) ? "Replace History" : "Load History";
       updateLoadBadge(id);
       const errorMsg = (result.data && result.data.error) || result.error || "Unknown error";
       const desc = (result.data && result.data.description) || name;
@@ -799,23 +949,50 @@ async function loadHistoryInvestment(id, button, name) {
     }
   } catch (err) {
     button.disabled = false;
-    button.textContent = "Load History";
+    button.textContent = investmentHasHistoryById(id) ? "Replace History" : "Load History";
     updateLoadBadge(id);
     showModal("Network Error", err.message);
   }
 }
 
 /**
- * @description Update the Load History button badge for an investment.
+ * @description Hide the replace history confirmation dialog and reset state.
+ */
+function hideReplaceHistoryDialog() {
+  replaceHistoryId = null;
+  replaceHistoryButton = null;
+  replaceHistoryName = "";
+  document.getElementById("replace-history-dialog").classList.add("hidden");
+}
+
+/**
+ * @description Execute the history replacement after the user confirmed "Yes".
+ */
+async function confirmReplaceHistory() {
+  const id = replaceHistoryId;
+  const button = replaceHistoryButton;
+  const name = replaceHistoryName;
+
+  hideReplaceHistoryDialog();
+
+  if (!id || !button) return;
+
+  await executeLoadHistory(id, button, name);
+}
+
+/**
+ * @description Update the Load/Replace History button badge for an investment.
  * Shows a small count badge after the button text if the count is > 0.
+ * Uses the correct label based on whether history exists.
  * @param {number} id - The investment ID
  */
 function updateLoadBadge(id) {
   const btn = document.getElementById("load-btn-" + id);
   if (!btn) return;
   const count = loadHistoryCounts[id] || 0;
+  const label = investmentHasHistoryById(id) ? "Replace History" : "Load History";
   if (count > 0) {
-    btn.innerHTML = "Load History " + '<span class="inline-flex items-center justify-center bg-blue-600 text-white font-bold rounded-full w-5 h-5 ml-1 text-xs">' + count + "</span>";
+    btn.innerHTML = label + " " + '<span class="inline-flex items-center justify-center bg-blue-600 text-white font-bold rounded-full w-5 h-5 ml-1 text-xs">' + count + "</span>";
   }
 }
 
@@ -917,6 +1094,8 @@ document.addEventListener("DOMContentLoaded", async function () {
   document.getElementById("delete-cancel-btn").addEventListener("click", hideDeleteDialog);
   document.getElementById("delete-confirm-btn").addEventListener("click", executeDelete);
   document.getElementById("view-close-btn").addEventListener("click", hideView);
+  document.getElementById("replace-history-no-btn").addEventListener("click", hideReplaceHistoryDialog);
+  document.getElementById("replace-history-yes-btn").addEventListener("click", confirmReplaceHistory);
 
   // Check public ID format when it changes (debounced)
   let publicIdCheckTimeout = null;
@@ -970,14 +1149,23 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
   });
 
+  document.getElementById("replace-history-dialog").addEventListener("click", function (event) {
+    if (event.target === this) {
+      hideReplaceHistoryDialog();
+    }
+  });
+
   // Close modals with Escape key
   document.addEventListener("keydown", function (event) {
     if (event.key === "Escape") {
+      const replaceDialog = document.getElementById("replace-history-dialog");
+      const deleteDialog = document.getElementById("delete-dialog");
       const formContainer = document.getElementById("investment-form-container");
       const viewContainer = document.getElementById("investment-view-container");
-      const deleteDialog = document.getElementById("delete-dialog");
 
-      if (!deleteDialog.classList.contains("hidden")) {
+      if (!replaceDialog.classList.contains("hidden")) {
+        hideReplaceHistoryDialog();
+      } else if (!deleteDialog.classList.contains("hidden")) {
         hideDeleteDialog();
       } else if (!formContainer.classList.contains("hidden")) {
         hideForm();

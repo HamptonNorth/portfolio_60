@@ -252,7 +252,7 @@ One holding per investment per account (UNIQUE on account_id + investment_id).
 - **SQL**: Raw SQL via bun:sqlite (no ORM). Parameterised queries for all user input.
 - **Error handling**: Return structured JSON errors from API `{ error: string, detail?: string }`
 - **Naming**: snake_case for database columns, camelCase for JS variables and functions, kebab-case for file names.
-- **Tests**: Write unit tests alongside implementation. Tests are the acceptance criteria. Run with `bun test`.
+- **Tests**: Write unit tests alongside implementation. Tests are the acceptance criteria. Run with `bun test`. **If any tests fail, fix them before making any further code changes.** Test failures take priority over new work.
 - **UI pattern**: Server-rendered HTML pages with progressive enhancement via vanilla JS. No SPA framework.
 - **CSS**: TailwindCSS v4 utility classes. Minimal custom CSS.
 

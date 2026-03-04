@@ -16,7 +16,8 @@ export function getAllBenchmarks() {
         b.benchmark_url,
         b.selector,
         c.code AS currency_code,
-        c.description AS currency_description
+        c.description AS currency_description,
+        (SELECT MIN(bd.benchmark_date) FROM benchmark_data bd WHERE bd.benchmark_id = b.id) AS oldest_value_date
       FROM benchmarks b
       JOIN currencies c ON b.currencies_id = c.id
       ORDER BY b.description`,

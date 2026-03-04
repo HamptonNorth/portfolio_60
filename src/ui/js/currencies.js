@@ -10,6 +10,21 @@ let deleteCurrencyId = null;
 /** @type {Object<number, number>} Track Load History click counts per currency ID */
 let loadHistoryCounts = {};
 
+/** @type {Array<Object>} Cached currencies data from last API load */
+let cachedCurrencies = [];
+
+/** @type {Set<number>} Currency IDs that have been successfully loaded in this session */
+let loadedInSession = new Set();
+
+/** @type {number|null} ID of the currency pending history replacement */
+let replaceHistoryId = null;
+
+/** @type {string} Code of the currency pending history replacement */
+let replaceHistoryCode = "";
+
+/** @type {HTMLElement|null} Reference to the button that triggered the replacement */
+let replaceHistoryButton = null;
+
 /**
  * @description Highlight a table row by currency ID.
  * @param {number} id - The currency ID
@@ -46,6 +61,7 @@ async function loadCurrencies() {
   }
 
   const currencies = result.data;
+  cachedCurrencies = currencies;
 
   if (currencies.length === 0) {
     container.innerHTML = '<p class="text-brand-500">No currencies yet. Click "Add Currency" to create one.</p>';
@@ -78,8 +94,10 @@ async function loadCurrencies() {
     html += '<td class="py-3 px-3 text-base flex gap-2">';
     html += '<button class="bg-brand-100 hover:bg-brand-200 text-brand-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="viewCurrency(' + cur.id + ')">View</button>';
     if (!isGbp) {
+      const hasHistory = currencyHasHistory(cur);
+      const loadBtnLabel = hasHistory ? "Replace History" : "Load History";
       html += '<button id="test-btn-' + cur.id + '" class="bg-green-100 hover:bg-green-200 text-green-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="testScrapeCurrency(' + cur.id + ', this)">Test</button>';
-      html += '<button id="load-btn-' + cur.id + '" class="bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="loadHistoryCurrency(' + cur.id + ", this, '" + escapeHtml(cur.code).replace(/'/g, "\\'") + "')\">Load History</button>";
+      html += '<button id="load-btn-' + cur.id + '" class="bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="loadHistoryCurrency(' + cur.id + ", this, '" + escapeHtml(cur.code).replace(/'/g, "\\'") + "')\">" + loadBtnLabel + "</button>";
     }
     html += "</td>";
     html += "</tr>";
@@ -107,6 +125,22 @@ async function viewCurrency(id) {
   document.getElementById("view-code").textContent = cur.code;
   document.getElementById("view-description").textContent = cur.description;
 
+  // Reset rate history toggle — hide for GBP (no exchange rates for base currency)
+  const rateToggle = document.getElementById("view-rates-toggle");
+  const rateCheckbox = document.getElementById("view-show-rates");
+  const rateContainer = document.getElementById("view-rates-container");
+  rateCheckbox.checked = false;
+  rateContainer.classList.add("hidden");
+  rateContainer.innerHTML = "";
+  if (cur.code === "GBP") {
+    rateToggle.classList.add("hidden");
+  } else {
+    rateToggle.classList.remove("hidden");
+    rateCheckbox.onchange = function () {
+      toggleViewRates(cur.id);
+    };
+  }
+
   // Wire the Edit button to switch to edit mode for this currency
   const editBtn = document.getElementById("view-edit-btn");
   editBtn.onclick = function () {
@@ -128,6 +162,60 @@ async function viewCurrency(id) {
 function hideView() {
   document.getElementById("currency-view-container").classList.add("hidden");
   clearRowHighlight();
+}
+
+/**
+ * @description Toggle the rate history display in the view modal.
+ * Fetches rates from the API on first show, then toggles visibility.
+ * @param {number} currencyId - The currency ID to fetch rates for
+ */
+async function toggleViewRates(currencyId) {
+  const container = document.getElementById("view-rates-container");
+  const checkbox = document.getElementById("view-show-rates");
+
+  if (!checkbox.checked) {
+    container.classList.add("hidden");
+    return;
+  }
+
+  container.classList.remove("hidden");
+  container.innerHTML = '<p class="text-sm text-brand-500">Loading rates...</p>';
+
+  const result = await apiRequest("/api/currencies/" + currencyId + "/rates");
+
+  if (!result.ok) {
+    container.innerHTML = '<p class="text-sm text-error">Failed to load rates.</p>';
+    return;
+  }
+
+  const rates = result.data.rates;
+  const totalCount = result.data.totalCount;
+
+  if (rates.length === 0) {
+    container.innerHTML = '<p class="text-sm text-brand-500">No rates recorded.</p>';
+    return;
+  }
+
+  let html = '<p class="text-xs text-brand-500 mb-1">' + totalCount + " rate" + (totalCount !== 1 ? "s" : "") + " recorded</p>";
+  html += '<div class="max-h-[16rem] overflow-y-auto border border-brand-200 rounded">';
+  html += '<table class="w-full text-left border-collapse">';
+  html += '<thead class="sticky top-0 bg-brand-100"><tr>';
+  html += '<th class="py-1 px-2 text-xs font-semibold text-brand-700">Date</th>';
+  html += '<th class="py-1 px-2 text-xs font-semibold text-brand-700 text-right">Rate (per 1 GBP)</th>';
+  html += '</tr></thead><tbody>';
+
+  const displayRows = rates.slice(0, 10);
+  for (let i = 0; i < displayRows.length; i++) {
+    const rowClass = i % 2 === 0 ? "bg-white" : "bg-brand-50";
+    const rateValue = rates[i].rate / 10000;
+    html += '<tr class="' + rowClass + ' border-b border-brand-100">';
+    html += '<td class="py-1 px-2 text-xs font-mono">' + escapeHtml(displayRows[i].rate_date) + "</td>";
+    html += '<td class="py-1 px-2 text-xs font-mono text-right">' + escapeHtml(rateValue.toFixed(4)) + "</td>";
+    html += "</tr>";
+  }
+
+  html += "</tbody></table></div>";
+  container.innerHTML = html;
 }
 
 /**
@@ -419,13 +507,74 @@ async function testScrapeCurrency(id, button) {
 }
 
 /**
+ * @description Determine if a currency has existing rate history (older than 6 days).
+ * A currency "has history" if it was loaded during this session, or if its
+ * oldest_rate_date is at least 7 days before today.
+ * @param {Object} cur - The currency object from the API (must have oldest_rate_date)
+ * @returns {boolean} True if history exists
+ */
+function currencyHasHistory(cur) {
+  if (loadedInSession.has(cur.id)) {
+    return true;
+  }
+
+  if (!cur.oldest_rate_date) {
+    return false;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const cutoff = new Date(today);
+  cutoff.setDate(cutoff.getDate() - 6);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+  return cur.oldest_rate_date <= cutoffStr;
+}
+
+/**
+ * @description Check if a currency has history by its ID, using cached data
+ * and session state.
+ * @param {number} id - The currency ID
+ * @returns {boolean} True if the currency has existing history
+ */
+function currencyHasHistoryById(id) {
+  if (loadedInSession.has(id)) return true;
+  const cur = cachedCurrencies.find(function (c) { return c.id === id; });
+  return cur ? currencyHasHistory(cur) : false;
+}
+
+/**
  * @description Load historic exchange rates for a single currency.
- * Shows a confirmation dialog first, then calls the backfill load endpoint.
+ * If the currency already has rate history, shows a confirmation dialog
+ * before proceeding. Otherwise proceeds directly with the load.
  * @param {number} id - The currency ID
  * @param {HTMLElement} button - The button element that was clicked
  * @param {string} code - The currency code for the confirmation message
  */
 async function loadHistoryCurrency(id, button, code) {
+  const hasHistory = currencyHasHistoryById(id);
+
+  if (hasHistory) {
+    replaceHistoryId = id;
+    replaceHistoryCode = code;
+    replaceHistoryButton = button;
+    document.getElementById("replace-history-name").textContent = code;
+    document.getElementById("replace-history-dialog").classList.remove("hidden");
+    document.getElementById("replace-history-no-btn").focus();
+    return;
+  }
+
+  await executeLoadHistory(id, button, code);
+}
+
+/**
+ * @description Execute the actual history load for a currency.
+ * Called directly for first-time loads, or after confirmation for replacements.
+ * @param {number} id - The currency ID
+ * @param {HTMLElement} button - The button element that was clicked
+ * @param {string} code - The currency code
+ */
+async function executeLoadHistory(id, button, code) {
   button.disabled = true;
   button.textContent = "Loading...";
 
@@ -436,13 +585,15 @@ async function loadHistoryCurrency(id, button, code) {
     });
 
     button.disabled = false;
-    button.textContent = "Load History";
 
     if (result.ok && result.data.success) {
       loadHistoryCounts[id] = (loadHistoryCounts[id] || 0) + 1;
+      loadedInSession.add(id);
+      button.textContent = "Replace History";
       updateLoadBadge(id);
       showModal("History Loaded", "Currency: " + result.data.code + "\nRates loaded: " + result.data.count);
     } else {
+      button.textContent = currencyHasHistoryById(id) ? "Replace History" : "Load History";
       updateLoadBadge(id);
       const errorMsg = (result.data && result.data.error) || result.error || "Unknown error";
       const desc = (result.data && result.data.code) || code;
@@ -450,23 +601,50 @@ async function loadHistoryCurrency(id, button, code) {
     }
   } catch (err) {
     button.disabled = false;
-    button.textContent = "Load History";
+    button.textContent = currencyHasHistoryById(id) ? "Replace History" : "Load History";
     updateLoadBadge(id);
     showModal("Network Error", err.message);
   }
 }
 
 /**
- * @description Update the Load History button badge for a currency.
+ * @description Hide the replace history confirmation dialog and reset state.
+ */
+function hideReplaceHistoryDialog() {
+  replaceHistoryId = null;
+  replaceHistoryButton = null;
+  replaceHistoryCode = "";
+  document.getElementById("replace-history-dialog").classList.add("hidden");
+}
+
+/**
+ * @description Execute the history replacement after the user confirmed "Yes".
+ */
+async function confirmReplaceHistory() {
+  const id = replaceHistoryId;
+  const button = replaceHistoryButton;
+  const code = replaceHistoryCode;
+
+  hideReplaceHistoryDialog();
+
+  if (!id || !button) return;
+
+  await executeLoadHistory(id, button, code);
+}
+
+/**
+ * @description Update the Load/Replace History button badge for a currency.
  * Shows a small count badge after the button text if the count is > 0.
+ * Uses the correct label based on whether history exists.
  * @param {number} id - The currency ID
  */
 function updateLoadBadge(id) {
   const btn = document.getElementById("load-btn-" + id);
   if (!btn) return;
   const count = loadHistoryCounts[id] || 0;
+  const label = currencyHasHistoryById(id) ? "Replace History" : "Load History";
   if (count > 0) {
-    btn.innerHTML = "Load History " + '<span class="inline-flex items-center justify-center bg-blue-600 text-white font-bold rounded-full w-5 h-5 ml-1 text-xs">' + count + "</span>";
+    btn.innerHTML = label + " " + '<span class="inline-flex items-center justify-center bg-blue-600 text-white font-bold rounded-full w-5 h-5 ml-1 text-xs">' + count + "</span>";
   }
 }
 
@@ -480,6 +658,8 @@ document.addEventListener("DOMContentLoaded", async function () {
   document.getElementById("delete-cancel-btn").addEventListener("click", hideDeleteDialog);
   document.getElementById("delete-confirm-btn").addEventListener("click", executeDelete);
   document.getElementById("view-close-btn").addEventListener("click", hideView);
+  document.getElementById("replace-history-no-btn").addEventListener("click", hideReplaceHistoryDialog);
+  document.getElementById("replace-history-yes-btn").addEventListener("click", confirmReplaceHistory);
 
   // Close modals when clicking on the backdrop (outside the modal content)
   document.getElementById("currency-form-container").addEventListener("click", function (event) {
@@ -500,14 +680,23 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
   });
 
+  document.getElementById("replace-history-dialog").addEventListener("click", function (event) {
+    if (event.target === this) {
+      hideReplaceHistoryDialog();
+    }
+  });
+
   // Close modals with Escape key
   document.addEventListener("keydown", function (event) {
     if (event.key === "Escape") {
+      const replaceDialog = document.getElementById("replace-history-dialog");
+      const deleteDialog = document.getElementById("delete-dialog");
       const formContainer = document.getElementById("currency-form-container");
       const viewContainer = document.getElementById("currency-view-container");
-      const deleteDialog = document.getElementById("delete-dialog");
 
-      if (!deleteDialog.classList.contains("hidden")) {
+      if (!replaceDialog.classList.contains("hidden")) {
+        hideReplaceHistoryDialog();
+      } else if (!deleteDialog.classList.contains("hidden")) {
         hideDeleteDialog();
       } else if (!formContainer.classList.contains("hidden")) {
         hideForm();

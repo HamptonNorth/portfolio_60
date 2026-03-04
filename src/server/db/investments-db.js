@@ -22,7 +22,8 @@ export function getAllInvestments() {
         c.code AS currency_code,
         c.description AS currency_description,
         it.short_description AS type_short,
-        it.description AS type_description
+        it.description AS type_description,
+        (SELECT MIN(p.price_date) FROM prices p WHERE p.investment_id = i.id) AS oldest_price_date
       FROM investments i
       JOIN currencies c ON i.currencies_id = c.id
       JOIN investment_types it ON i.investment_type_id = it.id

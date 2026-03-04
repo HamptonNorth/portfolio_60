@@ -12,6 +12,21 @@ let deleteBenchmarkName = "";
 /** @type {Object<number, number>} Track Load History click counts per benchmark ID */
 let loadHistoryCounts = {};
 
+/** @type {Array<Object>} Cached benchmarks data from last API load */
+let cachedBenchmarks = [];
+
+/** @type {Set<number>} Benchmark IDs that have been successfully loaded in this session */
+let loadedInSession = new Set();
+
+/** @type {number|null} ID of the benchmark pending history replacement */
+let replaceHistoryId = null;
+
+/** @type {string} Name of the benchmark pending history replacement */
+let replaceHistoryName = "";
+
+/** @type {HTMLElement|null} Reference to the button that triggered the replacement */
+let replaceHistoryButton = null;
+
 /** @type {Array<{id: number, code: string, description: string}>} Cached currencies */
 let currencies = [];
 
@@ -268,6 +283,7 @@ async function loadBenchmarks() {
   }
 
   const benchmarks = result.data;
+  cachedBenchmarks = benchmarks;
 
   if (benchmarks.length === 0) {
     container.innerHTML = '<p class="text-brand-500">No benchmarks yet. Click "Add Benchmark" to create one.</p>';
@@ -313,12 +329,14 @@ async function loadBenchmarks() {
     if (bm.benchmark_url) {
       html += '<button id="test-btn-' + bm.id + '" class="bg-green-100 hover:bg-green-200 text-green-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="testScrapeBenchmark(' + bm.id + ', this)">Test</button>';
     }
-    // Show Load History for benchmarks with URLs — disabled for MSCI (no free historic data source)
+    // Show Load/Replace History for benchmarks with URLs — disabled for MSCI (no free historic data source)
     if (bm.benchmark_url) {
       if (isMsci) {
         html += '<button class="bg-gray-100 text-gray-400 text-sm font-medium px-2 py-1 rounded cursor-not-allowed whitespace-nowrap" disabled title="No free historic data source for MSCI indexes">Load History</button>';
       } else {
-        html += '<button id="load-btn-' + bm.id + '" class="bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="loadHistoryBenchmark(' + bm.id + ", this, '" + escapeHtml(bm.description).replace(/'/g, "\\'") + "')\">Load History</button>";
+        const hasHistory = benchmarkHasHistory(bm);
+        const loadBtnLabel = hasHistory ? "Replace History" : "Load History";
+        html += '<button id="load-btn-' + bm.id + '" class="bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="loadHistoryBenchmark(' + bm.id + ", this, '" + escapeHtml(bm.description).replace(/'/g, "\\'") + "')\">" + loadBtnLabel + "</button>";
       }
     }
     html += "</td>";
@@ -385,6 +403,15 @@ async function viewBenchmark(id) {
     document.getElementById("view-currency").textContent = currencyDisplay;
   }
 
+  // Reset value history toggle
+  const valueCheckbox = document.getElementById("view-show-values");
+  valueCheckbox.checked = false;
+  document.getElementById("view-values-container").classList.add("hidden");
+  document.getElementById("view-values-container").innerHTML = "";
+  valueCheckbox.onchange = function () {
+    toggleViewValues(bm.id);
+  };
+
   // Wire the Edit button to switch to edit mode for this benchmark
   const editBtn = document.getElementById("view-edit-btn");
   editBtn.onclick = function () {
@@ -406,6 +433,59 @@ async function viewBenchmark(id) {
 function hideView() {
   document.getElementById("benchmark-view-container").classList.add("hidden");
   clearRowHighlight();
+}
+
+/**
+ * @description Toggle the value history display in the view modal.
+ * Fetches values from the API on first show, then toggles visibility.
+ * @param {number} benchmarkId - The benchmark ID to fetch values for
+ */
+async function toggleViewValues(benchmarkId) {
+  const container = document.getElementById("view-values-container");
+  const checkbox = document.getElementById("view-show-values");
+
+  if (!checkbox.checked) {
+    container.classList.add("hidden");
+    return;
+  }
+
+  container.classList.remove("hidden");
+  container.innerHTML = '<p class="text-sm text-brand-500">Loading values...</p>';
+
+  const result = await apiRequest("/api/benchmarks/" + benchmarkId + "/values");
+
+  if (!result.ok) {
+    container.innerHTML = '<p class="text-sm text-error">Failed to load values.</p>';
+    return;
+  }
+
+  const values = result.data.values;
+  const totalCount = result.data.totalCount;
+
+  if (values.length === 0) {
+    container.innerHTML = '<p class="text-sm text-brand-500">No values recorded.</p>';
+    return;
+  }
+
+  let html = '<p class="text-xs text-brand-500 mb-1">' + totalCount + " value" + (totalCount !== 1 ? "s" : "") + " recorded</p>";
+  html += '<div class="max-h-[16rem] overflow-y-auto border border-brand-200 rounded">';
+  html += '<table class="w-full text-left border-collapse">';
+  html += '<thead class="sticky top-0 bg-brand-100"><tr>';
+  html += '<th class="py-1 px-2 text-xs font-semibold text-brand-700">Date</th>';
+  html += '<th class="py-1 px-2 text-xs font-semibold text-brand-700 text-right">Value</th>';
+  html += '</tr></thead><tbody>';
+
+  const displayRows = values.slice(0, 10);
+  for (let i = 0; i < displayRows.length; i++) {
+    const rowClass = i % 2 === 0 ? "bg-white" : "bg-brand-50";
+    html += '<tr class="' + rowClass + ' border-b border-brand-100">';
+    html += '<td class="py-1 px-2 text-xs font-mono">' + escapeHtml(displayRows[i].benchmark_date) + "</td>";
+    html += '<td class="py-1 px-2 text-xs font-mono text-right">' + escapeHtml(String(displayRows[i].value.toFixed(2))) + "</td>";
+    html += "</tr>";
+  }
+
+  html += "</tbody></table></div>";
+  container.innerHTML = html;
 }
 
 /**
@@ -710,13 +790,74 @@ async function testScrapeBenchmark(id, button) {
 }
 
 /**
+ * @description Determine if a benchmark has existing value history (older than 6 days).
+ * A benchmark "has history" if it was loaded during this session, or if its
+ * oldest_value_date is at least 7 days before today.
+ * @param {Object} bm - The benchmark object from the API (must have oldest_value_date)
+ * @returns {boolean} True if history exists
+ */
+function benchmarkHasHistory(bm) {
+  if (loadedInSession.has(bm.id)) {
+    return true;
+  }
+
+  if (!bm.oldest_value_date) {
+    return false;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const cutoff = new Date(today);
+  cutoff.setDate(cutoff.getDate() - 6);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+  return bm.oldest_value_date <= cutoffStr;
+}
+
+/**
+ * @description Check if a benchmark has history by its ID, using cached data
+ * and session state.
+ * @param {number} id - The benchmark ID
+ * @returns {boolean} True if the benchmark has existing history
+ */
+function benchmarkHasHistoryById(id) {
+  if (loadedInSession.has(id)) return true;
+  const bm = cachedBenchmarks.find(function (b) { return b.id === id; });
+  return bm ? benchmarkHasHistory(bm) : false;
+}
+
+/**
  * @description Load historic values for a single benchmark.
- * Shows a confirmation dialog first, then calls the backfill load endpoint.
+ * If the benchmark already has value history, shows a confirmation dialog
+ * before proceeding. Otherwise proceeds directly with the load.
  * @param {number} id - The benchmark ID
  * @param {HTMLElement} button - The button element that was clicked
  * @param {string} name - The benchmark description for the confirmation message
  */
 async function loadHistoryBenchmark(id, button, name) {
+  const hasHistory = benchmarkHasHistoryById(id);
+
+  if (hasHistory) {
+    replaceHistoryId = id;
+    replaceHistoryName = name;
+    replaceHistoryButton = button;
+    document.getElementById("replace-history-name").textContent = name;
+    document.getElementById("replace-history-dialog").classList.remove("hidden");
+    document.getElementById("replace-history-no-btn").focus();
+    return;
+  }
+
+  await executeLoadHistory(id, button, name);
+}
+
+/**
+ * @description Execute the actual history load for a benchmark.
+ * Called directly for first-time loads, or after confirmation for replacements.
+ * @param {number} id - The benchmark ID
+ * @param {HTMLElement} button - The button element that was clicked
+ * @param {string} name - The benchmark description
+ */
+async function executeLoadHistory(id, button, name) {
   button.disabled = true;
   button.textContent = "Loading...";
 
@@ -727,13 +868,15 @@ async function loadHistoryBenchmark(id, button, name) {
     });
 
     button.disabled = false;
-    button.textContent = "Load History";
 
     if (result.ok && result.data.success) {
       loadHistoryCounts[id] = (loadHistoryCounts[id] || 0) + 1;
+      loadedInSession.add(id);
+      button.textContent = "Replace History";
       updateLoadBadge(id);
       showModal("History Loaded", "Benchmark: " + result.data.description + "\nValues loaded: " + result.data.count);
     } else {
+      button.textContent = benchmarkHasHistoryById(id) ? "Replace History" : "Load History";
       updateLoadBadge(id);
       const errorMsg = (result.data && result.data.error) || result.error || "Unknown error";
       const desc = (result.data && result.data.description) || name;
@@ -741,23 +884,50 @@ async function loadHistoryBenchmark(id, button, name) {
     }
   } catch (err) {
     button.disabled = false;
-    button.textContent = "Load History";
+    button.textContent = benchmarkHasHistoryById(id) ? "Replace History" : "Load History";
     updateLoadBadge(id);
     showModal("Network Error", err.message);
   }
 }
 
 /**
- * @description Update the Load History button badge for a benchmark.
+ * @description Hide the replace history confirmation dialog and reset state.
+ */
+function hideReplaceHistoryDialog() {
+  replaceHistoryId = null;
+  replaceHistoryButton = null;
+  replaceHistoryName = "";
+  document.getElementById("replace-history-dialog").classList.add("hidden");
+}
+
+/**
+ * @description Execute the history replacement after the user confirmed "Yes".
+ */
+async function confirmReplaceHistory() {
+  const id = replaceHistoryId;
+  const button = replaceHistoryButton;
+  const name = replaceHistoryName;
+
+  hideReplaceHistoryDialog();
+
+  if (!id || !button) return;
+
+  await executeLoadHistory(id, button, name);
+}
+
+/**
+ * @description Update the Load/Replace History button badge for a benchmark.
  * Shows a small count badge after the button text if the count is > 0.
+ * Uses the correct label based on whether history exists.
  * @param {number} id - The benchmark ID
  */
 function updateLoadBadge(id) {
   const btn = document.getElementById("load-btn-" + id);
   if (!btn) return;
   const count = loadHistoryCounts[id] || 0;
+  const label = benchmarkHasHistoryById(id) ? "Replace History" : "Load History";
   if (count > 0) {
-    btn.innerHTML = "Load History " + '<span class="inline-flex items-center justify-center bg-blue-600 text-white font-bold rounded-full w-5 h-5 ml-1 text-xs">' + count + "</span>";
+    btn.innerHTML = label + " " + '<span class="inline-flex items-center justify-center bg-blue-600 text-white font-bold rounded-full w-5 h-5 ml-1 text-xs">' + count + "</span>";
   }
 }
 
@@ -774,6 +944,8 @@ document.addEventListener("DOMContentLoaded", async function () {
   document.getElementById("delete-cancel-btn").addEventListener("click", hideDeleteDialog);
   document.getElementById("delete-confirm-btn").addEventListener("click", executeDelete);
   document.getElementById("view-close-btn").addEventListener("click", hideView);
+  document.getElementById("replace-history-no-btn").addEventListener("click", hideReplaceHistoryDialog);
+  document.getElementById("replace-history-yes-btn").addEventListener("click", confirmReplaceHistory);
 
   // Handle type change to enforce GBP for index benchmarks
   document.getElementById("benchmark_type").addEventListener("change", handleTypeChange);
@@ -805,15 +977,24 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
   });
 
+  document.getElementById("replace-history-dialog").addEventListener("click", function (event) {
+    if (event.target === this) {
+      hideReplaceHistoryDialog();
+    }
+  });
+
   // Close modals with Escape key
   document.addEventListener("keydown", function (event) {
     if (event.key === "Escape") {
+      const replaceDialog = document.getElementById("replace-history-dialog");
       const deleteDialog = document.getElementById("delete-dialog");
       const formContainer = document.getElementById("benchmark-form-container");
       const viewContainer = document.getElementById("benchmark-view-container");
 
-      // Close in priority order: delete dialog first, then form, then view
-      if (!deleteDialog.classList.contains("hidden")) {
+      // Close in priority order: replace history first, then delete, then form, then view
+      if (!replaceDialog.classList.contains("hidden")) {
+        hideReplaceHistoryDialog();
+      } else if (!deleteDialog.classList.contains("hidden")) {
         hideDeleteDialog();
       } else if (!formContainer.classList.contains("hidden")) {
         hideForm();

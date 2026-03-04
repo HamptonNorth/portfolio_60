@@ -46,7 +46,7 @@ beforeAll(async function () {
   );
 
   // Start the server with the test database
-  serverProcess = Bun.spawn(["bun", "run", "src/server/index.js"], {
+  serverProcess = Bun.spawn([process.execPath, "run", "src/server/index.js"], {
     env: { ...process.env, PORT: String(PORT), DB_PATH: testDbPath },
     stdout: "pipe",
     stderr: "pipe",

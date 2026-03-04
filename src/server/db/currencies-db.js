@@ -6,7 +6,14 @@ import { getDatabase } from "./connection.js";
  */
 export function getAllCurrencies() {
   const db = getDatabase();
-  return db.query("SELECT * FROM currencies ORDER BY code").all();
+  return db
+    .query(
+      `SELECT c.*,
+        (SELECT MIN(cr.rate_date) FROM currency_rates cr WHERE cr.currencies_id = c.id) AS oldest_rate_date
+      FROM currencies c
+      ORDER BY c.code`,
+    )
+    .all();
 }
 
 /**

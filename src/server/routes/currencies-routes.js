@@ -6,6 +6,7 @@ import {
   updateCurrency,
   deleteCurrency,
 } from "../db/currencies-db.js";
+import { getRateHistory } from "../db/currency-rates-db.js";
 import { validateCurrency } from "../validation.js";
 
 /**
@@ -25,6 +26,27 @@ currenciesRouter.get("/api/currencies", function () {
   } catch (err) {
     return new Response(
       JSON.stringify({ error: "Failed to fetch currencies", detail: err.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+});
+
+// GET /api/currencies/:id/rates — get rate history for a currency
+currenciesRouter.get("/api/currencies/:id/rates", function (request, params) {
+  try {
+    const id = Number(params.id);
+    const currency = getCurrencyById(id);
+    if (!currency) {
+      return new Response(
+        JSON.stringify({ error: "Currency not found" }),
+        { status: 404, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    const rates = getRateHistory(id, 100);
+    return Response.json({ rates: rates, totalCount: rates.length });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Failed to fetch rate history", detail: err.message }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }

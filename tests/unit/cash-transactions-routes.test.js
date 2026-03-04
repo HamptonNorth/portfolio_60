@@ -35,7 +35,7 @@ beforeAll(async () => {
   }
 
   // Start the server with isolated test database
-  serverProcess = Bun.spawn(["bun", "run", "src/server/index.js"], {
+  serverProcess = Bun.spawn([process.execPath, "run", "src/server/index.js"], {
     cwd: process.cwd(),
     stdout: "pipe",
     stderr: "pipe",

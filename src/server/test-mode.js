@@ -1,7 +1,12 @@
 import { resolve, join } from "node:path";
-Will now test manuaaly be deletimport { existsSync, readFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, mkdirSync } from "node:fs";
 import { DATA_DIR } from "../shared/server-constants.js";
-import { closeDatabase, createDatabase, getDatabase, resetDatabasePath } from "./db/connection.js";
+import {
+  closeDatabase,
+  createDatabase,
+  getDatabase,
+  resetDatabasePath,
+} from "./db/connection.js";
 import { setConfigPath, reloadConfig } from "./config.js";
 
 /**
@@ -68,9 +73,13 @@ function createTestDatabase() {
   if (existsSync(seedPath)) {
     const seedSql = readFileSync(seedPath, "utf-8");
     db.exec(seedSql);
-    console.log("[Test Mode] Test database created and seeded at " + testDbPath);
+    console.log(
+      "[Test Mode] Test database created and seeded at " + testDbPath,
+    );
   } else {
-    console.warn("[Test Mode] Test database created but seed file not found: " + seedPath);
+    console.warn(
+      "[Test Mode] Test database created but seed file not found: " + seedPath,
+    );
   }
 
   // Close so activateTestMode can re-open cleanly
