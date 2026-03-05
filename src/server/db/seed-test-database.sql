@@ -84,13 +84,17 @@ INSERT INTO investments (currencies_id, investment_type_id, description, public_
 
 INSERT INTO benchmarks (currencies_id, benchmark_type, description, benchmark_url, selector) VALUES
     (1, 'index', 'FTSE 100',
-     'https://markets.ft.com/data/indices/tearsheet/summary?s=FTSE:FSI', NULL),
+     'https://www.google.com/finance/quote/UKX:INDEXFTSE', NULL),
     (1, 'index', 'FTSE 250',
      'https://www.google.com/finance/quote/MCX:INDEXFTSE', NULL),
+     (1, 'index', 'FTSE All Share',
+      'https://www.google.com/finance/quote/ASX:INDEXFTSE', NULL),
     (2, 'index', 'S&P 500',
-     'https://markets.ft.com/data/indices/tearsheet/summary?s=INX:IOM', NULL),
-    (2, 'index', 'Nasdaq Composite',
-     'https://markets.ft.com/data/indices/tearsheet/summary?s=COMP:IOM', NULL);
+     'https://www.google.com/finance/quote/INX:INDEXSP', '.fxKbKc'),
+    (2, 'index', 'Dow Jones',a
+     'https://www.google.com/finance/quote/DJI:INDEXDJX', '.fxKbKc'),
+     (2, 'index', 'Nasdaq',
+      'https://www.google.com/finance/quote/IXIC:INDEXNASDAQ', '.fxKbKc');
 
 -- ============================================================================
 -- USERS

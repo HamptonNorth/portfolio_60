@@ -103,6 +103,7 @@ CREATE TABLE IF NOT EXISTS scraping_history (
     scrape_datetime TEXT NOT NULL,
     started_by INTEGER NOT NULL DEFAULT 0,
     attempt_number INTEGER NOT NULL DEFAULT 1,
+    max_attempts INTEGER NOT NULL DEFAULT 1,
     success INTEGER NOT NULL DEFAULT 0,
     error_code TEXT,
     error_message TEXT
