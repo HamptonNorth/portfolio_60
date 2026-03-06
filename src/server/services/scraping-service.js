@@ -16,10 +16,11 @@ import { fetchLatestYahooBenchmarkValue, getYahooScrapeableBenchmarks } from "..
 import { launchBrowser } from "../scrapers/browser-utils.js";
 import { SCRAPE_RETRY_CONFIG } from "../../shared/server-constants.js";
 import { getPriceMethodConfig } from "../config.js";
-import { getTotalPriceCount } from "../db/prices-db.js";
-import { getTotalRateCount } from "../db/currency-rates-db.js";
-import { getTotalBenchmarkDataCount } from "../db/benchmark-data-db.js";
-import { backfillInvestmentPrices, backfillBenchmarkValues, backfillCurrencyRates } from "./historic-backfill.js";
+import { getTotalPriceCount, getPriceCount } from "../db/prices-db.js";
+import { getTotalRateCount, getRateCount } from "../db/currency-rates-db.js";
+import { getTotalBenchmarkDataCount, getBenchmarkDataCount } from "../db/benchmark-data-db.js";
+import { backfillInvestmentPrices, backfillBenchmarkValues, backfillCurrencyRates, backfillSingleInvestment, backfillSingleBenchmark, backfillSingleCurrency } from "./historic-backfill.js";
+import { getDatabase } from "../db/connection.js";
 import { checkpointDatabase } from "../db/connection.js";
 
 /**
@@ -113,6 +114,23 @@ export async function runFullScrape(options = {}) {
         } catch (err) {
           console.warn("[ScrapeService] Currency rate backfill failed: " + err.message);
         }
+      } else {
+        // Per-currency backfill: check for newly added currencies with no history
+        const db = getDatabase();
+        const currencies = db.query("SELECT id, code FROM currencies WHERE code != 'GBP' ORDER BY code").all();
+        for (const c of currencies) {
+          if (getRateCount(c.id) === 0) {
+            console.log("[ScrapeService] No rate history for " + c.code + " — backfilling...");
+            try {
+              await backfillSingleCurrency(c, function (progress) {
+                console.log("[ScrapeService/Backfill] " + progress.message);
+              });
+              checkpointDatabase();
+            } catch (err) {
+              console.warn("[ScrapeService] Currency rate backfill for " + c.code + " failed: " + err.message);
+            }
+          }
+        }
       }
 
       if (getTotalPriceCount() === 0) {
@@ -159,6 +177,19 @@ export async function runFullScrape(options = {}) {
             });
           }
           continue;
+        }
+
+        // Per-item backfill: if this investment has no price history, backfill first
+        if (getPriceCount(investment.id) === 0) {
+          console.log("[ScrapeService] No price history for investment " + investment.id + " (" + investment.description + ") — backfilling...");
+          try {
+            await backfillSingleInvestment(investment, function (progress) {
+              console.log("[ScrapeService/Backfill] " + progress.message);
+            });
+            checkpointDatabase();
+          } catch (err) {
+            console.warn("[ScrapeService] Price backfill for " + investment.description + " failed: " + err.message);
+          }
         }
 
         try {
@@ -213,6 +244,19 @@ export async function runFullScrape(options = {}) {
             });
           }
           continue;
+        }
+
+        // Per-item backfill: if this benchmark has no value history, backfill first
+        if (getBenchmarkDataCount(benchmark.id) === 0) {
+          console.log("[ScrapeService] No value history for benchmark " + benchmark.id + " (" + benchmark.description + ") — backfilling...");
+          try {
+            await backfillSingleBenchmark(benchmark, function (progress) {
+              console.log("[ScrapeService/Backfill] " + progress.message);
+            });
+            checkpointDatabase();
+          } catch (err) {
+            console.warn("[ScrapeService] Benchmark backfill for " + benchmark.description + " failed: " + err.message);
+          }
         }
 
         try {

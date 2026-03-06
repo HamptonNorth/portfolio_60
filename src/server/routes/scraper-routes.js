@@ -1,10 +1,10 @@
 import { Router } from "../router.js";
 import { fetchCurrencyRates } from "../scrapers/currency-scraper.js";
-import { getLatestRates, getTotalRateCount } from "../db/currency-rates-db.js";
+import { getLatestRates, getTotalRateCount, getRateCount } from "../db/currency-rates-db.js";
 import { getAllInvestments, getInvestmentById, updateAutoScrape } from "../db/investments-db.js";
-import { getLatestPrice, getTotalPriceCount } from "../db/prices-db.js";
+import { getLatestPrice, getTotalPriceCount, getPriceCount } from "../db/prices-db.js";
 import { getAllBenchmarks } from "../db/benchmarks-db.js";
-import { getLatestBenchmarkData, getTotalBenchmarkDataCount } from "../db/benchmark-data-db.js";
+import { getLatestBenchmarkData, getTotalBenchmarkDataCount, getBenchmarkDataCount } from "../db/benchmark-data-db.js";
 import { scrapeAllPrices, scrapePriceById, getScrapeableInvestments, scrapeSingleInvestmentPrice, extractDomain, calculateDelay } from "../scrapers/price-scraper.js";
 import { fetchLatestMorningstarPrice, getMorningstarScrapeableInvestments } from "../scrapers/morningstar-price-scraper.js";
 import { scrapeAllBenchmarks, scrapeBenchmarkById, getScrapeableBenchmarks, scrapeSingleBenchmarkValue, extractDomain as extractBenchmarkDomain, calculateDelay as calculateBenchmarkDelay } from "../scrapers/benchmark-scraper.js";
@@ -14,8 +14,8 @@ import { SCRAPE_RETRY_CONFIG } from "../../shared/server-constants.js";
 import { getSchedulerStatus } from "../services/scheduled-scraper.js";
 import { getScrapeBatchConfig, getPriceMethodConfig } from "../config.js";
 import { fetchLatestYahooBenchmarkValue, getYahooScrapeableBenchmarks } from "../scrapers/yahoo-benchmark-scraper.js";
-import { checkpointDatabase } from "../db/connection.js";
-import { backfillInvestmentPrices, backfillBenchmarkValues, backfillCurrencyRates } from "../services/historic-backfill.js";
+import { checkpointDatabase, getDatabase } from "../db/connection.js";
+import { backfillInvestmentPrices, backfillBenchmarkValues, backfillCurrencyRates, backfillSingleInvestment, backfillSingleBenchmark, backfillSingleCurrency } from "../services/historic-backfill.js";
 
 /**
  * @description Sleep for a given number of milliseconds.
@@ -51,6 +51,27 @@ scraperRouter.post("/api/scraper/currency-rates", async function (request) {
         checkpointDatabase();
       } catch (err) {
         console.warn("[Scraper] Currency rate backfill failed: " + err.message);
+      }
+    }
+
+    // Per-currency backfill: if any non-GBP currency has no rate history,
+    // backfill 3 years of weekly rates for that currency (e.g. newly added currency)
+    if (!testMode && getPriceMethodConfig() === "api") {
+      const db = getDatabase();
+      const currencies = db.query("SELECT id, code FROM currencies WHERE code != 'GBP' ORDER BY code").all();
+
+      for (const c of currencies) {
+        if (getRateCount(c.id) === 0) {
+          console.log("[Scraper] No rate history for " + c.code + " — backfilling...");
+          try {
+            await backfillSingleCurrency(c, function (progress) {
+              console.log("[Scraper/Backfill] " + progress.message);
+            });
+            checkpointDatabase();
+          } catch (err) {
+            console.warn("[Scraper] Currency rate backfill for " + c.code + " failed: " + err.message);
+          }
+        }
       }
     }
 
@@ -446,6 +467,22 @@ scraperRouter.get("/api/scraper/prices/stream", async function (request) {
                   });
                   failedIds.push(investment.id);
                   continue;
+                }
+
+                // Per-item backfill: if this investment has no price history,
+                // backfill 3 years of weekly prices before fetching the latest
+                if (getPriceCount(investment.id) === 0) {
+                  console.log("[Scraper/MS] No price history for investment " + investment.id + " — backfilling...");
+                  sendEvent("backfill", { type: "prices", message: "Backfilling price history for " + investment.description + "..." });
+                  try {
+                    await backfillSingleInvestment(investment, function (progress) {
+                      sendEvent("backfill_progress", progress);
+                    });
+                    sendEvent("backfill", { type: "prices", message: "Price history populated for " + investment.description });
+                    checkpointDatabase();
+                  } catch (err) {
+                    sendEvent("backfill", { type: "prices", message: "Price backfill failed for " + investment.description + ": " + err.message });
+                  }
                 }
 
                 console.log("[Scraper/MS] Fetching price for investment " + investment.id + " (" + investment.description + ")");
@@ -1025,6 +1062,22 @@ scraperRouter.get("/api/scraper/benchmarks/stream", async function (request) {
                   });
                   failedIds.push(benchmark.id);
                   continue;
+                }
+
+                // Per-item backfill: if this benchmark has no value history,
+                // backfill 3 years of weekly values before fetching the latest
+                if (getBenchmarkDataCount(benchmark.id) === 0) {
+                  console.log("[Scraper/YF] No value history for benchmark " + benchmark.id + " — backfilling...");
+                  sendEvent("backfill", { type: "benchmarks", message: "Backfilling value history for " + benchmark.description + "..." });
+                  try {
+                    await backfillSingleBenchmark(benchmark, function (progress) {
+                      sendEvent("backfill_progress", progress);
+                    });
+                    sendEvent("backfill", { type: "benchmarks", message: "Value history populated for " + benchmark.description });
+                    checkpointDatabase();
+                  } catch (err) {
+                    sendEvent("backfill", { type: "benchmarks", message: "Benchmark backfill failed for " + benchmark.description + ": " + err.message });
+                  }
                 }
 
                 console.log("[Scraper/YF] Fetching value for benchmark " + benchmark.id + " (" + benchmark.description + ")");

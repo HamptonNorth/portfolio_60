@@ -18,7 +18,7 @@
     "taxYearStartMonth": 4,
     "taxYearStartDay": 6
   },
-  "priceMethod": "scrape",
+  "priceMethod": "api",
   "scrapeDelayProfile": "cron",
   "scrapeBatch": {
     "_readme": "Scrape investments/benchmarks in batches to avoid rate-limiting. batchSize is items per batch (1-50), cooldownSeconds is pause between batches (0-600).",

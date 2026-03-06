@@ -90,11 +90,11 @@ INSERT INTO benchmarks (currencies_id, benchmark_type, description, benchmark_ur
      (1, 'index', 'FTSE All Share',
       'https://www.google.com/finance/quote/ASX:INDEXFTSE', NULL),
     (2, 'index', 'S&P 500',
-     'https://www.google.com/finance/quote/INX:INDEXSP', '.fxKbKc'),
+     'https://www.google.com/finance/quote/INX:INDEXSP', NULL),
     (2, 'index', 'Dow Jones',
-     'https://www.google.com/finance/quote/DJI:INDEXDJX', '.fxKbKc'),
+     'https://www.google.com/finance/quote/DJI:INDEXDJX', NULL),
      (2, 'index', 'Nasdaq',
-      'https://www.google.com/finance/quote/IXIC:INDEXNASDAQ', '.fxKbKc');
+      'https://www.google.com/finance/quote/IXIC:INDEXNASDAQ', NULL);
 
 -- ============================================================================
 -- USERS

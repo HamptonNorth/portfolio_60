@@ -88,8 +88,10 @@ export async function fetchLatestYahooBenchmarkValue(benchmark) {
     };
   }
 
-  // Fetch values for the last 14 days to ensure we capture at least
-  // one trading week (accounts for holidays)
+  // Use daily interval over 14 days to get the most recent trading day's
+  // closing value. Daily interval is more reliable than weekly when US
+  // markets are open — weekly interval can return no data for short date
+  // ranges on live-market tickers like ^DJI, ^GSPC, ^IXIC.
   const endDate = new Date();
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - 14);
@@ -99,7 +101,7 @@ export async function fetchLatestYahooBenchmarkValue(benchmark) {
 
   let history;
   try {
-    history = await fetchYahooBenchmarkHistory(ticker, startStr, endStr);
+    history = await fetchYahooBenchmarkHistory(ticker, startStr, endStr, "1d");
   } catch (err) {
     return {
       success: false,

@@ -907,16 +907,17 @@ export function matchYahooTicker(description) {
  * @param {string} yahooTicker - The Yahoo Finance ticker symbol
  * @param {string} startDate - ISO-8601 start date (YYYY-MM-DD)
  * @param {string} endDate - ISO-8601 end date (YYYY-MM-DD)
+ * @param {string} [interval="1wk"] - Yahoo Finance interval ("1d", "1wk", "1mo")
  * @returns {Promise<{date: string, value: number}[]>} Array of {date, value}
  *   where value is in the benchmark's natural units (index points or GBP price)
  */
-export async function fetchYahooBenchmarkHistory(yahooTicker, startDate, endDate) {
+export async function fetchYahooBenchmarkHistory(yahooTicker, startDate, endDate, interval) {
   const yf = new YahooFinance({ suppressNotices: ["ripHistorical"] });
 
   const result = await yf.chart(yahooTicker, {
     period1: startDate,
     period2: endDate,
-    interval: "1wk",
+    interval: interval || "1wk",
   });
 
   const isGBPence = result.meta && result.meta.currency === "GBp";
@@ -1067,6 +1068,256 @@ export async function backfillBenchmarkValues(progressCallback) {
   });
 
   return { totalValues: totalValues, benchmarksUpdated: benchmarksUpdated, skipped: skipped };
+}
+
+// ---------------------------------------------------------------------------
+// Per-item backfill functions (auto-backfill for newly added items)
+// ---------------------------------------------------------------------------
+
+/**
+ * @description Backfill ~3 years of weekly prices for a single investment.
+ * Used when a new investment is added and has no price history yet.
+ * Resolves the Morningstar ID (caching if needed), fetches weekly prices,
+ * and inserts them via upsertPrice().
+ * @param {Object} inv - Investment object with id, description, investment_url,
+ *   morningstar_id, public_id, currency_code, type_short
+ * @param {Function} progressCallback - Called with {type, message} updates
+ * @returns {Promise<{success: boolean, pricesInserted: number, error?: string}>}
+ */
+export async function backfillSingleInvestment(inv, progressCallback) {
+  const db = getDatabase();
+
+  // Calculate date range: ~3 years back from today
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setFullYear(startDate.getFullYear() - 3);
+
+  const startStr = startDate.toISOString().split("T")[0];
+  const endStr = endDate.toISOString().split("T")[0];
+
+  progressCallback({
+    type: "progress",
+    message: inv.description + ": backfilling prices (" + startStr + " to " + endStr + ")...",
+  });
+
+  let morningstarId = inv.morningstar_id;
+  let universe = null;
+
+  // Step 1: If we don't have a cached Morningstar ID, look it up
+  if (!morningstarId) {
+    let lookupResult = null;
+
+    const publicIdType = detectPublicIdType(inv.public_id);
+    let isin = null;
+
+    if (publicIdType === "isin") {
+      isin = inv.public_id.trim().toUpperCase();
+    } else if (inv.type_short === "MUTUAL") {
+      isin = extractIsinFromUrl(inv.investment_url);
+    }
+
+    if (isin) {
+      progressCallback({ type: "progress", message: inv.description + ": looking up ISIN " + isin + "..." });
+      lookupResult = await lookupMorningstarIdByIsin(isin);
+    } else if (publicIdType === "ticker" || publicIdType === "etf") {
+      const tickerSymbol = extractTickerFromPublicId(inv.public_id);
+      progressCallback({ type: "progress", message: inv.description + ": looking up ticker " + tickerSymbol + "..." });
+      lookupResult = await lookupMorningstarIdByTicker(tickerSymbol);
+    } else {
+      const ticker = extractLseTickerFromUrl(inv.investment_url);
+      if (ticker) {
+        progressCallback({ type: "progress", message: inv.description + ": looking up LSE ticker " + ticker + "..." });
+        lookupResult = await lookupMorningstarIdByTicker(ticker);
+      } else {
+        return { success: false, pricesInserted: 0, error: "No ISIN or ticker found" };
+      }
+    }
+
+    if (!lookupResult) {
+      return { success: false, pricesInserted: 0, error: "Morningstar lookup returned no results" };
+    }
+
+    morningstarId = lookupResult.secId;
+    universe = lookupResult.universe;
+
+    // Cache the Morningstar ID and universe in the database
+    const cachedValue = morningstarId + "|" + universe;
+    db.run("UPDATE investments SET morningstar_id = ? WHERE id = ?", [cachedValue, inv.id]);
+
+    progressCallback({
+      type: "progress",
+      message: inv.description + ": found Morningstar ID " + morningstarId + " (" + lookupResult.name + ")",
+    });
+  } else {
+    const parts = morningstarId.split("|");
+    morningstarId = parts[0];
+    universe = parts[1] || "FOGBR$$ALL";
+  }
+
+  // Step 2: Fetch weekly price history
+  let priceHistory;
+  try {
+    priceHistory = await fetchMorningstarHistory(morningstarId, universe, inv.currency_code, startStr, endStr);
+  } catch (err) {
+    return { success: false, pricesInserted: 0, error: "Price fetch failed: " + err.message };
+  }
+
+  if (priceHistory.length === 0) {
+    return { success: false, pricesInserted: 0, error: "No price data returned" };
+  }
+
+  // Step 3: Insert prices into the database
+  // Morningstar returns prices in major units (pounds, dollars).
+  // upsertPrice() expects minor units (pence, cents), so multiply by 100.
+  let countForInvestment = 0;
+
+  for (const entry of priceHistory) {
+    const priceInMinorUnits = entry.price * 100;
+    upsertPrice(inv.id, entry.date, "00:00:00", priceInMinorUnits);
+    countForInvestment++;
+  }
+
+  progressCallback({
+    type: "progress",
+    message: inv.description + ": " + countForInvestment + " weekly prices inserted",
+  });
+
+  return { success: true, pricesInserted: countForInvestment };
+}
+
+/**
+ * @description Backfill ~3 years of weekly values for a single benchmark.
+ * Used when a new benchmark is added and has no value history yet.
+ * Resolves the Yahoo Finance ticker (caching if needed), fetches weekly values,
+ * and inserts them via upsertBenchmarkData().
+ * @param {Object} bm - Benchmark object with id, description, yahoo_ticker
+ * @param {Function} progressCallback - Called with {type, message} updates
+ * @returns {Promise<{success: boolean, valuesInserted: number, error?: string}>}
+ */
+export async function backfillSingleBenchmark(bm, progressCallback) {
+  const db = getDatabase();
+
+  // MSCI indexes have no free historic data API
+  if (bm.description.toLowerCase().includes("msci")) {
+    return { success: false, valuesInserted: 0, error: "MSCI index — no free historic data source" };
+  }
+
+  // Calculate date range: ~3 years back from today
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setFullYear(startDate.getFullYear() - 3);
+
+  const startStr = startDate.toISOString().split("T")[0];
+  const endStr = endDate.toISOString().split("T")[0];
+
+  progressCallback({
+    type: "progress",
+    message: bm.description + ": backfilling values (" + startStr + " to " + endStr + ")...",
+  });
+
+  // Step 1: Determine Yahoo ticker
+  let yahooTicker = bm.yahoo_ticker;
+
+  if (!yahooTicker) {
+    yahooTicker = matchYahooTicker(bm.description);
+
+    if (!yahooTicker) {
+      return { success: false, valuesInserted: 0, error: "No Yahoo Finance ticker mapping found" };
+    }
+
+    // Cache the ticker in the database
+    db.run("UPDATE benchmarks SET yahoo_ticker = ? WHERE id = ?", [yahooTicker, bm.id]);
+
+    progressCallback({
+      type: "progress",
+      message: bm.description + ": matched to Yahoo ticker " + yahooTicker,
+    });
+  }
+
+  // Step 2: Fetch weekly history
+  let history;
+  try {
+    history = await fetchYahooBenchmarkHistory(yahooTicker, startStr, endStr);
+  } catch (err) {
+    return { success: false, valuesInserted: 0, error: "Yahoo Finance fetch failed: " + err.message };
+  }
+
+  if (history.length === 0) {
+    return { success: false, valuesInserted: 0, error: "No data returned from Yahoo Finance" };
+  }
+
+  // Step 3: Insert values into the database
+  let countForBenchmark = 0;
+
+  for (const entry of history) {
+    upsertBenchmarkData(bm.id, entry.date, "00:00:00", entry.value);
+    countForBenchmark++;
+  }
+
+  progressCallback({
+    type: "progress",
+    message: bm.description + ": " + countForBenchmark + " weekly values inserted",
+  });
+
+  return { success: true, valuesInserted: countForBenchmark };
+}
+
+/**
+ * @description Backfill ~3 years of weekly exchange rates for a single currency.
+ * Used when a new non-GBP currency is added and has no rate history yet.
+ * Fetches rates from the Bank of England (the BoE endpoint returns all
+ * currencies in one request) and inserts only the target currency's rates.
+ * @param {Object} currency - Currency object with id, code
+ * @param {Function} progressCallback - Called with {type, message} updates
+ * @returns {Promise<{success: boolean, ratesInserted: number, error?: string}>}
+ */
+export async function backfillSingleCurrency(currency, progressCallback) {
+  const seriesCode = BOE_SERIES_CODES[currency.code];
+  if (!seriesCode) {
+    return { success: false, ratesInserted: 0, error: "No BoE series code for " + currency.code };
+  }
+
+  // Calculate date range: ~3 years back from today
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setFullYear(startDate.getFullYear() - 3);
+
+  const startStr = startDate.toISOString().split("T")[0];
+  const endStr = endDate.toISOString().split("T")[0];
+
+  progressCallback({
+    type: "progress",
+    message: currency.code + ": backfilling rates from Bank of England (" + startStr + " to " + endStr + ")...",
+  });
+
+  // Fetch all daily rates from BoE, then filter to weekly (Fridays)
+  let dailyRows;
+  try {
+    dailyRows = await fetchBoeRateHistory(startStr, endStr);
+  } catch (err) {
+    return { success: false, ratesInserted: 0, error: "BoE fetch failed: " + err.message };
+  }
+
+  const rateRows = filterToWeeklyFridays(dailyRows);
+
+  // Insert only the rates for the requested currency
+  let countForCurrency = 0;
+
+  for (const row of rateRows) {
+    const rate = row.rates[currency.code];
+    if (rate === undefined) continue;
+
+    const scaledRate = scaleRate(rate);
+    upsertRate(currency.id, row.date, "00:00:00", scaledRate);
+    countForCurrency++;
+  }
+
+  progressCallback({
+    type: "progress",
+    message: currency.code + ": " + countForCurrency + " weekly rates inserted",
+  });
+
+  return { success: true, ratesInserted: countForCurrency };
 }
 
 // ---------------------------------------------------------------------------
