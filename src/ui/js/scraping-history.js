@@ -187,7 +187,7 @@ async function loadHistory() {
     }
 
     html += '<td class="py-3 px-3 text-base">' + escapeHtml(formatStartedBy(h.started_by)) + "</td>";
-    html += '<td class="py-3 px-3 text-base text-center">' + h.attempt_number + "</td>";
+    html += '<td class="py-3 px-3 text-base text-center">' + h.attempt_number + (h.max_attempts > 1 ? " of " + h.max_attempts : "") + "</td>";
 
     if (h.error_message) {
       html += '<td class="py-3 px-3 text-sm text-brand-500" title="' + escapeHtml(h.error_message) + '">';

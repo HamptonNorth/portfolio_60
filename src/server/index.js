@@ -95,7 +95,7 @@ async function serveStaticFile(relativePath) {
  */
 const server = Bun.serve({
   port: port,
-  idleTimeout: 255, // seconds — scraper requests need long timeouts for Playwright navigation
+  idleTimeout: 0, // disabled globally — SSE scraping streams are long-lived; per-request server.timeout(req, 0) also applied for stream endpoints
 
   /**
    * @description Handle incoming HTTP requests.
@@ -345,6 +345,11 @@ const server = Bun.serve({
 
     // Scraper routes (unprotected — no passphrase required)
     if (path.startsWith("/api/scraper/")) {
+      // Disable per-request idle timeout for SSE stream endpoints so Bun
+      // does not close the connection while the server is busy scraping.
+      if (path.endsWith("/stream")) {
+        server.timeout(request, 0);
+      }
       const scraperResult = await handleScraperRoute(method, path, request);
       if (scraperResult) {
         return scraperResult;

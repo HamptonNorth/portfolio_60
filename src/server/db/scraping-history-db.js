@@ -6,7 +6,8 @@ import { getDatabase } from "./connection.js";
  * @param {string} params.scrapeType - 'currency', 'investment', or 'benchmark'
  * @param {number} params.referenceId - FK to the relevant table (currencies, investments, or benchmarks)
  * @param {number} [params.startedBy=0] - 0 = manual/interactive, 1 = scheduled/cron, 3 = test investments
- * @param {number} [params.attemptNumber=1] - Retry attempt counter (1-5)
+ * @param {number} [params.attemptNumber=1] - The attempt at which the outcome was determined
+ * @param {number} [params.maxAttempts=1] - Total attempts available for this scrape run
  * @param {boolean} params.success - Whether the scrape succeeded
  * @param {string|null} [params.errorCode=null] - HTTP status or error type
  * @param {string|null} [params.errorMessage=null] - Human-readable error description
@@ -18,9 +19,9 @@ export function recordScrapingAttempt(params) {
 
   const result = db.run(
     `INSERT INTO scraping_history
-     (scrape_type, reference_id, scrape_datetime, started_by, attempt_number, success, error_code, error_message)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [params.scrapeType, params.referenceId, now, params.startedBy || 0, params.attemptNumber || 1, params.success ? 1 : 0, params.errorCode || null, params.errorMessage || null],
+     (scrape_type, reference_id, scrape_datetime, started_by, attempt_number, max_attempts, success, error_code, error_message)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [params.scrapeType, params.referenceId, now, params.startedBy || 0, params.attemptNumber || 1, params.maxAttempts || 1, params.success ? 1 : 0, params.errorCode || null, params.errorMessage || null],
   );
 
   return result.lastInsertRowid;
@@ -109,7 +110,7 @@ export function getScrapingHistory(filters = {}) {
 
   const rows = db
     .query(
-      `SELECT id, scrape_type, reference_id, scrape_datetime, started_by, attempt_number, success, error_code, error_message
+      `SELECT id, scrape_type, reference_id, scrape_datetime, started_by, attempt_number, max_attempts, success, error_code, error_message
        FROM scraping_history
        ${whereClause}
        ORDER BY scrape_datetime DESC
@@ -125,6 +126,7 @@ export function getScrapingHistory(filters = {}) {
       scrape_datetime: row.scrape_datetime,
       started_by: row.started_by,
       attempt_number: row.attempt_number,
+      max_attempts: row.max_attempts,
       success: row.success === 1,
       error_code: row.error_code,
       error_message: row.error_message,
@@ -234,6 +236,7 @@ export function getScrapingHistoryWithDescriptions(filters = {}) {
          h.scrape_datetime,
          h.started_by,
          h.attempt_number,
+         h.max_attempts,
          h.success,
          h.error_code,
          h.error_message,
@@ -262,9 +265,44 @@ export function getScrapingHistoryWithDescriptions(filters = {}) {
       scrape_datetime: row.scrape_datetime,
       started_by: row.started_by,
       attempt_number: row.attempt_number,
+      max_attempts: row.max_attempts,
       success: row.success === 1,
       error_code: row.error_code,
       error_message: row.error_message,
     };
   });
+}
+
+/**
+ * @description Get items whose most recent scraping history record is a failure.
+ * Only returns investment and benchmark failures (currencies have no retry mechanism).
+ * Joins to investments/benchmarks tables for human-readable descriptions.
+ * @returns {Object[]} Array of objects with scrape_type, reference_id, description,
+ *   scrape_datetime, error_code, and error_message
+ */
+export function getLatestFailures() {
+  const db = getDatabase();
+
+  const rows = db
+    .query(
+      `SELECT h.scrape_type, h.reference_id, h.scrape_datetime, h.error_code, h.error_message,
+              CASE h.scrape_type
+                WHEN 'investment' THEN i.description
+                WHEN 'benchmark' THEN b.description
+              END as description
+       FROM scraping_history h
+       LEFT JOIN investments i ON h.scrape_type = 'investment' AND h.reference_id = i.id
+       LEFT JOIN benchmarks b ON h.scrape_type = 'benchmark' AND h.reference_id = b.id
+       WHERE h.success = 0
+         AND h.scrape_type IN ('investment', 'benchmark')
+         AND h.id = (
+           SELECT h2.id FROM scraping_history h2
+           WHERE h2.scrape_type = h.scrape_type AND h2.reference_id = h.reference_id
+           ORDER BY h2.scrape_datetime DESC LIMIT 1
+         )
+       ORDER BY h.scrape_type, h.reference_id`,
+    )
+    .all();
+
+  return rows;
 }

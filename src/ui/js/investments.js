@@ -18,6 +18,9 @@ let cachedInvestments = [];
 /** @type {Set<number>} Investment IDs that have been successfully loaded in this session */
 let loadedInSession = new Set();
 
+/** @type {string} Cached price method from config — "scrape" or "api" */
+let cachedPriceMethod = "scrape";
+
 /** @type {number|null} ID of the investment pending history replacement */
 let replaceHistoryId = null;
 
@@ -372,10 +375,13 @@ async function loadInvestments() {
     html += '<button class="bg-brand-100 hover:bg-brand-200 text-brand-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="viewInvestment(' + inv.id + ')">View</button>';
     // Show Test and Load/Replace History buttons if scrapeable (has URL or public_id)
     if (inv.investment_url || inv.public_id) {
-      const hasHistory = investmentHasHistory(inv);
-      const loadBtnLabel = hasHistory ? "Replace History" : "Load History";
       html += '<button id="test-btn-' + inv.id + '" class="bg-green-100 hover:bg-green-200 text-green-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="testScrapeInvestment(' + inv.id + ', this)">Test</button>';
-      html += '<button id="load-btn-' + inv.id + '" class="bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="loadHistoryInvestment(' + inv.id + ", this, '" + escapeHtml(inv.description).replace(/'/g, "\\'") + "')\">" + loadBtnLabel + "</button>";
+      // Hide Load History button when priceMethod is "api" (backfill is automatic)
+      if (cachedPriceMethod !== "api") {
+        const hasHistory = investmentHasHistory(inv);
+        const loadBtnLabel = hasHistory ? "Replace History" : "Load History";
+        html += '<button id="load-btn-' + inv.id + '" class="bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="loadHistoryInvestment(' + inv.id + ", this, '" + escapeHtml(inv.description).replace(/'/g, "\\'") + "')\">" + loadBtnLabel + "</button>";
+      }
     }
     html += "</td>";
     html += "</tr>";
@@ -1134,6 +1140,16 @@ async function handleSaveManualPrice() {
 
 // Initialise the page
 document.addEventListener("DOMContentLoaded", async function () {
+  // Fetch price method config to determine whether to show Load History buttons
+  try {
+    const configResult = await apiRequest("/api/config/price-method");
+    if (configResult.ok) {
+      cachedPriceMethod = configResult.data.priceMethod || "scrape";
+    }
+  } catch {
+    // Fall back to scrape
+  }
+
   await loadInvestmentTypes();
   await loadCurrencies();
   await loadScraperSites();

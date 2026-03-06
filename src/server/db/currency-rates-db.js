@@ -126,6 +126,16 @@ export function getRateCount(currenciesId) {
 }
 
 /**
+ * @description Get total number of rate records across all currencies.
+ * Used for auto-backfill detection (empty table = first run).
+ * @returns {number} Total count of all currency rate records
+ */
+export function getTotalRateCount() {
+  const db = getDatabase();
+  return db.query("SELECT COUNT(*) AS count FROM currency_rates").get().count;
+}
+
+/**
  * @description Convert a raw decimal rate to the integer-scaled value for storage.
  * Multiplies by CURRENCY_SCALE_FACTOR (10000) and rounds to the nearest integer.
  * @param {number} decimalRate - The decimal exchange rate (e.g. 1.2543)

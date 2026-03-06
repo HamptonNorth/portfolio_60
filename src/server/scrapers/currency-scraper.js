@@ -59,12 +59,13 @@ export async function fetchCurrencyRates(options = {}) {
 
   let apiResponse;
   try {
-    apiResponse = await fetch(url);
+    apiResponse = await fetch(url, { signal: AbortSignal.timeout(30000) });
   } catch (networkError) {
+    const isTimeout = networkError.name === "TimeoutError" || networkError.name === "AbortError";
     return {
       success: false,
       rates: [],
-      message: "Failed to connect to the Frankfurter API",
+      message: isTimeout ? "Frankfurter API request timed out after 30 seconds" : "Failed to connect to the Frankfurter API",
       error: networkError.message,
     };
   }
@@ -128,19 +129,25 @@ export async function fetchCurrencyRates(options = {}) {
 
     // Store in the database (skip in test mode)
     if (!testMode) {
-      // INSERT OR REPLACE for same currency+date
-      upsertRate(currency.id, rateDate, scrapeTime, scaledRate);
+      try {
+        // INSERT OR REPLACE for same currency+date
+        upsertRate(currency.id, rateDate, scrapeTime, scaledRate);
 
-      // Record successful attempt in history
-      recordScrapingAttempt({
-        scrapeType: "currency",
-        referenceId: currency.id,
-        startedBy: startedBy,
-        attemptNumber: attemptNumber,
-        success: true,
-        errorCode: null,
-        errorMessage: null,
-      });
+        // Record successful attempt in history
+        recordScrapingAttempt({
+          scrapeType: "currency",
+          referenceId: currency.id,
+          startedBy: startedBy,
+          attemptNumber: attemptNumber,
+          success: true,
+          errorCode: null,
+          errorMessage: null,
+        });
+      } catch (dbErr) {
+        console.warn("[Currency] Failed to write rate for " + currency.code + ": " + dbErr.message);
+        skippedCodes.push(currency.code);
+        continue;
+      }
     }
 
     storedRates.push({

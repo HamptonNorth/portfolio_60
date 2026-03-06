@@ -4,7 +4,7 @@ import { fetchCurrencyRates } from "./currency-scraper.js";
 import { SCRAPE_DELAY_PROFILES, DEFAULT_SCRAPE_DELAY_PROFILE } from "../../shared/server-constants.js";
 import { upsertPrice } from "../db/prices-db.js";
 import { recordScrapingAttempt } from "../db/scraping-history-db.js";
-import { launchBrowser, createStealthContext, createStealthPage, navigateTo, isBrowserAlive } from "./browser-utils.js";
+import { launchBrowser, createStealthContext, createStealthPage, navigateTo, isBrowserAlive, closePage } from "./browser-utils.js";
 import { getSelector } from "../config.js";
 import { buildFtMarketsUrl, buildFtMarketsAlternateUrl, getFtMarketsSelector, buildFidelitySearchUrl, detectPublicIdType } from "../../shared/public-id-utils.js";
 
@@ -159,13 +159,7 @@ export async function scrapeFidelityFactsheetUrl(isin, browser) {
   } catch (err) {
     return { success: false, url: null, error: "Fidelity search failed: " + err.message };
   } finally {
-    if (page) {
-      try {
-        await page.close();
-      } catch {
-        // Ignore close errors
-      }
-    }
+    await closePage(page);
   }
 }
 
@@ -207,6 +201,8 @@ async function readFtMarketsPriceLabel(page) {
  * @param {Object} [options={}] - Additional options
  * @param {number} [options.startedBy=0] - 0 = manual/interactive, 1 = scheduled/cron, 3 = test investments
  * @param {number} [options.attemptNumber=1] - Retry attempt counter (1-5)
+ * @param {boolean} [options.skipHistoryRecord=false] - If true, skip recording in scraping_history.
+ *   Used by SSE stream handlers that record history themselves after all retry passes.
  * @param {boolean} [options.testMode=false] - If true, skip writing to the live prices table.
  *   Scraping history is still recorded when startedBy=3 (test investments).
  * @param {string} [options.sourceTable="investments"] - Which table this investment comes from:
@@ -220,9 +216,11 @@ export async function scrapeSingleInvestmentPrice(investment, browser = null, op
   const testMode = options.testMode || false;
   const scrapeTime = options.scrapeTime || new Date().toTimeString().slice(0, 8);
   const sourceTable = options.sourceTable || "investments";
+  const skipHistoryRecord = options.skipHistoryRecord || false;
   // Record scraping history for live scrapes and test investment scrapes (startedBy=3),
   // but not for unit test mode where testMode=true and startedBy is 0 or 1.
-  const recordHistory = !testMode || startedBy === 3;
+  // When skipHistoryRecord is true, the caller (e.g. SSE stream handler) records history instead.
+  const recordHistory = !skipHistoryRecord && (!testMode || startedBy === 3);
   const result = {
     success: false,
     investmentId: investment.id,
@@ -233,6 +231,7 @@ export async function scrapeSingleInvestmentPrice(investment, browser = null, op
     priceMinorUnit: null,
     currency: investment.currency_code || "",
     error: "",
+    errorCode: null,
     fallbackUsed: false,
   };
 
@@ -254,6 +253,7 @@ export async function scrapeSingleInvestmentPrice(investment, browser = null, op
 
   if (!scrapeUrl) {
     result.error = "No URL configured and no public ID available";
+    result.errorCode = "NO_URL";
     if (recordHistory) {
       recordScrapingAttempt({
         scrapeType: "investment",
@@ -273,6 +273,7 @@ export async function scrapeSingleInvestmentPrice(investment, browser = null, op
 
   if (!selectorInfo.selector) {
     result.error = "No CSS selector configured and URL does not match any known site";
+    result.errorCode = "NO_SELECTOR";
     if (recordHistory) {
       recordScrapingAttempt({
         scrapeType: "investment",
@@ -361,8 +362,14 @@ export async function scrapeSingleInvestmentPrice(investment, browser = null, op
 
         // Store the price in the database (skip in test mode)
         if (!testMode) {
-          const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
-          upsertPrice(investment.id, today, scrapeTime, result.priceMinorUnit);
+          try {
+            const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+            upsertPrice(investment.id, today, scrapeTime, result.priceMinorUnit);
+          } catch (dbErr) {
+            result.success = false;
+            result.error = "Price scraped OK but database write failed: " + dbErr.message;
+            errorCode = "DB_WRITE_ERROR";
+          }
         }
       }
     }
@@ -384,13 +391,7 @@ export async function scrapeSingleInvestmentPrice(investment, browser = null, op
       }
     }
   } finally {
-    if (page) {
-      try {
-        await page.close();
-      } catch {
-        // Ignore close errors
-      }
-    }
+    await closePage(page);
     if (ownBrowser && browserInstance) {
       try {
         await browserInstance.close();
@@ -400,6 +401,10 @@ export async function scrapeSingleInvestmentPrice(investment, browser = null, op
       browserInstance = null; // Clear so fallback knows to launch its own
     }
   }
+  // Expose errorCode on the result so the SSE stream handler can use it
+  // when recording history itself (skipHistoryRecord mode).
+  result.errorCode = result.success ? null : errorCode;
+
   // Record the primary scraping attempt in history
   if (recordHistory) {
     recordScrapingAttempt({
@@ -408,7 +413,7 @@ export async function scrapeSingleInvestmentPrice(investment, browser = null, op
       startedBy: startedBy,
       attemptNumber: attemptNumber,
       success: result.success,
-      errorCode: result.success ? null : errorCode,
+      errorCode: result.errorCode,
       errorMessage: result.success ? null : result.error,
     });
   }
@@ -469,13 +474,7 @@ export async function scrapeSingleInvestmentPrice(investment, browser = null, op
       } catch {
         // Alternate URL also failed — continue to Fidelity fallback
       } finally {
-        if (altPage) {
-          try {
-            await altPage.close();
-          } catch {
-            /* ignore */
-          }
-        }
+        await closePage(altPage);
         if (launchedAltBrowser && altBrowser) {
           try {
             await altBrowser.close();
@@ -583,13 +582,7 @@ export async function scrapeSingleInvestmentPrice(investment, browser = null, op
           updateInvestmentScrapingSource(investment.id, factsheetUrl, null);
         }
       } finally {
-        if (fallbackPage) {
-          try {
-            await fallbackPage.close();
-          } catch {
-            // Ignore close errors
-          }
-        }
+        await closePage(fallbackPage);
       }
     } catch (err) {
       result.error = primaryError + " | Fidelity fallback error: " + err.message;

@@ -55,11 +55,12 @@ describe("Database - creation", () => {
   });
 });
 
-describe("Database - WAL mode", () => {
-  test("database uses WAL journal mode", () => {
+describe("Database - journal mode", () => {
+  test("database uses appropriate journal mode for filesystem", () => {
     const db = getDatabase();
     const row = db.query("PRAGMA journal_mode").get();
-    expect(row.journal_mode).toBe("wal");
+    // WAL on most filesystems, DELETE on btrfs (CoW conflicts with WAL)
+    expect(["wal", "delete"]).toContain(row.journal_mode);
   });
 });
 

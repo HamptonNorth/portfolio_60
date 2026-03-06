@@ -33,6 +33,11 @@ const DEFAULTS = {
     taxYearStartMonth: 4,
     taxYearStartDay: 6,
   },
+  scrapeBatch: {
+    batchSize: 8,
+    cooldownSeconds: 120,
+  },
+  priceMethod: "scrape",
   scrapeDelayProfile: "cron",
   scraperSites: {
     sites: [],
@@ -155,9 +160,21 @@ export function loadConfig() {
     taxYearStartDay: typeof rawIsaAllowance.taxYearStartDay === "number" && Number.isInteger(rawIsaAllowance.taxYearStartDay) && rawIsaAllowance.taxYearStartDay >= 1 && rawIsaAllowance.taxYearStartDay <= 28 ? rawIsaAllowance.taxYearStartDay : DEFAULTS.isaAllowance.taxYearStartDay,
   };
 
+  // priceMethod — must be "scrape" or "api"
+  const validPriceMethods = ["scrape", "api"];
+  config.priceMethod = validPriceMethods.includes(rawConfig.priceMethod) ? rawConfig.priceMethod : DEFAULTS.priceMethod;
+
   // scrapeDelayProfile — must be "interactive" or "cron"
   const validProfiles = ["interactive", "cron"];
   config.scrapeDelayProfile = validProfiles.includes(rawConfig.scrapeDelayProfile) ? rawConfig.scrapeDelayProfile : DEFAULTS.scrapeDelayProfile;
+
+  // scrapeBatch — batch size and cooldown between batches during scraping
+  const rawScrapeBatch = rawConfig.scrapeBatch || {};
+  config.scrapeBatch = {
+    batchSize: typeof rawScrapeBatch.batchSize === "number" && Number.isInteger(rawScrapeBatch.batchSize) && rawScrapeBatch.batchSize >= 1 && rawScrapeBatch.batchSize <= 50 ? rawScrapeBatch.batchSize : DEFAULTS.scrapeBatch.batchSize,
+
+    cooldownSeconds: typeof rawScrapeBatch.cooldownSeconds === "number" && Number.isInteger(rawScrapeBatch.cooldownSeconds) && rawScrapeBatch.cooldownSeconds >= 0 && rawScrapeBatch.cooldownSeconds <= 600 ? rawScrapeBatch.cooldownSeconds : DEFAULTS.scrapeBatch.cooldownSeconds,
+  };
 
   // scraperSites — validate sites is an array, preserve metadata
   const rawScraperSites = rawConfig.scraperSites || {};
@@ -214,12 +231,32 @@ export function getRetryConfig() {
 }
 
 /**
+ * @description Get the price fetching method from config.
+ * @returns {string} Either "scrape" (Playwright) or "api" (Morningstar/Yahoo Finance)
+ */
+export function getPriceMethodConfig() {
+  const config = loadConfig();
+  return config.priceMethod;
+}
+
+/**
  * @description Get the scrape delay profile name for scheduled runs.
  * @returns {string} Either "interactive" or "cron"
  */
 export function getScrapeDelayProfile() {
   const config = loadConfig();
   return config.scrapeDelayProfile;
+}
+
+/**
+ * @description Get the scrape batch configuration with defaults applied.
+ * Controls how many items are scraped per batch and the cooldown pause
+ * between batches to avoid rate-limiting by target websites.
+ * @returns {{ batchSize: number, cooldownSeconds: number }}
+ */
+export function getScrapeBatchConfig() {
+  const config = loadConfig();
+  return config.scrapeBatch;
 }
 
 /**

@@ -155,6 +155,23 @@ export async function createStealthContext(browser, targetUrl = "") {
  * @param {import('playwright').BrowserContext} context - The browser context
  * @returns {Promise<import('playwright').Page>} The configured page
  */
+/**
+ * @description Close a Playwright page and its parent BrowserContext.
+ * Each scrape creates a fresh context (for cookie/header isolation); closing
+ * the context releases the associated renderer process and prevents resource
+ * accumulation across many scrapes in a shared browser session.
+ * @param {import('playwright').Page} page - The page to close
+ */
+export async function closePage(page) {
+  if (!page) return;
+  try {
+    const ctx = page.context();
+    await ctx.close(); // closes all pages in this context
+  } catch {
+    // Context or page already closed — ignore
+  }
+}
+
 export async function createStealthPage(context) {
   const page = await context.newPage();
 

@@ -2,7 +2,7 @@ import { getAllBenchmarks, getBenchmarkById } from "../db/benchmarks-db.js";
 import { upsertBenchmarkData } from "../db/benchmark-data-db.js";
 import { recordScrapingAttempt } from "../db/scraping-history-db.js";
 import { SCRAPE_DELAY_PROFILES, DEFAULT_SCRAPE_DELAY_PROFILE } from "../../shared/server-constants.js";
-import { launchBrowser, createStealthContext, createStealthPage, navigateTo, isBrowserAlive } from "./browser-utils.js";
+import { launchBrowser, createStealthContext, createStealthPage, navigateTo, isBrowserAlive, closePage } from "./browser-utils.js";
 import { getSelector } from "../config.js";
 
 /**
@@ -77,14 +77,20 @@ export function parseBenchmarkValue(rawText) {
  * @param {Object} [options={}] - Additional options
  * @param {number} [options.startedBy=0] - 0 = manual/interactive, 1 = scheduled/cron
  * @param {number} [options.attemptNumber=1] - Retry attempt counter (1-5)
+ * @param {boolean} [options.skipHistoryRecord=false] - If true, skip recording in scraping_history.
+ *   Used by SSE stream handlers that record history themselves after all retry passes.
  * @param {boolean} [options.testMode=false] - If true, skip database writes (for testing)
- * @returns {Promise<{success: boolean, benchmarkId: number, description: string, benchmarkType: string, rawValue: string, parsedValue: number|null, currency: string, error?: string}>}
+ * @returns {Promise<{success: boolean, benchmarkId: number, description: string, benchmarkType: string, rawValue: string, parsedValue: number|null, currency: string, error?: string, errorCode?: string}>}
  */
 export async function scrapeSingleBenchmarkValue(benchmark, browser = null, options = {}) {
   const startedBy = options.startedBy || 0;
   const attemptNumber = options.attemptNumber || 1;
   const testMode = options.testMode || false;
+  const skipHistoryRecord = options.skipHistoryRecord || false;
   const scrapeTime = options.scrapeTime || new Date().toTimeString().slice(0, 8);
+  // Record scraping history unless skipHistoryRecord is set (caller records instead)
+  // or unless in test mode (where no history is desired)
+  const recordHistory = !skipHistoryRecord && !testMode;
   const result = {
     success: false,
     benchmarkId: benchmark.id,
@@ -94,12 +100,13 @@ export async function scrapeSingleBenchmarkValue(benchmark, browser = null, opti
     parsedValue: null,
     currency: benchmark.currency_code || "",
     error: "",
+    errorCode: null,
   };
 
   if (!benchmark.benchmark_url) {
     result.error = "No URL configured";
-    // Record failed attempt in history (skip in test mode)
-    if (!testMode) {
+    result.errorCode = "NO_URL";
+    if (recordHistory) {
       recordScrapingAttempt({
         scrapeType: "benchmark",
         referenceId: benchmark.id,
@@ -118,8 +125,8 @@ export async function scrapeSingleBenchmarkValue(benchmark, browser = null, opti
 
   if (!selectorInfo.selector) {
     result.error = "No CSS selector configured and URL does not match any known site";
-    // Record failed attempt in history (skip in test mode)
-    if (!testMode) {
+    result.errorCode = "NO_SELECTOR";
+    if (recordHistory) {
       recordScrapingAttempt({
         scrapeType: "benchmark",
         referenceId: benchmark.id,
@@ -191,8 +198,14 @@ export async function scrapeSingleBenchmarkValue(benchmark, browser = null, opti
 
         // Store the value in the database (skip in test mode)
         if (!testMode) {
-          const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
-          upsertBenchmarkData(benchmark.id, today, scrapeTime, result.parsedValue);
+          try {
+            const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+            upsertBenchmarkData(benchmark.id, today, scrapeTime, result.parsedValue);
+          } catch (dbErr) {
+            result.success = false;
+            result.error = "Value scraped OK but database write failed: " + dbErr.message;
+            errorCode = "DB_WRITE_ERROR";
+          }
         }
       }
     }
@@ -214,13 +227,7 @@ export async function scrapeSingleBenchmarkValue(benchmark, browser = null, opti
       }
     }
   } finally {
-    if (page) {
-      try {
-        await page.close();
-      } catch {
-        // Ignore close errors
-      }
-    }
+    await closePage(page);
     if (ownBrowser && browserInstance) {
       try {
         await browserInstance.close();
@@ -230,15 +237,19 @@ export async function scrapeSingleBenchmarkValue(benchmark, browser = null, opti
     }
   }
 
-  // Record the scraping attempt in history (skip in test mode)
-  if (!testMode) {
+  // Expose errorCode on the result so the SSE stream handler can use it
+  // when recording history itself (skipHistoryRecord mode).
+  result.errorCode = result.success ? null : errorCode;
+
+  // Record the scraping attempt in history
+  if (recordHistory) {
     recordScrapingAttempt({
       scrapeType: "benchmark",
       referenceId: benchmark.id,
       startedBy: startedBy,
       attemptNumber: attemptNumber,
       success: result.success,
-      errorCode: result.success ? null : errorCode,
+      errorCode: result.errorCode,
       errorMessage: result.success ? null : result.error,
     });
   }

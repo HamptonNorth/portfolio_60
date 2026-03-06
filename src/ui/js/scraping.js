@@ -282,25 +282,37 @@ function formatDatetime(datetime) {
 }
 
 /**
- * @description Format a minor-unit price value for display as £X.XXXX.
- * Converts from pence to pounds (divides by 100).
+ * @description Get the currency symbol for a given currency code.
+ * @param {string} code - ISO 4217 currency code (e.g. "GBP", "USD")
+ * @returns {string} Currency symbol (e.g. "£", "$")
+ */
+function getCurrencySymbol(code) {
+  const symbols = { GBP: "£", USD: "$", EUR: "€", AUD: "A$", CAD: "C$", CHF: "CHF ", JPY: "¥" };
+  return symbols[code] || code + " ";
+}
+
+/**
+ * @description Format a minor-unit price value for display with the correct currency symbol.
+ * Converts from pence/cents to major units (divides by 100).
  * Shows up to 4 decimal places; if the price has more precision, shows up to 6dp.
  * @param {number} value - The price in minor units (pence/cents)
- * @returns {string} Formatted price string in pounds
+ * @param {string} [currencyCode="GBP"] - ISO 4217 currency code
+ * @returns {string} Formatted price string with currency symbol
  */
-function formatPrice(value) {
+function formatPrice(value, currencyCode) {
   if (value === null || value === undefined) return "—";
-  const pounds = value / 100;
+  const symbol = getCurrencySymbol(currencyCode || "GBP");
+  const majorUnits = value / 100;
   // Check if more than 4dp of precision exists
-  const at4dp = parseFloat(pounds.toFixed(4));
-  const at6dp = parseFloat(pounds.toFixed(6));
+  const at4dp = parseFloat(majorUnits.toFixed(4));
+  const at6dp = parseFloat(majorUnits.toFixed(6));
   if (at4dp !== at6dp) {
-    return "£" + pounds.toFixed(6).replace(/0+$/, "");
+    return symbol + majorUnits.toFixed(6).replace(/0+$/, "");
   }
-  let formatted = pounds.toFixed(4);
+  let formatted = majorUnits.toFixed(4);
   // Remove trailing zeros but keep at least 2 decimal places
   formatted = formatted.replace(/(\.\d{2}\d*?)0+$/, "$1");
-  return "£" + formatted;
+  return symbol + formatted;
 }
 
 /**
@@ -431,11 +443,17 @@ function updatePriceRow(price) {
 
   // Status cell - show pass info if retries were needed
   if (price.success) {
+    let statusHtml = '<span class="text-sm text-success font-medium">OK</span>';
     if (price.attemptNumber && price.attemptNumber > 1) {
-      cells[2].innerHTML = '<span class="text-sm text-success font-medium">OK (pass ' + price.attemptNumber + ")</span>";
-    } else {
-      cells[2].innerHTML = '<span class="text-sm text-success font-medium">OK</span>';
+      statusHtml = '<span class="text-sm text-success font-medium">OK (pass ' + price.attemptNumber + ")</span>";
     }
+    // Show price date if available (Morningstar API returns this)
+    if (price.priceDate) {
+      statusHtml += '<br><span class="text-xs text-brand-400">' + escapeHtml(price.priceDate) + "</span>";
+    }
+    cells[2].innerHTML = statusHtml;
+  } else if (price.errorCode === "MANUALLY_PRICED") {
+    cells[2].innerHTML = '<span class="text-sm font-medium text-amber-600">Manually priced</span>';
   } else {
     if (price.attemptNumber && price.maxAttempts) {
       cells[2].innerHTML = '<span class="text-sm text-error font-medium">Failed (pass ' + price.attemptNumber + " of " + price.maxAttempts + ")</span>";
@@ -445,10 +463,14 @@ function updatePriceRow(price) {
   }
 
   // Raw text cell
-  cells[3].textContent = price.rawPrice || price.error || "—";
+  if (price.errorCode === "MANUALLY_PRICED") {
+    cells[3].innerHTML = '<span class="text-sm text-amber-600">Skipped</span>';
+  } else {
+    cells[3].textContent = price.rawPrice || price.error || "—";
+  }
 
   // Parsed price cell
-  cells[4].textContent = formatPrice(price.priceMinorUnit);
+  cells[4].textContent = formatPrice(price.priceMinorUnit, price.currency);
 }
 
 /**
@@ -510,16 +532,26 @@ function updateBenchmarkRow(benchmark) {
  * 2. Fetch investment prices (using SSE stream)
  * 3. Fetch benchmark values (using SSE stream)
  */
+/**
+ * @description Enable or disable all fetch-related buttons on the page.
+ * @param {boolean} disabled - Whether to disable (true) or enable (false) the buttons
+ */
+function setAllFetchButtonsDisabled(disabled) {
+  const ids = ["fetch-all-btn", "show-current-btn", "fetch-currencies-btn", "fetch-prices-btn", "fetch-benchmarks-btn", "retry-failed-prices-btn", "retry-failed-benchmarks-btn"];
+  for (const id of ids) {
+    const btn = document.getElementById(id);
+    if (btn) btn.disabled = disabled;
+  }
+}
+
 async function fetchAll() {
   const fetchBtn = document.getElementById("fetch-all-btn");
-  const showBtn = document.getElementById("show-current-btn");
   const progressDiv = document.getElementById("scrape-progress");
   const resultsContainer = document.getElementById("results-container");
 
-  // Disable both buttons and show progress
-  fetchBtn.disabled = true;
+  // Disable all buttons and show progress
+  setAllFetchButtonsDisabled(true);
   fetchBtn.textContent = "Fetching...";
-  showBtn.disabled = true;
   progressDiv.classList.remove("hidden");
   resultsContainer.innerHTML = "";
 
@@ -543,13 +575,12 @@ async function fetchAll() {
   }
 
   // Reset buttons and hide progress
-  fetchBtn.disabled = false;
+  setAllFetchButtonsDisabled(false);
   fetchBtn.textContent = "Fetch All";
-  showBtn.disabled = false;
   progressDiv.classList.add("hidden");
 
-  // Refresh last scrape times
-  await loadLastScrapeTimes();
+  // Refresh last scrape times and failure status
+  await Promise.all([loadLastScrapeTimes(), loadLatestFailures()]);
 }
 
 /**
@@ -589,6 +620,12 @@ async function runPricesSection() {
   container.innerHTML = "";
   const html = await fetchPricesStream();
   container.innerHTML = html;
+
+  // Re-attach click listener lost during innerHTML serialization
+  const retryBtn = document.getElementById("retry-prices-btn");
+  if (retryBtn) {
+    retryBtn.addEventListener("click", retryFailedPrices);
+  }
 }
 
 /**
@@ -600,6 +637,12 @@ async function runBenchmarksSection() {
   container.innerHTML = "";
   const html = await fetchBenchmarksStream();
   container.innerHTML = html;
+
+  // Re-attach click listener lost during innerHTML serialization
+  const retryBtn = document.getElementById("retry-benchmarks-btn");
+  if (retryBtn) {
+    retryBtn.addEventListener("click", retryFailedBenchmarks);
+  }
 }
 
 /**
@@ -636,351 +679,501 @@ async function retryBenchmarksSection() {
 }
 
 /**
- * @description Fetch investment prices using SSE stream.
- * Returns a promise that resolves with the HTML for the prices section.
- * @returns {Promise<string>} HTML string for the prices section
+ * @description Run a single SSE stream for a batch of investment IDs.
+ * Resolves when the stream completes (done or error). Updates existing
+ * DOM rows as price events arrive.
+ * @param {number[]} ids - Investment IDs to scrape in this batch
+ * @param {boolean} skipCurrencyRates - Whether to skip currency rate fetch
+ * @param {Set<number>} completedIds - Set of already-completed investment IDs (mutated)
+ * @returns {Promise<{successCount: number, failCount: number, failedIds: number[], error: string|null}>}
  */
-function fetchPricesStream() {
+function fetchPriceBatch(ids, skipCurrencyRates, completedIds) {
   return new Promise(function (resolve) {
-    const source = new EventSource("/api/scraper/prices/stream");
+    const streamUrl = "/api/scraper/prices/stream?ids=" + ids.join(",") + (skipCurrencyRates ? "&skipCurrencyRates=true" : "");
+    const source = new EventSource(streamUrl);
 
-    let html = '<section class="mb-8">';
-    html += '<div class="bg-white rounded-lg shadow-md p-6">';
-    html += '<h3 class="text-lg font-semibold text-brand-700 mb-4">Investment Prices</h3>';
-
-    let tableHtml = "";
-    let totalCount = 0;
-    let successCount = 0;
+    let batchSuccess = 0;
+    let batchFail = 0;
     let passItemCount = 0;
-    let passSuccessCount = 0;
-    let passFailCount = 0;
-    let passTotal = 0;
     let currentPass = 1;
-    let investments = [];
+    let passTotal = ids.length;
 
-    // Create a temporary container to hold the streaming table
-    const tempContainer = document.createElement("div");
-    tempContainer.id = "prices-temp-container";
+    source.addEventListener("init", function () {
+      // Table rows already exist — nothing to build
+    });
 
-    source.addEventListener("init", function (event) {
+    source.addEventListener("backfill", function (event) {
       const data = JSON.parse(event.data);
-      totalCount = data.total;
-      passTotal = data.total;
-      investments = data.investments;
+      setProgress(data.message);
+    });
 
-      if (totalCount === 0) {
-        tempContainer.innerHTML = '<p class="text-brand-500">No investments with URL and selector configured.</p>';
-        return;
+    source.addEventListener("backfill_progress", function (event) {
+      const data = JSON.parse(event.data);
+      if (data.message) {
+        setProgress("Backfill: " + data.message);
       }
-
-      // Build initial table with pending rows
-      let initHtml = '<div class="overflow-x-auto">';
-      initHtml += '<table class="w-full text-left border-collapse">';
-      initHtml += "<thead>";
-      initHtml += '<tr class="border-b-2 border-brand-200">';
-      initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Investment</th>';
-      initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Currency</th>';
-      initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Status</th>';
-      initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Raw Text</th>';
-      initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700 text-right">Price</th>';
-      initHtml += "</tr>";
-      initHtml += "</thead>";
-      initHtml += '<tbody id="prices-tbody">';
-
-      for (let i = 0; i < investments.length; i++) {
-        initHtml += buildPendingPriceRow(investments[i], i);
-      }
-
-      initHtml += "</tbody></table></div>";
-      initHtml += '<p id="prices-footer" class="text-sm text-brand-400 mt-2"></p>';
-
-      tempContainer.innerHTML = initHtml;
-
-      // Append to section container so DOM updates work during streaming
-      const sectionContainer = document.getElementById("section-prices") || document.getElementById("results-container");
-      sectionContainer.appendChild(tempContainer);
     });
 
     source.addEventListener("retry_pass", function (event) {
       const passInfo = JSON.parse(event.data);
       currentPass = passInfo.pass;
       passItemCount = 0;
-      passSuccessCount = 0;
-      passFailCount = 0;
       passTotal = passInfo.retryCount;
-      setProgress("Pass " + passInfo.pass + " of " + passInfo.maxPasses + ": re-trying " + passInfo.retryCount + " failed investment" + (passInfo.retryCount === 1 ? "" : "s") + "...");
-
-      // Reset the status of failed rows to show they are being retried
-      for (const inv of investments) {
-        const row = document.getElementById("price-row-" + inv.investmentId);
-        if (!row) continue;
-        const cells = row.querySelectorAll("td");
-        if (cells.length < 3) continue;
-        const statusText = cells[2].textContent || "";
-        if (statusText.indexOf("Failed") !== -1) {
-          cells[2].innerHTML = '<span class="text-sm text-amber-600 font-medium">' + spinnerHtml() + " Retrying (pass " + passInfo.pass + ")</span>";
-        }
-      }
     });
 
     source.addEventListener("price", function (event) {
       const price = JSON.parse(event.data);
       passItemCount++;
       if (price.success) {
-        successCount++;
-        passSuccessCount++;
+        batchSuccess++;
+        completedIds.add(price.investmentId);
       } else {
-        passFailCount++;
+        batchFail++;
       }
       updatePriceRow(price);
 
-      // Build a progress message showing pass progress and success/fail counts
-      let progressMsg = "";
-      if (currentPass === 1) {
-        progressMsg = "Fetching investment prices... " + passItemCount + " of " + passTotal;
-      } else {
-        progressMsg = "Pass " + currentPass + ": re-trying failed prices... " + passItemCount + " of " + passTotal;
+      // Update progress with batch context
+      let progressMsg = "Fetching investment prices... " + completedIds.size + " of " + passTotal;
+      if (currentPass > 1) {
+        progressMsg = "Pass " + currentPass + ": re-trying... " + passItemCount + " of " + passTotal;
       }
-      progressMsg += " (" + passSuccessCount + " OK";
-      if (passFailCount > 0) {
-        progressMsg += ", " + passFailCount + " failed";
-      }
-      progressMsg += ")";
       setProgress(progressMsg);
     });
 
     source.addEventListener("done", function (event) {
       const data = JSON.parse(event.data);
       source.close();
-
-      // Store failed IDs for retry functionality
-      failedInvestmentIds = data.failedIds || [];
-
-      // Update footer with retry button if there are failures
-      const footerEl = document.getElementById("prices-footer");
-      if (footerEl) {
-        let footerText = data.successCount + " of " + data.total + " price" + (data.total === 1 ? "" : "s") + " fetched successfully";
-        footerEl.textContent = footerText;
-
-        // Add retry button if there are failures
-        if (failedInvestmentIds.length > 0) {
-          const retryBtn = document.createElement("button");
-          retryBtn.id = "retry-prices-btn";
-          retryBtn.className = "ml-4 px-3 py-1 text-sm bg-amber-500 hover:bg-amber-600 text-white rounded";
-          retryBtn.textContent = "Retry " + failedInvestmentIds.length + " Failed";
-          retryBtn.addEventListener("click", retryFailedPrices);
-          footerEl.appendChild(retryBtn);
-        }
-      }
-
-      // Remove temp container and capture its HTML
-      const temp = document.getElementById("prices-temp-container");
-      if (temp) {
-        tableHtml = temp.innerHTML;
-        temp.remove();
-      }
-
-      html += tableHtml;
-      html += "</div></section>";
-      resolve(html);
+      resolve({
+        successCount: data.successCount,
+        failCount: data.failCount,
+        failedIds: data.failedIds || [],
+        error: null,
+      });
     });
 
-    source.addEventListener("error", function (event) {
+    source.addEventListener("error", function () {
       source.close();
-
-      // Remove temp container if it exists
-      const temp = document.getElementById("prices-temp-container");
-      if (temp) temp.remove();
-
-      // Provide more detail about the error state
-      let errorMsg = "Error connecting to price fetching service.";
-      if (source.readyState === EventSource.CLOSED) {
-        errorMsg += " Connection was closed unexpectedly.";
-      }
-      if (passItemCount > 0) {
-        errorMsg += " (" + passItemCount + " of " + passTotal + " fetched before error)";
-      }
-
-      html += '<p class="text-error">' + errorMsg + "</p>";
-      html += '<p class="mt-3"><button onclick="retryPricesSection()" class="bg-amber-500 hover:bg-amber-600 text-white rounded px-3 py-1 text-sm">Retry Investment Prices</button></p>';
-      html += "</div></section>";
-      resolve(html);
+      // Work out which IDs from this batch were not completed
+      const batchFailedIds = ids.filter(function (id) { return !completedIds.has(id); });
+      resolve({
+        successCount: batchSuccess,
+        failCount: batchFailedIds.length,
+        failedIds: batchFailedIds,
+        error: "Connection dropped",
+      });
     });
   });
 }
 
 /**
- * @description Fetch benchmark values using SSE stream.
- * Returns a promise that resolves with the HTML for the benchmarks section.
- * @returns {Promise<string>} HTML string for the benchmarks section
+ * @description Sleep for a given number of milliseconds (client-side).
+ * @param {number} ms - Milliseconds to sleep
+ * @returns {Promise<void>}
  */
-function fetchBenchmarksStream() {
+function clientSleep(ms) {
   return new Promise(function (resolve) {
-    const source = new EventSource("/api/scraper/benchmarks/stream");
+    setTimeout(resolve, ms);
+  });
+}
 
-    let html = '<section class="mb-8">';
-    html += '<div class="bg-white rounded-lg shadow-md p-6">';
-    html += '<h3 class="text-lg font-semibold text-brand-700 mb-4">Benchmark Values</h3>';
+/**
+ * @description Fetch investment prices in batches using separate SSE streams.
+ * Each batch opens a fresh connection to the server, which launches a fresh
+ * browser session. Between batches, a cooldown countdown is shown to avoid
+ * rate-limiting by target websites.
+ * @returns {Promise<string>} HTML string for the prices section
+ */
+async function fetchPricesStream() {
+  // Fetch the price method from server config
+  let priceMethod = "scrape";
+  try {
+    const configResult = await apiRequest("/api/config/price-method");
+    if (configResult.ok) {
+      priceMethod = configResult.data.priceMethod || "scrape";
+    }
+  } catch {
+    // Fall back to scrape
+  }
+  const methodLabel = priceMethod === "api" ? "Investment Prices (Morningstar API)" : "Investment Prices";
 
-    let tableHtml = "";
-    let totalCount = 0;
-    let successCount = 0;
+  let html = '<section class="mb-8">';
+  html += '<div class="bg-white rounded-lg shadow-md p-6">';
+  html += '<h3 class="text-lg font-semibold text-brand-700 mb-4">' + escapeHtml(methodLabel) + "</h3>";
+
+  // Step 1: Get the full investment list and batch config
+  const listUrl = "/api/scraper/prices/list";
+  const listResult = await apiRequest(listUrl);
+  if (!listResult.ok) {
+    html += '<p class="text-error">Failed to get investment list: ' + escapeHtml(listResult.data.error || "Unknown error") + "</p>";
+    html += '<p class="mt-3"><button onclick="retryPricesSection()" class="bg-amber-500 hover:bg-amber-600 text-white rounded px-3 py-1 text-sm">Retry Investment Prices</button></p>';
+    html += "</div></section>";
+    return html;
+  }
+
+  const allInvestments = listResult.data.investments;
+  const batchSize = listResult.data.batchSize || 8;
+  const cooldownSeconds = listResult.data.cooldownSeconds || 120;
+  const totalCount = allInvestments.length;
+
+  if (totalCount === 0) {
+    const noInvestmentsMsg = priceMethod === "api"
+      ? "No investments configured for automatic pricing."
+      : "No investments with URL and selector configured.";
+    html += '<p class="text-brand-500">' + escapeHtml(noInvestmentsMsg) + "</p>";
+    html += "</div></section>";
+    return html;
+  }
+
+  // Step 2: Build the full table with all investments as "pending"
+  const tempContainer = document.createElement("div");
+  tempContainer.id = "prices-temp-container";
+
+  let initHtml = '<div class="overflow-x-auto">';
+  initHtml += '<table class="w-full text-left border-collapse">';
+  initHtml += "<thead>";
+  initHtml += '<tr class="border-b-2 border-brand-200">';
+  initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Investment</th>';
+  initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Currency</th>';
+  initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Status</th>';
+  initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Raw Text</th>';
+  initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700 text-right">Price</th>';
+  initHtml += "</tr>";
+  initHtml += "</thead>";
+  initHtml += '<tbody id="prices-tbody">';
+
+  for (let i = 0; i < allInvestments.length; i++) {
+    initHtml += buildPendingPriceRow(allInvestments[i], i);
+  }
+
+  initHtml += "</tbody></table></div>";
+  initHtml += '<p id="prices-footer" class="text-sm text-brand-400 mt-2"></p>';
+
+  tempContainer.innerHTML = initHtml;
+  const sectionContainer = document.getElementById("section-prices") || document.getElementById("results-container");
+  sectionContainer.appendChild(tempContainer);
+
+  // Step 3: Split investments into batches and scrape each with a fresh stream
+  const allIds = allInvestments.map(function (inv) { return inv.investmentId; });
+  const completedInvestmentIds = new Set();
+  let totalSuccess = 0;
+  let totalFail = 0;
+  const allFailedIds = [];
+
+  const numBatches = Math.ceil(allIds.length / batchSize);
+
+  for (let batchIndex = 0; batchIndex < numBatches; batchIndex++) {
+    const batchStart = batchIndex * batchSize;
+    const batchIds = allIds.slice(batchStart, batchStart + batchSize);
+    const batchNum = batchIndex + 1;
+    const isFirstBatch = batchIndex === 0;
+
+    setProgress("Batch " + batchNum + " of " + numBatches + ": fetching prices for " + batchIds.length + " investment" + (batchIds.length === 1 ? "" : "s") + "...");
+
+    // Mark this batch's rows as "in progress"
+    for (const id of batchIds) {
+      const row = document.getElementById("price-row-" + id);
+      if (row) {
+        const cells = row.querySelectorAll("td");
+        if (cells.length >= 3) {
+          cells[2].innerHTML = '<span class="text-sm text-brand-400">' + spinnerHtml() + " Fetching...</span>";
+        }
+      }
+    }
+
+    // Open a fresh SSE stream for this batch
+    // First batch fetches currency rates; subsequent batches skip them
+    const batchResult = await fetchPriceBatch(batchIds, !isFirstBatch, completedInvestmentIds);
+
+    totalSuccess += batchResult.successCount;
+    totalFail += batchResult.failCount;
+    if (batchResult.failedIds.length > 0) {
+      for (const id of batchResult.failedIds) {
+        allFailedIds.push(id);
+      }
+    }
+
+    // Cooldown between batches (skip after the last batch)
+    if (batchIndex < numBatches - 1 && cooldownSeconds > 0) {
+      let remaining = cooldownSeconds;
+      setProgress("Batch " + batchNum + " of " + numBatches + " complete (" + completedInvestmentIds.size + " of " + totalCount + " done). Cooldown: " + remaining + "s...");
+
+      const countdownId = setInterval(function () {
+        remaining--;
+        if (remaining > 0) {
+          setProgress("Batch " + batchNum + " of " + numBatches + " complete (" + completedInvestmentIds.size + " of " + totalCount + " done). Cooldown: " + remaining + "s...");
+        }
+      }, 1000);
+
+      await clientSleep(cooldownSeconds * 1000);
+      clearInterval(countdownId);
+      setProgress("Starting batch " + (batchNum + 1) + "...");
+    }
+  }
+
+  // Step 4: Build final results
+  failedInvestmentIds = allFailedIds;
+
+  const footerEl = document.getElementById("prices-footer");
+  if (footerEl) {
+    let footerText = totalSuccess + " of " + totalCount + " price" + (totalCount === 1 ? "" : "s") + " fetched successfully";
+    if (allFailedIds.length > 0) {
+      footerText += " (" + allFailedIds.length + " failed)";
+    }
+    footerEl.textContent = footerText;
+
+    if (allFailedIds.length > 0) {
+      const retryBtn = document.createElement("button");
+      retryBtn.id = "retry-prices-btn";
+      retryBtn.className = "ml-4 px-3 py-1 text-sm bg-amber-500 hover:bg-amber-600 text-white rounded";
+      retryBtn.textContent = "Retry " + allFailedIds.length + " Failed";
+      retryBtn.addEventListener("click", retryFailedPrices);
+      footerEl.appendChild(retryBtn);
+    }
+  }
+
+  // Capture table HTML and clean up temp container
+  const temp = document.getElementById("prices-temp-container");
+  let tableHtml = "";
+  if (temp) {
+    tableHtml = temp.innerHTML;
+    temp.remove();
+  }
+
+  html += tableHtml;
+  html += "</div></section>";
+  return html;
+}
+
+/**
+ * @description Run a single SSE stream for a batch of benchmark IDs.
+ * Resolves when the stream completes (done or error). Updates existing
+ * DOM rows as benchmark events arrive.
+ * @param {number[]} ids - Benchmark IDs to scrape in this batch
+ * @param {Set<number>} completedIds - Set of already-completed benchmark IDs (mutated)
+ * @returns {Promise<{successCount: number, failCount: number, failedIds: number[], error: string|null}>}
+ */
+function fetchBenchmarkBatch(ids, completedIds) {
+  return new Promise(function (resolve) {
+    const streamUrl = "/api/scraper/benchmarks/stream?ids=" + ids.join(",");
+    const source = new EventSource(streamUrl);
+
+    let batchSuccess = 0;
+    let batchFail = 0;
     let passItemCount = 0;
-    let passSuccessCount = 0;
-    let passFailCount = 0;
-    let passTotal = 0;
     let currentPass = 1;
-    let benchmarks = [];
+    let passTotal = ids.length;
 
-    // Create a temporary container to hold the streaming table
-    const tempContainer = document.createElement("div");
-    tempContainer.id = "benchmarks-temp-container";
+    source.addEventListener("init", function () {
+      // Table rows already exist — nothing to build
+    });
 
-    source.addEventListener("init", function (event) {
+    source.addEventListener("backfill", function (event) {
       const data = JSON.parse(event.data);
-      totalCount = data.total;
-      passTotal = data.total;
-      benchmarks = data.benchmarks;
+      setProgress(data.message);
+    });
 
-      if (totalCount === 0) {
-        tempContainer.innerHTML = '<p class="text-brand-500">No benchmarks with URL and selector configured.</p>';
-        return;
+    source.addEventListener("backfill_progress", function (event) {
+      const data = JSON.parse(event.data);
+      if (data.message) {
+        setProgress("Backfill: " + data.message);
       }
-
-      // Build initial table with pending rows
-      let initHtml = '<div class="overflow-x-auto">';
-      initHtml += '<table class="w-full text-left border-collapse">';
-      initHtml += "<thead>";
-      initHtml += '<tr class="border-b-2 border-brand-200">';
-      initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Benchmark</th>';
-      initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Type</th>';
-      initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Status</th>';
-      initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Raw Text</th>';
-      initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700 text-right">Value</th>';
-      initHtml += "</tr>";
-      initHtml += "</thead>";
-      initHtml += '<tbody id="benchmarks-tbody">';
-
-      for (let i = 0; i < benchmarks.length; i++) {
-        initHtml += buildPendingBenchmarkRow(benchmarks[i], i);
-      }
-
-      initHtml += "</tbody></table></div>";
-      initHtml += '<p id="benchmarks-footer" class="text-sm text-brand-400 mt-2"></p>';
-
-      tempContainer.innerHTML = initHtml;
-
-      // Append to section container so DOM updates work during streaming
-      const sectionContainer = document.getElementById("section-benchmarks") || document.getElementById("results-container");
-      sectionContainer.appendChild(tempContainer);
     });
 
     source.addEventListener("retry_pass", function (event) {
       const passInfo = JSON.parse(event.data);
       currentPass = passInfo.pass;
       passItemCount = 0;
-      passSuccessCount = 0;
-      passFailCount = 0;
       passTotal = passInfo.retryCount;
-      setProgress("Pass " + passInfo.pass + " of " + passInfo.maxPasses + ": re-trying " + passInfo.retryCount + " failed benchmark" + (passInfo.retryCount === 1 ? "" : "s") + "...");
-
-      // Reset the status of failed rows to show they are being retried
-      for (const bm of benchmarks) {
-        const row = document.getElementById("benchmark-row-" + bm.benchmarkId);
-        if (!row) continue;
-        const cells = row.querySelectorAll("td");
-        if (cells.length < 3) continue;
-        const statusText = cells[2].textContent || "";
-        if (statusText.indexOf("Failed") !== -1) {
-          cells[2].innerHTML = '<span class="text-sm text-amber-600 font-medium">' + spinnerHtml() + " Retrying (pass " + passInfo.pass + ")</span>";
-        }
-      }
     });
 
     source.addEventListener("benchmark", function (event) {
       const benchmark = JSON.parse(event.data);
       passItemCount++;
       if (benchmark.success) {
-        successCount++;
-        passSuccessCount++;
+        batchSuccess++;
+        completedIds.add(benchmark.benchmarkId);
       } else {
-        passFailCount++;
+        batchFail++;
       }
       updateBenchmarkRow(benchmark);
 
-      // Build a progress message showing pass progress and success/fail counts
-      let progressMsg = "";
-      if (currentPass === 1) {
-        progressMsg = "Fetching benchmark values... " + passItemCount + " of " + passTotal;
-      } else {
-        progressMsg = "Pass " + currentPass + ": re-trying failed benchmarks... " + passItemCount + " of " + passTotal;
+      let progressMsg = "Fetching benchmark values... " + completedIds.size + " of " + passTotal;
+      if (currentPass > 1) {
+        progressMsg = "Pass " + currentPass + ": re-trying... " + passItemCount + " of " + passTotal;
       }
-      progressMsg += " (" + passSuccessCount + " OK";
-      if (passFailCount > 0) {
-        progressMsg += ", " + passFailCount + " failed";
-      }
-      progressMsg += ")";
       setProgress(progressMsg);
     });
 
     source.addEventListener("done", function (event) {
       const data = JSON.parse(event.data);
       source.close();
-
-      // Store failed IDs for retry functionality
-      failedBenchmarkIds = data.failedIds || [];
-
-      // Update footer with retry button if there are failures
-      const footerEl = document.getElementById("benchmarks-footer");
-      if (footerEl) {
-        let footerText = data.successCount + " of " + data.total + " benchmark" + (data.total === 1 ? "" : "s") + " fetched successfully";
-        footerEl.textContent = footerText;
-
-        // Add retry button if there are failures
-        if (failedBenchmarkIds.length > 0) {
-          const retryBtn = document.createElement("button");
-          retryBtn.id = "retry-benchmarks-btn";
-          retryBtn.className = "ml-4 px-3 py-1 text-sm bg-amber-500 hover:bg-amber-600 text-white rounded";
-          retryBtn.textContent = "Retry " + failedBenchmarkIds.length + " Failed";
-          retryBtn.addEventListener("click", retryFailedBenchmarks);
-          footerEl.appendChild(retryBtn);
-        }
-      }
-
-      // Remove temp container and capture its HTML
-      const temp = document.getElementById("benchmarks-temp-container");
-      if (temp) {
-        tableHtml = temp.innerHTML;
-        temp.remove();
-      }
-
-      html += tableHtml;
-      html += "</div></section>";
-      resolve(html);
+      resolve({
+        successCount: data.successCount,
+        failCount: data.failCount,
+        failedIds: data.failedIds || [],
+        error: null,
+      });
     });
 
-    source.addEventListener("error", function (event) {
+    source.addEventListener("error", function () {
       source.close();
-
-      // Remove temp container if it exists
-      const temp = document.getElementById("benchmarks-temp-container");
-      if (temp) temp.remove();
-
-      // Provide more detail about the error state
-      let errorMsg = "Error connecting to benchmark fetching service.";
-      if (source.readyState === EventSource.CLOSED) {
-        errorMsg += " Connection was closed unexpectedly.";
-      }
-      if (passItemCount > 0) {
-        errorMsg += " (" + passItemCount + " of " + passTotal + " fetched before error)";
-      }
-
-      html += '<p class="text-error">' + errorMsg + "</p>";
-      html += '<p class="mt-3"><button onclick="retryBenchmarksSection()" class="bg-amber-500 hover:bg-amber-600 text-white rounded px-3 py-1 text-sm">Retry Benchmark Values</button></p>';
-      html += "</div></section>";
-      resolve(html);
+      const batchFailedIds = ids.filter(function (id) { return !completedIds.has(id); });
+      resolve({
+        successCount: batchSuccess,
+        failCount: batchFailedIds.length,
+        failedIds: batchFailedIds,
+        error: "Connection dropped",
+      });
     });
   });
+}
+
+/**
+ * @description Fetch benchmark values in batches using separate SSE streams.
+ * Each batch opens a fresh connection to the server, which launches a fresh
+ * browser session. Between batches, a cooldown countdown is shown.
+ * @returns {Promise<string>} HTML string for the benchmarks section
+ */
+async function fetchBenchmarksStream() {
+  let html = '<section class="mb-8">';
+  html += '<div class="bg-white rounded-lg shadow-md p-6">';
+  html += '<h3 class="text-lg font-semibold text-brand-700 mb-4">Benchmark Values</h3>';
+
+  // Step 1: Get the full benchmark list and batch config
+  const listResult = await apiRequest("/api/scraper/benchmarks/list");
+  if (!listResult.ok) {
+    html += '<p class="text-error">Failed to get benchmark list: ' + escapeHtml(listResult.data.error || "Unknown error") + "</p>";
+    html += '<p class="mt-3"><button onclick="retryBenchmarksSection()" class="bg-amber-500 hover:bg-amber-600 text-white rounded px-3 py-1 text-sm">Retry Benchmark Values</button></p>';
+    html += "</div></section>";
+    return html;
+  }
+
+  const allBenchmarks = listResult.data.benchmarks;
+  const batchSize = listResult.data.batchSize || 8;
+  const cooldownSeconds = listResult.data.cooldownSeconds || 120;
+  const totalCount = allBenchmarks.length;
+
+  if (totalCount === 0) {
+    html += '<p class="text-brand-500">No benchmarks with URL and selector configured.</p>';
+    html += "</div></section>";
+    return html;
+  }
+
+  // Step 2: Build the full table with all benchmarks as "pending"
+  const tempContainer = document.createElement("div");
+  tempContainer.id = "benchmarks-temp-container";
+
+  let initHtml = '<div class="overflow-x-auto">';
+  initHtml += '<table class="w-full text-left border-collapse">';
+  initHtml += "<thead>";
+  initHtml += '<tr class="border-b-2 border-brand-200">';
+  initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Benchmark</th>';
+  initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Type</th>';
+  initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Status</th>';
+  initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Raw Text</th>';
+  initHtml += '<th class="py-2 px-3 text-sm font-semibold text-brand-700 text-right">Value</th>';
+  initHtml += "</tr>";
+  initHtml += "</thead>";
+  initHtml += '<tbody id="benchmarks-tbody">';
+
+  for (let i = 0; i < allBenchmarks.length; i++) {
+    initHtml += buildPendingBenchmarkRow(allBenchmarks[i], i);
+  }
+
+  initHtml += "</tbody></table></div>";
+  initHtml += '<p id="benchmarks-footer" class="text-sm text-brand-400 mt-2"></p>';
+
+  tempContainer.innerHTML = initHtml;
+  const sectionContainer = document.getElementById("section-benchmarks") || document.getElementById("results-container");
+  sectionContainer.appendChild(tempContainer);
+
+  // Step 3: Split benchmarks into batches and scrape each with a fresh stream
+  const allIds = allBenchmarks.map(function (bm) { return bm.benchmarkId; });
+  const completedBenchmarkIds = new Set();
+  let totalSuccess = 0;
+  let totalFail = 0;
+  const allFailedIds = [];
+
+  const numBatches = Math.ceil(allIds.length / batchSize);
+
+  for (let batchIndex = 0; batchIndex < numBatches; batchIndex++) {
+    const batchStart = batchIndex * batchSize;
+    const batchIds = allIds.slice(batchStart, batchStart + batchSize);
+    const batchNum = batchIndex + 1;
+
+    setProgress("Batch " + batchNum + " of " + numBatches + ": fetching values for " + batchIds.length + " benchmark" + (batchIds.length === 1 ? "" : "s") + "...");
+
+    // Mark this batch's rows as "in progress"
+    for (const id of batchIds) {
+      const row = document.getElementById("benchmark-row-" + id);
+      if (row) {
+        const cells = row.querySelectorAll("td");
+        if (cells.length >= 3) {
+          cells[2].innerHTML = '<span class="text-sm text-brand-400">' + spinnerHtml() + " Fetching...</span>";
+        }
+      }
+    }
+
+    const batchResult = await fetchBenchmarkBatch(batchIds, completedBenchmarkIds);
+
+    totalSuccess += batchResult.successCount;
+    totalFail += batchResult.failCount;
+    if (batchResult.failedIds.length > 0) {
+      for (const id of batchResult.failedIds) {
+        allFailedIds.push(id);
+      }
+    }
+
+    // Cooldown between batches (skip after the last batch)
+    if (batchIndex < numBatches - 1 && cooldownSeconds > 0) {
+      let remaining = cooldownSeconds;
+      setProgress("Batch " + batchNum + " of " + numBatches + " complete (" + completedBenchmarkIds.size + " of " + totalCount + " done). Cooldown: " + remaining + "s...");
+
+      const countdownId = setInterval(function () {
+        remaining--;
+        if (remaining > 0) {
+          setProgress("Batch " + batchNum + " of " + numBatches + " complete (" + completedBenchmarkIds.size + " of " + totalCount + " done). Cooldown: " + remaining + "s...");
+        }
+      }, 1000);
+
+      await clientSleep(cooldownSeconds * 1000);
+      clearInterval(countdownId);
+      setProgress("Starting batch " + (batchNum + 1) + "...");
+    }
+  }
+
+  // Step 4: Build final results
+  failedBenchmarkIds = allFailedIds;
+
+  const footerEl = document.getElementById("benchmarks-footer");
+  if (footerEl) {
+    let footerText = totalSuccess + " of " + totalCount + " benchmark" + (totalCount === 1 ? "" : "s") + " fetched successfully";
+    if (allFailedIds.length > 0) {
+      footerText += " (" + allFailedIds.length + " failed)";
+    }
+    footerEl.textContent = footerText;
+
+    if (allFailedIds.length > 0) {
+      const retryBtn = document.createElement("button");
+      retryBtn.id = "retry-benchmarks-btn";
+      retryBtn.className = "ml-4 px-3 py-1 text-sm bg-amber-500 hover:bg-amber-600 text-white rounded";
+      retryBtn.textContent = "Retry " + allFailedIds.length + " Failed";
+      retryBtn.addEventListener("click", retryFailedBenchmarks);
+      footerEl.appendChild(retryBtn);
+    }
+  }
+
+  // Capture table HTML and clean up temp container
+  const temp = document.getElementById("benchmarks-temp-container");
+  let tableHtml = "";
+  if (temp) {
+    tableHtml = temp.innerHTML;
+    temp.remove();
+  }
+
+  html += tableHtml;
+  html += "</div></section>";
+  return html;
 }
 
 /**
@@ -1219,7 +1412,7 @@ function buildCurrentPricesSection(prices) {
       html += '<tr class="' + rowClass + ' border-b border-brand-100">';
       html += '<td class="py-2 px-3 text-base">' + escapeHtml(p.description) + "</td>";
       html += '<td class="py-2 px-3 text-base">' + escapeHtml(p.currency) + "</td>";
-      html += '<td class="py-2 px-3 text-base text-right font-mono">' + formatPrice(p.price) + "</td>";
+      html += '<td class="py-2 px-3 text-base text-right font-mono">' + formatPrice(p.price, p.currency) + "</td>";
       html += '<td class="py-2 px-3 text-sm text-brand-500">' + (p.priceDate ? escapeHtml(formatDisplayDate(p.priceDate)) : "No data") + "</td>";
       html += "</tr>";
     }
@@ -1282,13 +1475,11 @@ function buildCurrentBenchmarksSection(benchmarks) {
  */
 async function showCurrent() {
   const showBtn = document.getElementById("show-current-btn");
-  const fetchBtn = document.getElementById("fetch-all-btn");
   const resultsContainer = document.getElementById("results-container");
 
-  // Disable both buttons while loading
-  showBtn.disabled = true;
+  // Disable all buttons while loading
+  setAllFetchButtonsDisabled(true);
   showBtn.textContent = "Loading...";
-  fetchBtn.disabled = true;
   resultsContainer.innerHTML = "";
 
   try {
@@ -1316,16 +1507,247 @@ async function showCurrent() {
     resultsContainer.innerHTML += "</div>";
   } finally {
     // Re-enable buttons
-    showBtn.disabled = false;
+    setAllFetchButtonsDisabled(false);
     showBtn.textContent = "Show Current";
-    fetchBtn.disabled = false;
   }
+}
+
+/**
+ * @description Fetch only currency rates (independent of prices/benchmarks).
+ */
+async function fetchCurrenciesOnly() {
+  const btn = document.getElementById("fetch-currencies-btn");
+  const progressDiv = document.getElementById("scrape-progress");
+  const resultsContainer = document.getElementById("results-container");
+
+  setAllFetchButtonsDisabled(true);
+  btn.textContent = "Fetching...";
+  progressDiv.classList.remove("hidden");
+  setProgress("Fetching currency exchange rates...");
+  resultsContainer.innerHTML = '<div id="section-currencies"></div>';
+
+  try {
+    await runCurrenciesSection();
+  } catch (err) {
+    resultsContainer.insertAdjacentHTML("beforeend", '<div class="bg-red-50 border border-red-300 text-error rounded-lg px-4 py-3 mb-4">' + '<p class="font-semibold">Error fetching currencies</p>' + '<p class="text-sm mt-1">' + escapeHtml(err.message) + "</p>" + "</div>");
+  }
+
+  setAllFetchButtonsDisabled(false);
+  btn.textContent = "Fetch Currencies";
+  progressDiv.classList.add("hidden");
+  await Promise.all([loadLastScrapeTimes(), loadLatestFailures()]);
+}
+
+/**
+ * @description Fetch only investment prices (currencies are fetched server-side first).
+ */
+async function fetchPricesOnly() {
+  const btn = document.getElementById("fetch-prices-btn");
+  const progressDiv = document.getElementById("scrape-progress");
+  const resultsContainer = document.getElementById("results-container");
+
+  setAllFetchButtonsDisabled(true);
+  btn.textContent = "Fetching...";
+  progressDiv.classList.remove("hidden");
+  setProgress("Fetching investment prices...");
+  resultsContainer.innerHTML = '<div id="section-currencies"></div><div id="section-prices"></div>';
+
+  try {
+    // The prices SSE stream fetches currency rates server-side and returns them
+    // in the init event, so the currencies section is populated automatically.
+    await runPricesSection();
+  } catch (err) {
+    resultsContainer.insertAdjacentHTML("beforeend", '<div class="bg-red-50 border border-red-300 text-error rounded-lg px-4 py-3 mb-4">' + '<p class="font-semibold">Error fetching prices</p>' + '<p class="text-sm mt-1">' + escapeHtml(err.message) + "</p>" + "</div>");
+  }
+
+  setAllFetchButtonsDisabled(false);
+  btn.textContent = "Fetch Prices";
+  progressDiv.classList.add("hidden");
+  await Promise.all([loadLastScrapeTimes(), loadLatestFailures()]);
+}
+
+/**
+ * @description Fetch only benchmark values.
+ */
+async function fetchBenchmarksOnly() {
+  const btn = document.getElementById("fetch-benchmarks-btn");
+  const progressDiv = document.getElementById("scrape-progress");
+  const resultsContainer = document.getElementById("results-container");
+
+  setAllFetchButtonsDisabled(true);
+  btn.textContent = "Fetching...";
+  progressDiv.classList.remove("hidden");
+  setProgress("Fetching benchmark values...");
+  resultsContainer.innerHTML = '<div id="section-benchmarks"></div>';
+
+  try {
+    await runBenchmarksSection();
+  } catch (err) {
+    resultsContainer.insertAdjacentHTML("beforeend", '<div class="bg-red-50 border border-red-300 text-error rounded-lg px-4 py-3 mb-4">' + '<p class="font-semibold">Error fetching benchmarks</p>' + '<p class="text-sm mt-1">' + escapeHtml(err.message) + "</p>" + "</div>");
+  }
+
+  setAllFetchButtonsDisabled(false);
+  btn.textContent = "Fetch Benchmarks";
+  progressDiv.classList.add("hidden");
+  await Promise.all([loadLastScrapeTimes(), loadLatestFailures()]);
+}
+
+/**
+ * @description Cached latest failures data from the API.
+ * Used by retry-from-DB buttons.
+ * @type {{investmentFailures: Object[], benchmarkFailures: Object[]}}
+ */
+let latestFailuresData = { investmentFailures: [], benchmarkFailures: [] };
+
+/**
+ * @description Load latest failures from the DB and show/hide the retry section.
+ * Called on page load and after every fetch/retry operation.
+ */
+async function loadLatestFailures() {
+  try {
+    const result = await apiRequest("/api/scraper/latest-failures");
+    if (!result.ok) return;
+
+    latestFailuresData = result.data;
+    const section = document.getElementById("retry-failures-section");
+    const priceBtn = document.getElementById("retry-failed-prices-btn");
+    const benchmarkBtn = document.getElementById("retry-failed-benchmarks-btn");
+    const summary = document.getElementById("retry-failures-summary");
+
+    const priceCount = latestFailuresData.investmentFailures.length;
+    const benchmarkCount = latestFailuresData.benchmarkFailures.length;
+
+    if (priceCount === 0 && benchmarkCount === 0) {
+      section.classList.add("hidden");
+      return;
+    }
+
+    // Build summary text
+    const parts = [];
+    if (priceCount > 0) {
+      parts.push(priceCount + " investment price" + (priceCount === 1 ? "" : "s"));
+    }
+    if (benchmarkCount > 0) {
+      parts.push(benchmarkCount + " benchmark value" + (benchmarkCount === 1 ? "" : "s"));
+    }
+    summary.textContent = parts.join(" and ") + " failed on the most recent fetch.";
+
+    // Show/hide individual retry buttons
+    if (priceCount > 0) {
+      priceBtn.textContent = "Retry " + priceCount + " Failed Price" + (priceCount === 1 ? "" : "s");
+      priceBtn.classList.remove("hidden");
+    } else {
+      priceBtn.classList.add("hidden");
+    }
+
+    if (benchmarkCount > 0) {
+      benchmarkBtn.textContent = "Retry " + benchmarkCount + " Failed Benchmark" + (benchmarkCount === 1 ? "" : "s");
+      benchmarkBtn.classList.remove("hidden");
+    } else {
+      benchmarkBtn.classList.add("hidden");
+    }
+
+    section.classList.remove("hidden");
+  } catch {
+    // Silently fail — this is a non-critical enhancement
+  }
+}
+
+/**
+ * @description Retry failed investment prices using IDs from the latest failures query.
+ */
+async function retryFailedPricesFromDb() {
+  const ids = latestFailuresData.investmentFailures.map(function (f) {
+    return f.reference_id;
+  });
+  if (ids.length === 0) return;
+
+  const progressDiv = document.getElementById("scrape-progress");
+  const resultsContainer = document.getElementById("results-container");
+
+  setAllFetchButtonsDisabled(true);
+  progressDiv.classList.remove("hidden");
+  setProgress("Retrying " + ids.length + " failed investment price" + (ids.length === 1 ? "" : "s") + "...");
+  resultsContainer.innerHTML = '<div id="section-prices"></div>';
+
+  try {
+    const result = await apiRequest("/api/scraper/prices/retry", {
+      method: "POST",
+      body: { ids: ids },
+    });
+
+    const container = document.getElementById("section-prices");
+    if (result.ok && result.data) {
+      let html = '<section class="mb-8"><div class="bg-white rounded-lg shadow-md p-6">';
+      html += '<h3 class="text-lg font-semibold text-brand-700 mb-4">Retry Results — Investment Prices</h3>';
+      html += "<p class=\"text-sm text-brand-500 mb-3\">" + result.data.successCount + " of " + result.data.total + " succeeded</p>";
+      html += "</div></section>";
+      container.innerHTML = html;
+    } else {
+      container.innerHTML = '<section class="mb-8"><div class="bg-red-50 border border-red-300 text-error rounded-lg px-4 py-3">' + "<p>Retry failed: " + escapeHtml(result.error || "Unknown error") + "</p></div></section>";
+    }
+  } catch (err) {
+    const container = document.getElementById("section-prices");
+    container.innerHTML = '<section class="mb-8"><div class="bg-red-50 border border-red-300 text-error rounded-lg px-4 py-3">' + "<p>Error: " + escapeHtml(err.message) + "</p></div></section>";
+  }
+
+  setAllFetchButtonsDisabled(false);
+  progressDiv.classList.add("hidden");
+  await Promise.all([loadLastScrapeTimes(), loadLatestFailures()]);
+}
+
+/**
+ * @description Retry failed benchmark values using IDs from the latest failures query.
+ */
+async function retryFailedBenchmarksFromDb() {
+  const ids = latestFailuresData.benchmarkFailures.map(function (f) {
+    return f.reference_id;
+  });
+  if (ids.length === 0) return;
+
+  const progressDiv = document.getElementById("scrape-progress");
+  const resultsContainer = document.getElementById("results-container");
+
+  setAllFetchButtonsDisabled(true);
+  progressDiv.classList.remove("hidden");
+  setProgress("Retrying " + ids.length + " failed benchmark value" + (ids.length === 1 ? "" : "s") + "...");
+  resultsContainer.innerHTML = '<div id="section-benchmarks"></div>';
+
+  try {
+    const result = await apiRequest("/api/scraper/benchmarks/retry", {
+      method: "POST",
+      body: { ids: ids },
+    });
+
+    const container = document.getElementById("section-benchmarks");
+    if (result.ok && result.data) {
+      let html = '<section class="mb-8"><div class="bg-white rounded-lg shadow-md p-6">';
+      html += '<h3 class="text-lg font-semibold text-brand-700 mb-4">Retry Results — Benchmark Values</h3>';
+      html += "<p class=\"text-sm text-brand-500 mb-3\">" + result.data.successCount + " of " + result.data.total + " succeeded</p>";
+      html += "</div></section>";
+      container.innerHTML = html;
+    } else {
+      container.innerHTML = '<section class="mb-8"><div class="bg-red-50 border border-red-300 text-error rounded-lg px-4 py-3">' + "<p>Retry failed: " + escapeHtml(result.error || "Unknown error") + "</p></div></section>";
+    }
+  } catch (err) {
+    const container = document.getElementById("section-benchmarks");
+    container.innerHTML = '<section class="mb-8"><div class="bg-red-50 border border-red-300 text-error rounded-lg px-4 py-3">' + "<p>Error: " + escapeHtml(err.message) + "</p></div></section>";
+  }
+
+  setAllFetchButtonsDisabled(false);
+  progressDiv.classList.add("hidden");
+  await Promise.all([loadLastScrapeTimes(), loadLatestFailures()]);
 }
 
 // Initialise the page
 document.addEventListener("DOMContentLoaded", async function () {
-  await Promise.all([loadLastScrapeTimes(), loadScheduleDisplay()]);
+  await Promise.all([loadLastScrapeTimes(), loadScheduleDisplay(), loadLatestFailures()]);
 
   document.getElementById("show-current-btn").addEventListener("click", showCurrent);
   document.getElementById("fetch-all-btn").addEventListener("click", fetchAll);
+  document.getElementById("fetch-currencies-btn").addEventListener("click", fetchCurrenciesOnly);
+  document.getElementById("fetch-prices-btn").addEventListener("click", fetchPricesOnly);
+  document.getElementById("fetch-benchmarks-btn").addEventListener("click", fetchBenchmarksOnly);
+  document.getElementById("retry-failed-prices-btn").addEventListener("click", retryFailedPricesFromDb);
+  document.getElementById("retry-failed-benchmarks-btn").addEventListener("click", retryFailedBenchmarksFromDb);
 });

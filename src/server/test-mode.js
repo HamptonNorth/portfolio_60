@@ -1,5 +1,5 @@
 import { resolve, join } from "node:path";
-import { existsSync, readFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { DATA_DIR } from "../shared/server-constants.js";
 import {
   closeDatabase,
@@ -52,12 +52,10 @@ export function isTestDatabaseFresh() {
  * @returns {boolean} True if creation succeeded
  */
 function createTestDatabase() {
-  // Ensure the test reference directory exists
-  if (!existsSync(TEST_REF_DIR)) {
-    mkdirSync(TEST_REF_DIR, { recursive: true });
-  }
-
-  // Point DB_PATH at the test reference location
+  // Point DB_PATH at the test reference location.
+  // createDatabase() handles directory creation — it must create the
+  // directory itself so that disableCopyOnWrite() is called on btrfs
+  // filesystems (prevents "disk I/O error" under sustained writes).
   const testDbPath = resolve(TEST_REF_DIR, "portfolio60.db");
   process.env.DB_PATH = testDbPath;
   resetDatabasePath();

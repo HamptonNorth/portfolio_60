@@ -93,6 +93,16 @@ export function getBenchmarkDataCount(benchmarkId) {
 }
 
 /**
+ * @description Get total number of value records across all benchmarks.
+ * Used for auto-backfill detection (empty table = first run).
+ * @returns {number} Total count of all benchmark data records
+ */
+export function getTotalBenchmarkDataCount() {
+  const db = getDatabase();
+  return db.query("SELECT COUNT(*) AS count FROM benchmark_data").get().count;
+}
+
+/**
  * @description Get benchmark value on a specific date.
  * @param {number} benchmarkId - The benchmark ID
  * @param {string} benchmarkDate - ISO-8601 date (YYYY-MM-DD)

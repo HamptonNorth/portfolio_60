@@ -5,14 +5,22 @@ import {
   extractDomain as extractPriceDomain,
   calculateDelay as calculatePriceDelay,
 } from "../scrapers/price-scraper.js";
+import { fetchLatestMorningstarPrice, getMorningstarScrapeableInvestments } from "../scrapers/morningstar-price-scraper.js";
 import {
   getScrapeableBenchmarks,
   scrapeSingleBenchmarkValue,
   extractDomain as extractBenchmarkDomain,
   calculateDelay as calculateBenchmarkDelay,
 } from "../scrapers/benchmark-scraper.js";
+import { fetchLatestYahooBenchmarkValue, getYahooScrapeableBenchmarks } from "../scrapers/yahoo-benchmark-scraper.js";
 import { launchBrowser } from "../scrapers/browser-utils.js";
 import { SCRAPE_RETRY_CONFIG } from "../../shared/server-constants.js";
+import { getPriceMethodConfig } from "../config.js";
+import { getTotalPriceCount } from "../db/prices-db.js";
+import { getTotalRateCount } from "../db/currency-rates-db.js";
+import { getTotalBenchmarkDataCount } from "../db/benchmark-data-db.js";
+import { backfillInvestmentPrices, backfillBenchmarkValues, backfillCurrencyRates } from "./historic-backfill.js";
+import { checkpointDatabase } from "../db/connection.js";
 
 /**
  * @description Sleep for a given number of milliseconds.
@@ -90,6 +98,154 @@ export async function runFullScrape(options = {}) {
     if (onCurrencyRates) {
       onCurrencyRates(currencyResult);
     }
+
+    const priceMethod = getPriceMethodConfig();
+
+    // -----------------------------------------------------------------
+    // API method — Morningstar (prices) + Yahoo Finance (benchmarks)
+    // -----------------------------------------------------------------
+    if (priceMethod === "api") {
+      // Auto-backfill empty tables (first run only)
+      if (getTotalRateCount() === 0) {
+        try {
+          await backfillCurrencyRates(function () {});
+          checkpointDatabase();
+        } catch (err) {
+          console.warn("[ScrapeService] Currency rate backfill failed: " + err.message);
+        }
+      }
+
+      if (getTotalPriceCount() === 0) {
+        try {
+          await backfillInvestmentPrices(function () {});
+          checkpointDatabase();
+        } catch (err) {
+          console.warn("[ScrapeService] Price backfill failed: " + err.message);
+        }
+      }
+
+      if (getTotalBenchmarkDataCount() === 0) {
+        try {
+          await backfillBenchmarkValues(function () {});
+          checkpointDatabase();
+        } catch (err) {
+          console.warn("[ScrapeService] Benchmark backfill failed: " + err.message);
+        }
+      }
+
+      // Step 2: Fetch latest investment prices via Morningstar API
+      const investments = getMorningstarScrapeableInvestments();
+      let isFirstPrice = true;
+
+      for (const investment of investments) {
+        // Random delay of 5-30 seconds between API calls
+        if (!isFirstPrice) {
+          const delayMs = Math.floor(Math.random() * 25001) + 5000;
+          await sleep(delayMs);
+        }
+        isFirstPrice = false;
+
+        // Skip manually priced investments
+        if (!investment.morningstarResolvable) {
+          summary.priceFailCount++;
+          summary.failedInvestmentIds.push(investment.id);
+          if (onPriceResult) {
+            onPriceResult({
+              success: false,
+              investmentId: investment.id,
+              description: investment.description,
+              error: "No Morningstar ID — manually priced",
+              errorCode: "MANUALLY_PRICED",
+            });
+          }
+          continue;
+        }
+
+        try {
+          const priceResult = await fetchLatestMorningstarPrice(investment);
+          if (priceResult.success) {
+            summary.priceSuccessCount++;
+          } else {
+            summary.priceFailCount++;
+            summary.failedInvestmentIds.push(investment.id);
+          }
+          if (onPriceResult) {
+            onPriceResult(priceResult);
+          }
+        } catch (err) {
+          summary.priceFailCount++;
+          summary.failedInvestmentIds.push(investment.id);
+          if (onPriceResult) {
+            onPriceResult({
+              success: false,
+              investmentId: investment.id,
+              description: investment.description,
+              error: "Unexpected error: " + err.message,
+              errorCode: "API_ERROR",
+            });
+          }
+        }
+      }
+
+      // Step 3: Fetch latest benchmark values via Yahoo Finance API
+      const benchmarks = getYahooScrapeableBenchmarks();
+      let isFirstBenchmark = true;
+
+      for (const benchmark of benchmarks) {
+        // Random delay of 5-30 seconds between API calls
+        if (!isFirstBenchmark) {
+          const delayMs = Math.floor(Math.random() * 25001) + 5000;
+          await sleep(delayMs);
+        }
+        isFirstBenchmark = false;
+
+        // Skip benchmarks without Yahoo ticker
+        if (!benchmark.yahooResolvable) {
+          summary.benchmarkFailCount++;
+          summary.failedBenchmarkIds.push(benchmark.id);
+          if (onBenchmarkResult) {
+            onBenchmarkResult({
+              success: false,
+              benchmarkId: benchmark.id,
+              description: benchmark.description,
+              error: "No Yahoo Finance ticker — requires web scraping",
+              errorCode: "NO_YAHOO_TICKER",
+            });
+          }
+          continue;
+        }
+
+        try {
+          const benchmarkResult = await fetchLatestYahooBenchmarkValue(benchmark);
+          if (benchmarkResult.success) {
+            summary.benchmarkSuccessCount++;
+          } else {
+            summary.benchmarkFailCount++;
+            summary.failedBenchmarkIds.push(benchmark.id);
+          }
+          if (onBenchmarkResult) {
+            onBenchmarkResult(benchmarkResult);
+          }
+        } catch (err) {
+          summary.benchmarkFailCount++;
+          summary.failedBenchmarkIds.push(benchmark.id);
+          if (onBenchmarkResult) {
+            onBenchmarkResult({
+              success: false,
+              benchmarkId: benchmark.id,
+              description: benchmark.description,
+              error: "Unexpected error: " + err.message,
+              errorCode: "API_ERROR",
+            });
+          }
+        }
+      }
+
+      checkpointDatabase();
+    } else {
+    // -----------------------------------------------------------------
+    // Web scrape method (default) — Playwright browser-based scraping
+    // -----------------------------------------------------------------
 
     // Step 2: Scrape investment prices using breadth-first retry.
     // Pass 1 attempts every investment. Subsequent passes retry only failures.
@@ -185,6 +341,7 @@ export async function runFullScrape(options = {}) {
         previousDomain = currentDomain;
       }
     }
+    } // end of scrape method else block
 
     if (onComplete) {
       onComplete(summary);

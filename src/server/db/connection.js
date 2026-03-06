@@ -1,7 +1,20 @@
 import { Database } from "bun:sqlite";
-import { existsSync, mkdirSync, readFileSync, chmodSync, accessSync, constants as fsConstants } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, chmodSync, accessSync, statfsSync, constants as fsConstants } from "node:fs";
 import { resolve, dirname } from "node:path";
+import { execSync } from "node:child_process";
 import { DB_PATH } from "../../shared/server-constants.js";
+
+/**
+ * @description Btrfs filesystem magic number used by statfs.
+ * Btrfs copy-on-write semantics conflict with SQLite WAL mode,
+ * causing "disk I/O error" under sustained writes.
+ *
+ * Node returns this as unsigned (0x9123683e = 2434729022), but Bun
+ * returns it as a signed 32-bit integer (-1860238274). We check both.
+ * @type {number}
+ */
+const BTRFS_MAGIC = 0x9123683e;
+const BTRFS_MAGIC_SIGNED = BTRFS_MAGIC | 0; // -1860238274 (signed 32-bit)
 
 /**
  * @description Cached resolved path to the database file. Set on first
@@ -33,6 +46,37 @@ function getResolvedDbPath() {
  * @type {Database|null}
  */
 let db = null;
+
+/**
+ * @description Check whether a path is on a btrfs filesystem.
+ * Btrfs copy-on-write conflicts with SQLite WAL mode, causing
+ * "disk I/O error" under sustained writes.
+ * @param {string} dirPath - Directory path to check
+ * @returns {boolean} True if the path is on btrfs
+ */
+function isBtrfs(dirPath) {
+  try {
+    const stats = statfsSync(dirPath);
+    return stats.type === BTRFS_MAGIC || stats.type === BTRFS_MAGIC_SIGNED;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * @description Disable btrfs copy-on-write on a directory using chattr +C.
+ * Only effective on empty directories — existing files keep their CoW setting.
+ * Fails silently on non-btrfs filesystems or if chattr is unavailable.
+ * @param {string} dirPath - Directory path to modify
+ */
+function disableCopyOnWrite(dirPath) {
+  try {
+    execSync("chattr +C " + JSON.stringify(dirPath), { stdio: "ignore" });
+    console.log("[DB] Disabled btrfs copy-on-write on " + dirPath);
+  } catch {
+    // chattr may not be available or may fail on non-btrfs — ignore
+  }
+}
 
 /**
  * @description Check whether the database file exists on disk.
@@ -72,8 +116,20 @@ export function getDatabase() {
   }
 
   db = new Database(dbPath);
-  db.exec("PRAGMA journal_mode = WAL");
+
+  // Btrfs copy-on-write conflicts with SQLite WAL mode, causing
+  // "disk I/O error" under sustained writes (e.g. scraping 20+ prices).
+  // Use DELETE journal mode on btrfs for reliability.
+  const dbDir = dirname(dbPath);
+  if (isBtrfs(dbDir)) {
+    db.exec("PRAGMA journal_mode = DELETE");
+    console.log("[DB] Btrfs detected — using DELETE journal mode");
+  } else {
+    db.exec("PRAGMA journal_mode = WAL");
+  }
+
   db.exec("PRAGMA foreign_keys = ON");
+  db.exec("PRAGMA busy_timeout = 5000");
 
   runMigrations(db);
 
@@ -474,6 +530,18 @@ function runMigrations(database) {
   if (!hasAutoScrape) {
     database.exec("ALTER TABLE investments ADD COLUMN auto_scrape INTEGER NOT NULL DEFAULT 1");
   }
+
+  // Migration 19: Add max_attempts column to scraping_history (v0.13.0)
+  // Records how many attempts were available for a scrape run, so history
+  // shows "succeeded on attempt 2 of 3" or "failed after 3 of 3 attempts".
+  const shCols19 = database.query("PRAGMA table_info(scraping_history)").all();
+  const hasMaxAttempts = shCols19.some(function (col) {
+    return col.name === "max_attempts";
+  });
+
+  if (!hasMaxAttempts) {
+    database.exec("ALTER TABLE scraping_history ADD COLUMN max_attempts INTEGER NOT NULL DEFAULT 1");
+  }
 }
 
 /**
@@ -493,6 +561,9 @@ export function createDatabase() {
   const dbDir = dirname(dbPath);
   if (!existsSync(dbDir)) {
     mkdirSync(dbDir, { recursive: true, mode: 0o700 });
+    // Disable btrfs copy-on-write on new directories so SQLite files
+    // created inside will inherit the no-CoW attribute
+    disableCopyOnWrite(dbDir);
   } else {
     // Ensure existing directory has restrictive permissions
     chmodSync(dbDir, 0o700);
@@ -503,8 +574,17 @@ export function createDatabase() {
 
   // Restrict database file to owner read/write only
   chmodSync(dbPath, 0o600);
-  db.exec("PRAGMA journal_mode = WAL");
+
+  // Btrfs copy-on-write conflicts with SQLite WAL mode
+  if (isBtrfs(dbDir)) {
+    db.exec("PRAGMA journal_mode = DELETE");
+    console.log("[DB] Btrfs detected — using DELETE journal mode");
+  } else {
+    db.exec("PRAGMA journal_mode = WAL");
+  }
+
   db.exec("PRAGMA foreign_keys = ON");
+  db.exec("PRAGMA busy_timeout = 5000");
 
   // Read and execute the schema SQL
   const schemaPath = resolve("src/server/db/schema.sql");
@@ -523,6 +603,22 @@ export function createDatabase() {
  * @description Close the database connection and reset the singleton.
  * Safe to call even if the database is not open.
  */
+/**
+ * @description Run a WAL checkpoint to flush the write-ahead log back into
+ * the main database file. Call this between scraping batches to keep the
+ * WAL file small and avoid "disk I/O error" on subsequent database access.
+ * Best-effort — errors are logged but not thrown.
+ */
+export function checkpointDatabase() {
+  if (db) {
+    try {
+      db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+    } catch (err) {
+      console.warn("[DB] WAL checkpoint failed:", err.message);
+    }
+  }
+}
+
 export function closeDatabase() {
   if (db) {
     try { db.exec("PRAGMA wal_checkpoint(TRUNCATE)"); } catch (_) { /* best effort */ }

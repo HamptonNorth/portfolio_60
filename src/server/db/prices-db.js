@@ -95,6 +95,16 @@ export function getPriceCount(investmentId) {
 }
 
 /**
+ * @description Get total number of price records across all investments.
+ * Used for auto-backfill detection (empty table = first run).
+ * @returns {number} Total count of all price records
+ */
+export function getTotalPriceCount() {
+  const db = getDatabase();
+  return db.query("SELECT COUNT(*) AS count FROM prices").get().count;
+}
+
+/**
  * @description Get price for an investment on a specific date.
  * @param {number} investmentId - The investment ID
  * @param {string} priceDate - ISO-8601 date (YYYY-MM-DD)

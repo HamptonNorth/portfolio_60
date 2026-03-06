@@ -613,10 +613,11 @@ async function lookupMorningstarIdBySecuritySearch(ticker) {
  * @param {string} currencyCode - The investment's currency (e.g. "GBP", "USD")
  * @param {string} startDate - ISO-8601 start date (YYYY-MM-DD)
  * @param {string} endDate - ISO-8601 end date (YYYY-MM-DD)
+ * @param {string} [frequency="weekly"] - Data frequency: "weekly" or "daily"
  * @returns {Promise<{date: string, price: number}[]>} Array of {date, price} where
  *   price is in major units (pounds, dollars) of the investment's currency
  */
-export async function fetchMorningstarHistory(morningstarId, universe, currencyCode, startDate, endDate) {
+export async function fetchMorningstarHistory(morningstarId, universe, currencyCode, startDate, endDate, frequency = "weekly") {
   // Morningstar API uses a specific ID format that includes universe info
   // Format: {secId}]2]0]{universe} (with | replaced by ] in the id param)
   const idParam = morningstarId + "]2]0]" + universe;
@@ -624,7 +625,7 @@ export async function fetchMorningstarHistory(morningstarId, universe, currencyC
   const params = new URLSearchParams({
     currencyId: currencyCode,
     idtype: "Morningstar",
-    frequency: "weekly",
+    frequency: frequency,
     outputType: "JSON",
     startDate: startDate,
     endDate: endDate,
@@ -886,7 +887,7 @@ const YAHOO_TICKER_MAP = {
  * @param {string} description - The benchmark description from the database
  * @returns {string|null} The Yahoo Finance ticker, or null if no match
  */
-function matchYahooTicker(description) {
+export function matchYahooTicker(description) {
   const descLower = description.toLowerCase();
 
   for (const [prefix, ticker] of Object.entries(YAHOO_TICKER_MAP)) {

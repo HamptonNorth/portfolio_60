@@ -18,7 +18,13 @@
     "taxYearStartMonth": 4,
     "taxYearStartDay": 6
   },
+  "priceMethod": "scrape",
   "scrapeDelayProfile": "cron",
+  "scrapeBatch": {
+    "_readme": "Scrape investments/benchmarks in batches to avoid rate-limiting. batchSize is items per batch (1-50), cooldownSeconds is pause between batches (0-600).",
+    "batchSize": 5,
+    "cooldownSeconds": 120
+  },
   "scraperTesting": {
     "_readme": "Enable the Scraper Testing page — a sandbox for testing scraper configurations without affecting live portfolio data. Disabled by default; set enabled to true via Edit Settings to show the page.",
     "enabled": true
