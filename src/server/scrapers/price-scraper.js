@@ -1,5 +1,4 @@
 import { getAllInvestments, getInvestmentById, updateInvestmentScrapingSource } from "../db/investments-db.js";
-import { updateTestInvestmentScrapingSource } from "../db/test-investments-db.js";
 import { fetchCurrencyRates } from "./currency-scraper.js";
 import { SCRAPE_DELAY_PROFILES, DEFAULT_SCRAPE_DELAY_PROFILE } from "../../shared/server-constants.js";
 import { upsertPrice } from "../db/prices-db.js";
@@ -199,15 +198,11 @@ async function readFtMarketsPriceLabel(page) {
  * @param {Object} [browser=null] - An existing Playwright browser instance to reuse.
  *   If null, a new browser is launched and closed after scraping.
  * @param {Object} [options={}] - Additional options
- * @param {number} [options.startedBy=0] - 0 = manual/interactive, 1 = scheduled/cron, 3 = test investments
+ * @param {number} [options.startedBy=0] - 0 = manual/interactive, 1 = scheduled/cron
  * @param {number} [options.attemptNumber=1] - Retry attempt counter (1-5)
  * @param {boolean} [options.skipHistoryRecord=false] - If true, skip recording in scraping_history.
  *   Used by SSE stream handlers that record history themselves after all retry passes.
  * @param {boolean} [options.testMode=false] - If true, skip writing to the live prices table.
- *   Scraping history is still recorded when startedBy=3 (test investments).
- * @param {string} [options.sourceTable="investments"] - Which table this investment comes from:
- *   "investments" or "test_investments". Used by the Fidelity fallback to write back
- *   the discovered factsheet URL to the correct table.
  * @returns {Promise<{success: boolean, investmentId: number, description: string, rawPrice: string, parsedPrice: number|null, isMinorUnit: boolean, priceMinorUnit: number|null, currency: string, error?: string, fallbackUsed?: boolean}>}
  */
 export async function scrapeSingleInvestmentPrice(investment, browser = null, options = {}) {
@@ -215,12 +210,11 @@ export async function scrapeSingleInvestmentPrice(investment, browser = null, op
   const attemptNumber = options.attemptNumber || 1;
   const testMode = options.testMode || false;
   const scrapeTime = options.scrapeTime || new Date().toTimeString().slice(0, 8);
-  const sourceTable = options.sourceTable || "investments";
   const skipHistoryRecord = options.skipHistoryRecord || false;
-  // Record scraping history for live scrapes and test investment scrapes (startedBy=3),
-  // but not for unit test mode where testMode=true and startedBy is 0 or 1.
-  // When skipHistoryRecord is true, the caller (e.g. SSE stream handler) records history instead.
-  const recordHistory = !skipHistoryRecord && (!testMode || startedBy === 3);
+  // Record scraping history for live scrapes but not for unit test mode
+  // where testMode=true. When skipHistoryRecord is true, the caller
+  // (e.g. SSE stream handler) records history instead.
+  const recordHistory = !skipHistoryRecord && !testMode;
   const result = {
     success: false,
     investmentId: investment.id,
@@ -576,11 +570,7 @@ export async function scrapeSingleInvestmentPrice(investment, browser = null, op
         // Write the discovered factsheet URL back to the investment record
         // so subsequent scrapes go direct to Fidelity without the search step.
         // Selector is left null — the Fidelity config pattern match provides it.
-        if (sourceTable === "test_investments") {
-          updateTestInvestmentScrapingSource(investment.id, factsheetUrl, null);
-        } else {
-          updateInvestmentScrapingSource(investment.id, factsheetUrl, null);
-        }
+        updateInvestmentScrapingSource(investment.id, factsheetUrl, null);
       } finally {
         await closePage(fallbackPage);
       }

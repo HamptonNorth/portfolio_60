@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { getAllSiteConfigs, findSiteConfig, loadConfig, getAllowedProviders, getSchedulingConfig, reloadConfig, getScraperTestingEnabled, getStalestLimit, getListItems, getConfigFilePath, getWritableConfigPath, getPriceMethodConfig } from "../config.js";
+import { getAllSiteConfigs, findSiteConfig, loadConfig, getAllowedProviders, getSchedulingConfig, reloadConfig, getListItems, getConfigFilePath, getWritableConfigPath, getPriceMethodConfig } from "../config.js";
 import { DB_PATH, BACKUP_DIR, APP_NAME, APP_VERSION } from "../../shared/server-constants.js";
 
 /**
@@ -140,15 +140,6 @@ export function handleConfigRoute(method, path) {
   if (method === "GET" && path === "/api/config/price-method") {
     const priceMethod = getPriceMethodConfig();
     return new Response(JSON.stringify({ priceMethod: priceMethod }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  // GET /api/config/scraper-testing-enabled — check if scraper testing feature is enabled
-  if (method === "GET" && path === "/api/config/scraper-testing-enabled") {
-    const enabled = getScraperTestingEnabled();
-    return new Response(JSON.stringify({ enabled: enabled, stalestLimit: getStalestLimit() }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });

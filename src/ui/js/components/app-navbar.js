@@ -32,7 +32,6 @@ class AppNavbar extends LitElement {
                   <a href="/pages/currencies.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="currencies">Currencies</a>
                   <a href="/pages/global-events.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="global-events">Global Events</a>
                   <a href="/pages/scraping.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="scraping">Fetching</a>
-                  <a href="/pages/scraper-testing.html" class="hidden block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="scraper-testing" id="nav-scraper-testing">Scraper Testing</a>
                   <a href="/pages/portfolio.html?view=setup" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="portfolio-setup">Portfolio Setup</a>
                   <hr class="my-1 border-brand-200" />
                   <a href="/pages/backup.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="backup">Backup</a>
@@ -103,9 +102,6 @@ class AppNavbar extends LitElement {
   firstUpdated() {
     if (typeof highlightActiveNav === "function") {
       highlightActiveNav();
-    }
-    if (typeof checkScraperTestingNav === "function") {
-      checkScraperTestingNav();
     }
     this._loadLists();
     this._loadDocs();

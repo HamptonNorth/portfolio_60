@@ -288,44 +288,14 @@ function runMigrations(database) {
     database.exec("ALTER TABLE investments ADD COLUMN public_id TEXT");
   }
 
-  // Migration 9: Add test_investments and test_prices tables (v0.4.0)
-  // Scraper testing sandbox — allows users to test scraper configurations
-  // without affecting live portfolio data.
+  // Migration 9: Remove test_investments and test_prices tables (no longer needed —
+  // test/live database switching makes the scraper testing sandbox redundant).
   const testInvestmentsTable = database.query("SELECT name FROM sqlite_master WHERE type='table' AND name='test_investments'").get();
 
-  if (!testInvestmentsTable) {
-    database.exec(`
-      CREATE TABLE IF NOT EXISTS test_investments (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        currencies_id INTEGER NOT NULL,
-        investment_type_id INTEGER NOT NULL,
-        description TEXT NOT NULL CHECK(length(description) <= 60),
-        public_id TEXT CHECK(public_id IS NULL OR length(public_id) <= 20),
-        investment_url TEXT CHECK(investment_url IS NULL OR length(investment_url) <= 255),
-        selector TEXT CHECK(selector IS NULL OR length(selector) <= 255),
-        source_site TEXT CHECK(source_site IS NULL OR length(source_site) <= 60),
-        notes TEXT CHECK(notes IS NULL OR length(notes) <= 255),
-        last_test_date TEXT,
-        last_test_success INTEGER,
-        last_test_price TEXT,
-        FOREIGN KEY (currencies_id) REFERENCES currencies(id),
-        FOREIGN KEY (investment_type_id) REFERENCES investment_types(id)
-      )
-    `);
-
-    database.exec(`
-      CREATE TABLE IF NOT EXISTS test_prices (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        test_investment_id INTEGER NOT NULL,
-        price_date TEXT NOT NULL,
-        price_time TEXT NOT NULL DEFAULT '00:00:00',
-        price INTEGER NOT NULL,
-        FOREIGN KEY (test_investment_id) REFERENCES test_investments(id) ON DELETE CASCADE,
-        UNIQUE(test_investment_id, price_date)
-      )
-    `);
-
-    database.exec("CREATE INDEX IF NOT EXISTS idx_test_prices_lookup ON test_prices(test_investment_id, price_date DESC)");
+  if (testInvestmentsTable) {
+    database.exec("DROP INDEX IF EXISTS idx_test_prices_lookup");
+    database.exec("DROP TABLE IF EXISTS test_prices");
+    database.exec("DROP TABLE IF EXISTS test_investments");
   }
 
   // Migration 10: Add accounts, holdings, cash_transactions and holding_movements tables (v0.6.0)
@@ -542,6 +512,29 @@ function runMigrations(database) {
   if (!hasMaxAttempts) {
     database.exec("ALTER TABLE scraping_history ADD COLUMN max_attempts INTEGER NOT NULL DEFAULT 1");
   }
+
+  // Migration 20: Clear all cached morningstar_id values (v0.14.0)
+  // Previous ticker lookups did not filter by exchange, so cached IDs may
+  // point to the wrong exchange listing (e.g. a European AMZN instead of
+  // NASDAQ). Clearing forces re-resolution with exchange-aware lookups.
+  // Uses a one-time flag: once cleared, the migration is a no-op.
+  const hasMorningstarIds = database.query(
+    "SELECT COUNT(*) AS cnt FROM investments WHERE morningstar_id IS NOT NULL"
+  ).get();
+  // Check if this migration has already run by looking for the marker column.
+  // We add a trivial column 'ms_id_cleared' to track this one-time reset.
+  const investmentsCols20 = database.query("PRAGMA table_info(investments)").all();
+  const hasMsIdCleared = investmentsCols20.some(function (col) {
+    return col.name === "ms_id_cleared";
+  });
+
+  if (!hasMsIdCleared && hasMorningstarIds.cnt > 0) {
+    database.exec("UPDATE investments SET morningstar_id = NULL");
+    database.exec("ALTER TABLE investments ADD COLUMN ms_id_cleared INTEGER NOT NULL DEFAULT 1");
+  } else if (!hasMsIdCleared) {
+    // No rows to clear, but still add the marker so this doesn't re-run
+    database.exec("ALTER TABLE investments ADD COLUMN ms_id_cleared INTEGER NOT NULL DEFAULT 1");
+  }
 }
 
 /**
@@ -595,6 +588,10 @@ export function createDatabase() {
   const seedPath = resolve("src/server/db/seed.sql");
   const seedSql = readFileSync(seedPath, "utf-8");
   db.exec(seedSql);
+
+  // Run migrations so that a freshly created database has the same schema
+  // as an existing database that has been migrated over time.
+  runMigrations(db);
 
   return true;
 }

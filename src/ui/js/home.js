@@ -92,7 +92,7 @@ async function handleCreateDatabase() {
 /**
  * @description Format the started_by value into a human-readable label for
  * the "How Priced" column.
- * @param {number|null} startedBy - 0=Manual scrape, 1=Scheduled, 2=Manual entry, 3=Test
+ * @param {number|null} startedBy - 0=Manual scrape, 1=Scheduled, 2=Manual entry
  * @returns {string} Display label
  */
 function formatHowPriced(startedBy) {
@@ -100,7 +100,6 @@ function formatHowPriced(startedBy) {
   if (startedBy === 0) return "Manual scrape";
   if (startedBy === 1) return "Scheduled";
   if (startedBy === 2) return "Manual entry";
-  if (startedBy === 3) return "Test";
   return "Unknown";
 }
 

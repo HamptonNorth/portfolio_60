@@ -198,16 +198,6 @@ export function loadConfig() {
     categories: typeof rawDocs.categories === "object" && rawDocs.categories !== null ? rawDocs.categories : {},
   };
 
-  // scraperTesting — feature flag for the scraper testing sandbox
-  const rawScraperTesting = rawConfig.scraperTesting || {};
-  const stalestLimit = parseInt(rawScraperTesting.stalestLimit, 10);
-  const stalestRetries = parseInt(rawScraperTesting.stalestRetries, 10);
-  config.scraperTesting = {
-    enabled: typeof rawScraperTesting.enabled === "boolean" ? rawScraperTesting.enabled : false,
-    stalestLimit: Number.isFinite(stalestLimit) && stalestLimit > 0 ? stalestLimit : 20,
-    stalestRetries: Number.isFinite(stalestRetries) && stalestRetries >= 1 && stalestRetries <= 3 ? stalestRetries : 1,
-  };
-
   configCache = config;
   return config;
 }
@@ -275,35 +265,6 @@ export function getAllowedProviders() {
 export function getIsaAllowanceConfig() {
   const config = loadConfig();
   return config.isaAllowance;
-}
-
-/**
- * @description Check whether the Scraper Testing feature is enabled in config.
- * @returns {boolean} True if scraperTesting.enabled is true
- */
-export function getScraperTestingEnabled() {
-  const config = loadConfig();
-  return config.scraperTesting && config.scraperTesting.enabled === true;
-}
-
-/**
- * @description Get the configured limit for the "Test Stalest" feature.
- * Defaults to 20 if not set or invalid.
- * @returns {number} Number of stalest investments to test per run
- */
-export function getStalestLimit() {
-  const config = loadConfig();
-  return config.scraperTesting ? config.scraperTesting.stalestLimit : 20;
-}
-
-/**
- * @description Get the configured max retry attempts for the "Test Stalest" feature.
- * Defaults to 1 (no retries). Maximum 3.
- * @returns {number} Max attempts per investment (1 = no retries, 3 = max)
- */
-export function getStalestRetries() {
-  const config = loadConfig();
-  return config.scraperTesting ? config.scraperTesting.stalestRetries : 1;
 }
 
 /**

@@ -133,6 +133,37 @@ export function extractTickerFromPublicId(publicId) {
 }
 
 /**
+ * @description Extract the exchange code from a ticker or ETF public_id.
+ * For ticker format (EXCHANGE:TICKER, e.g. LSE:AZN), returns the exchange part (LSE).
+ * For ETF format (TICKER:EXCHANGE:CURRENCY, e.g. ISF:LSE:GBX), returns the exchange part (LSE).
+ * Returns null for ISINs, invalid input, or unrecognised formats.
+ * @param {string} publicId - The public identifier
+ * @returns {string|null} The exchange code, or null if not a ticker/ETF format
+ */
+export function extractExchangeFromPublicId(publicId) {
+  if (!publicId || typeof publicId !== "string") {
+    return null;
+  }
+
+  const trimmed = publicId.trim().toUpperCase();
+  const type = detectPublicIdType(trimmed);
+
+  if (type === "ticker") {
+    // Format: EXCHANGE:TICKER (e.g. LSE:AZN)
+    const parts = trimmed.split(":");
+    return parts[0] || null;
+  }
+
+  if (type === "etf") {
+    // Format: TICKER:EXCHANGE:CURRENCY (e.g. ISF:LSE:GBX)
+    const parts = trimmed.split(":");
+    return parts[1] || null;
+  }
+
+  return null;
+}
+
+/**
  * @description Build an FT Markets URL for a given public_id and currency code.
  * ISIN codes produce a funds tearsheet URL; ticker codes produce an equities
  * tearsheet URL; ETF codes produce an ETFs tearsheet URL.

@@ -131,56 +131,6 @@ export function validateInvestment(data) {
 }
 
 /**
- * @description Validate test investment data for create or update operations.
- * Same as validateInvestment but with additional source_site and notes fields.
- * Returns an array of error messages (empty if all valid).
- * @param {Object} data - The test investment data to validate
- * @returns {string[]} Array of validation error messages
- */
-export function validateTestInvestment(data) {
-  const errors = [];
-
-  // Required fields
-  const requiredChecks = [validateRequired(data.currencies_id, "Currency"), validateRequired(data.investment_type_id, "Investment type"), validateRequired(data.description, "Description")];
-
-  for (const error of requiredChecks) {
-    if (error) errors.push(error);
-  }
-
-  // currencies_id and investment_type_id must be positive integers
-  if (data.currencies_id !== undefined && data.currencies_id !== null) {
-    const currencyId = Number(data.currencies_id);
-    if (!Number.isInteger(currencyId) || currencyId <= 0) {
-      errors.push("Currency must be a valid selection");
-    }
-  }
-
-  if (data.investment_type_id !== undefined && data.investment_type_id !== null) {
-    const typeId = Number(data.investment_type_id);
-    if (!Number.isInteger(typeId) || typeId <= 0) {
-      errors.push("Investment type must be a valid selection");
-    }
-  }
-
-  // Max length checks
-  const lengthChecks = [validateMaxLength(data.description, 60, "Description"), validateMaxLength(data.public_id, 20, "Public ID"), validateMaxLength(data.investment_url, 255, "Investment URL"), validateMaxLength(data.selector, 255, "CSS selector"), validateMaxLength(data.source_site, 60, "Source site"), validateMaxLength(data.notes, 255, "Notes")];
-
-  for (const error of lengthChecks) {
-    if (error) errors.push(error);
-  }
-
-  // Public ID format validation (optional field — only validate if provided)
-  if (data.public_id && String(data.public_id).trim() !== "") {
-    const publicIdResult = validatePublicIdFormat(data.public_id);
-    if (!publicIdResult.valid) {
-      errors.push(publicIdResult.error);
-    }
-  }
-
-  return errors;
-}
-
-/**
  * @description Validate currency data for create or update operations.
  * Returns an array of error messages (empty if all valid).
  * @param {Object} data - The currency data to validate

@@ -5,7 +5,7 @@ import { getDatabase } from "./connection.js";
  * @param {Object} params - The scraping history parameters
  * @param {string} params.scrapeType - 'currency', 'investment', or 'benchmark'
  * @param {number} params.referenceId - FK to the relevant table (currencies, investments, or benchmarks)
- * @param {number} [params.startedBy=0] - 0 = manual/interactive, 1 = scheduled/cron, 3 = test investments
+ * @param {number} [params.startedBy=0] - 0 = manual/interactive, 1 = scheduled/cron
  * @param {number} [params.attemptNumber=1] - The attempt at which the outcome was determined
  * @param {number} [params.maxAttempts=1] - Total attempts available for this scrape run
  * @param {boolean} params.success - Whether the scrape succeeded

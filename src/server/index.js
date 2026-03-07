@@ -12,7 +12,6 @@ import { handleScraperRoute } from "./routes/scraper-routes.js";
 import { handleBackupRoute } from "./routes/backup-routes.js";
 import { handleBenchmarksRoute } from "./routes/benchmarks-routes.js";
 import { handleBackfillRoute } from "./routes/backfill-routes.js";
-import { handleTestInvestmentsRoute } from "./routes/test-investments-routes.js";
 import { handleAccountsRoute } from "./routes/accounts-routes.js";
 import { handleHoldingsRoute } from "./routes/holdings-routes.js";
 import { handlePortfolioRoute } from "./routes/portfolio-routes.js";
@@ -361,14 +360,6 @@ const server = Bun.serve({
       const backfillResult = await handleBackfillRoute(method, path, request);
       if (backfillResult) {
         return backfillResult;
-      }
-    }
-
-    // Test investments routes (CRUD + scraping, gated by scraperTesting.enabled)
-    if (path.startsWith("/api/test-investments")) {
-      const testInvestmentsResult = await handleTestInvestmentsRoute(method, path, request);
-      if (testInvestmentsResult) {
-        return testInvestmentsResult;
       }
     }
 

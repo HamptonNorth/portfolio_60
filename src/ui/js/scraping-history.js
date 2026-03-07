@@ -51,12 +51,11 @@ function formatDatetime(datetime) {
 
 /**
  * @description Format the started_by value for display.
- * @param {number} startedBy - 0 = manual, 1 = scheduled, 3 = test investments
+ * @param {number} startedBy - 0 = manual, 1 = scheduled
  * @returns {string} Display string
  */
 function formatStartedBy(startedBy) {
   if (startedBy === 1) return "Scheduled";
-  if (startedBy === 3) return "Test";
   return "Manual";
 }
 

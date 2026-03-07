@@ -13,8 +13,8 @@ import { getDatabase } from "../db/connection.js";
 import { upsertRate, scaleRate } from "../db/currency-rates-db.js";
 import { upsertPrice } from "../db/prices-db.js";
 import { upsertBenchmarkData } from "../db/benchmark-data-db.js";
-import { detectPublicIdType, extractTickerFromPublicId } from "../../shared/public-id-utils.js";
-import { getTestInvestmentById } from "../db/test-investments-db.js";
+import { getScrapeBatchConfig } from "../config.js";
+import { detectPublicIdType, extractTickerFromPublicId, extractExchangeFromPublicId } from "../../shared/public-id-utils.js";
 import YahooFinance from "yahoo-finance2";
 
 // ---------------------------------------------------------------------------
@@ -375,6 +375,20 @@ const MORNINGSTAR_SEARCH_URL = "https://www.morningstar.co.uk/uk/util/SecuritySe
 const MORNINGSTAR_FETCH_TIMEOUT_MS = 15000;
 
 /**
+ * @description Mapping from FT Markets exchange codes (used in public_id) to
+ * Morningstar ExchangeId values used in the screener API. This allows
+ * ticker lookups to be filtered by exchange, avoiding wrong-exchange matches
+ * (e.g. AMZN on a European exchange instead of NASDAQ).
+ * @type {Object<string, string>}
+ */
+const EXCHANGE_TO_MORNINGSTAR = {
+  LSE: "XLON",
+  NSQ: "XNAS",
+  NYQ: "XNYS",
+  AEX: "XAMS",
+};
+
+/**
  * @description Extract an ISIN from a Fidelity-style investment URL.
  * Handles two Fidelity URL formats:
  *   - /factsheet/GB00B41YBW71/...   (funds — ISIN after /factsheet/)
@@ -495,20 +509,30 @@ export async function lookupMorningstarIdByName(description) {
  *   1. Screener API with Ticker filter (exact match, covers most equities/ETFs)
  *   2. SecuritySearch API (covers investment trusts and other securities not in the screener)
  *   3. Screener API with text-based term search (last resort)
- * @param {string} ticker - The ticker symbol (e.g. "BARC", "LLOY", "SSON")
+ * When an exchange code is provided (e.g. "NSQ"), the screener API filters by
+ * both ticker and exchange to avoid matching the wrong listing.
+ * @param {string} ticker - The ticker symbol (e.g. "BARC", "LLOY", "AMZN")
+ * @param {string} [exchange] - Optional FT Markets exchange code (e.g. "LSE", "NSQ", "NYQ")
  * @returns {Promise<{secId: string, universe: string, name: string}|null>}
  *   The Morningstar SecId, universe, and name, or null if not found
  */
-export async function lookupMorningstarIdByTicker(ticker) {
-  // Priority 1: screener API with exact ticker filter
+export async function lookupMorningstarIdByTicker(ticker, exchange) {
+  // Build the filter string — always filter by ticker, optionally also by exchange
+  const morningstarExchange = exchange ? EXCHANGE_TO_MORNINGSTAR[exchange.toUpperCase()] : null;
+  let filterString = "Ticker:IN:" + ticker;
+  if (morningstarExchange) {
+    filterString += "|ExchangeId:IN:" + morningstarExchange;
+  }
+
+  // Priority 1: screener API with exact ticker (and optional exchange) filter
   const filterParams = new URLSearchParams({
     outputType: "json",
     version: "1",
     languageId: "en-GB",
     currencyId: "GBP",
     securityDataPoints: "SecId,Name,ISIN,Universe,Ticker,ExchangeId",
-    filters: "Ticker:IN:" + ticker,
-    rows: "1",
+    filters: filterString,
+    rows: "5",
   });
 
   const filterUrl = MORNINGSTAR_SCREENER_URL + "?" + filterParams.toString();
@@ -522,6 +546,8 @@ export async function lookupMorningstarIdByTicker(ticker) {
   const filterRows = filterData && filterData.rows;
 
   if (filterRows && filterRows.length > 0) {
+    // If we filtered by exchange, the first result should be correct.
+    // If no exchange filter, take the first result (existing behaviour).
     const row = filterRows[0];
     return {
       secId: row.SecId,
@@ -531,7 +557,7 @@ export async function lookupMorningstarIdByTicker(ticker) {
   }
 
   // Priority 2: SecuritySearch API (covers investment trusts not in the screener)
-  const searchResult = await lookupMorningstarIdBySecuritySearch(ticker);
+  const searchResult = await lookupMorningstarIdBySecuritySearch(ticker, exchange);
   if (searchResult) {
     return searchResult;
   }
@@ -545,10 +571,12 @@ export async function lookupMorningstarIdByTicker(ticker) {
  * This endpoint covers securities (especially closed-end investment trusts) that
  * are not indexed by the screener API. The response is pipe-delimited text, not JSON.
  * Matches are filtered to results where the ticker column exactly matches the query.
+ * When an exchange code is provided, results matching that exchange are preferred.
  * @param {string} ticker - The ticker symbol to search for
+ * @param {string} [exchange] - Optional FT Markets exchange code (e.g. "LSE", "NSQ")
  * @returns {Promise<{secId: string, universe: string, name: string}|null>}
  */
-async function lookupMorningstarIdBySecuritySearch(ticker) {
+async function lookupMorningstarIdBySecuritySearch(ticker, exchange) {
   const params = new URLSearchParams({
     q: ticker,
     limit: "10",
@@ -566,9 +594,22 @@ async function lookupMorningstarIdBySecuritySearch(ticker) {
   const text = await response.text();
   const lines = text.split("\n");
 
+  // Map the FT exchange code to what SecuritySearch uses in its metadata.
+  // SecuritySearch uses short names like "NAS", "NYS", "LSE", "AMS".
+  const EXCHANGE_TO_SEARCH = {
+    LSE: "LSE",
+    NSQ: "NAS",
+    NYQ: "NYS",
+    AEX: "AMS",
+  };
+  const targetExchange = exchange ? (EXCHANGE_TO_SEARCH[exchange.toUpperCase()] || null) : null;
+
   // Each result line is pipe-delimited:
   // Name|{JSON metadata}|Type|Ticker|Exchange|Category
   // The JSON metadata contains: i=SecId, n=Name, s=Ticker, e=Exchange, t=type
+  // Collect all ticker-matching results so we can prefer the exchange match.
+  const candidates = [];
+
   for (const line of lines) {
     const parts = line.split("|");
     if (parts.length < 5) continue;
@@ -582,26 +623,43 @@ async function lookupMorningstarIdBySecuritySearch(ticker) {
       if (meta && meta.i) {
         // Determine universe from the type field and exchange
         // t=21 is closed-end fund, e=LSE exchange
-        const exchange = (meta.e || "").toUpperCase();
+        const resultExchange = (meta.e || "").toUpperCase();
         let universe = "";
         if (meta.t === 21 || meta.t === "21") {
-          universe = "CEEXG$X" + (exchange === "LSE" ? "LON" : exchange) + "_3519";
+          universe = "CEEXG$X" + (resultExchange === "LSE" ? "LON" : resultExchange) + "_3519";
         } else {
-          universe = "E0EXG$X" + (exchange === "LSE" ? "LON" : exchange) + "_3520";
+          universe = "E0EXG$X" + (resultExchange === "LSE" ? "LON" : resultExchange) + "_3520";
         }
 
-        return {
+        candidates.push({
           secId: meta.i,
           universe: universe,
           name: meta.n || parts[0] || "",
-        };
+          exchange: resultExchange,
+        });
       }
     } catch {
       // Skip malformed JSON metadata
     }
   }
 
-  return null;
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  // If we have a target exchange, prefer the matching candidate
+  if (targetExchange) {
+    const exchangeMatch = candidates.find(function (c) {
+      return c.exchange === targetExchange;
+    });
+    if (exchangeMatch) {
+      return { secId: exchangeMatch.secId, universe: exchangeMatch.universe, name: exchangeMatch.name };
+    }
+  }
+
+  // Fall back to first candidate
+  const first = candidates[0];
+  return { secId: first.secId, universe: first.universe, name: first.name };
 }
 
 /**
@@ -707,14 +765,20 @@ export async function backfillInvestmentPrices(progressCallback) {
   const startStr = startDate.toISOString().split("T")[0];
   const endStr = endDate.toISOString().split("T")[0];
 
+  // Use the same batch/cooldown settings as "Fetch All" to avoid rate-limiting
+  const batchConfig = getScrapeBatchConfig();
+  const batchSize = batchConfig.batchSize;
+  const cooldownSeconds = batchConfig.cooldownSeconds;
+
   progressCallback({
     type: "progress",
-    message: "Backfilling prices for " + investments.length + " investments (" + startStr + " to " + endStr + ")",
+    message: "Backfilling prices for " + investments.length + " investments (" + startStr + " to " + endStr + "), batch size " + batchSize + ", cooldown " + cooldownSeconds + "s",
   });
 
   let totalPrices = 0;
   let investmentsUpdated = 0;
   const skipped = [];
+  let itemsProcessedInBatch = 0;
 
   for (const inv of investments) {
     let morningstarId = inv.morningstar_id;
@@ -744,13 +808,14 @@ export async function backfillInvestmentPrices(progressCallback) {
         });
         lookupResult = await lookupMorningstarIdByIsin(isin);
       } else if (publicIdType === "ticker" || publicIdType === "etf") {
-        // Priority 3: public_id is a ticker — search Morningstar by ticker symbol
+        // Priority 3: public_id is a ticker — search Morningstar by ticker and exchange
         const tickerSymbol = extractTickerFromPublicId(inv.public_id);
+        const exchangeCode = extractExchangeFromPublicId(inv.public_id);
         progressCallback({
           type: "progress",
-          message: inv.description + ": looking up ticker " + tickerSymbol + "...",
+          message: inv.description + ": looking up ticker " + tickerSymbol + (exchangeCode ? " on " + exchangeCode : "") + "...",
         });
-        lookupResult = await lookupMorningstarIdByTicker(tickerSymbol);
+        lookupResult = await lookupMorningstarIdByTicker(tickerSymbol, exchangeCode);
       } else {
         // Priority 4: Try LSE ticker extraction from URL
         const ticker = extractLseTickerFromUrl(inv.investment_url);
@@ -760,7 +825,7 @@ export async function backfillInvestmentPrices(progressCallback) {
             type: "progress",
             message: inv.description + ": looking up LSE ticker " + ticker + "...",
           });
-          lookupResult = await lookupMorningstarIdByTicker(ticker);
+          lookupResult = await lookupMorningstarIdByTicker(ticker, "LSE");
         } else {
           progressCallback({
             type: "progress",
@@ -845,10 +910,21 @@ export async function backfillInvestmentPrices(progressCallback) {
       message: inv.description + ": " + countForInvestment + " weekly prices inserted",
     });
 
-    // Small delay between investments to be polite to Morningstar's API
-    await new Promise(function (resolve) {
-      setTimeout(resolve, 500);
-    });
+    // Batch cooldown: after every batchSize items, pause for cooldownSeconds
+    // to avoid rate-limiting by Morningstar's API
+    itemsProcessedInBatch++;
+    if (itemsProcessedInBatch >= batchSize) {
+      itemsProcessedInBatch = 0;
+      if (cooldownSeconds > 0) {
+        progressCallback({
+          type: "progress",
+          message: "Batch complete — cooling down for " + cooldownSeconds + "s to avoid rate-limiting...",
+        });
+        await new Promise(function (resolve) {
+          setTimeout(resolve, cooldownSeconds * 1000);
+        });
+      }
+    }
   }
 
   progressCallback({
@@ -966,14 +1042,20 @@ export async function backfillBenchmarkValues(progressCallback) {
   const startStr = startDate.toISOString().split("T")[0];
   const endStr = endDate.toISOString().split("T")[0];
 
+  // Use the same batch/cooldown settings as "Fetch All" to avoid rate-limiting
+  const batchConfig = getScrapeBatchConfig();
+  const batchSize = batchConfig.batchSize;
+  const cooldownSeconds = batchConfig.cooldownSeconds;
+
   progressCallback({
     type: "progress",
-    message: "Backfilling values for " + benchmarks.length + " benchmarks (" + startStr + " to " + endStr + ")",
+    message: "Backfilling values for " + benchmarks.length + " benchmarks (" + startStr + " to " + endStr + "), batch size " + batchSize + ", cooldown " + cooldownSeconds + "s",
   });
 
   let totalValues = 0;
   let benchmarksUpdated = 0;
   const skipped = [];
+  let itemsProcessedInBatch = 0;
 
   for (const bm of benchmarks) {
     // MSCI indexes have no free historic data API — skip them.
@@ -1056,10 +1138,21 @@ export async function backfillBenchmarkValues(progressCallback) {
       message: bm.description + ": " + countForBenchmark + " weekly values inserted",
     });
 
-    // Small delay between benchmarks to be polite
-    await new Promise(function (resolve) {
-      setTimeout(resolve, 500);
-    });
+    // Batch cooldown: after every batchSize items, pause for cooldownSeconds
+    // to avoid rate-limiting by Yahoo Finance's API
+    itemsProcessedInBatch++;
+    if (itemsProcessedInBatch >= batchSize) {
+      itemsProcessedInBatch = 0;
+      if (cooldownSeconds > 0) {
+        progressCallback({
+          type: "progress",
+          message: "Batch complete — cooling down for " + cooldownSeconds + "s to avoid rate-limiting...",
+        });
+        await new Promise(function (resolve) {
+          setTimeout(resolve, cooldownSeconds * 1000);
+        });
+      }
+    }
   }
 
   progressCallback({
@@ -1121,13 +1214,14 @@ export async function backfillSingleInvestment(inv, progressCallback) {
       lookupResult = await lookupMorningstarIdByIsin(isin);
     } else if (publicIdType === "ticker" || publicIdType === "etf") {
       const tickerSymbol = extractTickerFromPublicId(inv.public_id);
-      progressCallback({ type: "progress", message: inv.description + ": looking up ticker " + tickerSymbol + "..." });
-      lookupResult = await lookupMorningstarIdByTicker(tickerSymbol);
+      const exchangeCode = extractExchangeFromPublicId(inv.public_id);
+      progressCallback({ type: "progress", message: inv.description + ": looking up ticker " + tickerSymbol + (exchangeCode ? " on " + exchangeCode : "") + "..." });
+      lookupResult = await lookupMorningstarIdByTicker(tickerSymbol, exchangeCode);
     } else {
       const ticker = extractLseTickerFromUrl(inv.investment_url);
       if (ticker) {
         progressCallback({ type: "progress", message: inv.description + ": looking up LSE ticker " + ticker + "..." });
-        lookupResult = await lookupMorningstarIdByTicker(ticker);
+        lookupResult = await lookupMorningstarIdByTicker(ticker, "LSE");
       } else {
         return { success: false, pricesInserted: 0, error: "No ISIN or ticker found" };
       }
@@ -1367,11 +1461,12 @@ export async function testBackfillInvestment(investmentId) {
       lookupResult = await lookupMorningstarIdByIsin(isin);
     } else if (publicIdType === "ticker" || publicIdType === "etf") {
       const tickerSymbol = extractTickerFromPublicId(inv.public_id);
-      lookupResult = await lookupMorningstarIdByTicker(tickerSymbol);
+      const exchangeCode = extractExchangeFromPublicId(inv.public_id);
+      lookupResult = await lookupMorningstarIdByTicker(tickerSymbol, exchangeCode);
     } else {
       const ticker = extractLseTickerFromUrl(inv.investment_url);
       if (ticker) {
-        lookupResult = await lookupMorningstarIdByTicker(ticker);
+        lookupResult = await lookupMorningstarIdByTicker(ticker, "LSE");
       }
     }
 
@@ -1405,70 +1500,6 @@ export async function testBackfillInvestment(investmentId) {
   return { success: true, description: inv.description, currency: inv.currency_code, rows: rows };
 }
 
-/**
- * @description Test historic data availability for a single test investment.
- * Same as testBackfillInvestment but reads from the test_investments table.
- * Fetches the 10 most recent weekly prices from Morningstar without writing to DB.
- * Does not cache the Morningstar ID (test_investments lacks the morningstar_id column).
- * @param {number} testInvestmentId - The test investment ID
- * @returns {Promise<{success: boolean, description: string, currency: string, rows: {date: string, price: number}[], error?: string}>}
- */
-export async function testBackfillTestInvestment(testInvestmentId) {
-  const inv = getTestInvestmentById(testInvestmentId);
-
-  if (!inv) return { success: false, description: "Unknown", currency: "", rows: [], error: "Test investment not found" };
-
-  // Resolve Morningstar ID (no caching — test_investments has no morningstar_id column)
-  const publicIdType = detectPublicIdType(inv.public_id);
-  let isin = null;
-
-  if (publicIdType === "isin") {
-    isin = inv.public_id.trim().toUpperCase();
-  } else if (inv.type_short === "MUTUAL") {
-    // Only extract ISINs from URLs for mutual funds. Shares and trusts
-    // may have ISINs embedded in Fidelity URLs that resolve to the wrong
-    // exchange listing on Morningstar.
-    isin = extractIsinFromUrl(inv.investment_url);
-  }
-
-  let lookupResult = null;
-
-  if (isin) {
-    lookupResult = await lookupMorningstarIdByIsin(isin);
-  } else if (publicIdType === "ticker" || publicIdType === "etf") {
-    const tickerSymbol = extractTickerFromPublicId(inv.public_id);
-    lookupResult = await lookupMorningstarIdByTicker(tickerSymbol);
-  } else {
-    const ticker = extractLseTickerFromUrl(inv.investment_url);
-    if (ticker) {
-      lookupResult = await lookupMorningstarIdByTicker(ticker);
-    }
-  }
-
-  if (!lookupResult) {
-    return { success: false, description: inv.description, currency: inv.currency_code, rows: [], error: "Could not find on Morningstar" };
-  }
-
-  const morningstarId = lookupResult.secId;
-  const universe = lookupResult.universe;
-
-  // Fetch last ~3 months to get 10+ weekly data points
-  const endDate = new Date();
-  const startDate = new Date();
-  startDate.setMonth(startDate.getMonth() - 3);
-
-  const history = await fetchMorningstarHistory(morningstarId, universe, inv.currency_code, startDate.toISOString().split("T")[0], endDate.toISOString().split("T")[0]);
-
-  // Return last 10 entries, most recent first
-  const rows = history
-    .slice(-10)
-    .reverse()
-    .map(function (entry) {
-      return { date: entry.date, price: entry.price };
-    });
-
-  return { success: true, description: inv.description, currency: inv.currency_code, rows: rows };
-}
 
 /**
  * @description Load historic prices for a single investment (full 3-year backfill).
@@ -1511,11 +1542,12 @@ export async function loadBackfillInvestment(investmentId) {
       lookupResult = await lookupMorningstarIdByIsin(isin);
     } else if (publicIdType === "ticker" || publicIdType === "etf") {
       const tickerSymbol = extractTickerFromPublicId(inv.public_id);
-      lookupResult = await lookupMorningstarIdByTicker(tickerSymbol);
+      const exchangeCode = extractExchangeFromPublicId(inv.public_id);
+      lookupResult = await lookupMorningstarIdByTicker(tickerSymbol, exchangeCode);
     } else {
       const ticker = extractLseTickerFromUrl(inv.investment_url);
       if (ticker) {
-        lookupResult = await lookupMorningstarIdByTicker(ticker);
+        lookupResult = await lookupMorningstarIdByTicker(ticker, "LSE");
       }
     }
 

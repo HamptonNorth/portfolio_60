@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { detectPublicIdType, validatePublicId, buildFtMarketsUrl, buildFtMarketsAlternateUrl, getFtMarketsSelector, buildFidelitySearchUrl, extractTickerFromPublicId } from "../../src/shared/public-id-utils.js";
+import { detectPublicIdType, validatePublicId, buildFtMarketsUrl, buildFtMarketsAlternateUrl, getFtMarketsSelector, buildFidelitySearchUrl, extractTickerFromPublicId, extractExchangeFromPublicId } from "../../src/shared/public-id-utils.js";
 
 // ---------------------------------------------------------------------------
 // detectPublicIdType
@@ -389,5 +389,55 @@ describe("extractTickerFromPublicId", function () {
 
   test("is case-insensitive (lowercased input)", function () {
     expect(extractTickerFromPublicId("lse:azn")).toBe("AZN");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extractExchangeFromPublicId
+// ---------------------------------------------------------------------------
+
+describe("extractExchangeFromPublicId", function () {
+  test("extracts exchange from EXCHANGE:TICKER format", function () {
+    expect(extractExchangeFromPublicId("LSE:AZN")).toBe("LSE");
+  });
+
+  test("extracts exchange from NSQ:AMZN", function () {
+    expect(extractExchangeFromPublicId("NSQ:AMZN")).toBe("NSQ");
+  });
+
+  test("extracts exchange from NYQ:KO", function () {
+    expect(extractExchangeFromPublicId("NYQ:KO")).toBe("NYQ");
+  });
+
+  test("extracts exchange from AEX:ASML", function () {
+    expect(extractExchangeFromPublicId("AEX:ASML")).toBe("AEX");
+  });
+
+  test("extracts exchange from ETF format (TICKER:EXCHANGE:CURRENCY)", function () {
+    expect(extractExchangeFromPublicId("ISF:LSE:GBX")).toBe("LSE");
+  });
+
+  test("extracts exchange from ETF IH2O:LSE:GBX", function () {
+    expect(extractExchangeFromPublicId("IH2O:LSE:GBX")).toBe("LSE");
+  });
+
+  test("returns null for ISIN", function () {
+    expect(extractExchangeFromPublicId("GB00B4PQW151")).toBeNull();
+  });
+
+  test("returns null for null", function () {
+    expect(extractExchangeFromPublicId(null)).toBeNull();
+  });
+
+  test("returns null for empty string", function () {
+    expect(extractExchangeFromPublicId("")).toBeNull();
+  });
+
+  test("returns null for undefined", function () {
+    expect(extractExchangeFromPublicId(undefined)).toBeNull();
+  });
+
+  test("is case-insensitive (lowercased input)", function () {
+    expect(extractExchangeFromPublicId("nsq:amzn")).toBe("NSQ");
   });
 });

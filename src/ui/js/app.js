@@ -645,28 +645,7 @@ async function showAboutModal() {
   okBtn.focus();
 }
 
-/**
- * @description Check whether the Scraper Testing feature is enabled and show/hide
- * the nav link accordingly. Fetches the flag from the config API.
- */
-async function checkScraperTestingNav() {
-  const navLink = document.getElementById("nav-scraper-testing");
-  if (!navLink) return;
-
-  try {
-    const response = await fetch("/api/config/scraper-testing-enabled");
-    if (response.ok) {
-      const data = await response.json();
-      if (data.enabled) {
-        navLink.classList.remove("hidden");
-      }
-    }
-  } catch {
-    // Silently fail — link stays hidden
-  }
-}
-
-// Navigation highlighting, build time loading, and scraper testing nav check
+// Navigation highlighting and build time loading
 // are handled by the <app-navbar> and <app-footer> web components
 // in their firstUpdated() lifecycle methods.
 // The functions remain defined here as globals for the components to call.

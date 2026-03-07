@@ -12,7 +12,7 @@
 import { getDatabase } from "../db/connection.js";
 import { getAllInvestments } from "../db/investments-db.js";
 import { upsertPrice } from "../db/prices-db.js";
-import { detectPublicIdType, extractTickerFromPublicId } from "../../shared/public-id-utils.js";
+import { detectPublicIdType, extractTickerFromPublicId, extractExchangeFromPublicId } from "../../shared/public-id-utils.js";
 import {
   fetchMorningstarHistory,
   lookupMorningstarIdByIsin,
@@ -77,12 +77,13 @@ async function resolveMorningstarId(investment) {
     }
   }
 
-  // Step 4: Ticker from public_id
+  // Step 4: Ticker from public_id (with exchange filtering)
   if (!lookupResult && (publicIdType === "ticker" || publicIdType === "etf")) {
     const tickerSymbol = extractTickerFromPublicId(investment.public_id);
+    const exchangeCode = extractExchangeFromPublicId(investment.public_id);
     if (tickerSymbol) {
       try {
-        lookupResult = await lookupMorningstarIdByTicker(tickerSymbol);
+        lookupResult = await lookupMorningstarIdByTicker(tickerSymbol, exchangeCode);
       } catch {
         // Lookup failed — continue to next method
       }
@@ -94,7 +95,7 @@ async function resolveMorningstarId(investment) {
     const ticker = extractLseTickerFromUrl(investment.investment_url);
     if (ticker) {
       try {
-        lookupResult = await lookupMorningstarIdByTicker(ticker);
+        lookupResult = await lookupMorningstarIdByTicker(ticker, "LSE");
       } catch {
         // Lookup failed — all methods exhausted
       }
