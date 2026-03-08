@@ -2,7 +2,7 @@ import { Cron } from "croner";
 import { getSchedulingConfig, getRetryConfig, getScrapeDelayProfile } from "../config.js";
 import { getLastSuccessfulScrapeByType } from "../db/scraping-history-db.js";
 import { databaseExists } from "../db/connection.js";
-import { runFullScrape, retryFailedItems } from "./scraping-service.js";
+import { runFullPriceUpdate, retryFailedItems } from "./scraping-service.js";
 
 /**
  * @description The active Croner job instance, or null if scheduling is disabled.
@@ -79,7 +79,7 @@ async function executeScrapeRun(startedBy) {
 
   try {
     // Run the initial full scrape
-    const summary = await runFullScrape({
+    const summary = await runFullPriceUpdate({
       startedBy: startedBy,
       delayProfile: delayProfile,
     });

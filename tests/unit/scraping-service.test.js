@@ -29,7 +29,7 @@ import { createCurrency } from "../../src/server/db/currencies-db.js";
 import { createInvestment } from "../../src/server/db/investments-db.js";
 import { createBenchmark } from "../../src/server/db/benchmarks-db.js";
 import { getAllInvestmentTypes } from "../../src/server/db/investment-types-db.js";
-import { runFullScrape, retryFailedItems } from "../../src/server/services/scraping-service.js";
+import { runFullPriceUpdate, retryFailedItems } from "../../src/server/services/scraping-service.js";
 
 /**
  * @description Remove the test database files.
@@ -62,7 +62,7 @@ afterAll(function () {
   delete process.env.DB_PATH;
 });
 
-describe("runFullScrape — with no data configured", function () {
+describe("runFullPriceUpdate — with no data configured", function () {
   test("completes successfully with no currencies, investments, or benchmarks", async function () {
     // Mock fetch to return empty rates (no non-GBP currencies exist yet)
     globalThis.fetch = mock(async function () {
@@ -75,7 +75,7 @@ describe("runFullScrape — with no data configured", function () {
       };
     });
 
-    const summary = await runFullScrape({ startedBy: 0 });
+    const summary = await runFullPriceUpdate({ startedBy: 0 });
 
     expect(summary).toBeDefined();
     expect(summary.currencySuccess).toBe(true);
@@ -101,7 +101,7 @@ describe("runFullScrape — with no data configured", function () {
     let callbackCalled = false;
     let callbackData = null;
 
-    await runFullScrape({
+    await runFullPriceUpdate({
       startedBy: 0,
       onCurrencyRates: function (result) {
         callbackCalled = true;
@@ -127,7 +127,7 @@ describe("runFullScrape — with no data configured", function () {
 
     let completeSummary = null;
 
-    await runFullScrape({
+    await runFullPriceUpdate({
       startedBy: 0,
       onComplete: function (summary) {
         completeSummary = summary;
@@ -140,7 +140,7 @@ describe("runFullScrape — with no data configured", function () {
   });
 });
 
-describe("runFullScrape — with non-GBP currency", function () {
+describe("runFullPriceUpdate — with non-GBP currency", function () {
   test("fetches currency rates for configured currencies", async function () {
     // Add a USD currency
     createCurrency({ code: "USD", description: "US Dollar" });
@@ -161,7 +161,7 @@ describe("runFullScrape — with non-GBP currency", function () {
       };
     });
 
-    const summary = await runFullScrape({ startedBy: 1 });
+    const summary = await runFullPriceUpdate({ startedBy: 1 });
 
     expect(summary.currencySuccess).toBe(true);
     // Verify the Frankfurter API was called with USD
@@ -169,7 +169,7 @@ describe("runFullScrape — with non-GBP currency", function () {
   });
 });
 
-describe("runFullScrape — currency rate failure", function () {
+describe("runFullPriceUpdate — currency rate failure", function () {
   test("reports currency failure when API returns error", async function () {
     globalThis.fetch = mock(async function () {
       return {
@@ -181,13 +181,13 @@ describe("runFullScrape — currency rate failure", function () {
       };
     });
 
-    const summary = await runFullScrape({ startedBy: 0 });
+    const summary = await runFullPriceUpdate({ startedBy: 0 });
 
     expect(summary.currencySuccess).toBe(false);
   });
 });
 
-describe("runFullScrape — error handling", function () {
+describe("runFullPriceUpdate — error handling", function () {
   test("calls onError callback on fatal error", async function () {
     globalThis.fetch = mock(async function () {
       throw new Error("Network failure");
@@ -195,7 +195,7 @@ describe("runFullScrape — error handling", function () {
 
     let errorCaught = null;
 
-    await runFullScrape({
+    await runFullPriceUpdate({
       startedBy: 0,
       onError: function (err) {
         errorCaught = err;
@@ -210,7 +210,7 @@ describe("runFullScrape — error handling", function () {
   });
 });
 
-describe("runFullScrape — delay profile", function () {
+describe("runFullPriceUpdate — delay profile", function () {
   test("sets SCRAPE_DELAY_PROFILE env var and restores it", async function () {
     // Save current value
     const originalProfile = process.env.SCRAPE_DELAY_PROFILE;
@@ -226,7 +226,7 @@ describe("runFullScrape — delay profile", function () {
       };
     });
 
-    await runFullScrape({
+    await runFullPriceUpdate({
       startedBy: 1,
       delayProfile: "cron",
     });

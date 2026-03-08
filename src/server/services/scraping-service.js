@@ -57,7 +57,7 @@ function sleep(ms) {
  *   failedBenchmarkIds, priceSuccessCount, priceFailCount, benchmarkSuccessCount,
  *   benchmarkFailCount, currencySuccess
  */
-export async function runFullScrape(options = {}) {
+export async function runFullPriceUpdate(options = {}) {
   const startedBy = options.startedBy || 0;
   const delayProfile = options.delayProfile || null;
   const onCurrencyRates = options.onCurrencyRates || null;
