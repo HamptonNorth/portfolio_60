@@ -917,8 +917,9 @@ export async function backfillInvestmentPrices(progressCallback) {
       itemsProcessedInBatch = 0;
       if (cooldownSeconds > 0) {
         progressCallback({
-          type: "progress",
+          type: "cooldown",
           message: "Batch complete — cooling down for " + cooldownSeconds + "s to avoid rate-limiting...",
+          cooldownSeconds: cooldownSeconds,
         });
         await new Promise(function (resolve) {
           setTimeout(resolve, cooldownSeconds * 1000);
@@ -1145,8 +1146,9 @@ export async function backfillBenchmarkValues(progressCallback) {
       itemsProcessedInBatch = 0;
       if (cooldownSeconds > 0) {
         progressCallback({
-          type: "progress",
+          type: "cooldown",
           message: "Batch complete — cooling down for " + cooldownSeconds + "s to avoid rate-limiting...",
+          cooldownSeconds: cooldownSeconds,
         });
         await new Promise(function (resolve) {
           setTimeout(resolve, cooldownSeconds * 1000);

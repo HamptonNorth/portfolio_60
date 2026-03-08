@@ -369,6 +369,57 @@ function setProgress(text) {
 }
 
 /**
+ * @description Show a decrementing green progress bar during a cooldown pause.
+ * Updates the progress text each second and smoothly shrinks the bar from
+ * 100% to 0%. Returns a promise that resolves when the countdown finishes.
+ * @param {number} totalSeconds - Total cooldown duration in seconds
+ * @param {string} messagePrefix - Text shown before the countdown (e.g. "Batch 2 of 5 complete")
+ * @returns {Promise<void>} Resolves when the cooldown is complete
+ */
+function showCooldownBar(totalSeconds, messagePrefix) {
+  return new Promise(function (resolve) {
+    const barContainer = document.getElementById("cooldown-bar-container");
+    const bar = document.getElementById("cooldown-bar");
+    if (!barContainer || !bar) {
+      // Fall back to a simple sleep if the bar elements are missing
+      setTimeout(resolve, totalSeconds * 1000);
+      return;
+    }
+
+    let remaining = totalSeconds;
+    setProgress(messagePrefix + " Cooldown: " + remaining + "s...");
+
+    // Reset bar to full width instantly, then allow transitions for shrinking
+    bar.style.transition = "none";
+    bar.style.width = "100%";
+    barContainer.classList.remove("hidden");
+
+    // Force a reflow so the reset takes effect before re-enabling transition
+    void bar.offsetWidth;
+    bar.style.transition = "width 1s linear";
+
+    const countdownId = setInterval(function () {
+      remaining--;
+      if (remaining > 0) {
+        setProgress(messagePrefix + " Cooldown: " + remaining + "s...");
+        const pct = (remaining / totalSeconds) * 100;
+        bar.style.width = pct + "%";
+      } else {
+        bar.style.width = "0%";
+      }
+    }, 1000);
+
+    setTimeout(function () {
+      clearInterval(countdownId);
+      barContainer.classList.add("hidden");
+      bar.style.transition = "none";
+      bar.style.width = "100%";
+      resolve();
+    }, totalSeconds * 1000);
+  });
+}
+
+/**
  * @description Build the currency rates results section.
  * @param {Object} data - The currency rates response data
  * @returns {string} HTML string for the section
@@ -709,7 +760,10 @@ function fetchPriceBatch(ids, skipCurrencyRates, completedIds) {
 
     source.addEventListener("backfill_progress", function (event) {
       const data = JSON.parse(event.data);
-      if (data.message) {
+      if (data.cooldownSeconds) {
+        // Server is pausing — show a decrementing progress bar client-side
+        showCooldownBar(data.cooldownSeconds, "Backfill: Batch complete.");
+      } else if (data.message) {
         setProgress("Backfill: " + data.message);
       }
     });
@@ -894,18 +948,8 @@ async function fetchPricesStream() {
 
     // Cooldown between batches (skip after the last batch)
     if (batchIndex < numBatches - 1 && cooldownSeconds > 0) {
-      let remaining = cooldownSeconds;
-      setProgress("Batch " + batchNum + " of " + numBatches + " complete (" + completedInvestmentIds.size + " of " + totalCount + " done). Cooldown: " + remaining + "s...");
-
-      const countdownId = setInterval(function () {
-        remaining--;
-        if (remaining > 0) {
-          setProgress("Batch " + batchNum + " of " + numBatches + " complete (" + completedInvestmentIds.size + " of " + totalCount + " done). Cooldown: " + remaining + "s...");
-        }
-      }, 1000);
-
-      await clientSleep(cooldownSeconds * 1000);
-      clearInterval(countdownId);
+      const prefix = "Batch " + batchNum + " of " + numBatches + " complete (" + completedInvestmentIds.size + " of " + totalCount + " done).";
+      await showCooldownBar(cooldownSeconds, prefix);
       setProgress("Starting batch " + (batchNum + 1) + "...");
     }
   }
@@ -974,7 +1018,10 @@ function fetchBenchmarkBatch(ids, completedIds) {
 
     source.addEventListener("backfill_progress", function (event) {
       const data = JSON.parse(event.data);
-      if (data.message) {
+      if (data.cooldownSeconds) {
+        // Server is pausing — show a decrementing progress bar client-side
+        showCooldownBar(data.cooldownSeconds, "Backfill: Batch complete.");
+      } else if (data.message) {
         setProgress("Backfill: " + data.message);
       }
     });
@@ -1126,18 +1173,8 @@ async function fetchBenchmarksStream() {
 
     // Cooldown between batches (skip after the last batch)
     if (batchIndex < numBatches - 1 && cooldownSeconds > 0) {
-      let remaining = cooldownSeconds;
-      setProgress("Batch " + batchNum + " of " + numBatches + " complete (" + completedBenchmarkIds.size + " of " + totalCount + " done). Cooldown: " + remaining + "s...");
-
-      const countdownId = setInterval(function () {
-        remaining--;
-        if (remaining > 0) {
-          setProgress("Batch " + batchNum + " of " + numBatches + " complete (" + completedBenchmarkIds.size + " of " + totalCount + " done). Cooldown: " + remaining + "s...");
-        }
-      }, 1000);
-
-      await clientSleep(cooldownSeconds * 1000);
-      clearInterval(countdownId);
+      const prefix = "Batch " + batchNum + " of " + numBatches + " complete (" + completedBenchmarkIds.size + " of " + totalCount + " done).";
+      await showCooldownBar(cooldownSeconds, prefix);
       setProgress("Starting batch " + (batchNum + 1) + "...");
     }
   }
