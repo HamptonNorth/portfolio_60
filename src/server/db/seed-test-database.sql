@@ -154,7 +154,7 @@ INSERT INTO accounts (user_id, account_type, account_ref, cash_balance, warn_cas
 INSERT INTO holdings (account_id, investment_id, quantity, average_cost) VALUES
     (1,  3,   6250000,  372600),
     (1,  2,   3500000,  294500),
-    (1,  6, 137500000,   19100),
+    (1,  6,   1375000,   19100),
     (1,  7,  27500000,  132700);
 
 -- Ben ISA (account 2): Fidelity Index World, Jupiter Gold & Silver, Polar Capital Tech
