@@ -109,6 +109,7 @@ export function getPortfolioSummary(userId) {
   return {
     user: {
       id: user.id,
+      initials: user.initials,
       first_name: user.first_name,
       last_name: user.last_name,
     },

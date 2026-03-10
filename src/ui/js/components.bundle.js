@@ -1654,7 +1654,8 @@ class AppNavbar extends LitElement {
             <li class="relative group">
               <span class="hover:text-brand-200 transition-colors cursor-pointer select-none" data-nav-parent="reports">Reports <span class="text-xs">&#9662;</span></span>
               <div class="hidden group-hover:block absolute left-0 top-full pt-1 z-50">
-                <div class="bg-white text-brand-800 rounded-md shadow-lg border border-brand-200 py-1 min-w-48">
+                <div class="bg-white text-brand-800 rounded-md shadow-lg border border-brand-200 py-1 min-w-48" id="nav-reports-dropdown">
+                  <a href="/pages/reports.html?block=portfolio_summary" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="report-portfolio-summary">Portfolio Summary</a>
                   <a href="/pages/reports.html?block=household_assets" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="report-household">Household Assets</a>
                 </div>
               </div>
@@ -1712,7 +1713,36 @@ class AppNavbar extends LitElement {
     }
     this._loadLists();
     this._loadDocs();
+    this._loadCompositeReports();
     this._checkTestMode();
+  }
+  async _loadCompositeReports() {
+    try {
+      const response = await fetch("/api/reports");
+      if (!response.ok) return;
+      const reports = await response.json();
+      if (!Array.isArray(reports) || reports.length === 0) return;
+
+      const dropdown = document.getElementById("nav-reports-dropdown");
+      if (!dropdown) return;
+
+      // Add a divider between report blocks and composite reports
+      const hr = document.createElement("hr");
+      hr.className = "my-1 border-brand-200";
+      dropdown.appendChild(hr);
+
+      for (var i = 0; i < reports.length; i++) {
+        var report = reports[i];
+        var link = document.createElement("a");
+        link.href = "/pages/reports.html?report=" + encodeURIComponent(report.id);
+        link.className = "block px-4 py-2 hover:bg-brand-50 transition-colors";
+        link.setAttribute("data-nav", "report-" + report.id);
+        link.textContent = report.title;
+        dropdown.appendChild(link);
+      }
+    } catch (err) {
+      // Silently ignore — composite reports menu items are optional
+    }
   }
   async _checkTestMode() {
     try {

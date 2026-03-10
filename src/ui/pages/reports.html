@@ -6,9 +6,17 @@
         <title>Portfolio 60 — Reports</title>
         <link rel="stylesheet" href="/css/output.css" />
         <link rel="icon" type="image/svg+xml" href="/images/favicon.svg" />
+        <style>
+            /* Print: suppress screen-only spacing between pages */
+            @media print {
+                .report-page {
+                    margin-bottom: 0 !important;
+                }
+            }
+        </style>
     </head>
     <body class="bg-brand-25 text-brand-900 min-h-screen flex flex-col">
-        <header class="bg-brand-800 text-white px-6 py-3">
+        <header id="report-header" class="bg-brand-800 text-white px-6 py-3">
             <div class="max-w-7xl mx-auto flex items-center gap-3">
                 <img src="/images/favicon.svg" alt="" class="h-6 w-6" />
                 <span class="text-lg font-semibold">Portfolio 60</span>
@@ -21,13 +29,23 @@
         </main>
         <script src="/js/app.js"></script>
         <script src="/js/report-blocks/household-assets.js"></script>
+        <script src="/js/report-blocks/portfolio-summary.js"></script>
+        <script src="/js/report-runner.js"></script>
         <script>
             document.addEventListener("DOMContentLoaded", function () {
-                var params = new URLSearchParams(window.location.search);
-                var block = params.get("block");
+                var urlParams = new URLSearchParams(window.location.search);
+                var block = urlParams.get("block");
+                var reportId = urlParams.get("report");
 
-                if (block === "household_assets") {
+                if (reportId) {
+                    // Composite report: hide the static page header (runner adds per-page headers)
+                    var pageHeader = document.getElementById("report-header");
+                    if (pageHeader) pageHeader.style.display = "none";
+                    runCompositeReport(reportId, "report-container");
+                } else if (block === "household_assets") {
                     renderHouseholdAssets("report-container");
+                } else if (block === "portfolio_summary") {
+                    renderPortfolioSummary("report-container");
                 } else {
                     document.getElementById("report-container").innerHTML =
                         '<p class="text-brand-500">Unknown report block: ' + (block || "none") + "</p>";

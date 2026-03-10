@@ -1,0 +1,11 @@
+[
+  {
+    "id": "weekly_summary",
+    "title": "Weekly Summary",
+    "blocks": [
+      { "type": "household_assets", "params": [] },
+      { "type": "new_page" },
+      { "type": "portfolio_summary_valuation", "params": ["AW", "BW", "AW + BW"] }
+    ]
+  }
+]

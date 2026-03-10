@@ -20,6 +20,7 @@ import { handleDrawdownSchedulesRoute } from "./routes/drawdown-schedules-routes
 import { handleHoldingMovementsRoute } from "./routes/holding-movements-routes.js";
 import { handleDocsRoute } from "./routes/docs-routes.js";
 import { handleOtherAssetsRoute } from "./routes/other-assets-routes.js";
+import { handleReportsRoute } from "./routes/reports-routes.js";
 import { initScheduledScraper, stopScheduledScraper } from "./services/scheduled-scraper.js";
 import { launchBrowser } from "./scrapers/browser-utils.js";
 import { processDrawdowns } from "./services/drawdown-processor.js";
@@ -324,6 +325,14 @@ const server = Bun.serve({
       const otherAssetsResult = await handleOtherAssetsRoute(method, path, request);
       if (otherAssetsResult) {
         return otherAssetsResult;
+      }
+    }
+
+    // Composite report definitions
+    if (path.startsWith("/api/reports")) {
+      const reportsResult = await handleReportsRoute(method, path, request);
+      if (reportsResult) {
+        return reportsResult;
       }
     }
 

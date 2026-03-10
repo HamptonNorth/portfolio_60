@@ -73,8 +73,9 @@ function reportTodayFormatted() {
  * @description Render the Household Assets report into a container element.
  * Fetches data from /api/other-assets/summary and builds a grouped table.
  * @param {string} containerId - The ID of the container element to render into
+ * @param {Array} [params] - Reserved for future filtering (currently unused)
  */
-async function renderHouseholdAssets(containerId) {
+async function renderHouseholdAssets(containerId, params) {
   const container = document.getElementById(containerId);
 
   const result = await apiRequest("/api/other-assets/summary");
@@ -233,13 +234,15 @@ async function renderHouseholdAssets(containerId) {
   html += "</tr>";
 
   html += "</table></div>";
-  html += '<div class="mt-6 border-t-2 border-brand-300 pt-1">';
 
-  // Date footer
-  html +=
-    '<p class="mt-8 font-light text-xs text-brand-600">' +
-    reportTodayFormatted() +
-    "</p>";
+  // Date footer (suppressed when running inside a composite report)
+  if (!window._compositeReport) {
+    html += '<div class="mt-6 border-t-2 border-brand-300 pt-1">';
+    html +=
+      '<p class="mt-8 font-light text-xs text-brand-600">' +
+      reportTodayFormatted() +
+      "</p>";
+  }
 
   container.innerHTML = html;
 }
