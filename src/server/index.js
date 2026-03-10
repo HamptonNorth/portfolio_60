@@ -21,6 +21,7 @@ import { handleHoldingMovementsRoute } from "./routes/holding-movements-routes.j
 import { handleDocsRoute } from "./routes/docs-routes.js";
 import { handleOtherAssetsRoute } from "./routes/other-assets-routes.js";
 import { handleReportsRoute } from "./routes/reports-routes.js";
+import { handlePortfolioDetailRoute } from "./routes/portfolio-detail-routes.js";
 import { initScheduledScraper, stopScheduledScraper } from "./services/scheduled-scraper.js";
 import { launchBrowser } from "./scrapers/browser-utils.js";
 import { processDrawdowns } from "./services/drawdown-processor.js";
@@ -199,7 +200,14 @@ const server = Bun.serve({
       }
     }
 
-    // Portfolio summary routes
+    // Portfolio routes (detail must be checked before summary since both start with /api/portfolio)
+    if (path.startsWith("/api/portfolio/detail")) {
+      const detailResult = await handlePortfolioDetailRoute(method, path, request);
+      if (detailResult) {
+        return detailResult;
+      }
+    }
+
     if (path.startsWith("/api/portfolio")) {
       const portfolioResult = await handlePortfolioRoute(method, path, request);
       if (portfolioResult) {

@@ -8,8 +8,45 @@
  * Report block types:
  *   - "household_assets"              → renderHouseholdAssets(id, params)
  *   - "portfolio_summary_valuation"   → renderPortfolioSummary(id, params)
+ *   - "portfolio_detail_valuation"   → renderPortfolioDetailValuation(id, params)
  *   - "new_page"                      → starts a new page
  */
+
+/**
+ * @description Inject CSS named page rules for per-page layout control.
+ * Uses the CSS "page" property to assign named page types to elements,
+ * allowing portrait and landscape pages within the same print job.
+ * Called once when the report runner starts.
+ */
+function injectPageLayoutStyles() {
+  // Only inject once
+  if (document.getElementById("report-layout-style")) return;
+
+  var style = document.createElement("style");
+  style.id = "report-layout-style";
+  style.textContent =
+    "@page report-portrait { size: A4 portrait; } " +
+    "@page report-landscape { size: A4 landscape; } " +
+    ".report-layout-portrait { page: report-portrait; } " +
+    ".report-layout-landscape { page: report-landscape; }";
+  document.head.appendChild(style);
+}
+
+/**
+ * @description Determine the layout for a page from its blocks.
+ * Uses the layout property of the first block that specifies one.
+ * Defaults to "portrait" if no block specifies a layout.
+ * @param {Array<Object>} pageBlocks - The blocks on this page
+ * @returns {string} "portrait" or "landscape"
+ */
+function getPageLayout(pageBlocks) {
+  for (var i = 0; i < pageBlocks.length; i++) {
+    if (pageBlocks[i].layout) {
+      return pageBlocks[i].layout === "landscape" ? "landscape" : "portrait";
+    }
+  }
+  return "portrait";
+}
 
 /**
  * @description Registry mapping block type names to their render functions.
@@ -19,6 +56,7 @@
 const REPORT_BLOCK_REGISTRY = {
   household_assets: renderHouseholdAssets,
   portfolio_summary_valuation: renderPortfolioSummary,
+  portfolio_detail_valuation: renderPortfolioDetailValuation,
 };
 
 /**
@@ -94,6 +132,9 @@ async function runCompositeReport(reportId, containerId) {
 
   var report = result.data;
 
+  // Inject CSS named page rules for per-page layout switching
+  injectPageLayoutStyles();
+
   // Signal to block render functions to suppress their own footers
   window._compositeReport = true;
 
@@ -116,10 +157,15 @@ async function runCompositeReport(reportId, containerId) {
   container.innerHTML = "";
 
   for (var p = 0; p < pages.length; p++) {
-    // Page wrapper — mb-16 for screen spacing between pages, print CSS
-    // overrides to flex-col + min-h-100vh to pin footer to page bottom
+    // Determine page layout from its blocks (portrait or landscape)
+    var pageLayout = getPageLayout(pages[p]);
+
+    // Page wrapper — mb-16 for screen spacing between pages
+    // report-layout-* class triggers the CSS named page for print orientation
     var pageDiv = document.createElement("div");
-    pageDiv.className = "report-page mb-16" + (p > 0 ? " break-before-page" : "");
+    pageDiv.className =
+      "report-page mb-16 report-layout-" + pageLayout +
+      (p > 0 ? " break-before-page" : "");
 
     // Page header
     var headerDiv = document.createElement("div");

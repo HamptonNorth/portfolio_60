@@ -133,6 +133,38 @@ export function getPriceByDate(investmentId, priceDate) {
 }
 
 /**
+ * @description Get the nearest price for an investment on or before a given date.
+ * Useful for historic lookups where the exact date may not have a price
+ * (weekends, bank holidays, etc.).
+ * @param {number} investmentId - The investment ID
+ * @param {string} priceDate - ISO-8601 date (YYYY-MM-DD) upper bound
+ * @returns {Object|null} Price record with unscaled price, or null if none found
+ */
+export function getPriceOnOrBefore(investmentId, priceDate) {
+  const db = getDatabase();
+  const row = db
+    .query(
+      `SELECT id, investment_id, price_date, price_time, price
+       FROM prices
+       WHERE investment_id = ? AND price_date <= ?
+       ORDER BY price_date DESC
+       LIMIT 1`,
+    )
+    .get(investmentId, priceDate);
+
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    investment_id: row.investment_id,
+    price_date: row.price_date,
+    price_time: row.price_time,
+    price: row.price / CURRENCY_SCALE_FACTOR,
+    price_scaled: row.price,
+  };
+}
+
+/**
  * @description Scale a price value for storage (multiply by CURRENCY_SCALE_FACTOR).
  * @param {number} price - The price in minor units
  * @returns {number} Scaled integer value
