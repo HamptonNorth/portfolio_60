@@ -535,6 +535,102 @@ export function validateDrawdownSchedule(data) {
 }
 
 /**
+ * @description Valid categories for other assets.
+ * @type {string[]}
+ */
+const OTHER_ASSET_CATEGORIES = ["pension", "property", "savings", "alternative"];
+
+/**
+ * @description Valid frequencies for recurring other assets.
+ * @type {string[]}
+ */
+const OTHER_ASSET_FREQUENCIES = ["weekly", "fortnightly", "4_weeks", "monthly", "quarterly", "6_monthly", "annually"];
+
+/**
+ * @description Validate other asset data for create or update operations.
+ * Returns an array of error messages (empty if all valid).
+ * @param {Object} data - The other asset data to validate
+ * @returns {string[]} Array of validation error messages
+ */
+export function validateOtherAsset(data) {
+  const errors = [];
+
+  // Required fields
+  const requiredChecks = [
+    validateRequired(data.user_id, "User"),
+    validateRequired(data.description, "Description"),
+    validateRequired(data.category, "Category"),
+    validateRequired(data.value_type, "Value type"),
+  ];
+
+  for (const error of requiredChecks) {
+    if (error) errors.push(error);
+  }
+
+  // user_id must be a positive integer
+  if (data.user_id !== undefined && data.user_id !== null) {
+    const userId = Number(data.user_id);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      errors.push("User must be a valid selection");
+    }
+  }
+
+  // category must be one of the allowed values
+  if (data.category !== undefined && data.category !== null) {
+    const category = String(data.category).trim();
+    if (category !== "" && !OTHER_ASSET_CATEGORIES.includes(category)) {
+      errors.push("Category must be one of: " + OTHER_ASSET_CATEGORIES.join(", "));
+    }
+  }
+
+  // value_type must be 'recurring' or 'value'
+  if (data.value_type !== undefined && data.value_type !== null) {
+    const valueType = String(data.value_type).trim();
+    if (valueType !== "" && valueType !== "recurring" && valueType !== "value") {
+      errors.push("Value type must be 'recurring' or 'value'");
+    }
+  }
+
+  // frequency: required for recurring, must be null/absent for value type
+  if (data.value_type === "recurring") {
+    const freqError = validateRequired(data.frequency, "Frequency");
+    if (freqError) {
+      errors.push(freqError);
+    } else if (!OTHER_ASSET_FREQUENCIES.includes(String(data.frequency).trim())) {
+      errors.push("Frequency must be one of: " + OTHER_ASSET_FREQUENCIES.join(", "));
+    }
+  } else if (data.value_type === "value") {
+    if (data.frequency !== undefined && data.frequency !== null && String(data.frequency).trim() !== "") {
+      errors.push("Frequency must not be set for value-type assets");
+    }
+  }
+
+  // value required, must be >= 0
+  const valueError = validateRequired(data.value, "Value");
+  if (valueError) {
+    errors.push(valueError);
+  } else {
+    const value = Number(data.value);
+    if (isNaN(value) || value < 0) {
+      errors.push("Value must be zero or a positive number");
+    }
+  }
+
+  // Max length checks
+  const lengthChecks = [
+    validateMaxLength(data.description, 40, "Description"),
+    validateMaxLength(data.notes, 60, "Notes"),
+    validateMaxLength(data.executor_reference, 80, "Executor reference"),
+  ];
+
+  for (const error of lengthChecks) {
+    if (error) errors.push(error);
+  }
+
+  return errors;
+}
+
+/**
  * @description Validate benchmark data for create or update operations.
  * Returns an array of error messages (empty if all valid).
  * Note: The check that index benchmarks must use GBP currency is done at the route

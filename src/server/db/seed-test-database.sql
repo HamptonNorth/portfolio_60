@@ -98,8 +98,10 @@ INSERT INTO benchmarks (currencies_id, benchmark_type, description, benchmark_ur
 
 -- ============================================================================
 -- USERS
+-- Joint (id=1) already exists from seed.sql.
 -- Two family members, both with Interactive Investor (ii) accounts.
 -- NI numbers and UTRs are fictitious test data.
+-- User IDs: Joint=1, Ben=2, Alexis=3
 -- ============================================================================
 
 INSERT INTO users (initials, first_name, last_name, ni_number, utr, provider, trading_ref, isa_ref, sipp_ref) VALUES
@@ -113,12 +115,12 @@ INSERT INTO users (initials, first_name, last_name, ni_number, utr, provider, tr
 -- ============================================================================
 
 INSERT INTO accounts (user_id, account_type, account_ref, cash_balance, warn_cash) VALUES
-    (1, 'sipp',    '3366521', 48500000, 20000000),
-    (1, 'isa',     '3366527',  9857500,  1500000),
-    (1, 'trading', '3366524', 17500000,  1500000),
-    (2, 'sipp',    '3633175', 36540000, 16000000),
-    (2, 'trading', '3633173',  2140000,  1500000),
-    (2, 'isa',     '3633174',  7880000,  1500000);
+    (2, 'sipp',    '3366521', 48500000, 20000000),
+    (2, 'isa',     '3366527',  9857500,  1500000),
+    (2, 'trading', '3366524', 17500000,  1500000),
+    (3, 'sipp',    '3633175', 36540000, 16000000),
+    (3, 'trading', '3633173',  2140000,  1500000),
+    (3, 'isa',     '3633174',  7880000,  1500000);
 
 -- ============================================================================
 -- HOLDINGS
@@ -198,3 +200,22 @@ INSERT INTO cash_transactions (account_id, transaction_type, transaction_date, a
     (4, 'deposit', '2026-03-02', 36540000, 'Opening balance'),
     (5, 'deposit', '2026-03-02',  2140000, 'Opening balance'),
     (6, 'deposit', '2026-03-02',  7880000, 'Opening balance');
+
+-- ============================================================================
+-- OTHER ASSETS
+-- Non-portfolio financial assets: pensions, property, savings, alternatives.
+-- User IDs: Joint=1, Ben=2, Alexis=3
+-- value is stored as GBP × 10000.
+-- ============================================================================
+
+INSERT INTO other_assets (user_id, description, category, value_type, frequency, value, notes, executor_reference, last_updated) VALUES
+    (3, 'State Pension',           'pension', 'recurring', '4_weeks',    8450000, NULL, NULL, '2026-05-01'),
+    (2, 'State Pension',           'pension', 'recurring', '4_weeks',    9740000, NULL, NULL, '2026-05-01'),
+    (3, 'NHS Pension',             'pension', 'recurring', 'monthly',   10240000, NULL, NULL, '2026-03-01'),
+    (2, 'Scottish Widows Annuity', 'pension', 'recurring', 'monthly',    6000000, 'Fixed, 50% spouse', 'Policy SW/2013-45671', '2026-01-01'),
+    (3, 'SIPP Income',            'pension', 'recurring', 'annually',  30000000, NULL, NULL, '2026-01-01'),
+    (2, 'SIPP Income',            'pension', 'recurring', 'annually',  50000000, NULL, NULL, '2026-01-01'),
+    (1, '12 Primrose Av',         'property', 'value', NULL, 4450000000, NULL, NULL, '2024-01-01'),
+    (1, 'Cars',                   'property', 'value', NULL,  250000000, NULL, NULL, '2026-01-01'),
+    (2, 'Barclays Saving A/c',    'savings', 'value', NULL,   37500000, NULL, NULL, '2026-03-01'),
+    (3, 'Premium Bonds',          'savings', 'value', NULL,   25000000, NULL, NULL, '2010-12-01');

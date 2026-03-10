@@ -177,6 +177,32 @@ CREATE TABLE IF NOT EXISTS drawdown_schedules (
     FOREIGN KEY (account_id) REFERENCES accounts(id)
 );
 
+-- Other assets: non-portfolio financial assets (pensions, property, savings, alternatives)
+CREATE TABLE IF NOT EXISTS other_assets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    description TEXT NOT NULL CHECK(length(description) <= 40),
+    category TEXT NOT NULL CHECK(category IN ('pension', 'property', 'savings', 'alternative')),
+    value_type TEXT NOT NULL CHECK(value_type IN ('recurring', 'value')),
+    frequency TEXT CHECK(frequency IS NULL OR frequency IN ('weekly', 'fortnightly', '4_weeks', 'monthly', 'quarterly', '6_monthly', 'annually')),
+    value INTEGER NOT NULL DEFAULT 0,
+    notes TEXT CHECK(notes IS NULL OR length(notes) <= 60),
+    executor_reference TEXT CHECK(executor_reference IS NULL OR length(executor_reference) <= 80),
+    last_updated TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+-- Other assets history: tracks changes to value, notes, and executor_reference
+CREATE TABLE IF NOT EXISTS other_assets_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    other_asset_id INTEGER NOT NULL,
+    change_date TEXT NOT NULL,
+    revised_value INTEGER NOT NULL,
+    revised_notes TEXT CHECK(revised_notes IS NULL OR length(revised_notes) <= 80),
+    revised_executor_reference TEXT CHECK(revised_executor_reference IS NULL OR length(revised_executor_reference) <= 80),
+    FOREIGN KEY (other_asset_id) REFERENCES other_assets(id) ON DELETE CASCADE
+);
+
 -- Indexes for query performance
 CREATE INDEX IF NOT EXISTS idx_currency_rates_lookup ON currency_rates(currencies_id, rate_date DESC);
 CREATE INDEX IF NOT EXISTS idx_investments_type ON investments(investment_type_id);
@@ -194,3 +220,6 @@ CREATE INDEX IF NOT EXISTS idx_holdings_investment ON holdings(investment_id);
 CREATE INDEX IF NOT EXISTS idx_cash_transactions_account ON cash_transactions(account_id, transaction_date DESC);
 CREATE INDEX IF NOT EXISTS idx_holding_movements_holding ON holding_movements(holding_id, movement_date DESC);
 CREATE INDEX IF NOT EXISTS idx_drawdown_schedules_account ON drawdown_schedules(account_id);
+CREATE INDEX IF NOT EXISTS idx_other_assets_user ON other_assets(user_id);
+CREATE INDEX IF NOT EXISTS idx_other_assets_category ON other_assets(category);
+CREATE INDEX IF NOT EXISTS idx_other_assets_history_asset ON other_assets_history(other_asset_id, change_date DESC);

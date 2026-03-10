@@ -1637,6 +1637,7 @@ class AppNavbar extends LitElement {
                   <a href="/pages/global-events.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="global-events">Global Events</a>
                   <a href="/pages/scraping.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="scraping">Fetching</a>
                   <a href="/pages/portfolio.html?view=setup" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="portfolio-setup">Portfolio Setup</a>
+                  <a href="/pages/other-assets.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="other-assets">Other Assets</a>
                   <hr class="my-1 border-brand-200" />
                   <a href="/pages/backup.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="backup">Backup</a>
                 </div>
@@ -1650,7 +1651,14 @@ class AppNavbar extends LitElement {
                 </div>
               </div>
             </li>
-            <li><span class="text-brand-400 cursor-not-allowed select-none">Reports</span></li>
+            <li class="relative group">
+              <span class="hover:text-brand-200 transition-colors cursor-pointer select-none" data-nav-parent="reports">Reports <span class="text-xs">&#9662;</span></span>
+              <div class="hidden group-hover:block absolute left-0 top-full pt-1 z-50">
+                <div class="bg-white text-brand-800 rounded-md shadow-lg border border-brand-200 py-1 min-w-48">
+                  <a href="/pages/reports.html?block=household_assets" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="report-household">Household Assets</a>
+                </div>
+              </div>
+            </li>
             <li class="relative group" id="nav-docs-item" style="display:none">
               <span class="hover:text-brand-200 transition-colors cursor-pointer select-none" data-nav-parent="docs">Docs <span class="text-xs">&#9662;</span></span>
               <div class="hidden group-hover:block absolute left-0 top-full pt-1 z-50">

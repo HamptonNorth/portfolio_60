@@ -19,6 +19,7 @@ import { handleCashTransactionsRoute } from "./routes/cash-transactions-routes.j
 import { handleDrawdownSchedulesRoute } from "./routes/drawdown-schedules-routes.js";
 import { handleHoldingMovementsRoute } from "./routes/holding-movements-routes.js";
 import { handleDocsRoute } from "./routes/docs-routes.js";
+import { handleOtherAssetsRoute } from "./routes/other-assets-routes.js";
 import { initScheduledScraper, stopScheduledScraper } from "./services/scheduled-scraper.js";
 import { launchBrowser } from "./scrapers/browser-utils.js";
 import { processDrawdowns } from "./services/drawdown-processor.js";
@@ -315,6 +316,14 @@ const server = Bun.serve({
       const investmentsResult = await handleInvestmentsRoute(method, path, request);
       if (investmentsResult) {
         return investmentsResult;
+      }
+    }
+
+    // Other assets routes (CRUD + summary)
+    if (path.startsWith("/api/other-assets")) {
+      const otherAssetsResult = await handleOtherAssetsRoute(method, path, request);
+      if (otherAssetsResult) {
+        return otherAssetsResult;
       }
     }
 

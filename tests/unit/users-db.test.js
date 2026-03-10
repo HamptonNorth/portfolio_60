@@ -32,9 +32,11 @@ afterAll(() => {
 });
 
 describe("Users DB - getAllUsers", () => {
-  test("returns empty array when no users exist", () => {
+  test("returns only the Joint user from seed data", () => {
     const users = getAllUsers();
-    expect(users).toEqual([]);
+    expect(users.length).toBe(1);
+    expect(users[0].first_name).toBe("Joint");
+    expect(users[0].last_name).toBe("Household");
   });
 });
 
@@ -84,10 +86,11 @@ describe("Users DB - createUser", () => {
 describe("Users DB - getAllUsers after inserts", () => {
   test("returns all users ordered by last name then first name", () => {
     const users = getAllUsers();
-    expect(users.length).toBe(2);
-    // Jones comes before Smith alphabetically
-    expect(users[0].last_name).toBe("Jones");
-    expect(users[1].last_name).toBe("Smith");
+    expect(users.length).toBe(3); // Joint (seed) + Smith + Jones
+    // Household, Jones, Smith alphabetically by last name
+    expect(users[0].last_name).toBe("Household");
+    expect(users[1].last_name).toBe("Jones");
+    expect(users[2].last_name).toBe("Smith");
   });
 });
 

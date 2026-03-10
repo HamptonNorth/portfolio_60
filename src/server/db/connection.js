@@ -535,6 +535,56 @@ function runMigrations(database) {
     // No rows to clear, but still add the marker so this doesn't re-run
     database.exec("ALTER TABLE investments ADD COLUMN ms_id_cleared INTEGER NOT NULL DEFAULT 1");
   }
+
+  // Migration 21: Add other_assets and other_assets_history tables, plus Joint user (v0.15.0)
+  // Tracks non-portfolio financial assets (pensions, property, savings, alternative assets).
+  const otherAssetsTable = database.query(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='other_assets'"
+  ).get();
+
+  if (!otherAssetsTable) {
+    // Insert the Joint user row if it doesn't already exist
+    const jointUser = database.query(
+      "SELECT id FROM users WHERE first_name = 'Joint' AND last_name = 'Household'"
+    ).get();
+    if (!jointUser) {
+      database.exec(
+        "INSERT INTO users (initials, first_name, last_name, provider) VALUES ('JNT', 'Joint', 'Household', '-')"
+      );
+    }
+
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS other_assets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        description TEXT NOT NULL CHECK(length(description) <= 40),
+        category TEXT NOT NULL CHECK(category IN ('pension', 'property', 'savings', 'alternative')),
+        value_type TEXT NOT NULL CHECK(value_type IN ('recurring', 'value')),
+        frequency TEXT CHECK(frequency IS NULL OR frequency IN ('weekly', 'fortnightly', '4_weeks', 'monthly', 'quarterly', '6_monthly', 'annually')),
+        value INTEGER NOT NULL DEFAULT 0,
+        notes TEXT CHECK(notes IS NULL OR length(notes) <= 60),
+        executor_reference TEXT CHECK(executor_reference IS NULL OR length(executor_reference) <= 80),
+        last_updated TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      )
+    `);
+
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS other_assets_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        other_asset_id INTEGER NOT NULL,
+        change_date TEXT NOT NULL,
+        revised_value INTEGER NOT NULL,
+        revised_notes TEXT CHECK(revised_notes IS NULL OR length(revised_notes) <= 80),
+        revised_executor_reference TEXT CHECK(revised_executor_reference IS NULL OR length(revised_executor_reference) <= 80),
+        FOREIGN KEY (other_asset_id) REFERENCES other_assets(id) ON DELETE CASCADE
+      )
+    `);
+
+    database.exec("CREATE INDEX IF NOT EXISTS idx_other_assets_user ON other_assets(user_id)");
+    database.exec("CREATE INDEX IF NOT EXISTS idx_other_assets_category ON other_assets(category)");
+    database.exec("CREATE INDEX IF NOT EXISTS idx_other_assets_history_asset ON other_assets_history(other_asset_id, change_date DESC)");
+  }
 }
 
 /**

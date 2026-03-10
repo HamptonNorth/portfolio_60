@@ -12,3 +12,7 @@ INSERT INTO investment_types (short_description, description, usage_notes) VALUE
 -- Base currency (always GBP for a UK portfolio tracker)
 INSERT INTO currencies (code, description) VALUES
     ('GBP', 'British Pound Sterling');
+
+-- Joint user: represents jointly held assets (property, cars, etc.)
+INSERT INTO users (initials, first_name, last_name, provider) VALUES
+    ('JNT', 'Joint', 'Household', '-');

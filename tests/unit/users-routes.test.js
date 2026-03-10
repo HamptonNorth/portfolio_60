@@ -77,11 +77,12 @@ afterAll(() => {
 describe("Users Routes - CRUD", () => {
   let createdUserId;
 
-  test("GET /api/users returns empty array initially", async () => {
+  test("GET /api/users returns only the Joint seed user initially", async () => {
     const response = await fetch(`${BASE_URL}/api/users`);
     expect(response.status).toBe(200);
     const data = await response.json();
-    expect(data).toEqual([]);
+    expect(data.length).toBe(1);
+    expect(data[0].first_name).toBe("Joint");
   });
 
   test("POST /api/users creates a user", async () => {
@@ -131,12 +132,14 @@ describe("Users Routes - CRUD", () => {
     expect(data.detail).toContain("Initials");
   });
 
-  test("GET /api/users returns the created user", async () => {
+  test("GET /api/users returns the Joint seed user and created user", async () => {
     const response = await fetch(`${BASE_URL}/api/users`);
     expect(response.status).toBe(200);
     const users = await response.json();
-    expect(users.length).toBe(1);
-    expect(users[0].initials).toBe("JDS");
+    expect(users.length).toBe(2);
+    // Household comes before Smith alphabetically by last_name
+    expect(users[0].first_name).toBe("Joint");
+    expect(users[1].initials).toBe("JDS");
   });
 
   test("GET /api/users/:id returns the user", async () => {
