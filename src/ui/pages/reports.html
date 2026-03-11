@@ -12,6 +12,11 @@
                 .report-page {
                     margin-bottom: 0 !important;
                 }
+                /* Preserve background colours (row shading, header rows) when printing */
+                table, tr, th, td {
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
             }
         </style>
     </head>

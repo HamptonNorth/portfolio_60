@@ -23,9 +23,29 @@
         "params": [
           "AW:ISA:1m,3m,1y,3y",
           "AW:sipp:1m,3m,1y,3y",
+
           "AW:trading:1m,3m,1y,3y",
           "AW:isa+sipp+trading:1m,3m,1y,3y"
         ]
+      }
+    ]
+  },
+  {
+    "id": "weekly_detail2",
+    "title": "Weekly Detail AW Only2",
+    "blocks": [
+      { "type": "household_assets", "layout": "portrait", "params": [] },
+      { "type": "new_page" },
+      {
+        "type": "portfolio_detail_valuation",
+        "layout": "landscape",
+        "params": ["AW:ISA:1m,3m,1y,3y", "AW:sipp:1m,3m,1y,3y"]
+      },
+      { "type": "new_page" },
+      {
+        "type": "portfolio_detail_valuation",
+        "layout": "landscape",
+        "params": ["AW:trading:1m,3m,1y,3y", "AW:isa+sipp+trading:1m,3m,1y,3y"]
       }
     ]
   }
