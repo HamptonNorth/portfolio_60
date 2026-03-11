@@ -26,6 +26,21 @@
     --color-warning: #e09f3e;
 }
 
+/* Test mode table row shading — green instead of brand blue.
+   Applied automatically when app-navbar detects test mode and
+   sets data-db-mode="test" on <html>.
+   Uses !important to override Tailwind @layer utilities which
+   otherwise win due to nested @media (hover: hover) specificity. */
+[data-db-mode="test"] tr.bg-brand-50 {
+    background-color: #f0fdf4 !important;
+}
+[data-db-mode="test"] tr.bg-brand-100 {
+    background-color: #dcfce7 !important;
+}
+[data-db-mode="test"] tr.hover\:bg-brand-100:hover {
+    background-color: #dcfce7 !important;
+}
+
 /* Responsive container for embedded Google Sheets / Excel Online iframes.
    Uses viewport height minus navbar (~64px), heading+padding (~88px),
    and footer (~52px) to fill available space. */

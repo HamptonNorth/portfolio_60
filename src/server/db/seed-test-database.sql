@@ -219,3 +219,11 @@ INSERT INTO other_assets (user_id, description, category, value_type, frequency,
     (1, 'Cars',                   'property', 'value', NULL,  250000000, NULL, NULL, '2026-01-01'),
     (2, 'Barclays Saving A/c',    'savings', 'value', NULL,   37500000, NULL, NULL, '2026-03-01'),
     (3, 'Premium Bonds',          'savings', 'value', NULL,   25000000, NULL, NULL, '2010-12-01');
+
+-- ============================================================================
+-- REPORT PARAMS
+-- Token mappings for report template substitution in user-reports.json.
+-- ============================================================================
+INSERT INTO report_params (param_key, param_value) VALUES
+    ('USER1', 'BW'),
+    ('USER2', 'AW');

@@ -585,6 +585,24 @@ function runMigrations(database) {
     database.exec("CREATE INDEX IF NOT EXISTS idx_other_assets_category ON other_assets(category)");
     database.exec("CREATE INDEX IF NOT EXISTS idx_other_assets_history_asset ON other_assets_history(other_asset_id, change_date DESC)");
   }
+
+  // Migration 22: Add report_params table (v0.16.0)
+  // Stores key-value token mappings used for report template substitution.
+  // Tokens like "USER1" in user-reports.json are replaced with the
+  // corresponding value from this table when reports are loaded.
+  const reportParamsTable = database.query(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='report_params'"
+  ).get();
+
+  if (!reportParamsTable) {
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS report_params (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        param_key TEXT NOT NULL UNIQUE CHECK(length(param_key) <= 30),
+        param_value TEXT NOT NULL CHECK(length(param_value) <= 100)
+      )
+    `);
+  }
 }
 
 /**

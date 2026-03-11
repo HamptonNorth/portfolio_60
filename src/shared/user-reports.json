@@ -7,45 +7,60 @@
       { "type": "new_page" },
       {
         "type": "portfolio_summary_valuation",
-        "params": ["AW", "BW", "AW + BW"]
+        "params": ["USER2", "USER1", "USER2 + USER1"]
       }
     ]
   },
   {
     "id": "weekly_detail",
-    "title": "Weekly Detail AW Only",
+    "title": "Weekly Detail",
     "blocks": [
       { "type": "household_assets", "layout": "portrait", "params": [] },
       { "type": "new_page" },
       {
-        "type": "portfolio_detail_valuation",
-        "layout": "landscape",
-        "params": [
-          "AW:ISA:1m,3m,1y,3y",
-          "AW:sipp:1m,3m,1y,3y",
-
-          "AW:trading:1m,3m,1y,3y",
-          "AW:isa+sipp+trading:1m,3m,1y,3y"
-        ]
-      }
-    ]
-  },
-  {
-    "id": "weekly_detail2",
-    "title": "Weekly Detail AW Only2",
-    "blocks": [
-      { "type": "household_assets", "layout": "portrait", "params": [] },
-      { "type": "new_page" },
-      {
-        "type": "portfolio_detail_valuation",
-        "layout": "landscape",
-        "params": ["AW:ISA:1m,3m,1y,3y", "AW:sipp:1m,3m,1y,3y"]
+        "type": "portfolio_summary_valuation",
+        "params": ["USER2", "USER1", "USER2 + USER1"]
       },
       { "type": "new_page" },
       {
         "type": "portfolio_detail_valuation",
         "layout": "landscape",
-        "params": ["AW:trading:1m,3m,1y,3y", "AW:isa+sipp+trading:1m,3m,1y,3y"]
+        "params": ["USER2:ISA:1m,3m,1y,3y", "USER2:sipp:1m,3m,1y,3y"]
+      },
+      { "type": "new_page" },
+      {
+        "type": "portfolio_detail_valuation",
+        "layout": "landscape",
+        "params": ["USER2:trading:1m,3m,1y,3y", "USER2:isa+sipp+trading:1m,3m,1y,3y"]
+      },
+      { "type": "new_page" },
+      {
+        "type": "portfolio_detail_valuation",
+        "layout": "landscape",
+        "params": ["USER1:ISA:1m,3m,1y,3y", "USER1:sipp:1m,3m,1y,3y"]
+      },
+      { "type": "new_page" },
+      {
+        "type": "portfolio_detail_valuation",
+        "layout": "landscape",
+        "params": ["USER1:trading:1m,3m,1y,3y", "USER1:isa+sipp+trading:1m,3m,1y,3y"]
+      }
+    ]
+  },
+  {
+    "id": "test_detail",
+    "title": "Test Detail",
+    "blocks": [
+      {
+        "type": "portfolio_detail_valuation",
+        "layout": "landscape",
+        "params": ["USER1:ISA:1m,3m,1y,3y", "USER1:sipp:1m,3m,1y,3y"]
+      },
+      { "type": "new_page" },
+      {
+        "type": "portfolio_detail_valuation",
+        "layout": "landscape",
+        "params": ["USER1:trading:1m,3m,1y,3y", "USER1:isa+sipp+trading:1m,3m,1y,3y"]
       }
     ]
   }

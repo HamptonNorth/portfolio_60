@@ -33,6 +33,7 @@ class AppNavbar extends LitElement {
                   <a href="/pages/global-events.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="global-events">Global Events</a>
                   <a href="/pages/scraping.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="scraping">Fetching</a>
                   <a href="/pages/portfolio.html?view=setup" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="portfolio-setup">Portfolio Setup</a>
+                  <a href="/pages/other-assets.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="other-assets">Other Assets</a>
                   <hr class="my-1 border-brand-200" />
                   <a href="/pages/backup.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="backup">Backup</a>
                 </div>
@@ -46,7 +47,15 @@ class AppNavbar extends LitElement {
                 </div>
               </div>
             </li>
-            <li><span class="text-brand-400 cursor-not-allowed select-none">Reports</span></li>
+            <li class="relative group">
+              <span class="hover:text-brand-200 transition-colors cursor-pointer select-none" data-nav-parent="reports">Reports <span class="text-xs">&#9662;</span></span>
+              <div class="hidden group-hover:block absolute left-0 top-full pt-1 z-50">
+                <div class="bg-white text-brand-800 rounded-md shadow-lg border border-brand-200 py-1 min-w-48" id="nav-reports-dropdown">
+                  <a href="/pages/reports.html?block=portfolio_summary" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="report-portfolio-summary">Portfolio Summary</a>
+                  <a href="/pages/reports.html?block=household_assets" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="report-household">Household Assets</a>
+                </div>
+              </div>
+            </li>
             <li class="relative group" id="nav-docs-item" style="display:none">
               <span class="hover:text-brand-200 transition-colors cursor-pointer select-none" data-nav-parent="docs">Docs <span class="text-xs">&#9662;</span></span>
               <div class="hidden group-hover:block absolute left-0 top-full pt-1 z-50">
@@ -105,7 +114,40 @@ class AppNavbar extends LitElement {
     }
     this._loadLists();
     this._loadDocs();
+    this._loadCompositeReports();
     this._checkTestMode();
+  }
+
+  /**
+   * @description Fetch composite report definitions from the API and add them
+   * to the Reports dropdown menu below the built-in report block links.
+   */
+  async _loadCompositeReports() {
+    try {
+      const response = await fetch("/api/reports");
+      if (!response.ok) return;
+      const reports = await response.json();
+      if (!Array.isArray(reports) || reports.length === 0) return;
+
+      const dropdown = document.getElementById("nav-reports-dropdown");
+      if (!dropdown) return;
+
+      // Add a divider between report blocks and composite reports
+      const hr = document.createElement("hr");
+      hr.className = "my-1 border-brand-200";
+      dropdown.appendChild(hr);
+
+      for (const report of reports) {
+        const link = document.createElement("a");
+        link.href = "/pages/reports.html?report=" + encodeURIComponent(report.id);
+        link.className = "block px-4 py-2 hover:bg-brand-50 transition-colors";
+        link.setAttribute("data-nav", "report-" + report.id);
+        link.textContent = report.title;
+        dropdown.appendChild(link);
+      }
+    } catch (err) {
+      // Silently ignore — composite reports menu items are optional
+    }
   }
 
   /**
@@ -118,6 +160,8 @@ class AppNavbar extends LitElement {
       if (!response.ok) return;
       const data = await response.json();
       if (!data.testMode) return;
+
+      document.documentElement.dataset.dbMode = "test";
 
       const titleSpan = this.querySelector("#nav-app-title");
       if (titleSpan) {

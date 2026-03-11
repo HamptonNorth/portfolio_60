@@ -1719,30 +1719,26 @@ class AppNavbar extends LitElement {
   async _loadCompositeReports() {
     try {
       const response = await fetch("/api/reports");
-      if (!response.ok) return;
+      if (!response.ok)
+        return;
       const reports = await response.json();
-      if (!Array.isArray(reports) || reports.length === 0) return;
-
+      if (!Array.isArray(reports) || reports.length === 0)
+        return;
       const dropdown = document.getElementById("nav-reports-dropdown");
-      if (!dropdown) return;
-
-      // Add a divider between report blocks and composite reports
+      if (!dropdown)
+        return;
       const hr = document.createElement("hr");
       hr.className = "my-1 border-brand-200";
       dropdown.appendChild(hr);
-
-      for (var i = 0; i < reports.length; i++) {
-        var report = reports[i];
-        var link = document.createElement("a");
+      for (const report of reports) {
+        const link = document.createElement("a");
         link.href = "/pages/reports.html?report=" + encodeURIComponent(report.id);
         link.className = "block px-4 py-2 hover:bg-brand-50 transition-colors";
         link.setAttribute("data-nav", "report-" + report.id);
         link.textContent = report.title;
         dropdown.appendChild(link);
       }
-    } catch (err) {
-      // Silently ignore — composite reports menu items are optional
-    }
+    } catch (err) {}
   }
   async _checkTestMode() {
     try {
@@ -1752,6 +1748,7 @@ class AppNavbar extends LitElement {
       const data = await response.json();
       if (!data.testMode)
         return;
+      document.documentElement.dataset.dbMode = "test";
       const titleSpan = this.querySelector("#nav-app-title");
       if (titleSpan) {
         titleSpan.textContent = "Portfolio 60 - Test";

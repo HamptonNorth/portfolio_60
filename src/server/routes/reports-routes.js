@@ -1,6 +1,7 @@
 import { Router } from "../router.js";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { getReportParams } from "../db/report-params-db.js";
 
 /**
  * @description Router instance for user-reports API routes.
@@ -16,13 +17,44 @@ const reportsRouter = new Router();
 const reportsFilePath = resolve(import.meta.dir, "../../shared/user-reports.json");
 
 /**
- * @description Load and parse the user-reports.json file.
- * Re-reads on every call so hand-edits take effect without restart.
- * @returns {Array} Array of report definitions
+ * @description Replace placeholder tokens in all param strings within a
+ * report definition array. Tokens are stored in the report_params database
+ * table and substituted as plain text (e.g. "USER1:ISA" becomes "BW:ISA").
+ * @param {Array} reports - Array of report definitions
+ * @param {Object<string, string>} tokenMap - Token-to-value mapping
+ * @returns {Array} Reports with tokens replaced in param strings
+ */
+function substituteTokens(reports, tokenMap) {
+  var tokens = Object.keys(tokenMap);
+  if (tokens.length === 0) return reports;
+
+  return JSON.parse(JSON.stringify(reports), function (key, value) {
+    if (typeof value !== "string") return value;
+    var result = value;
+    for (var i = 0; i < tokens.length; i++) {
+      result = result.split(tokens[i]).join(tokenMap[tokens[i]]);
+    }
+    return result;
+  });
+}
+
+/**
+ * @description Load and parse the user-reports.json file, with placeholder
+ * tokens substituted from the report_params database table.
+ * Re-reads the JSON file on every call so hand-edits take effect without restart.
+ * @returns {Array} Array of report definitions with tokens resolved
  */
 function loadReportDefinitions() {
   const raw = readFileSync(reportsFilePath, "utf-8");
-  return JSON.parse(raw);
+  const reports = JSON.parse(raw);
+
+  try {
+    const tokenMap = getReportParams();
+    return substituteTokens(reports, tokenMap);
+  } catch (err) {
+    // If report_params table is empty or unavailable, return reports as-is
+    return reports;
+  }
 }
 
 // GET /api/reports — list all composite report definitions
