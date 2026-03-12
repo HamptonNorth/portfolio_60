@@ -1,6 +1,6 @@
 import { isFirstRun, getAuthStatus, setAuthStatus, hashPassphrase, verifyPassphrase, loadHashFromEnv, saveHashToEnv } from "../auth.js";
 import { databaseExists, createDatabase } from "../db/connection.js";
-import { isTestMode, activateTestMode, isTestDatabaseFresh } from "../test-mode.js";
+import { isTestMode, activateTestMode, deactivateTestMode, isTestDatabaseFresh } from "../test-mode.js";
 
 /**
  * @description Check if a passphrase value is the test mode trigger.
@@ -192,6 +192,10 @@ export async function handleAuthRoute(method, path, request) {
     const isValid = await verifyPassphrase(passphrase, storedHash);
 
     if (isValid) {
+      // If switching from test mode back to live, deactivate test mode first
+      if (isTestMode()) {
+        deactivateTestMode();
+      }
       setAuthStatus(true);
       return new Response(JSON.stringify({ success: true, message: "Passphrase verified" }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
