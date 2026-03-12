@@ -18,6 +18,7 @@
     "taxYearStartMonth": 4,
     "taxYearStartDay": 6
   },
+  "reportsOpenInNewTab": true,
   "priceMethod": "api",
   "scrapeDelayProfile": "cron",
   "scrapeBatch": {

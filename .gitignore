@@ -47,6 +47,7 @@ logs
 # Portfolio 60 specific
 data/
 backups/
+src/shared/*-backup-*.json
 docs/*
 !docs/guide/user_prices.md
 !docs/guide/user_*.md

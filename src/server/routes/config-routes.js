@@ -1,7 +1,25 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { getAllSiteConfigs, findSiteConfig, loadConfig, getAllowedProviders, getSchedulingConfig, reloadConfig, getListItems, getConfigFilePath, getWritableConfigPath, getPriceMethodConfig } from "../config.js";
+import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync } from "node:fs";
+import { resolve, dirname, basename, join } from "node:path";
+import { getAllSiteConfigs, findSiteConfig, loadConfig, getAllowedProviders, getSchedulingConfig, reloadConfig, getListItems, getConfigFilePath, getWritableConfigPath, getPriceMethodConfig, getReportsOpenInNewTab } from "../config.js";
 import { DB_PATH, BACKUP_DIR, APP_NAME, APP_VERSION } from "../../shared/server-constants.js";
+
+/**
+ * @description Create a timestamped backup of a JSON file before overwriting.
+ * The backup is written to the same directory as the original file with a
+ * timestamp suffix: filename-backup-yyyy-mm-dd-hh-mm.json.
+ * @param {string} filePath - Absolute path to the file to back up
+ */
+function backupJsonFile(filePath) {
+  if (!existsSync(filePath)) return;
+  const dir = dirname(filePath);
+  const base = basename(filePath, ".json");
+  const now = new Date();
+  const pad = function (n) { return String(n).padStart(2, "0"); };
+  const timestamp = now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate()) + "-" + pad(now.getHours()) + "-" + pad(now.getMinutes());
+  const backupName = base + "-backup-" + timestamp + ".json";
+  const backupPath = join(dir, backupName);
+  copyFileSync(filePath, backupPath);
+}
 
 /**
  * @description Get the list of allowed provider codes.
@@ -79,10 +97,12 @@ export function handleConfigRoute(method, path) {
     });
   }
 
-  // GET /api/config/raw — return the raw user-settings.json content as a string for editing
+  // GET /api/config/raw — return the raw user-settings.json content as a string for editing.
+  // Creates a timestamped backup before returning so the user can recover if their edits break things.
   if (method === "GET" && path === "/api/config/raw") {
     try {
       const configPath = getConfigFilePath();
+      backupJsonFile(configPath);
       const raw = readFileSync(configPath, "utf-8");
       return new Response(JSON.stringify({ content: raw, path: configPath }), {
         status: 200,
@@ -140,6 +160,15 @@ export function handleConfigRoute(method, path) {
   if (method === "GET" && path === "/api/config/price-method") {
     const priceMethod = getPriceMethodConfig();
     return new Response(JSON.stringify({ priceMethod: priceMethod }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // GET /api/config/reports-new-tab — whether reports should open in a new tab
+  if (method === "GET" && path === "/api/config/reports-new-tab") {
+    const openInNewTab = getReportsOpenInNewTab();
+    return new Response(JSON.stringify({ reportsOpenInNewTab: openInNewTab }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });

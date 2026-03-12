@@ -199,6 +199,15 @@ export async function handleAuthRoute(method, path, request) {
     return new Response(JSON.stringify({ success: false, error: "Incorrect passphrase" }), { status: 401, headers: { "Content-Type": "application/json" } });
   }
 
+  // POST /api/auth/sign-out — clear authentication, return to passphrase screen
+  if (method === "POST" && path === "/api/auth/sign-out") {
+    setAuthStatus(false);
+    return new Response(
+      JSON.stringify({ success: true, message: "Signed out" }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
   // No matching auth route
   return null;
 }

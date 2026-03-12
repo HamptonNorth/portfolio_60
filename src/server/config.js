@@ -37,6 +37,7 @@ const DEFAULTS = {
     batchSize: 8,
     cooldownSeconds: 120,
   },
+  reportsOpenInNewTab: true,
   priceMethod: "scrape",
   scrapeDelayProfile: "cron",
   scraperSites: {
@@ -198,6 +199,9 @@ export function loadConfig() {
     categories: typeof rawDocs.categories === "object" && rawDocs.categories !== null ? rawDocs.categories : {},
   };
 
+  // reportsOpenInNewTab — boolean flag for opening report pages in a new tab
+  config.reportsOpenInNewTab = typeof rawConfig.reportsOpenInNewTab === "boolean" ? rawConfig.reportsOpenInNewTab : DEFAULTS.reportsOpenInNewTab;
+
   configCache = config;
   return config;
 }
@@ -227,6 +231,15 @@ export function getRetryConfig() {
 export function getPriceMethodConfig() {
   const config = loadConfig();
   return config.priceMethod;
+}
+
+/**
+ * @description Get whether report pages should open in a new browser tab.
+ * @returns {boolean} True if reports should open in a new tab
+ */
+export function getReportsOpenInNewTab() {
+  const config = loadConfig();
+  return config.reportsOpenInNewTab === true;
 }
 
 /**

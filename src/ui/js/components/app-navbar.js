@@ -81,8 +81,11 @@ class AppNavbar extends LitElement {
               </span>
               <div class="hidden group-hover:block absolute right-0 top-full pt-1 z-50">
                 <div class="bg-white text-brand-800 rounded-md shadow-lg border border-brand-200 py-1 min-w-48">
-                  <a href="#" @click=${this._editSettings} class="block px-4 py-2 hover:bg-brand-50 transition-colors">Edit Settings</a>
+                  <a href="#" @click=${this._editSettings} class="block px-4 py-2 hover:bg-brand-50 transition-colors">Edit User Settings</a>
+                  <a href="#" @click=${this._editReports} class="block px-4 py-2 hover:bg-brand-50 transition-colors">Edit Reports</a>
                   <a href="#" @click=${this._about} class="block px-4 py-2 hover:bg-brand-50 transition-colors">About</a>
+                  <hr class="my-1 border-brand-200" />
+                  <a href="#" @click=${this._signOut} class="block px-4 py-2 hover:bg-brand-50 transition-colors text-red-600">Sign Out</a>
                 </div>
               </div>
             </li>
@@ -100,6 +103,25 @@ class AppNavbar extends LitElement {
     }
   }
 
+  /** @description Call the global showEditReportsModal function from app.js */
+  _editReports(event) {
+    event.preventDefault();
+    if (typeof showEditReportsModal === "function") {
+      showEditReportsModal();
+    }
+  }
+
+  /** @description Sign out and redirect to the passphrase screen. */
+  async _signOut(event) {
+    event.preventDefault();
+    try {
+      await fetch("/api/auth/sign-out", { method: "POST" });
+    } catch {
+      // Even if the request fails, redirect to force re-auth
+    }
+    window.location.href = "/";
+  }
+
   /** @description Call the global showAboutModal function from app.js */
   _about(event) {
     event.preventDefault();
@@ -108,13 +130,14 @@ class AppNavbar extends LitElement {
     }
   }
 
-  firstUpdated() {
+  async firstUpdated() {
     if (typeof highlightActiveNav === "function") {
       highlightActiveNav();
     }
     this._loadLists();
     this._loadDocs();
-    this._loadCompositeReports();
+    await this._loadCompositeReports();
+    this._checkReportsNewTab();
     this._checkTestMode();
   }
 
@@ -142,6 +165,9 @@ class AppNavbar extends LitElement {
         link.href = "/pages/reports.html?report=" + encodeURIComponent(report.id);
         link.className = "block px-4 py-2 hover:bg-brand-50 transition-colors";
         link.setAttribute("data-nav", "report-" + report.id);
+        if (this._reportsNewTab) {
+          link.setAttribute("target", "_blank");
+        }
         link.textContent = report.title;
         dropdown.appendChild(link);
       }
@@ -171,10 +197,37 @@ class AppNavbar extends LitElement {
       const nav = this.querySelector("nav");
       if (nav) {
         nav.classList.remove("bg-brand-800");
-        nav.classList.add("bg-amber-700");
+        nav.classList.add("bg-emerald-900");
       }
     } catch {
       // Ignore fetch errors — navbar stays in normal mode
+    }
+  }
+
+  /**
+   * @description Check whether report links should open in a new browser tab.
+   * If enabled, sets target="_blank" on all links inside the Reports dropdown.
+   */
+  async _checkReportsNewTab() {
+    try {
+      const response = await fetch("/api/config/reports-new-tab");
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!data.reportsOpenInNewTab) return;
+
+      const dropdown = document.getElementById("nav-reports-dropdown");
+      if (!dropdown) return;
+
+      // Apply to existing static links
+      const links = dropdown.querySelectorAll("a");
+      links.forEach(function (link) {
+        link.setAttribute("target", "_blank");
+      });
+
+      // Store flag so dynamically added composite report links also get it
+      this._reportsNewTab = true;
+    } catch {
+      // Ignore — default behaviour (same tab)
     }
   }
 

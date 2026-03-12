@@ -151,52 +151,60 @@ async function loadAssets() {
     }
   }
 
-  let html = "";
+  // Build a single table so all columns align across category sections
+  let html = '<div class="overflow-x-auto">';
+  html += '<table class="w-full text-left border-collapse">';
+  html += "<colgroup>";
+  html += '<col class="w-20" />';   // User
+  html += "<col />";                // Description (flex)
+  html += '<col class="w-32" />';   // Value
+  html += '<col class="w-28" />';   // Every
+  html += '<col class="w-32" />';   // Last changed
+  html += "<col />";                // Notes (flex)
+  html += '<col class="w-16" />';   // Edit button
+  html += "</colgroup>";
+  html += "<tbody>";
 
   for (const cat of CATEGORY_ORDER) {
     const items = grouped[cat.key];
 
-    // Section header
-    html += '<h3 class="text-lg font-semibold text-brand-800 mt-6 mb-2">' + escapeHtml(cat.label) + "</h3>";
+    // Category sub-header row
+    html += '<tr class="border-b-2 border-brand-200">';
+    html += '<td colspan="7" class="pt-6 pb-2 px-3 text-lg font-semibold text-brand-800">' + escapeHtml(cat.label) + "</td>";
+    html += "</tr>";
 
     if (items.length === 0) {
-      html += '<p class="text-brand-400 mb-4 ml-2">None</p>';
+      html += '<tr><td colspan="7" class="py-2 px-3 text-brand-400">None</td></tr>';
       continue;
     }
 
-    html += '<div class="overflow-x-auto mb-4">';
-    html += '<table class="w-full text-left border-collapse">';
-    html += "<thead>";
-    html += '<tr class="border-b-2 border-brand-200 bg-blue-50">';
-    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700 w-20">User</th>';
+    // Column headers for this section
+    html += '<tr class="border-b border-brand-200 bg-blue-50">';
+    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">User</th>';
     html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Description</th>';
-    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700 w-24">Type</th>';
-    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700 text-right w-32">Value</th>';
-    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700 w-28">Every</th>';
-    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700 w-32">Last changed</th>';
+    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700 text-right">Value</th>';
+    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Every</th>';
+    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Last changed</th>';
     html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Notes</th>';
-    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700 w-16"></th>';
+    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700"></th>';
     html += "</tr>";
-    html += "</thead>";
-    html += "<tbody>";
 
     for (let i = 0; i < items.length; i++) {
       const asset = items[i];
       const rowClass = i % 2 === 0 ? "bg-white" : "bg-brand-50";
 
       html += '<tr data-id="' + asset.id + '" class="' + rowClass + ' border-b border-brand-100 hover:bg-brand-100 transition-colors cursor-pointer" ondblclick="editAsset(' + asset.id + ')">';
-      html += '<td class="py-2 px-3 text-base">' + escapeHtml(getUserDisplay(asset)) + "</td>";
-      html += '<td class="py-2 px-3 text-base">' + escapeHtml(asset.description) + "</td>";
-      html += '<td class="py-2 px-3 text-base">' + escapeHtml(asset.value_type === "recurring" ? "Recurring" : "") + "</td>";
-      html += '<td class="py-2 px-3 text-base text-right font-mono">' + escapeHtml(formatGBP(asset.value)) + "</td>";
-      html += '<td class="py-2 px-3 text-base">' + escapeHtml(asset.frequency ? (FREQUENCY_LABELS[asset.frequency] || asset.frequency) : "") + "</td>";
-      html += '<td class="py-2 px-3 text-base">';
+      html += '<td class="py-2 px-3 text-base align-baseline">' + escapeHtml(getUserDisplay(asset)) + "</td>";
+      html += '<td class="py-2 px-3 text-base align-baseline">' + escapeHtml(asset.description) + "</td>";
+      html += '<td class="py-2 px-3 text-base text-right font-mono tabular-nums align-baseline">' + escapeHtml(formatGBP(asset.value)) + "</td>";
+      html += '<td class="py-2 px-3 text-base align-baseline">' + escapeHtml(asset.frequency ? (FREQUENCY_LABELS[asset.frequency] || asset.frequency) : "") + "</td>";
+      html += '<td class="py-2 px-3 text-base align-baseline">';
       html += '<button class="text-brand-600 hover:text-brand-800 hover:underline transition-colors" onclick="showHistory(' + asset.id + ", '" + escapeHtml(asset.description) + "'" + ')">';
       html += escapeHtml(formatDisplayDate(asset.last_updated));
       html += "</button></td>";
 
       // Notes column with executor reference as tooltip icon
-      html += '<td class="py-2 px-3 text-base">';
+      html += '<td class="py-2 px-3 text-base align-baseline">';
       if (asset.notes) {
         html += escapeHtml(asset.notes);
       }
@@ -208,15 +216,14 @@ async function loadAssets() {
       }
       html += "</td>";
 
-      html += '<td class="py-2 px-3 text-base">';
+      html += '<td class="py-2 px-3 text-base align-baseline">';
       html += '<button class="bg-brand-100 hover:bg-brand-200 text-brand-700 text-sm font-medium px-3 py-1 rounded transition-colors" onclick="editAsset(' + asset.id + ')">Edit</button>';
       html += "</td>";
       html += "</tr>";
     }
-
-    html += "</tbody></table></div>";
   }
 
+  html += "</tbody></table></div>";
   container.innerHTML = html;
 }
 
@@ -429,7 +436,7 @@ async function showHistory(id, desc) {
     const rowClass = i % 2 === 0 ? "bg-white" : "bg-brand-50";
     html += '<tr class="' + rowClass + ' border-b border-brand-100">';
     html += '<td class="py-2 px-2 text-sm">' + escapeHtml(formatDisplayDate(h.change_date)) + "</td>";
-    html += '<td class="py-2 px-2 text-sm text-right font-mono">' + escapeHtml(formatGBP(h.revised_value)) + "</td>";
+    html += '<td class="py-2 px-2 text-sm text-right font-mono tabular-nums">' + escapeHtml(formatGBP(h.revised_value)) + "</td>";
     html += '<td class="py-2 px-2 text-sm">' + escapeHtml(h.revised_notes || "") + "</td>";
     html += '<td class="py-2 px-2 text-sm">' + escapeHtml(h.revised_executor_reference || "") + "</td>";
     html += "</tr>";

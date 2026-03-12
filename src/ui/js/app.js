@@ -218,6 +218,87 @@ function escapeHtml(text) {
 }
 
 /**
+ * @description Create a line-numbered editor wrapper around a textarea.
+ * Adds a line-number gutter on the left that scrolls in sync with the textarea.
+ * Call this after the textarea is in the DOM.
+ * @param {HTMLTextAreaElement} textarea - The textarea element to enhance
+ */
+function attachLineNumbers(textarea) {
+  // Wrap the textarea in a flex container with a gutter.
+  // Use a fixed height so the content scrolls rather than expanding the modal.
+  const wrapper = document.createElement("div");
+  wrapper.className = "flex border-2 border-brand-300 rounded-lg overflow-hidden focus-within:border-brand-500";
+  wrapper.style.height = "70vh";
+
+  const gutter = document.createElement("div");
+  gutter.className = "bg-brand-100 text-brand-400 text-sm font-mono text-right select-none py-3 px-2 overflow-hidden";
+  gutter.style.minWidth = "3rem";
+  gutter.style.whiteSpace = "pre";
+  gutter.style.lineHeight = "1.425";
+
+  // Remove border/rounding from textarea since wrapper handles it.
+  // Set explicit height so the textarea scrolls within the wrapper.
+  textarea.classList.remove("border-2", "border-brand-300", "rounded-lg", "focus:outline-none", "focus:border-brand-500");
+  textarea.classList.add("border-0", "outline-none", "rounded-none");
+  textarea.style.lineHeight = "1.425";
+  textarea.style.resize = "none";
+  textarea.style.height = "100%";
+  textarea.removeAttribute("rows");
+
+  // Insert wrapper in place of textarea
+  textarea.parentNode.insertBefore(wrapper, textarea);
+  wrapper.appendChild(gutter);
+  wrapper.appendChild(textarea);
+
+  function updateLineNumbers() {
+    const lineCount = textarea.value.split("\n").length;
+    var nums = "";
+    for (var i = 1; i <= lineCount; i++) {
+      nums += i + "\n";
+    }
+    gutter.textContent = nums;
+  }
+
+  function syncScroll() {
+    gutter.scrollTop = textarea.scrollTop;
+  }
+
+  textarea.addEventListener("scroll", syncScroll);
+  textarea.addEventListener("input", updateLineNumbers);
+  updateLineNumbers();
+}
+
+/**
+ * @description Build a user-friendly JSON parse error message with line and column info.
+ * Extracts the position from the native error message and converts it to line:column.
+ * @param {string} jsonText - The JSON text that failed to parse
+ * @param {SyntaxError} parseErr - The native JSON parse error
+ * @returns {string} A message like "Invalid JSON at line 12, column 5: Unexpected token }"
+ */
+function formatJsonError(jsonText, parseErr) {
+  const msg = parseErr.message;
+
+  // Try to extract character position from error message (varies by engine)
+  // Bun/V8: "... at position 123" or "... at line 4 column 5"
+  const posMatch = msg.match(/position\s+(\d+)/i);
+  if (posMatch) {
+    const pos = parseInt(posMatch[1], 10);
+    const before = jsonText.slice(0, pos);
+    const line = (before.match(/\n/g) || []).length + 1;
+    const lastNewline = before.lastIndexOf("\n");
+    const column = pos - lastNewline;
+    return "Invalid JSON at line " + line + ", column " + column + ": " + msg;
+  }
+
+  const lineMatch = msg.match(/line\s+(\d+)\s+column\s+(\d+)/i);
+  if (lineMatch) {
+    return "Invalid JSON at line " + lineMatch[1] + ", column " + lineMatch[2] + ": " + msg;
+  }
+
+  return "Invalid JSON: " + msg;
+}
+
+/**
  * @description Auto-fix unescaped double quotes inside "iframe" JSON string values.
  * When a user pastes an iframe tag from Google Sheets or Excel into user-settings.json,
  * the inner quotes (e.g. src="...") break JSON parsing. This function finds
@@ -412,7 +493,7 @@ async function showEditSettingsModal() {
   // Show loading modal while fetching config
   const loadingHtml = `
     <div id="app-modal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 overflow-hidden">
+      <div class="bg-white rounded-lg shadow-xl mx-4 overflow-hidden" style="width:60vw;min-width:48rem;max-width:60vw">>
         <div class="bg-brand-800 text-white px-4 py-3">
           <h3 class="text-lg font-semibold">Edit Settings</h3>
         </div>
@@ -437,12 +518,12 @@ async function showEditSettingsModal() {
 
   // Replace loading content with the editor
   modal.innerHTML = `
-    <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 overflow-hidden">
+    <div class="bg-white rounded-lg shadow-xl mx-4 overflow-hidden" style="width:60vw;min-width:48rem;max-width:60vw">
       <div class="bg-brand-800 text-white px-4 py-3">
         <h3 class="text-lg font-semibold">Edit Settings</h3>
       </div>
       <div class="p-4">
-        <p class="text-sm text-brand-600 mb-2">Edit user settings. Changes take effect immediately on save.</p>
+        <p class="text-sm text-brand-600 mb-2">Edit user settings. A backup was created when this editor opened. Changes take effect immediately on save.</p>
         <p class="text-xs text-brand-400 mb-3">Save location: ${escapeHtml(configPath)}</p>
         <div id="settings-error" class="hidden mb-3 bg-red-50 border border-red-300 text-error rounded-lg px-3 py-2 text-sm"></div>
         <textarea id="settings-editor" class="w-full font-mono text-sm border-2 border-brand-300 rounded-lg p-3 focus:outline-none focus:border-brand-500 bg-brand-25 text-brand-800" rows="20" spellcheck="false">${escapeHtml(configContent)}</textarea>
@@ -458,6 +539,7 @@ async function showEditSettingsModal() {
   `;
 
   const editor = document.getElementById("settings-editor");
+  attachLineNumbers(editor);
   const errorDiv = document.getElementById("settings-error");
   const saveBtn = document.getElementById("settings-save-btn");
   const cancelBtn = document.getElementById("settings-cancel-btn");
@@ -498,7 +580,7 @@ async function showEditSettingsModal() {
     try {
       JSON.parse(content);
     } catch (parseErr) {
-      errorDiv.textContent = "Invalid JSON: " + parseErr.message;
+      errorDiv.textContent = formatJsonError(content, parseErr);
       errorDiv.classList.remove("hidden");
       return;
     }
@@ -544,7 +626,127 @@ async function showEditSettingsModal() {
       },
     };
     editor.value = JSON.stringify(defaults, null, 2);
+    editor.dispatchEvent(new Event("input"));
     errorDiv.classList.add("hidden");
+  });
+
+  editor.focus();
+}
+
+/**
+ * @description Show the Edit Reports modal. Loads the raw user-reports.json into
+ * a textarea for editing, with Save and Cancel buttons. Creates a timestamped
+ * backup on the server before saving.
+ */
+async function showEditReportsModal() {
+  // Remove any existing modal
+  const existingModal = document.getElementById("app-modal");
+  if (existingModal) {
+    existingModal.remove();
+  }
+
+  // Show loading modal while fetching reports
+  const loadingHtml = `
+    <div id="app-modal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-xl mx-4 overflow-hidden" style="width:60vw;min-width:48rem;max-width:60vw">>
+        <div class="bg-brand-800 text-white px-4 py-3">
+          <h3 class="text-lg font-semibold">Edit Reports</h3>
+        </div>
+        <div class="p-6 text-center text-brand-500">Loading report definitions...</div>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML("beforeend", loadingHtml);
+
+  // Fetch the raw reports content
+  const result = await apiRequest("/api/reports/raw");
+  const modal = document.getElementById("app-modal");
+
+  if (!result.ok) {
+    modal.remove();
+    showModal("Error", "Failed to load report definitions: " + (result.error || "Unknown error"));
+    return;
+  }
+
+  const reportsContent = result.data.content;
+  const reportsPath = result.data.path;
+
+  // Replace loading content with the editor
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg shadow-xl mx-4 overflow-hidden" style="width:60vw;min-width:48rem;max-width:60vw">
+      <div class="bg-brand-800 text-white px-4 py-3">
+        <h3 class="text-lg font-semibold">Edit Reports</h3>
+      </div>
+      <div class="p-4">
+        <p class="text-sm text-brand-600 mb-2">Edit composite report definitions. A backup was created when this editor opened.</p>
+        <p class="text-xs text-brand-400 mb-3">Save location: ${escapeHtml(reportsPath)}</p>
+        <div id="reports-error" class="hidden mb-3 bg-red-50 border border-red-300 text-error rounded-lg px-3 py-2 text-sm"></div>
+        <textarea id="reports-editor" class="w-full font-mono text-sm border-2 border-brand-300 rounded-lg p-3 focus:outline-none focus:border-brand-500 bg-brand-25 text-brand-800" rows="20" spellcheck="false">${escapeHtml(reportsContent)}</textarea>
+      </div>
+      <div class="px-4 py-3 bg-brand-50 flex justify-end gap-3">
+        <button id="reports-cancel-btn" class="bg-brand-200 hover:bg-brand-300 text-brand-700 font-medium px-4 py-2 rounded transition-colors">Cancel</button>
+        <button id="reports-save-btn" class="bg-brand-700 hover:bg-brand-800 text-white font-medium px-4 py-2 rounded transition-colors">Save</button>
+      </div>
+    </div>
+  `;
+
+  const editor = document.getElementById("reports-editor");
+  attachLineNumbers(editor);
+  const errorDiv = document.getElementById("reports-error");
+  const saveBtn = document.getElementById("reports-save-btn");
+  const cancelBtn = document.getElementById("reports-cancel-btn");
+
+  function closeReportsModal() {
+    modal.remove();
+  }
+
+  cancelBtn.addEventListener("click", closeReportsModal);
+
+  modal.addEventListener("click", function (event) {
+    if (event.target === modal) {
+      closeReportsModal();
+    }
+  });
+
+  function handleEscape(event) {
+    if (event.key === "Escape") {
+      closeReportsModal();
+      document.removeEventListener("keydown", handleEscape);
+    }
+  }
+  document.addEventListener("keydown", handleEscape);
+
+  // Save handler — validate JSON and send to server
+  saveBtn.addEventListener("click", async function () {
+    errorDiv.classList.add("hidden");
+    const content = editor.value;
+
+    // Client-side JSON validation
+    try {
+      JSON.parse(content);
+    } catch (parseErr) {
+      errorDiv.textContent = formatJsonError(content, parseErr);
+      errorDiv.classList.remove("hidden");
+      return;
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
+
+    const saveResult = await apiRequest("/api/reports/raw", {
+      method: "PUT",
+      body: { content: content },
+    });
+
+    if (saveResult.ok) {
+      closeReportsModal();
+      document.removeEventListener("keydown", handleEscape);
+    } else {
+      errorDiv.textContent = "Save failed: " + (saveResult.error || "Unknown error") + (saveResult.detail ? " — " + saveResult.detail : "");
+      errorDiv.classList.remove("hidden");
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Save";
+    }
   });
 
   editor.focus();

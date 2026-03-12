@@ -1,6 +1,6 @@
 import { Router } from "../router.js";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readFileSync, writeFileSync, existsSync, copyFileSync } from "node:fs";
+import { resolve, dirname, basename, join } from "node:path";
 import { getReportParams } from "../db/report-params-db.js";
 
 /**
@@ -73,6 +73,25 @@ reportsRouter.get("/api/reports", function () {
   }
 });
 
+// GET /api/reports/raw — return the raw user-reports.json content for editing.
+// Creates a timestamped backup before returning so the user can recover if their edits break things.
+// Must be registered before /api/reports/:id so "raw" is not matched as an :id param
+reportsRouter.get("/api/reports/raw", function () {
+  try {
+    backupJsonFile(reportsFilePath);
+    const raw = readFileSync(reportsFilePath, "utf-8");
+    return new Response(JSON.stringify({ content: raw, path: reportsFilePath }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Failed to read reports file", detail: err.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+});
+
 // GET /api/reports/:id — single report definition by ID
 reportsRouter.get("/api/reports/:id", function (request, params) {
   try {
@@ -95,6 +114,59 @@ reportsRouter.get("/api/reports/:id", function (request, params) {
   } catch (err) {
     return new Response(
       JSON.stringify({ error: "Failed to load report definition", detail: err.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+});
+
+/**
+ * @description Create a timestamped backup of a JSON file before overwriting.
+ * @param {string} filePath - Absolute path to the file to back up
+ */
+function backupJsonFile(filePath) {
+  if (!existsSync(filePath)) return;
+  const dir = dirname(filePath);
+  const base = basename(filePath, ".json");
+  const now = new Date();
+  const pad = function (n) { return String(n).padStart(2, "0"); };
+  const timestamp = now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate()) + "-" + pad(now.getHours()) + "-" + pad(now.getMinutes());
+  const backupName = base + "-backup-" + timestamp + ".json";
+  const backupPath = join(dir, backupName);
+  copyFileSync(filePath, backupPath);
+}
+
+// PUT /api/reports/raw — save edited user-reports.json content with backup
+reportsRouter.put("/api/reports/raw", async function (request) {
+  try {
+    const body = await request.json();
+    const content = body.content;
+
+    if (typeof content !== "string" || content.trim().length === 0) {
+      return new Response(JSON.stringify({ error: "Content is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Validate that the content is valid JSON
+    try {
+      JSON.parse(content);
+    } catch (parseErr) {
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON", detail: parseErr.message }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    writeFileSync(reportsFilePath, content, "utf-8");
+
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Failed to save reports", detail: err.message }),
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }

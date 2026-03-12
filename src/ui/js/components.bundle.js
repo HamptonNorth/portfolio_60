@@ -1685,8 +1685,11 @@ class AppNavbar extends LitElement {
               </span>
               <div class="hidden group-hover:block absolute right-0 top-full pt-1 z-50">
                 <div class="bg-white text-brand-800 rounded-md shadow-lg border border-brand-200 py-1 min-w-48">
-                  <a href="#" @click=${this._editSettings} class="block px-4 py-2 hover:bg-brand-50 transition-colors">Edit Settings</a>
+                  <a href="#" @click=${this._editSettings} class="block px-4 py-2 hover:bg-brand-50 transition-colors">Edit User Settings</a>
+                  <a href="#" @click=${this._editReports} class="block px-4 py-2 hover:bg-brand-50 transition-colors">Edit Reports</a>
                   <a href="#" @click=${this._about} class="block px-4 py-2 hover:bg-brand-50 transition-colors">About</a>
+                  <hr class="my-1 border-brand-200" />
+                  <a href="#" @click=${this._signOut} class="block px-4 py-2 hover:bg-brand-50 transition-colors text-red-600">Sign Out</a>
                 </div>
               </div>
             </li>
@@ -1701,19 +1704,33 @@ class AppNavbar extends LitElement {
       showEditSettingsModal();
     }
   }
+  _editReports(event) {
+    event.preventDefault();
+    if (typeof showEditReportsModal === "function") {
+      showEditReportsModal();
+    }
+  }
+  async _signOut(event) {
+    event.preventDefault();
+    try {
+      await fetch("/api/auth/sign-out", { method: "POST" });
+    } catch {}
+    window.location.href = "/";
+  }
   _about(event) {
     event.preventDefault();
     if (typeof showAboutModal === "function") {
       showAboutModal();
     }
   }
-  firstUpdated() {
+  async firstUpdated() {
     if (typeof highlightActiveNav === "function") {
       highlightActiveNav();
     }
     this._loadLists();
     this._loadDocs();
-    this._loadCompositeReports();
+    await this._loadCompositeReports();
+    this._checkReportsNewTab();
     this._checkTestMode();
   }
   async _loadCompositeReports() {
@@ -1735,6 +1752,9 @@ class AppNavbar extends LitElement {
         link.href = "/pages/reports.html?report=" + encodeURIComponent(report.id);
         link.className = "block px-4 py-2 hover:bg-brand-50 transition-colors";
         link.setAttribute("data-nav", "report-" + report.id);
+        if (this._reportsNewTab) {
+          link.setAttribute("target", "_blank");
+        }
         link.textContent = report.title;
         dropdown.appendChild(link);
       }
@@ -1756,8 +1776,26 @@ class AppNavbar extends LitElement {
       const nav = this.querySelector("nav");
       if (nav) {
         nav.classList.remove("bg-brand-800");
-        nav.classList.add("bg-amber-700");
+        nav.classList.add("bg-emerald-900");
       }
+    } catch {}
+  }
+  async _checkReportsNewTab() {
+    try {
+      const response = await fetch("/api/config/reports-new-tab");
+      if (!response.ok)
+        return;
+      const data = await response.json();
+      if (!data.reportsOpenInNewTab)
+        return;
+      const dropdown = document.getElementById("nav-reports-dropdown");
+      if (!dropdown)
+        return;
+      const links = dropdown.querySelectorAll("a");
+      links.forEach(function(link) {
+        link.setAttribute("target", "_blank");
+      });
+      this._reportsNewTab = true;
     } catch {}
   }
   async _loadLists() {
