@@ -1,86 +1,59 @@
 [
   {
-    "id": "weekly_summary",
-    "title": "Weekly Summary",
-    "blocks": [
-      { "type": "household_assets", "params": [] },
-      { "type": "new_page" },
-      {
-        "type": "portfolio_summary_valuation",
-        "params": ["USER2", "USER1", "USER2 + USER1"]
-      }
-    ]
-  },
-  {
-    "id": "weekly_detail",
-    "title": "Weekly Detail",
-    "blocks": [
-      { "type": "household_assets", "layout": "portrait", "params": [] },
-      { "type": "new_page" },
-      {
-        "type": "portfolio_summary_valuation",
-        "params": ["USER2", "USER1", "USER2 + USER1"]
-      },
-      { "type": "new_page" },
-      {
-        "type": "portfolio_detail_valuation",
-        "layout": "landscape",
-        "params": ["USER2:ISA:1m,3m,1y,3y", "USER2:sipp:1m,3m,1y,3y"]
-      },
-      { "type": "new_page" },
-      {
-        "type": "portfolio_detail_valuation",
-        "layout": "landscape",
-        "params": [
-          "USER2:trading:1m,3m,1y,3y",
-          "USER2:isa+sipp+trading:1m,3m,1y,3y"
-        ]
-      },
-      { "type": "new_page" },
-      {
-        "type": "portfolio_detail_valuation",
-        "layout": "landscape",
-        "params": ["USER1:ISA:1m,3m,1y,3y", "USER1:sipp:1m,3m,1y,3y"]
-      },
-      { "type": "new_page" },
-      {
-        "type": "portfolio_detail_valuation",
-        "layout": "landscape",
-        "params": [
-          "USER1:trading:1m,3m,1y,3y",
-          "USER1:isa+sipp+trading:1m,3m,1y,3y"
-        ]
-      }
-    ]
-  },
-  {
     "id": "pdf_household_assets",
-    "title": "Household Assets (PDF)",
-    "output": "pdf",
+    "title": "Household Assets",
     "pdfEndpoint": "/api/reports/pdf/household-assets",
     "params": []
   },
   {
     "id": "pdf_portfolio_summary",
-    "title": "Portfolio Summary (PDF)",
-    "output": "pdf",
+    "title": "Portfolio Summary",
     "pdfEndpoint": "/api/reports/pdf/portfolio-summary",
     "params": ["USER2", "USER1", "USER2 + USER1"]
   },
   {
     "id": "pdf_portfolio_detail",
-    "title": "Portfolio Detail (PDF)",
-    "output": "pdf",
+    "title": "Portfolio Detail",
     "pdfEndpoint": "/api/reports/pdf/portfolio-detail",
     "params": [
       "USER2:ISA:1m,3m,1y,3y",
       "USER2:sipp:1m,3m,1y,3y",
       "USER2:trading:1m,3m,1y,3y",
       "USER2:isa+sipp+trading:1m,3m,1y,3y",
+      "new_page",
       "USER1:ISA:1m,3m,1y,3y",
       "USER1:sipp:1m,3m,1y,3y",
       "USER1:trading:1m,3m,1y,3y",
       "USER1:isa+sipp+trading:1m,3m,1y,3y"
+    ]
+  },
+  {
+    "id": "weekly_pdf",
+    "title": "Weekly Report",
+    "blocks": [
+      { "type": "household_assets" },
+      {
+        "type": "portfolio_summary",
+        "params": ["USER2", "USER1", "USER2 + USER1"]
+      },
+      {
+        "type": "portfolio_detail",
+        "params": [
+          "USER2:ISA:1m,3m,1y,3y",
+          "USER2:sipp:1m,3m,1y,3y",
+          "USER2:trading:1m,3m,1y,3y",
+          "USER2:isa+sipp+trading:1m,3m,1y,3y"
+        ]
+      },
+      {
+        "type": "portfolio_detail",
+        "params": [
+          "USER1:ISA:1m,3m,1y,3y",
+          "USER1:sipp:1m,3m,1y,3y",
+          "USER1:trading:1m,3m,1y,3y",
+          "USER1:isa+sipp+trading:1m,3m,1y,3y"
+        ]
+      }
     ]
   }
 ]

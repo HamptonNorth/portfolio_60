@@ -96,10 +96,13 @@ export function drawPageHeader(pdf, page, marginLeft, pageHeight, marginTop) {
 /**
  * @description Draw the footer on every page: separator line, date on left,
  * report title centred, page number on right.
+ * Supports mixed page orientations: usableWidth can be a single number
+ * (all pages same width) or an array of numbers (per-page width).
  * @param {Array<Object>} pages - Array of PDFPage instances
  * @param {string} reportTitle - The report block title for the centre text
  * @param {number} marginLeft - Left margin in points
- * @param {number} usableWidth - Usable content width in points
+ * @param {number|Array<number>} usableWidth - Usable content width in points,
+ *   either a single value for all pages or an array with one value per page
  */
 export function drawPageFooters(pages, reportTitle, marginLeft, usableWidth) {
   const footerTextY = 20;
@@ -109,10 +112,12 @@ export function drawPageFooters(pages, reportTitle, marginLeft, usableWidth) {
   const footerFont = Standard14Font.of(StandardFonts.Helvetica);
 
   for (var p = 0; p < pages.length; p++) {
+    var pageWidth = Array.isArray(usableWidth) ? usableWidth[p] : usableWidth;
+
     // Separator line
     pages[p].drawLine({
       start: { x: marginLeft, y: footerLineY },
-      end: { x: marginLeft + usableWidth, y: footerLineY },
+      end: { x: marginLeft + pageWidth, y: footerLineY },
       color: COLOURS.brand200,
       thickness: 0.5,
     });
@@ -128,7 +133,7 @@ export function drawPageFooters(pages, reportTitle, marginLeft, usableWidth) {
 
     // Report title centred
     var titleWidth = footerFont.widthOfTextAtSize(reportTitle, FONT_SIZE_FOOTER);
-    var titleX = marginLeft + (usableWidth - titleWidth) / 2;
+    var titleX = marginLeft + (pageWidth - titleWidth) / 2;
     pages[p].drawText(reportTitle, {
       x: titleX,
       y: footerTextY,
@@ -139,9 +144,9 @@ export function drawPageFooters(pages, reportTitle, marginLeft, usableWidth) {
 
     // Page number on the right
     var pageStr = "page " + (p + 1) + "/" + totalPages;
-    var pageWidth = footerFont.widthOfTextAtSize(pageStr, FONT_SIZE_FOOTER);
+    var pageNumWidth = footerFont.widthOfTextAtSize(pageStr, FONT_SIZE_FOOTER);
     pages[p].drawText(pageStr, {
-      x: marginLeft + usableWidth - pageWidth,
+      x: marginLeft + pageWidth - pageNumWidth,
       y: footerTextY,
       font: StandardFonts.Helvetica,
       size: FONT_SIZE_FOOTER,

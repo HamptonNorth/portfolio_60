@@ -59,14 +59,17 @@ const SECTION_HEADING_HEIGHT = 20;
  * @type {Array<{key: string, label: string, width: number, align: string}>}
  */
 const BASE_COLUMNS = [
-  { key: "investment", label: "Investment", width: 190, align: "left" },
+  { key: "investment", label: "Investment", width: 170, align: "left" },
   { key: "currency", label: "Ccy", width: 30, align: "left" },
-  { key: "quantity", label: "Quantity", width: 80, align: "right" },
-  { key: "avgCost", label: "Avg Cost", width: 70, align: "right" },
-  { key: "price", label: "Price", width: 70, align: "right" },
-  { key: "valueLocal", label: "Value", width: 70, align: "right" },
-  { key: "valueGBP", label: "Value GBP", width: 80, align: "right" },
+  { key: "quantity", label: "Quantity", width: 70, align: "right" },
+  { key: "avgCost", label: "Avg Cost", width: 60, align: "right" },
+  { key: "price", label: "Price", width: 60, align: "right" },
+  { key: "valueLocal", label: "Value", width: 60, align: "right" },
+  { key: "valueGBP", label: "Value GBP", width: 70, align: "right" },
 ];
+
+/** @description Width for each change period column in points */
+const CHANGE_COL_WIDTH = 60;
 
 /**
  * @description Format a number as whole pounds with thousand separators.
@@ -218,7 +221,6 @@ function resolveParams(params) {
  * @returns {Array<{key: string, label: string, width: number, align: string, x: number}>}
  */
 function buildColumns(periods) {
-  var changeWidth = 55;
   var cols = BASE_COLUMNS.map(function (col) {
     return { key: col.key, label: col.label, width: col.width, align: col.align };
   });
@@ -227,7 +229,7 @@ function buildColumns(periods) {
     cols.push({
       key: "change_" + i,
       label: periods[i].label,
-      width: changeWidth,
+      width: CHANGE_COL_WIDTH,
       align: "right",
     });
   }
@@ -243,43 +245,45 @@ function buildColumns(periods) {
 }
 
 /**
- * @description Generate a PDF for the Portfolio Detail Valuation report.
- * Fetches data from the database and renders it as an A4 landscape PDF
- * with per-account holdings tables and optional change columns.
- * @param {Array<string>} params - Params array controlling which accounts
- *   to render, in the format "USER:ACCOUNT_TYPE:periods" or
- *   "USER:isa+sipp+trading:periods" for combined totals.
+ * @description Render the Portfolio Detail Valuation block into a shared PDF context.
+ * Draws the block title, per-account holdings tables with change columns,
+ * and optional combined totals sections.
+ * Does not add footers — the caller is responsible for that.
+ * @param {Object} ctx - Shared rendering context
+ * @param {Object} ctx.pdf - The PDF document
+ * @param {Object} ctx.page - Current page (updated in place on ctx)
+ * @param {Array<Object>} ctx.pages - Array of all pages (pushed to when new pages added)
+ * @param {number} ctx.y - Current y position (updated in place on ctx)
+ * @param {Array<number>} ctx.pageWidths - Per-page usable widths (pushed to when new pages added)
+ * @param {Array<string>} params - Params array controlling which accounts to render.
+ *   Format: "USER:ACCOUNT_TYPE:periods" or "USER:isa+sipp+trading:periods".
+ *   Use "new_page" to force a page break between sections.
  *   Tokens like "USER1" are substituted from report_params.
- * @returns {Promise<Uint8Array>} The PDF file bytes
  */
-export async function generatePortfolioDetailPdf(params) {
+export function renderPortfolioDetailBlock(ctx, params) {
+  var pdf = ctx.pdf;
+  var page = ctx.page;
+  var pages = ctx.pages;
+  var y = ctx.y;
+
   var resolvedParams = resolveParams(params);
 
   if (!resolvedParams || resolvedParams.length === 0) {
-    // Return a minimal PDF with a "no params" message
-    const pdf = PDF.create();
-    const page = pdf.addPage({ size: "a4", orientation: "landscape" });
-    var emptyY = drawPageHeader(pdf, page, MARGIN_LEFT, A4_LANDSCAPE_HEIGHT, MARGIN_TOP);
-    page.drawText("Portfolio Detail Valuation — no parameters provided.", {
+    page.drawText("Portfolio Detail Valuation \u2014 no parameters provided.", {
       x: MARGIN_LEFT,
-      y: emptyY - FONT_SIZE_TITLE,
+      y: y - FONT_SIZE_TITLE,
       font: StandardFonts.Helvetica,
       size: FONT_SIZE_TITLE,
       color: COLOURS.brand800,
     });
-    drawPageFooters([page], "Portfolio Detail Valuation", MARGIN_LEFT, USABLE_WIDTH);
-    return await pdf.save();
+    y -= FONT_SIZE_TITLE + 12;
+    ctx.page = page;
+    ctx.y = y;
+    return;
   }
 
   const testMode = isTestMode();
   const headerRowColour = testMode ? COLOURS.green100 : COLOURS.brand100;
-
-  const pdf = PDF.create();
-  var page = pdf.addPage({ size: "a4", orientation: "landscape" });
-  var pages = [page];
-
-  // Draw page header (logo + "Portfolio 60") and get starting y position
-  var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_LANDSCAPE_HEIGHT, MARGIN_TOP);
 
   /**
    * @description Check if there is enough vertical space. If not, add a new page with header.
@@ -289,6 +293,7 @@ export async function generatePortfolioDetailPdf(params) {
     if (y - needed < MARGIN_BOTTOM) {
       page = pdf.addPage({ size: "a4", orientation: "landscape" });
       pages.push(page);
+      if (ctx.pageWidths) ctx.pageWidths.push(USABLE_WIDTH);
       y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_LANDSCAPE_HEIGHT, MARGIN_TOP);
     }
   }
@@ -305,6 +310,23 @@ export async function generatePortfolioDetailPdf(params) {
 
   // --- Process each param entry ---
   for (var i = 0; i < resolvedParams.length; i++) {
+    // "new_page" forces a page break and redraws the title
+    if (resolvedParams[i] === "new_page") {
+      page = pdf.addPage({ size: "a4", orientation: "landscape" });
+      pages.push(page);
+      if (ctx.pageWidths) ctx.pageWidths.push(USABLE_WIDTH);
+      y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_LANDSCAPE_HEIGHT, MARGIN_TOP);
+      page.drawText("Portfolio Detail Valuation", {
+        x: MARGIN_LEFT,
+        y: y - FONT_SIZE_TITLE,
+        font: StandardFonts.HelveticaBold,
+        size: FONT_SIZE_TITLE,
+        color: COLOURS.brand800,
+      });
+      y -= FONT_SIZE_TITLE + 12;
+      continue;
+    }
+
     var parsed = parseDetailParam(resolvedParams[i]);
 
     if (!parsed.user || !parsed.accountType) continue;
@@ -328,6 +350,8 @@ export async function generatePortfolioDetailPdf(params) {
 
     var periods = data.periods || [];
     var columns = buildColumns(periods);
+    var lastCol = columns[columns.length - 1];
+    var tableWidth = lastCol.x + lastCol.width;
 
     // Section heading
     var typeLabel = ACCOUNT_TYPE_LABELS[data.account.account_type] || data.account.account_type;
@@ -344,7 +368,7 @@ export async function generatePortfolioDetailPdf(params) {
     y -= SECTION_HEADING_HEIGHT;
 
     // Header row
-    drawTableHeader(columns);
+    drawTableHeader(columns, tableWidth);
 
     // Holdings rows
     for (var h = 0; h < data.holdings.length; h++) {
@@ -419,7 +443,7 @@ export async function generatePortfolioDetailPdf(params) {
       // Row bottom border
       page.drawLine({
         start: { x: MARGIN_LEFT, y: rowY },
-        end: { x: MARGIN_LEFT + USABLE_WIDTH, y: rowY },
+        end: { x: MARGIN_LEFT + tableWidth, y: rowY },
         color: COLOURS.brand100,
         thickness: 0.3,
       });
@@ -435,7 +459,7 @@ export async function generatePortfolioDetailPdf(params) {
     page.drawRectangle({
       x: MARGIN_LEFT,
       y: totalsRowY,
-      width: USABLE_WIDTH,
+      width: tableWidth,
       height: ROW_HEIGHT,
       color: headerRowColour,
     });
@@ -484,7 +508,7 @@ export async function generatePortfolioDetailPdf(params) {
     // Totals row bottom border
     page.drawLine({
       start: { x: MARGIN_LEFT, y: totalsRowY },
-      end: { x: MARGIN_LEFT + USABLE_WIDTH, y: totalsRowY },
+      end: { x: MARGIN_LEFT + tableWidth, y: totalsRowY },
       color: COLOURS.brand200,
       thickness: 0.5,
     });
@@ -584,18 +608,18 @@ export async function generatePortfolioDetailPdf(params) {
     // Build columns for the combined row (Value GBP + change columns)
     var hasPeriods = combinedPeriods.length > 0;
     var combinedCols = [
-      { key: "valueGBP", label: "Value GBP", width: 80, align: "right", x: 0 },
+      { key: "valueGBP", label: "Value GBP", width: 70, align: "right", x: 0 },
     ];
-    var cx = 80;
+    var cx = 70;
     for (var k = 0; k < combinedPeriods.length; k++) {
       combinedCols.push({
         key: "change_" + k,
         label: combinedPeriods[k].label,
-        width: 55,
+        width: CHANGE_COL_WIDTH,
         align: "right",
         x: cx,
       });
-      cx += 55;
+      cx += CHANGE_COL_WIDTH;
     }
 
     // Header row (if periods exist)
@@ -684,14 +708,15 @@ export async function generatePortfolioDetailPdf(params) {
   /**
    * @description Draw the column header row for a detail table.
    * @param {Array<Object>} columns - Column definitions with x positions
+   * @param {number} width - Total table width in points
    */
-  function drawTableHeader(columns) {
+  function drawTableHeader(columns, width) {
     ensureSpace(HEADER_ROW_HEIGHT + ROW_HEIGHT + 4);
 
     page.drawRectangle({
       x: MARGIN_LEFT,
       y: y - HEADER_ROW_HEIGHT,
-      width: USABLE_WIDTH,
+      width: width,
       height: HEADER_ROW_HEIGHT,
       color: headerRowColour,
     });
@@ -717,15 +742,33 @@ export async function generatePortfolioDetailPdf(params) {
 
     page.drawLine({
       start: { x: MARGIN_LEFT, y: y - HEADER_ROW_HEIGHT },
-      end: { x: MARGIN_LEFT + USABLE_WIDTH, y: y - HEADER_ROW_HEIGHT },
+      end: { x: MARGIN_LEFT + width, y: y - HEADER_ROW_HEIGHT },
       color: COLOURS.brand200,
       thickness: 0.5,
     });
     y -= HEADER_ROW_HEIGHT;
   }
 
-  // --- Fixed footer on every page: date left, title centre, page number right ---
-  drawPageFooters(pages, "Portfolio Detail Valuation", MARGIN_LEFT, USABLE_WIDTH);
+  // Write back modified state
+  ctx.page = page;
+  ctx.y = y;
+}
 
+/**
+ * @description Generate a standalone PDF for the Portfolio Detail Valuation report.
+ * Creates a PDF document, renders the block, adds footers, and returns bytes.
+ * @param {Array<string>} params - Params array controlling which accounts to render.
+ * @returns {Promise<Uint8Array>} The PDF file bytes
+ */
+export async function generatePortfolioDetailPdf(params) {
+  const pdf = PDF.create();
+  var page = pdf.addPage({ size: "a4", orientation: "landscape" });
+  var pages = [page];
+  var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_LANDSCAPE_HEIGHT, MARGIN_TOP);
+
+  var ctx = { pdf: pdf, page: page, pages: pages, y: y };
+  renderPortfolioDetailBlock(ctx, params);
+
+  drawPageFooters(ctx.pages, "Portfolio Detail Valuation", MARGIN_LEFT, USABLE_WIDTH);
   return await pdf.save();
 }

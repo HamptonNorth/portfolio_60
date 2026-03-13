@@ -1,6 +1,6 @@
 /**
  * @description Report runner for Portfolio 60.
- * Loads a composite report definition from /api/reports/:id and renders
+ * Loads a composite view definition from /api/views/:id and renders
  * each block in sequence into the given container. Blocks are grouped
  * into pages (split by "new_page" entries). Each page gets a consistent
  * header (logo + title) and footer (report title, page number, date).
@@ -111,14 +111,14 @@ function buildPageFooter(reportTitle, pageNum, totalPages) {
  * @description Run a composite report by loading its definition and rendering
  * each block in sequence into the given container element. Blocks are split
  * into pages by "new_page" entries, each page getting a header and footer.
- * @param {string} reportId - The report definition ID from user-reports.json
+ * @param {string} reportId - The view definition ID from user-views.json
  * @param {string} containerId - The ID of the container element to render into
  */
 async function runCompositeReport(reportId, containerId) {
   const container = document.getElementById(containerId);
 
   // Load the specific report definition
-  const result = await apiRequest("/api/reports/" + encodeURIComponent(reportId));
+  const result = await apiRequest("/api/views/" + encodeURIComponent(reportId));
 
   if (!result.ok) {
     container.innerHTML =

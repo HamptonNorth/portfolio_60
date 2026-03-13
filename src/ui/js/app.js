@@ -648,7 +648,7 @@ async function showEditReportsModal() {
   // Show loading modal while fetching reports
   const loadingHtml = `
     <div id="app-modal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div class="bg-white rounded-lg shadow-xl mx-4 overflow-hidden" style="width:60vw;min-width:48rem;max-width:60vw">>
+      <div class="bg-white rounded-lg shadow-xl mx-4 overflow-hidden" style="width:60vw;min-width:48rem;max-width:60vw">
         <div class="bg-brand-800 text-white px-4 py-3">
           <h3 class="text-lg font-semibold">Edit Reports</h3>
         </div>
@@ -678,8 +678,9 @@ async function showEditReportsModal() {
         <h3 class="text-lg font-semibold">Edit Reports</h3>
       </div>
       <div class="p-4">
-        <p class="text-sm text-brand-600 mb-2">Edit composite report definitions. A backup was created when this editor opened.</p>
+        <p class="text-sm text-brand-600 mb-2">Edit PDF report definitions. A backup was created when this editor opened.</p>
         <p class="text-xs text-brand-400 mb-3">Save location: ${escapeHtml(reportsPath)}</p>
+        <div id="reports-warning" class="hidden mb-3 bg-amber-50 border border-amber-300 text-amber-800 rounded-lg px-3 py-2 text-sm"></div>
         <div id="reports-error" class="hidden mb-3 bg-red-50 border border-red-300 text-error rounded-lg px-3 py-2 text-sm"></div>
         <textarea id="reports-editor" class="w-full font-mono text-sm border-2 border-brand-300 rounded-lg p-3 focus:outline-none focus:border-brand-500 bg-brand-25 text-brand-800" rows="20" spellcheck="false">${escapeHtml(reportsContent)}</textarea>
       </div>
@@ -692,6 +693,7 @@ async function showEditReportsModal() {
 
   const editor = document.getElementById("reports-editor");
   attachLineNumbers(editor);
+  const warningDiv = document.getElementById("reports-warning");
   const errorDiv = document.getElementById("reports-error");
   const saveBtn = document.getElementById("reports-save-btn");
   const cancelBtn = document.getElementById("reports-cancel-btn");
@@ -716,9 +718,10 @@ async function showEditReportsModal() {
   }
   document.addEventListener("keydown", handleEscape);
 
-  // Save handler — validate JSON and send to server
+  // Save handler — validate JSON, check for warnings, and send to server
   saveBtn.addEventListener("click", async function () {
     errorDiv.classList.add("hidden");
+    warningDiv.classList.add("hidden");
     const content = editor.value;
 
     // Client-side JSON validation
@@ -728,6 +731,13 @@ async function showEditReportsModal() {
       errorDiv.textContent = formatJsonError(content, parseErr);
       errorDiv.classList.remove("hidden");
       return;
+    }
+
+    // Check for warnings (new_page or layout in reports file)
+    var warnings = validateJsonWarnings(content, "reports");
+    if (warnings.length > 0) {
+      warningDiv.innerHTML = "<strong>Warning:</strong> " + warnings.map(escapeHtml).join("<br>");
+      warningDiv.classList.remove("hidden");
     }
 
     saveBtn.disabled = true;
@@ -740,6 +750,183 @@ async function showEditReportsModal() {
 
     if (saveResult.ok) {
       closeReportsModal();
+      document.removeEventListener("keydown", handleEscape);
+    } else {
+      errorDiv.textContent = "Save failed: " + (saveResult.error || "Unknown error") + (saveResult.detail ? " — " + saveResult.detail : "");
+      errorDiv.classList.remove("hidden");
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Save";
+    }
+  });
+
+  editor.focus();
+}
+
+/**
+ * @description Check JSON content for properties that belong in the other file.
+ * Returns an array of warning strings to display in the editor.
+ * @param {string} content - The raw JSON string
+ * @param {string} fileType - Either "views" or "reports"
+ * @returns {Array<string>} Warning messages (empty if none)
+ */
+function validateJsonWarnings(content, fileType) {
+  var warnings = [];
+  try {
+    var parsed = JSON.parse(content);
+    if (!Array.isArray(parsed)) return warnings;
+
+    if (fileType === "views") {
+      // Warn if any entry contains pdfEndpoint (belongs in user-reports.json)
+      for (var i = 0; i < parsed.length; i++) {
+        if (parsed[i].pdfEndpoint) {
+          warnings.push('Entry "' + (parsed[i].id || parsed[i].title || "index " + i) + '" has "pdfEndpoint" — this belongs in user-reports.json (PDF reports), not user-views.json.');
+        }
+      }
+    } else if (fileType === "reports") {
+      // Warn if any entry or its blocks contain new_page or layout (belongs in user-views.json)
+      for (var i = 0; i < parsed.length; i++) {
+        var entry = parsed[i];
+        var entryName = entry.id || entry.title || "index " + i;
+        if (entry.layout) {
+          warnings.push('Entry "' + entryName + '" has "layout" — this belongs in user-views.json (HTML views), not user-reports.json.');
+        }
+        if (entry.blocks && Array.isArray(entry.blocks)) {
+          for (var j = 0; j < entry.blocks.length; j++) {
+            if (entry.blocks[j].type === "new_page") {
+              warnings.push('Entry "' + entryName + '" has a "new_page" block — this belongs in user-views.json (HTML views), not user-reports.json.');
+              break;
+            }
+            if (entry.blocks[j].layout) {
+              warnings.push('Entry "' + entryName + '" has a block with "layout" — this belongs in user-views.json (HTML views), not user-reports.json.');
+              break;
+            }
+          }
+        }
+      }
+    }
+  } catch {
+    // If JSON is invalid, skip validation warnings (parse error will be shown separately)
+  }
+  return warnings;
+}
+
+/**
+ * @description Show the Edit Views modal. Loads the raw user-views.json into
+ * a textarea for editing, with Save and Cancel buttons. Creates a timestamped
+ * backup on the server before saving. Warns if content contains pdfEndpoint.
+ */
+async function showEditViewsModal() {
+  // Remove any existing modal
+  const existingModal = document.getElementById("app-modal");
+  if (existingModal) {
+    existingModal.remove();
+  }
+
+  // Show loading modal while fetching views
+  const loadingHtml = `
+    <div id="app-modal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-xl mx-4 overflow-hidden" style="width:60vw;min-width:48rem;max-width:60vw">
+        <div class="bg-brand-800 text-white px-4 py-3">
+          <h3 class="text-lg font-semibold">Edit Views</h3>
+        </div>
+        <div class="p-6 text-center text-brand-500">Loading view definitions...</div>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML("beforeend", loadingHtml);
+
+  // Fetch the raw views content
+  const result = await apiRequest("/api/views/raw");
+  const modal = document.getElementById("app-modal");
+
+  if (!result.ok) {
+    modal.remove();
+    showModal("Error", "Failed to load view definitions: " + (result.error || "Unknown error"));
+    return;
+  }
+
+  const viewsContent = result.data.content;
+  const viewsPath = result.data.path;
+
+  // Replace loading content with the editor
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg shadow-xl mx-4 overflow-hidden" style="width:60vw;min-width:48rem;max-width:60vw">
+      <div class="bg-brand-800 text-white px-4 py-3">
+        <h3 class="text-lg font-semibold">Edit Views</h3>
+      </div>
+      <div class="p-4">
+        <p class="text-sm text-brand-600 mb-2">Edit HTML composite view definitions. A backup was created when this editor opened.</p>
+        <p class="text-xs text-brand-400 mb-3">Save location: ${escapeHtml(viewsPath)}</p>
+        <div id="views-warning" class="hidden mb-3 bg-amber-50 border border-amber-300 text-amber-800 rounded-lg px-3 py-2 text-sm"></div>
+        <div id="views-error" class="hidden mb-3 bg-red-50 border border-red-300 text-error rounded-lg px-3 py-2 text-sm"></div>
+        <textarea id="views-editor" class="w-full font-mono text-sm border-2 border-brand-300 rounded-lg p-3 focus:outline-none focus:border-brand-500 bg-brand-25 text-brand-800" rows="20" spellcheck="false">${escapeHtml(viewsContent)}</textarea>
+      </div>
+      <div class="px-4 py-3 bg-brand-50 flex justify-end gap-3">
+        <button id="views-cancel-btn" class="bg-brand-200 hover:bg-brand-300 text-brand-700 font-medium px-4 py-2 rounded transition-colors">Cancel</button>
+        <button id="views-save-btn" class="bg-brand-700 hover:bg-brand-800 text-white font-medium px-4 py-2 rounded transition-colors">Save</button>
+      </div>
+    </div>
+  `;
+
+  const editor = document.getElementById("views-editor");
+  attachLineNumbers(editor);
+  const warningDiv = document.getElementById("views-warning");
+  const errorDiv = document.getElementById("views-error");
+  const saveBtn = document.getElementById("views-save-btn");
+  const cancelBtn = document.getElementById("views-cancel-btn");
+
+  function closeViewsModal() {
+    modal.remove();
+  }
+
+  cancelBtn.addEventListener("click", closeViewsModal);
+
+  modal.addEventListener("click", function (event) {
+    if (event.target === modal) {
+      closeViewsModal();
+    }
+  });
+
+  function handleEscape(event) {
+    if (event.key === "Escape") {
+      closeViewsModal();
+      document.removeEventListener("keydown", handleEscape);
+    }
+  }
+  document.addEventListener("keydown", handleEscape);
+
+  // Save handler — validate JSON, check for warnings, and send to server
+  saveBtn.addEventListener("click", async function () {
+    errorDiv.classList.add("hidden");
+    warningDiv.classList.add("hidden");
+    const content = editor.value;
+
+    // Client-side JSON validation
+    try {
+      JSON.parse(content);
+    } catch (parseErr) {
+      errorDiv.textContent = formatJsonError(content, parseErr);
+      errorDiv.classList.remove("hidden");
+      return;
+    }
+
+    // Check for warnings (pdfEndpoint in views file)
+    var warnings = validateJsonWarnings(content, "views");
+    if (warnings.length > 0) {
+      warningDiv.innerHTML = "<strong>Warning:</strong> " + warnings.map(escapeHtml).join("<br>");
+      warningDiv.classList.remove("hidden");
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
+
+    const saveResult = await apiRequest("/api/views/raw", {
+      method: "PUT",
+      body: { content: content },
+    });
+
+    if (saveResult.ok) {
+      closeViewsModal();
       document.removeEventListener("keydown", handleEscape);
     } else {
       errorDiv.textContent = "Save failed: " + (saveResult.error || "Unknown error") + (saveResult.detail ? " — " + saveResult.detail : "");

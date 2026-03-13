@@ -1652,13 +1652,18 @@ class AppNavbar extends LitElement {
               </div>
             </li>
             <li class="relative group">
+              <span class="hover:text-brand-200 transition-colors cursor-pointer select-none" data-nav-parent="views">Views <span class="text-xs">&#9662;</span></span>
+              <div class="hidden group-hover:block absolute left-0 top-full pt-1 z-50">
+                <div class="bg-white text-brand-800 rounded-md shadow-lg border border-brand-200 py-1 min-w-48" id="nav-views-dropdown">
+                  <a href="/pages/reports.html?block=portfolio_summary" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="view-portfolio-summary">Portfolio Summary</a>
+                  <a href="/pages/reports.html?block=household_assets" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="view-household">Household Assets</a>
+                </div>
+              </div>
+            </li>
+            <li class="relative group">
               <span class="hover:text-brand-200 transition-colors cursor-pointer select-none" data-nav-parent="reports">Reports <span class="text-xs">&#9662;</span></span>
               <div class="hidden group-hover:block absolute left-0 top-full pt-1 z-50">
                 <div class="bg-white text-brand-800 rounded-md shadow-lg border border-brand-200 py-1 min-w-48" id="nav-reports-dropdown">
-                  <a href="/pages/reports.html?block=portfolio_summary" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="report-portfolio-summary">Portfolio Summary</a>
-                  <a href="/pages/reports.html?block=household_assets" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="report-household">Household Assets</a>
-                  <hr class="my-1 border-brand-200" />
-                  <a href="/api/reports/pdf/household-assets" target="_blank" class="block px-4 py-2 hover:bg-brand-50 transition-colors text-brand-600" data-nav="report-household-pdf">Household Assets (PDF)</a>
                 </div>
               </div>
             </li>
@@ -1680,7 +1685,7 @@ class AppNavbar extends LitElement {
                   <path
                     stroke-linecap="round"
                     stroke-linejoin="round"
-                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.573-1.066z"
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.11 2.37-2.37.996.608 2.296.07 2.573-1.066z"
                   />
                   <circle cx="12" cy="12" r="3" />
                 </svg>
@@ -1688,6 +1693,7 @@ class AppNavbar extends LitElement {
               <div class="hidden group-hover:block absolute right-0 top-full pt-1 z-50">
                 <div class="bg-white text-brand-800 rounded-md shadow-lg border border-brand-200 py-1 min-w-48">
                   <a href="#" @click=${this._editSettings} class="block px-4 py-2 hover:bg-brand-50 transition-colors">Edit User Settings</a>
+                  <a href="#" @click=${this._editViews} class="block px-4 py-2 hover:bg-brand-50 transition-colors">Edit Views</a>
                   <a href="#" @click=${this._editReports} class="block px-4 py-2 hover:bg-brand-50 transition-colors">Edit Reports</a>
                   <a href="#" @click=${this._about} class="block px-4 py-2 hover:bg-brand-50 transition-colors">About</a>
                   <hr class="my-1 border-brand-200" />
@@ -1704,6 +1710,12 @@ class AppNavbar extends LitElement {
     event.preventDefault();
     if (typeof showEditSettingsModal === "function") {
       showEditSettingsModal();
+    }
+  }
+  _editViews(event) {
+    event.preventDefault();
+    if (typeof showEditViewsModal === "function") {
+      showEditViewsModal();
     }
   }
   _editReports(event) {
@@ -1739,11 +1751,39 @@ class AppNavbar extends LitElement {
     }
     this._loadLists();
     this._loadDocs();
-    await this._loadCompositeReports();
+    await this._loadViews();
+    await this._loadReports();
     this._checkReportsNewTab();
     this._checkTestMode();
   }
-  async _loadCompositeReports() {
+  async _loadViews() {
+    try {
+      const response = await fetch("/api/views");
+      if (!response.ok)
+        return;
+      const views = await response.json();
+      if (!Array.isArray(views) || views.length === 0)
+        return;
+      const dropdown = document.getElementById("nav-views-dropdown");
+      if (!dropdown)
+        return;
+      const hr = document.createElement("hr");
+      hr.className = "my-1 border-brand-200";
+      dropdown.appendChild(hr);
+      for (const view of views) {
+        const link = document.createElement("a");
+        link.href = "/pages/reports.html?report=" + encodeURIComponent(view.id);
+        link.className = "block px-4 py-2 hover:bg-brand-50 transition-colors";
+        if (this._reportsNewTab) {
+          link.setAttribute("target", "_blank");
+        }
+        link.setAttribute("data-nav", "view-" + view.id);
+        link.textContent = view.title;
+        dropdown.appendChild(link);
+      }
+    } catch (err) {}
+  }
+  async _loadReports() {
     try {
       const response = await fetch("/api/reports");
       if (!response.ok)
@@ -1754,22 +1794,17 @@ class AppNavbar extends LitElement {
       const dropdown = document.getElementById("nav-reports-dropdown");
       if (!dropdown)
         return;
-      const hr = document.createElement("hr");
-      hr.className = "my-1 border-brand-200";
-      dropdown.appendChild(hr);
       for (const report of reports) {
         const link = document.createElement("a");
-        if (report.output === "pdf" && report.pdfEndpoint) {
+        if (report.blocks && Array.isArray(report.blocks)) {
+          link.href = "/api/reports/pdf/composite?id=" + encodeURIComponent(report.id);
+        } else if (report.pdfEndpoint) {
           link.href = this._buildPdfUrl(report.pdfEndpoint, report.params || []);
-          link.setAttribute("target", "_blank");
-          link.className = "block px-4 py-2 hover:bg-brand-50 transition-colors text-brand-600";
         } else {
-          link.href = "/pages/reports.html?report=" + encodeURIComponent(report.id);
-          link.className = "block px-4 py-2 hover:bg-brand-50 transition-colors";
-          if (this._reportsNewTab) {
-            link.setAttribute("target", "_blank");
-          }
+          continue;
         }
+        link.setAttribute("target", "_blank");
+        link.className = "block px-4 py-2 hover:bg-brand-50 transition-colors text-brand-600";
         link.setAttribute("data-nav", "report-" + report.id);
         link.textContent = report.title;
         dropdown.appendChild(link);
@@ -1804,13 +1839,13 @@ class AppNavbar extends LitElement {
       const data = await response.json();
       if (!data.reportsOpenInNewTab)
         return;
-      const dropdown = document.getElementById("nav-reports-dropdown");
-      if (!dropdown)
-        return;
-      const links = dropdown.querySelectorAll("a");
-      links.forEach(function(link) {
-        link.setAttribute("target", "_blank");
-      });
+      const viewsDropdown = document.getElementById("nav-views-dropdown");
+      if (viewsDropdown) {
+        const links = viewsDropdown.querySelectorAll("a");
+        links.forEach(function(link) {
+          link.setAttribute("target", "_blank");
+        });
+      }
       this._reportsNewTab = true;
     } catch {}
   }

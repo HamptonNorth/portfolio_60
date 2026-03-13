@@ -336,8 +336,8 @@ const server = Bun.serve({
       }
     }
 
-    // Composite report definitions
-    if (path.startsWith("/api/reports")) {
+    // Views (HTML composite reports) and Reports (PDF reports)
+    if (path.startsWith("/api/views") || path.startsWith("/api/reports")) {
       const reportsResult = await handleReportsRoute(method, path, request);
       if (reportsResult) {
         return reportsResult;

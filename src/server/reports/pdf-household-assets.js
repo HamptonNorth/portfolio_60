@@ -146,12 +146,22 @@ function truncateText(text, fontName, fontSize, maxWidth) {
 }
 
 /**
- * @description Generate a PDF for the Household Assets report.
- * Fetches data from the database and renders it as an A4 portrait PDF
- * with category-grouped tables matching the HTML report layout.
- * @returns {Promise<Uint8Array>} The PDF file bytes
+ * @description Render the Household Assets block into a shared PDF context.
+ * Draws the block title, category tables, and summary section.
+ * Does not add footers — the caller is responsible for that.
+ * @param {Object} ctx - Shared rendering context
+ * @param {Object} ctx.pdf - The PDF document
+ * @param {Object} ctx.page - Current page (updated in place on ctx)
+ * @param {Array<Object>} ctx.pages - Array of all pages (pushed to when new pages added)
+ * @param {number} ctx.y - Current y position (updated in place on ctx)
+ * @param {Array<number>} ctx.pageWidths - Per-page usable widths (pushed to when new pages added)
  */
-export async function generateHouseholdAssetsPdf() {
+export function renderHouseholdAssetsBlock(ctx) {
+  var pdf = ctx.pdf;
+  var page = ctx.page;
+  var pages = ctx.pages;
+  var y = ctx.y;
+
   const data = getHouseholdAssetsSummary();
   const categoryOrder = ["pension", "property", "savings", "alternative"];
   const activeCats = categoryOrder.filter(function (key) {
@@ -162,13 +172,6 @@ export async function generateHouseholdAssetsPdf() {
   const testMode = isTestMode();
   const headerRowColour = testMode ? COLOURS.green100 : COLOURS.brand100;
 
-  const pdf = PDF.create();
-  var page = pdf.addPage({ size: "a4", orientation: "portrait" });
-  var pages = [page];
-
-  // Draw page header (logo + "Portfolio 60") and get starting y position
-  var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_HEIGHT, MARGIN_TOP);
-
   /**
    * @description Check if there is enough vertical space for the next section.
    * If not, add a new page with header and reset y.
@@ -178,6 +181,7 @@ export async function generateHouseholdAssetsPdf() {
     if (y - needed < MARGIN_BOTTOM) {
       page = pdf.addPage({ size: "a4", orientation: "portrait" });
       pages.push(page);
+      if (ctx.pageWidths) ctx.pageWidths.push(USABLE_WIDTH);
       y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_HEIGHT, MARGIN_TOP);
     }
   }
@@ -381,8 +385,25 @@ export async function generateHouseholdAssetsPdf() {
   );
   y -= 24;
 
-  // --- Fixed footer on every page: date left, title centre, page number right ---
-  drawPageFooters(pages, "Household Assets", MARGIN_LEFT, USABLE_WIDTH);
+  // Write back modified state
+  ctx.page = page;
+  ctx.y = y;
+}
 
+/**
+ * @description Generate a standalone PDF for the Household Assets report.
+ * Creates a PDF document, renders the block, adds footers, and returns bytes.
+ * @returns {Promise<Uint8Array>} The PDF file bytes
+ */
+export async function generateHouseholdAssetsPdf() {
+  const pdf = PDF.create();
+  var page = pdf.addPage({ size: "a4", orientation: "portrait" });
+  var pages = [page];
+  var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_HEIGHT, MARGIN_TOP);
+
+  var ctx = { pdf: pdf, page: page, pages: pages, y: y };
+  renderHouseholdAssetsBlock(ctx);
+
+  drawPageFooters(ctx.pages, "Household Assets", MARGIN_LEFT, USABLE_WIDTH);
   return await pdf.save();
 }

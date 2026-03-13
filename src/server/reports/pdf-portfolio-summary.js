@@ -161,17 +161,26 @@ function buildInitialsMap(summaries) {
 }
 
 /**
- * @description Generate a PDF for the Portfolio Summary Valuation report.
- * Fetches data from the database and renders it as an A4 portrait PDF
- * with per-user account tables and optional combined totals, matching
- * the HTML report layout.
+ * @description Render the Portfolio Summary Valuation block into a shared PDF context.
+ * Draws the block title, per-user account tables, and optional combined totals.
+ * Does not add footers — the caller is responsible for that.
+ * @param {Object} ctx - Shared rendering context
+ * @param {Object} ctx.pdf - The PDF document
+ * @param {Object} ctx.page - Current page (updated in place on ctx)
+ * @param {Array<Object>} ctx.pages - Array of all pages (pushed to when new pages added)
+ * @param {number} ctx.y - Current y position (updated in place on ctx)
+ * @param {Array<number>} ctx.pageWidths - Per-page usable widths (pushed to when new pages added)
  * @param {Array<string>} [params] - Optional params array controlling which
  *   users and combined sections to render (e.g. ["AW", "BW", "AW + BW"]).
  *   Tokens like "USER1" are substituted from report_params.
  *   When empty, all users with accounts are shown with combined totals.
- * @returns {Promise<Uint8Array>} The PDF file bytes
  */
-export async function generatePortfolioSummaryPdf(params) {
+export function renderPortfolioSummaryBlock(ctx, params) {
+  var pdf = ctx.pdf;
+  var page = ctx.page;
+  var pages = ctx.pages;
+  var y = ctx.y;
+
   // Fetch all user summaries
   const users = getAllUsers();
   const summaries = [];
@@ -190,13 +199,6 @@ export async function generatePortfolioSummaryPdf(params) {
   const testMode = isTestMode();
   const headerRowColour = testMode ? COLOURS.green100 : COLOURS.brand100;
 
-  const pdf = PDF.create();
-  var page = pdf.addPage({ size: "a4", orientation: "portrait" });
-  var pages = [page];
-
-  // Draw page header (logo + "Portfolio 60") and get starting y position
-  var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_HEIGHT, MARGIN_TOP);
-
   /**
    * @description Check if there is enough vertical space for the next section.
    * If not, add a new page with header and reset y.
@@ -206,6 +208,7 @@ export async function generatePortfolioSummaryPdf(params) {
     if (y - needed < MARGIN_BOTTOM) {
       page = pdf.addPage({ size: "a4", orientation: "portrait" });
       pages.push(page);
+      if (ctx.pageWidths) ctx.pageWidths.push(USABLE_WIDTH);
       y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_HEIGHT, MARGIN_TOP);
     }
   }
@@ -481,8 +484,27 @@ export async function generatePortfolioSummaryPdf(params) {
     }
   }
 
-  // --- Fixed footer on every page: date left, title centre, page number right ---
-  drawPageFooters(pages, "Portfolio Summary Valuation", MARGIN_LEFT, USABLE_WIDTH);
+  // Write back modified state
+  ctx.page = page;
+  ctx.y = y;
+}
 
+/**
+ * @description Generate a standalone PDF for the Portfolio Summary Valuation report.
+ * Creates a PDF document, renders the block, adds footers, and returns bytes.
+ * @param {Array<string>} [params] - Optional params array controlling which
+ *   users and combined sections to render.
+ * @returns {Promise<Uint8Array>} The PDF file bytes
+ */
+export async function generatePortfolioSummaryPdf(params) {
+  const pdf = PDF.create();
+  var page = pdf.addPage({ size: "a4", orientation: "portrait" });
+  var pages = [page];
+  var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_HEIGHT, MARGIN_TOP);
+
+  var ctx = { pdf: pdf, page: page, pages: pages, y: y };
+  renderPortfolioSummaryBlock(ctx, params);
+
+  drawPageFooters(ctx.pages, "Portfolio Summary Valuation", MARGIN_LEFT, USABLE_WIDTH);
   return await pdf.save();
 }
