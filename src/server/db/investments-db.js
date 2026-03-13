@@ -131,9 +131,10 @@ export function getInvestmentByPublicId(publicId) {
   const db = getDatabase();
   return db
     .query(
-      `SELECT id, description, public_id
-       FROM investments
-       WHERE public_id = ?`,
+      `SELECT i.id, i.description, i.public_id, i.currencies_id, c.code AS currency_code
+       FROM investments i
+       JOIN currencies c ON i.currencies_id = c.id
+       WHERE i.public_id = ?`,
     )
     .get(publicId);
 }

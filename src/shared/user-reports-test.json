@@ -58,8 +58,8 @@
   },
   {
     "id": "chart_uk_funds",
-    "title": "UK Mutual Funds Performance",
-    "subTitle": "12 month performance versus FTSE 100 index",
+    "title": "UK Funds & Shares Performance",
+    "subTitle": "36 month performance versus FTSE 100 and S&P 500",
     "pdfEndpoint": "/api/reports/pdf/chart",
     "fromMonthsAgo": "0",
     "monthsToShow": "36",
@@ -69,9 +69,11 @@
       "inv:GB00B41YBW71",
       "inv:GB00B4PQW151",
       "inv:GB00BD3RZ582",
+      "inv:LSE:RR.",
+      "inv:NSQ:NVDA",
       "inv:AEX:ASML",
       "bm:FTSE 100",
-      "bm:Dow Jones"
+      "bm:S&P 500"
     ]
   }
 ]

@@ -7,6 +7,7 @@ import { generatePortfolioSummaryPdf } from "../reports/pdf-portfolio-summary.js
 import { generatePortfolioDetailPdf } from "../reports/pdf-portfolio-detail.js";
 import { generateCompositePdf } from "../reports/pdf-compositor.js";
 import { generateChartPdf } from "../reports/pdf-chart.js";
+import { isTestMode } from "../test-mode.js";
 
 /**
  * @description Router instance for views and reports API routes.
@@ -23,10 +24,12 @@ const reportsRouter = new Router();
 const viewsFilePath = resolve(import.meta.dir, "../../shared/user-views.json");
 
 /**
- * @description Path to the user-reports JSON file (PDF reports).
+ * @description Paths to the user-reports JSON files (PDF reports).
+ * The test file is used when the app is in test mode; the live file is used otherwise.
  * @type {string}
  */
 const reportsFilePath = resolve(import.meta.dir, "../../shared/user-reports.json");
+const reportsTestFilePath = resolve(import.meta.dir, "../../shared/user-reports-test.json");
 
 /**
  * @description Replace placeholder tokens in all param strings within a
@@ -69,13 +72,15 @@ function loadViewDefinitions() {
 }
 
 /**
- * @description Load and parse the user-reports.json file (PDF reports), with
- * placeholder tokens substituted from the report_params database table.
+ * @description Load and parse the appropriate user-reports JSON file (PDF reports),
+ * selecting the test file when in test mode and the live file otherwise.
+ * Placeholder tokens are substituted from the report_params database table.
  * Re-reads the JSON file on every call so hand-edits take effect without restart.
  * @returns {Array} Array of PDF report definitions with tokens resolved
  */
 function loadReportDefinitions() {
-  const raw = readFileSync(reportsFilePath, "utf-8");
+  var filePath = isTestMode() ? reportsTestFilePath : reportsFilePath;
+  const raw = readFileSync(filePath, "utf-8");
   const reports = JSON.parse(raw);
 
   try {

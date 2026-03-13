@@ -136,6 +136,33 @@ export function getTotalRateCount() {
 }
 
 /**
+ * @description Get currency rates for a specific currency within a date range,
+ * ordered by date ascending. Rates are returned unscaled (divided by CURRENCY_SCALE_FACTOR).
+ * @param {number} currenciesId - The currency ID
+ * @param {string} fromDate - ISO-8601 start date (YYYY-MM-DD)
+ * @param {string} toDate - ISO-8601 end date (YYYY-MM-DD)
+ * @returns {Object[]} Array of {rate_date, rate} objects with unscaled rates
+ */
+export function getRatesInRange(currenciesId, fromDate, toDate) {
+  const db = getDatabase();
+  var rows = db
+    .query(
+      `SELECT rate_date, rate
+       FROM currency_rates
+       WHERE currencies_id = ? AND rate_date >= ? AND rate_date <= ?
+       ORDER BY rate_date ASC`,
+    )
+    .all(currenciesId, fromDate, toDate);
+
+  return rows.map(function (row) {
+    return {
+      rate_date: row.rate_date,
+      rate: row.rate / CURRENCY_SCALE_FACTOR,
+    };
+  });
+}
+
+/**
  * @description Convert a raw decimal rate to the integer-scaled value for storage.
  * Multiplies by CURRENCY_SCALE_FACTOR (10000) and rounds to the nearest integer.
  * @param {number} decimalRate - The decimal exchange rate (e.g. 1.2543)

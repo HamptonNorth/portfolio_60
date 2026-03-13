@@ -3,6 +3,7 @@ import { getBenchmarkByDescription } from "../db/benchmarks-db.js";
 import { getPricesInRange } from "../db/prices-db.js";
 import { getBenchmarkDataInRange } from "../db/benchmark-data-db.js";
 import { getGlobalEventsInRange } from "../db/global-events-db.js";
+import { getRatesInRange } from "../db/currency-rates-db.js";
 
 /**
  * @description Build chart data for a performance comparison chart.
@@ -80,6 +81,8 @@ export function getChartData(chartDef) {
 
 /**
  * @description Build a rebased data series for an investment identified by public_id.
+ * If the investment is priced in a non-GBP currency, each price is converted to GBP
+ * using the currency rate from the same date (nearest on or before).
  * @param {string} publicId - The investment public_id (ISIN or Exchange:Ticker)
  * @param {string} fromStr - ISO-8601 start date
  * @param {string} toStr - ISO-8601 end date
@@ -93,6 +96,13 @@ function buildInvestmentSeries(publicId, fromStr, toStr, sampleDates) {
   var allPrices = getPricesInRange(inv.id, fromStr, toStr);
   if (allPrices.length === 0) return null;
 
+  // Convert non-GBP prices to GBP using contemporaneous currency rates
+  var needsConversion = inv.currency_code && inv.currency_code !== "GBP";
+  if (needsConversion) {
+    var allRates = getRatesInRange(inv.currencies_id, fromStr, toStr);
+    allPrices = convertPricesToGBP(allPrices, allRates);
+  }
+
   // Sample weekly: for each sample date, find the nearest price on or before
   var weeklyValues = sampleWeekly(sampleDates, allPrices, "price_date", "price");
   var rebased = rebaseToZero(weeklyValues);
@@ -102,6 +112,51 @@ function buildInvestmentSeries(publicId, fromStr, toStr, sampleDates) {
     type: "investment",
     values: rebased,
   };
+}
+
+/**
+ * @description Convert an array of price records from foreign currency to GBP.
+ * For each price, finds the nearest currency rate on or before the price date
+ * and divides the price by the rate (rate is foreign currency per 1 GBP).
+ * @param {Array<Object>} prices - Sorted ascending price records with price_date and price
+ * @param {Array<Object>} rates - Sorted ascending rate records with rate_date and rate
+ * @returns {Array<Object>} New array with prices converted to GBP
+ */
+function convertPricesToGBP(prices, rates) {
+  if (rates.length === 0) return prices;
+
+  var converted = [];
+  var rateIdx = 0;
+  var lastRate = null;
+
+  for (var i = 0; i < prices.length; i++) {
+    var priceDate = prices[i].price_date;
+
+    // Advance rate index to the last rate on or before this price date
+    while (rateIdx < rates.length - 1 && rates[rateIdx + 1].rate_date <= priceDate) {
+      rateIdx++;
+    }
+
+    // Use rate if it is on or before the price date
+    if (rates[rateIdx].rate_date <= priceDate) {
+      lastRate = rates[rateIdx].rate;
+    }
+
+    if (lastRate !== null && lastRate > 0) {
+      converted.push({
+        price_date: priceDate,
+        price: prices[i].price / lastRate,
+      });
+    } else {
+      // No rate available yet — keep original (better than dropping the point)
+      converted.push({
+        price_date: priceDate,
+        price: prices[i].price,
+      });
+    }
+  }
+
+  return converted;
 }
 
 /**

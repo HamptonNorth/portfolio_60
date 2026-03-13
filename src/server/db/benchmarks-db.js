@@ -57,7 +57,7 @@ export function getBenchmarkById(id) {
  * @returns {Object|null} Object with id and description, or null if not found
  */
 export function getBenchmarkByDescription(description) {
-  const db = getDatabase();
+  Strip spaceconst db = getDatabase();
   return db
     .query(
       `SELECT id, description
