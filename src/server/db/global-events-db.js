@@ -59,6 +59,21 @@ export function updateGlobalEvent(id, data) {
 }
 
 /**
+ * @description Get global events within a date range, ordered by date ascending.
+ * @param {string} fromDate - ISO-8601 start date (YYYY-MM-DD)
+ * @param {string} toDate - ISO-8601 end date (YYYY-MM-DD)
+ * @returns {Object[]} Array of global event objects within the range
+ */
+export function getGlobalEventsInRange(fromDate, toDate) {
+  const db = getDatabase();
+  return db
+    .query(
+      "SELECT * FROM global_events WHERE event_date >= ? AND event_date <= ? ORDER BY event_date ASC"
+    )
+    .all(fromDate, toDate);
+}
+
+/**
  * @description Delete a global event by ID.
  * @param {number} id - The event ID to delete
  * @returns {boolean} True if the event was deleted, false if not found

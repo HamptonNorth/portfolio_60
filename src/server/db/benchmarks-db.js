@@ -51,6 +51,23 @@ export function getBenchmarkById(id) {
 }
 
 /**
+ * @description Look up a benchmark by its description.
+ * Used by chart reports where benchmarks are referenced by name.
+ * @param {string} description - The benchmark description (e.g. "FTSE 100")
+ * @returns {Object|null} Object with id and description, or null if not found
+ */
+export function getBenchmarkByDescription(description) {
+  const db = getDatabase();
+  return db
+    .query(
+      `SELECT id, description
+       FROM benchmarks
+       WHERE description = ?`,
+    )
+    .get(description);
+}
+
+/**
  * @description Create a new benchmark.
  * @param {Object} data - The benchmark data
  * @param {number} data.currencies_id - FK to currencies table

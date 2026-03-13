@@ -122,6 +122,23 @@ export function updateInvestmentScrapingSource(id, url, selector) {
 }
 
 /**
+ * @description Look up an investment by its public_id (ISIN or Exchange:Ticker).
+ * Returns the investment ID and description for chart/report use.
+ * @param {string} publicId - The public identifier (e.g. "GB00B41YBW71" or "LSE:RR.")
+ * @returns {Object|null} Object with id and description, or null if not found
+ */
+export function getInvestmentByPublicId(publicId) {
+  const db = getDatabase();
+  return db
+    .query(
+      `SELECT id, description, public_id
+       FROM investments
+       WHERE public_id = ?`,
+    )
+    .get(publicId);
+}
+
+/**
  * @description Check if an investment is held in any account.
  * @param {number} id - The investment ID to check
  * @returns {Object|null} Null if not held, or an object with holding count if in use

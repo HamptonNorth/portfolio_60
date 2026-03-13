@@ -1798,6 +1798,8 @@ class AppNavbar extends LitElement {
         const link = document.createElement("a");
         if (report.blocks && Array.isArray(report.blocks)) {
           link.href = "/api/reports/pdf/composite?id=" + encodeURIComponent(report.id);
+        } else if (report.pdfEndpoint && report.pdfEndpoint.indexOf("/chart") !== -1) {
+          link.href = report.pdfEndpoint + "?id=" + encodeURIComponent(report.id);
         } else if (report.pdfEndpoint) {
           link.href = this._buildPdfUrl(report.pdfEndpoint, report.params || []);
         } else {

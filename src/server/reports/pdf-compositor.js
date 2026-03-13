@@ -3,6 +3,7 @@ import { drawPageHeader, drawPageFooters } from "./pdf-common.js";
 import { renderHouseholdAssetsBlock } from "./pdf-household-assets.js";
 import { renderPortfolioSummaryBlock } from "./pdf-portfolio-summary.js";
 import { renderPortfolioDetailBlock } from "./pdf-portfolio-detail.js";
+import { renderChartBlock } from "./pdf-chart.js";
 
 /**
  * @description Block type registry mapping type names to their renderer
@@ -29,6 +30,12 @@ const BLOCK_TYPES = {
   },
   portfolio_detail: {
     render: renderPortfolioDetailBlock,
+    orientation: "landscape",
+    pageHeight: 595.28,
+    usableWidth: 761.89,
+  },
+  chart: {
+    render: renderChartBlock,
     orientation: "landscape",
     pageHeight: 595.28,
     usableWidth: 761.89,
@@ -100,8 +107,8 @@ export async function generateCompositePdf(reportDef) {
       pageWidths: pageWidths,
     };
 
-    // Call the block renderer
-    blockType.render(ctx, block.params || []);
+    // Call the block renderer (chart blocks also receive the full block definition)
+    blockType.render(ctx, block.params || [], block);
 
     // The renderer may have added more pages; ctx.page and ctx.y
     // reflect the final state but we don't need them between blocks

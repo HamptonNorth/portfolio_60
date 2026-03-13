@@ -165,6 +165,37 @@ export function getPriceOnOrBefore(investmentId, priceDate) {
 }
 
 /**
+ * @description Get all prices for an investment within a date range, ordered
+ * by date ascending. Used for chart data where we need chronological values.
+ * @param {number} investmentId - The investment ID
+ * @param {string} fromDate - ISO-8601 start date (inclusive)
+ * @param {string} toDate - ISO-8601 end date (inclusive)
+ * @returns {Object[]} Array of price records with unscaled prices, date ascending
+ */
+export function getPricesInRange(investmentId, fromDate, toDate) {
+  const db = getDatabase();
+  const rows = db
+    .query(
+      `SELECT id, investment_id, price_date, price_time, price
+       FROM prices
+       WHERE investment_id = ? AND price_date >= ? AND price_date <= ?
+       ORDER BY price_date ASC`,
+    )
+    .all(investmentId, fromDate, toDate);
+
+  return rows.map(function (row) {
+    return {
+      id: row.id,
+      investment_id: row.investment_id,
+      price_date: row.price_date,
+      price_time: row.price_time,
+      price: row.price / CURRENCY_SCALE_FACTOR,
+      price_scaled: row.price,
+    };
+  });
+}
+
+/**
  * @description Scale a price value for storage (multiply by CURRENCY_SCALE_FACTOR).
  * @param {number} price - The price in minor units
  * @returns {number} Scaled integer value

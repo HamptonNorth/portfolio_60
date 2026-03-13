@@ -6,6 +6,7 @@ import { generateHouseholdAssetsPdf } from "../reports/pdf-household-assets.js";
 import { generatePortfolioSummaryPdf } from "../reports/pdf-portfolio-summary.js";
 import { generatePortfolioDetailPdf } from "../reports/pdf-portfolio-detail.js";
 import { generateCompositePdf } from "../reports/pdf-compositor.js";
+import { generateChartPdf } from "../reports/pdf-chart.js";
 
 /**
  * @description Router instance for views and reports API routes.
@@ -367,6 +368,51 @@ reportsRouter.get("/api/reports/pdf/composite", async function (request) {
   } catch (err) {
     return new Response(
       JSON.stringify({ error: "Failed to generate composite PDF", detail: err.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+});
+
+// GET /api/reports/pdf/chart — generate a standalone performance chart PDF.
+// Accepts the report ID as a query parameter (e.g. /api/reports/pdf/chart?id=chart_uk_funds).
+// Looks up the report definition and passes the full definition to the chart generator.
+// Must be registered before /api/reports/:id so "pdf" is not matched as an :id param
+reportsRouter.get("/api/reports/pdf/chart", async function (request) {
+  try {
+    const url = new URL(request.url);
+    const reportId = url.searchParams.get("id");
+
+    if (!reportId) {
+      return new Response(
+        JSON.stringify({ error: "Report ID is required (use ?id=...)" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    const reports = loadReportDefinitions();
+    const report = reports.find(function (r) {
+      return r.id === reportId;
+    });
+
+    if (!report) {
+      return new Response(
+        JSON.stringify({ error: "Report not found: " + reportId }),
+        { status: 404, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    const pdfBytes = await generateChartPdf(report);
+    var filename = (report.id || "chart").replace(/[^a-z0-9_-]/gi, "-") + ".pdf";
+    return new Response(pdfBytes, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": 'inline; filename="' + filename + '"',
+      },
+    });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Failed to generate chart PDF", detail: err.message }),
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }

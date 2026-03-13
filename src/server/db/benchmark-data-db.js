@@ -131,6 +131,37 @@ export function getBenchmarkDataByDate(benchmarkId, benchmarkDate) {
 }
 
 /**
+ * @description Get all benchmark values within a date range, ordered by date
+ * ascending. Used for chart data where we need chronological values.
+ * @param {number} benchmarkId - The benchmark ID
+ * @param {string} fromDate - ISO-8601 start date (inclusive)
+ * @param {string} toDate - ISO-8601 end date (inclusive)
+ * @returns {Object[]} Array of benchmark data records with unscaled values, date ascending
+ */
+export function getBenchmarkDataInRange(benchmarkId, fromDate, toDate) {
+  const db = getDatabase();
+  const rows = db
+    .query(
+      `SELECT id, benchmark_id, benchmark_date, benchmark_time, value
+       FROM benchmark_data
+       WHERE benchmark_id = ? AND benchmark_date >= ? AND benchmark_date <= ?
+       ORDER BY benchmark_date ASC`,
+    )
+    .all(benchmarkId, fromDate, toDate);
+
+  return rows.map(function (row) {
+    return {
+      id: row.id,
+      benchmark_id: row.benchmark_id,
+      benchmark_date: row.benchmark_date,
+      benchmark_time: row.benchmark_time,
+      value: row.value / CURRENCY_SCALE_FACTOR,
+      value_scaled: row.value,
+    };
+  });
+}
+
+/**
  * @description Scale a benchmark value for storage (multiply by CURRENCY_SCALE_FACTOR).
  * @param {number} value - The benchmark value
  * @returns {number} Scaled integer value
