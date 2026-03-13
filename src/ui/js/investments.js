@@ -368,7 +368,15 @@ async function loadInvestments() {
     html += '<td class="py-3 px-3 text-base">' + escapeHtml(inv.description) + manualBadge + "</td>";
     html += '<td class="py-3 px-3 text-base">' + escapeHtml(getTypeDisplayName(inv.type_short, inv.type_description)) + "</td>";
     html += '<td class="py-3 px-3 text-base">' + escapeHtml(inv.currency_code) + "</td>";
-    html += '<td class="py-3 px-3 text-sm text-brand-500 font-mono">' + escapeHtml(inv.public_id || "—") + "</td>";
+    if (inv.public_id) {
+      html += '<td class="py-3 px-3 text-sm text-brand-500 font-mono">';
+      html += escapeHtml(inv.public_id);
+      html += ' <button type="button" class="inline-flex items-center justify-center w-6 h-6 -my-1 rounded hover:bg-brand-200 transition-colors" title="Copy to clipboard" onclick="event.stopPropagation(); copyPublicId(\'' + escapeHtml(inv.public_id).replace(/'/g, "\\'") + '\', this)">';
+      html += '<svg class="w-3.5 h-3.5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" stroke-width="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke-width="2"/></svg>';
+      html += "</button></td>";
+    } else {
+      html += '<td class="py-3 px-3 text-sm text-brand-500 font-mono">\u2014</td>';
+    }
     html += '<td class="py-3 px-3 text-sm text-brand-500">' + escapeHtml(urlDisplay) + "</td>";
     html += '<td class="py-3 px-3 text-sm text-brand-500 font-mono">' + escapeHtml(selectorDisplay) + "</td>";
     html += '<td class="py-3 px-3 text-base flex gap-2">';
@@ -389,6 +397,24 @@ async function loadInvestments() {
 
   html += "</tbody></table></div>";
   container.innerHTML = html;
+}
+
+/**
+ * @description Copy a public ID string to the clipboard and show brief
+ * visual feedback on the copy button (tick icon for 1.5 seconds).
+ * @param {string} text - The public ID to copy
+ * @param {HTMLElement} btn - The button element that was clicked
+ */
+function copyPublicId(text, btn) {
+  navigator.clipboard.writeText(text).then(function () {
+    var svg = btn.querySelector("svg");
+    var original = svg.outerHTML;
+    svg.outerHTML = '<svg class="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>';
+    setTimeout(function () {
+      var tick = btn.querySelector("svg");
+      if (tick) tick.outerHTML = original;
+    }, 1500);
+  });
 }
 
 /**
