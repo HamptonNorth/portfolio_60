@@ -13,6 +13,7 @@
     "test:e2e": "bunx playwright test"
   },
   "dependencies": {
+    "@libpdf/core": "^0.3.3",
     "@tailwindcss/cli": "^4.1.18",
     "adm-zip": "^0.5.16",
     "archiver": "^7.0.1",

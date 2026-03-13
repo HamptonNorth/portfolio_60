@@ -2,6 +2,9 @@ import { Router } from "../router.js";
 import { readFileSync, writeFileSync, existsSync, copyFileSync } from "node:fs";
 import { resolve, dirname, basename, join } from "node:path";
 import { getReportParams } from "../db/report-params-db.js";
+import { generateHouseholdAssetsPdf } from "../reports/pdf-household-assets.js";
+import { generatePortfolioSummaryPdf } from "../reports/pdf-portfolio-summary.js";
+import { generatePortfolioDetailPdf } from "../reports/pdf-portfolio-detail.js";
 
 /**
  * @description Router instance for user-reports API routes.
@@ -87,6 +90,87 @@ reportsRouter.get("/api/reports/raw", function () {
   } catch (err) {
     return new Response(
       JSON.stringify({ error: "Failed to read reports file", detail: err.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+});
+
+// GET /api/reports/pdf/household-assets — generate and return PDF
+// Must be registered before /api/reports/:id so "pdf" is not matched as an :id param
+reportsRouter.get("/api/reports/pdf/household-assets", async function () {
+  try {
+    const pdfBytes = await generateHouseholdAssetsPdf();
+    return new Response(pdfBytes, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": 'inline; filename="household-assets.pdf"',
+      },
+    });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Failed to generate PDF", detail: err.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+});
+
+// GET /api/reports/pdf/portfolio-summary — generate portfolio summary PDF.
+// Accepts optional "params" query parameter as a comma-separated list of
+// user initials entries (e.g. "AW,BW,AW + BW"). Tokens like USER1 are
+// resolved from the report_params table inside the generator.
+// Must be registered before /api/reports/:id so "pdf" is not matched as an :id param
+reportsRouter.get("/api/reports/pdf/portfolio-summary", async function (request) {
+  try {
+    const url = new URL(request.url);
+    const paramsStr = url.searchParams.get("params");
+    var params = [];
+    if (paramsStr) {
+      params = paramsStr.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+    }
+
+    const pdfBytes = await generatePortfolioSummaryPdf(params);
+    return new Response(pdfBytes, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": 'inline; filename="portfolio-summary.pdf"',
+      },
+    });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Failed to generate PDF", detail: err.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+});
+
+// GET /api/reports/pdf/portfolio-detail — generate portfolio detail PDF.
+// Accepts optional "params" query parameter as a pipe-separated list of
+// detail param strings (e.g. "BW:ISA:1m,3m|BW:SIPP:1m,3m"). Pipe-separated
+// because each param contains commas for period codes. Tokens like USER1
+// are resolved from the report_params table inside the generator.
+// Must be registered before /api/reports/:id so "pdf" is not matched as an :id param
+reportsRouter.get("/api/reports/pdf/portfolio-detail", async function (request) {
+  try {
+    const url = new URL(request.url);
+    const paramsStr = url.searchParams.get("params");
+    var params = [];
+    if (paramsStr) {
+      params = paramsStr.split("|").map(function (s) { return s.trim(); }).filter(Boolean);
+    }
+
+    const pdfBytes = await generatePortfolioDetailPdf(params);
+    return new Response(pdfBytes, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": 'inline; filename="portfolio-detail.pdf"',
+      },
+    });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Failed to generate PDF", detail: err.message }),
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }

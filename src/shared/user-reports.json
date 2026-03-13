@@ -31,7 +31,10 @@
       {
         "type": "portfolio_detail_valuation",
         "layout": "landscape",
-        "params": ["USER2:trading:1m,3m,1y,3y", "USER2:isa+sipp+trading:1m,3m,1y,3y"]
+        "params": [
+          "USER2:trading:1m,3m,1y,3y",
+          "USER2:isa+sipp+trading:1m,3m,1y,3y"
+        ]
       },
       { "type": "new_page" },
       {
@@ -43,25 +46,41 @@
       {
         "type": "portfolio_detail_valuation",
         "layout": "landscape",
-        "params": ["USER1:trading:1m,3m,1y,3y", "USER1:isa+sipp+trading:1m,3m,1y,3y"]
+        "params": [
+          "USER1:trading:1m,3m,1y,3y",
+          "USER1:isa+sipp+trading:1m,3m,1y,3y"
+        ]
       }
     ]
   },
   {
-    "id": "test_detail",
-    "title": "Test Detail",
-    "blocks": [
-      {
-        "type": "portfolio_detail_valuation",
-        "layout": "landscape",
-        "params": ["USER1:ISA:1m,3m,1y,3y", "USER1:sipp:1m,3m,1y,3y"]
-      },
-      { "type": "new_page" },
-      {
-        "type": "portfolio_detail_valuation",
-        "layout": "landscape",
-        "params": ["USER1:trading:1m,3m,1y,3y", "USER1:isa+sipp+trading:1m,3m,1y,3y"]
-      }
+    "id": "pdf_household_assets",
+    "title": "Household Assets (PDF)",
+    "output": "pdf",
+    "pdfEndpoint": "/api/reports/pdf/household-assets",
+    "params": []
+  },
+  {
+    "id": "pdf_portfolio_summary",
+    "title": "Portfolio Summary (PDF)",
+    "output": "pdf",
+    "pdfEndpoint": "/api/reports/pdf/portfolio-summary",
+    "params": ["USER2", "USER1", "USER2 + USER1"]
+  },
+  {
+    "id": "pdf_portfolio_detail",
+    "title": "Portfolio Detail (PDF)",
+    "output": "pdf",
+    "pdfEndpoint": "/api/reports/pdf/portfolio-detail",
+    "params": [
+      "USER2:ISA:1m,3m,1y,3y",
+      "USER2:sipp:1m,3m,1y,3y",
+      "USER2:trading:1m,3m,1y,3y",
+      "USER2:isa+sipp+trading:1m,3m,1y,3y",
+      "USER1:ISA:1m,3m,1y,3y",
+      "USER1:sipp:1m,3m,1y,3y",
+      "USER1:trading:1m,3m,1y,3y",
+      "USER1:isa+sipp+trading:1m,3m,1y,3y"
     ]
   }
 ]

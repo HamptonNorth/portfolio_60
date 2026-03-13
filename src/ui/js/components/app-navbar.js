@@ -53,6 +53,8 @@ class AppNavbar extends LitElement {
                 <div class="bg-white text-brand-800 rounded-md shadow-lg border border-brand-200 py-1 min-w-48" id="nav-reports-dropdown">
                   <a href="/pages/reports.html?block=portfolio_summary" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="report-portfolio-summary">Portfolio Summary</a>
                   <a href="/pages/reports.html?block=household_assets" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="report-household">Household Assets</a>
+                  <hr class="my-1 border-brand-200" />
+                  <a href="/api/reports/pdf/household-assets" target="_blank" class="block px-4 py-2 hover:bg-brand-50 transition-colors text-brand-600" data-nav="report-household-pdf">Household Assets (PDF)</a>
                 </div>
               </div>
             </li>
@@ -130,6 +132,26 @@ class AppNavbar extends LitElement {
     }
   }
 
+  /**
+   * @description Build the URL for a PDF report endpoint with params encoded.
+   * Portfolio detail params use pipe "|" as separator (because individual
+   * params contain commas for period codes). Portfolio summary params use
+   * comma "," as separator.
+   * @param {string} endpoint - The PDF API endpoint path
+   * @param {Array<string>} params - The params array from the report definition
+   * @returns {string} The full URL with encoded params query parameter
+   */
+  _buildPdfUrl(endpoint, params) {
+    if (!params || params.length === 0) return endpoint;
+
+    // Detail params contain colons and commas (e.g. "BW:ISA:1m,3m,1y,3y")
+    // so use pipe separator for detail, comma for summary
+    var isDetail = endpoint.indexOf("portfolio-detail") !== -1;
+    var separator = isDetail ? "|" : ",";
+    var joined = params.join(separator);
+    return endpoint + "?params=" + encodeURIComponent(joined);
+  }
+
   async firstUpdated() {
     if (typeof highlightActiveNav === "function") {
       highlightActiveNav();
@@ -162,12 +184,22 @@ class AppNavbar extends LitElement {
 
       for (const report of reports) {
         const link = document.createElement("a");
-        link.href = "/pages/reports.html?report=" + encodeURIComponent(report.id);
-        link.className = "block px-4 py-2 hover:bg-brand-50 transition-colors";
-        link.setAttribute("data-nav", "report-" + report.id);
-        if (this._reportsNewTab) {
+
+        if (report.output === "pdf" && report.pdfEndpoint) {
+          // PDF report: link directly to the PDF endpoint with params
+          link.href = this._buildPdfUrl(report.pdfEndpoint, report.params || []);
           link.setAttribute("target", "_blank");
+          link.className = "block px-4 py-2 hover:bg-brand-50 transition-colors text-brand-600";
+        } else {
+          // HTML composite report: link to the report runner page
+          link.href = "/pages/reports.html?report=" + encodeURIComponent(report.id);
+          link.className = "block px-4 py-2 hover:bg-brand-50 transition-colors";
+          if (this._reportsNewTab) {
+            link.setAttribute("target", "_blank");
+          }
         }
+
+        link.setAttribute("data-nav", "report-" + report.id);
         link.textContent = report.title;
         dropdown.appendChild(link);
       }
