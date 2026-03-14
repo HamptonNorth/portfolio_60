@@ -1,6 +1,6 @@
 import { getAllCurrencies } from "../db/currencies-db.js";
 import { upsertRate, scaleRate } from "../db/currency-rates-db.js";
-import { recordScrapingAttempt } from "../db/scraping-history-db.js";
+import { recordFetchAttempt } from "../db/fetch-history-db.js";
 
 /**
  * @description The Frankfurter API base URL for fetching exchange rates.
@@ -22,7 +22,7 @@ const FRANKFURTER_API_URL = "https://api.frankfurter.dev/v1/latest";
  * @param {number} [options.startedBy=0] - 0 = manual/interactive, 1 = scheduled/cron
  * @param {number} [options.attemptNumber=1] - Retry attempt counter (1-5)
  * @param {boolean} [options.testMode=false] - If true, skip database writes (for testing)
- * @param {string} [options.scrapeTime=null] - Time to store (HH:MM:SS). If not provided, uses current time.
+ * @param {string} [options.fetchTime=null] - Time to store (HH:MM:SS). If not provided, uses current time.
  * @returns {Promise<{success: boolean, rates: Object[], message: string, error?: string}>}
  *   - success: whether the fetch and store completed without error
  *   - rates: array of {code, description, rate, scaledRate, rateDate, rateTime} for each currency processed
@@ -33,7 +33,7 @@ export async function fetchCurrencyRates(options = {}) {
   const startedBy = options.startedBy || 0;
   const attemptNumber = options.attemptNumber || 1;
   const testMode = options.testMode || false;
-  const scrapeTime = options.scrapeTime || new Date().toTimeString().slice(0, 8);
+  const fetchTime = options.fetchTime || new Date().toTimeString().slice(0, 8);
   // Get all non-GBP currencies from the database
   const allCurrencies = getAllCurrencies();
   const nonGbpCurrencies = allCurrencies.filter(function (c) {
@@ -112,8 +112,8 @@ export async function fetchCurrencyRates(options = {}) {
       skippedCodes.push(currency.code);
       // Record failed attempt in history (skip in test mode)
       if (!testMode) {
-        recordScrapingAttempt({
-          scrapeType: "currency",
+        recordFetchAttempt({
+          fetchType: "currency",
           referenceId: currency.id,
           startedBy: startedBy,
           attemptNumber: attemptNumber,
@@ -131,11 +131,11 @@ export async function fetchCurrencyRates(options = {}) {
     if (!testMode) {
       try {
         // INSERT OR REPLACE for same currency+date
-        upsertRate(currency.id, rateDate, scrapeTime, scaledRate);
+        upsertRate(currency.id, rateDate, fetchTime, scaledRate);
 
         // Record successful attempt in history
-        recordScrapingAttempt({
-          scrapeType: "currency",
+        recordFetchAttempt({
+          fetchType: "currency",
           referenceId: currency.id,
           startedBy: startedBy,
           attemptNumber: attemptNumber,
@@ -156,7 +156,7 @@ export async function fetchCurrencyRates(options = {}) {
       rate: decimalRate,
       scaledRate: scaledRate,
       rateDate: rateDate,
-      rateTime: scrapeTime,
+      rateTime: fetchTime,
     });
   }
 

@@ -96,7 +96,7 @@ async function loadCurrencies() {
     if (!isGbp) {
       const hasHistory = currencyHasHistory(cur);
       const loadBtnLabel = hasHistory ? "Replace History" : "Load History";
-      html += '<button id="test-btn-' + cur.id + '" class="bg-green-100 hover:bg-green-200 text-green-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="testScrapeCurrency(' + cur.id + ', this)">Test</button>';
+      html += '<button id="test-btn-' + cur.id + '" class="bg-green-100 hover:bg-green-200 text-green-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="testFetchCurrency(' + cur.id + ', this)">Test</button>';
       html += '<button id="load-btn-' + cur.id + '" class="bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="loadHistoryCurrency(' + cur.id + ", this, '" + escapeHtml(cur.code).replace(/'/g, "\\'") + "')\">" + loadBtnLabel + "</button>";
     }
     html += "</td>";
@@ -508,7 +508,7 @@ function buildHistoryResultHtml(historyResult) {
  * @param {number} id - The currency ID to test
  * @param {HTMLElement} button - The button element that was clicked
  */
-async function testScrapeCurrency(id, button) {
+async function testFetchCurrency(id, button) {
   const originalText = button.textContent;
   button.disabled = true;
   button.textContent = "Testing...";
@@ -521,7 +521,7 @@ async function testScrapeCurrency(id, button) {
   // Fire all requests in parallel, update sections as they complete
   // The live rate and currency lookup both need to complete before we can show the rate
   const ratePromise = Promise.all([
-    apiRequest("/api/scraper/currency-rates?testMode=true", {
+    apiRequest("/api/fetch/currency-rates?testMode=true", {
       method: "POST",
       timeout: 60000,
     }),

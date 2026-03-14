@@ -18,7 +18,7 @@ export function getAllInvestments() {
         i.public_id,
         i.investment_url,
         i.selector,
-        i.auto_scrape,
+        i.auto_fetch,
         c.code AS currency_code,
         c.description AS currency_description,
         it.short_description AS type_short,
@@ -49,7 +49,7 @@ export function getInvestmentById(id) {
         i.public_id,
         i.investment_url,
         i.selector,
-        i.auto_scrape,
+        i.auto_fetch,
         c.code AS currency_code,
         c.description AS currency_description,
         it.short_description AS type_short,
@@ -107,15 +107,15 @@ export function updateInvestment(id, data) {
 }
 
 /**
- * @description Update only the scraping source fields (investment_url and selector)
- * on an investment. Used by the Fidelity fallback to write back the discovered
- * factsheet URL without requiring a full record update.
+ * @description Update only the fetch source fields (investment_url and selector)
+ * on an investment. Used to write back a discovered URL without requiring a
+ * full record update.
  * @param {number} id - The investment ID to update
  * @param {string|null} url - The new investment_url value
- * @param {string|null} selector - The new selector value (null if config provides it)
+ * @param {string|null} selector - The new selector value
  * @returns {boolean} True if the investment was updated, false if not found
  */
-export function updateInvestmentScrapingSource(id, url, selector) {
+export function updateInvestmentFetchSource(id, url, selector) {
   const db = getDatabase();
   const result = db.run("UPDATE investments SET investment_url = ?, selector = ? WHERE id = ?", [url || null, selector || null, id]);
   return result.changes > 0;
@@ -180,16 +180,16 @@ export function deleteInvestment(id) {
 }
 
 /**
- * @description Update the auto_scrape flag on an investment.
+ * @description Update the auto_fetch flag on an investment.
  * When set to 0, the investment is excluded from automatic price fetching.
  * @param {number} id - The investment ID
- * @param {boolean} autoScrape - True to enable auto-scrape, false to disable
+ * @param {boolean} autoFetch - True to enable auto-fetch, false to disable
  * @returns {Object|null} The updated investment, or null if not found
  */
-export function updateAutoScrape(id, autoScrape) {
+export function updateAutoFetch(id, autoFetch) {
   const db = getDatabase();
-  const value = autoScrape ? 1 : 0;
-  const result = db.run("UPDATE investments SET auto_scrape = ? WHERE id = ?", [value, id]);
+  const value = autoFetch ? 1 : 0;
+  const result = db.run("UPDATE investments SET auto_fetch = ? WHERE id = ?", [value, id]);
 
   if (result.changes === 0) {
     return null;
@@ -199,7 +199,7 @@ export function updateAutoScrape(id, autoScrape) {
 }
 
 /**
- * @description Get all manually-priced investments (auto_scrape = 0) with their
+ * @description Get all manually-priced investments (auto_fetch = 0) with their
  * latest price date and how the last price was obtained.
  * Used by the home page alert table to show investments that need manual price updates.
  * @returns {Object[]} Array of investment objects with price and history details
@@ -216,7 +216,7 @@ export function getManuallyPricedInvestments() {
         i.public_id,
         p.price_date AS last_price_date,
         p.price AS last_price,
-        sh.started_by AS how_priced
+        fh.started_by AS how_priced
       FROM investments i
       JOIN investment_types it ON i.investment_type_id = it.id
       JOIN currencies c ON i.currencies_id = c.id
@@ -224,16 +224,16 @@ export function getManuallyPricedInvestments() {
         AND p.price_date = (
           SELECT MAX(p2.price_date) FROM prices p2 WHERE p2.investment_id = i.id
         )
-      LEFT JOIN scraping_history sh ON sh.reference_id = i.id
-        AND sh.scrape_type = 'investment'
-        AND sh.success = 1
-        AND sh.id = (
-          SELECT MAX(sh2.id) FROM scraping_history sh2
-          WHERE sh2.reference_id = i.id
-          AND sh2.scrape_type = 'investment'
-          AND sh2.success = 1
+      LEFT JOIN fetch_history fh ON fh.reference_id = i.id
+        AND fh.fetch_type = 'investment'
+        AND fh.success = 1
+        AND fh.id = (
+          SELECT MAX(fh2.id) FROM fetch_history fh2
+          WHERE fh2.reference_id = i.id
+          AND fh2.fetch_type = 'investment'
+          AND fh2.success = 1
         )
-      WHERE i.auto_scrape = 0
+      WHERE i.auto_fetch = 0
       ORDER BY i.description`,
     )
     .all();

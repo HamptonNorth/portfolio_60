@@ -25,7 +25,7 @@ INSERT INTO currencies (code, description) VALUES
 
 -- ============================================================================
 -- INVESTMENTS — GBP Mutual Funds (FT Markets via ISIN)
--- auto_scrape defaults to 1; selector NULL = use site config from settings
+-- auto_fetch defaults to 1; selector NULL = use site config from settings
 -- ============================================================================
 
 INSERT INTO investments (currencies_id, investment_type_id, description, public_id) VALUES

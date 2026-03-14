@@ -1,5 +1,5 @@
 /**
- * @description Scraping page logic for Portfolio 60.
+ * @description Fetching page logic for Portfolio 60.
  * Handles fetching all rates, prices and benchmark values in sequence.
  */
 
@@ -12,14 +12,14 @@
 let cachedExchangeRates = { GBP: 1 };
 
 /**
- * @description Track failed investment IDs from the last scrape run.
+ * @description Track failed investment IDs from the last fetch run.
  * Used for the "Retry Failed" button functionality.
  * @type {number[]}
  */
 let failedInvestmentIds = [];
 
 /**
- * @description Track failed benchmark IDs from the last scrape run.
+ * @description Track failed benchmark IDs from the last fetch run.
  * Used for the "Retry Failed" button functionality.
  * @type {number[]}
  */
@@ -335,14 +335,14 @@ function spinnerHtml() {
 }
 
 /**
- * @description Load and display the last successful scrape times for each type.
+ * @description Load and display the last successful fetch times for each type.
  */
 async function loadLastScrapeTimes() {
-  const currencyEl = document.getElementById("last-currency-scrape");
-  const investmentEl = document.getElementById("last-investment-scrape");
-  const benchmarkEl = document.getElementById("last-benchmark-scrape");
+  const currencyEl = document.getElementById("last-currency-fetch");
+  const investmentEl = document.getElementById("last-investment-fetch");
+  const benchmarkEl = document.getElementById("last-benchmark-fetch");
 
-  const result = await apiRequest("/api/scraper/last-scrape");
+  const result = await apiRequest("/api/fetch/last-fetch");
 
   if (!result.ok) {
     currencyEl.textContent = "Error";
@@ -358,11 +358,11 @@ async function loadLastScrapeTimes() {
 }
 
 /**
- * @description Update the progress text during scraping.
+ * @description Update the progress text during fetching.
  * @param {string} text - The progress message to display
  */
 function setProgress(text) {
-  const progressText = document.getElementById("scrape-progress-text");
+  const progressText = document.getElementById("fetch-progress-text");
   if (progressText) {
     progressText.textContent = text;
   }
@@ -463,7 +463,7 @@ function buildCurrencyRatesSection(data) {
 }
 
 /**
- * @description Build a pending row for an investment while scraping.
+ * @description Build a pending row for an investment while fetching.
  * @param {Object} inv - Investment stub ({investmentId, description, currency})
  * @param {number} rowIndex - Row index for zebra striping
  * @returns {string} HTML string for the row
@@ -525,7 +525,7 @@ function updatePriceRow(price) {
 }
 
 /**
- * @description Build a pending row for a benchmark while scraping.
+ * @description Build a pending row for a benchmark while fetching.
  * @param {Object} bm - Benchmark stub ({benchmarkId, description, benchmarkType, currency})
  * @param {number} rowIndex - Row index for zebra striping
  * @returns {string} HTML string for the row
@@ -597,7 +597,7 @@ function setAllFetchButtonsDisabled(disabled) {
 
 async function fetchAll() {
   const fetchBtn = document.getElementById("fetch-all-btn");
-  const progressDiv = document.getElementById("scrape-progress");
+  const progressDiv = document.getElementById("fetch-progress");
   const resultsContainer = document.getElementById("results-container");
 
   // Disable all buttons and show progress
@@ -630,7 +630,7 @@ async function fetchAll() {
   fetchBtn.textContent = "Fetch All";
   progressDiv.classList.add("hidden");
 
-  // Refresh last scrape times and failure status
+  // Refresh last fetch times and failure status
   await Promise.all([loadLastScrapeTimes(), loadLatestFailures()]);
 }
 
@@ -641,7 +641,7 @@ async function fetchAll() {
 async function runCurrenciesSection() {
   const container = document.getElementById("section-currencies");
 
-  const currencyResult = await apiRequest("/api/scraper/currency-rates", {
+  const currencyResult = await apiRequest("/api/fetch/currency-rates", {
     method: "POST",
   });
 
@@ -733,14 +733,14 @@ async function retryBenchmarksSection() {
  * @description Run a single SSE stream for a batch of investment IDs.
  * Resolves when the stream completes (done or error). Updates existing
  * DOM rows as price events arrive.
- * @param {number[]} ids - Investment IDs to scrape in this batch
+ * @param {number[]} ids - Investment IDs to fetch in this batch
  * @param {boolean} skipCurrencyRates - Whether to skip currency rate fetch
  * @param {Set<number>} completedIds - Set of already-completed investment IDs (mutated)
  * @returns {Promise<{successCount: number, failCount: number, failedIds: number[], error: string|null}>}
  */
 function fetchPriceBatch(ids, skipCurrencyRates, completedIds) {
   return new Promise(function (resolve) {
-    const streamUrl = "/api/scraper/prices/stream?ids=" + ids.join(",") + (skipCurrencyRates ? "&skipCurrencyRates=true" : "");
+    const streamUrl = "/api/fetch/prices/stream?ids=" + ids.join(",") + (skipCurrencyRates ? "&skipCurrencyRates=true" : "");
     const source = new EventSource(streamUrl);
 
     let batchSuccess = 0;
@@ -846,7 +846,7 @@ async function fetchPricesStream() {
       priceMethod = configResult.data.priceMethod || "scrape";
     }
   } catch {
-    // Fall back to scrape
+    // Fall back to default
   }
   const methodLabel = priceMethod === "api" ? "Investment Prices (Morningstar API)" : "Investment Prices";
 
@@ -855,7 +855,7 @@ async function fetchPricesStream() {
   html += '<h3 class="text-lg font-semibold text-brand-700 mb-4">' + escapeHtml(methodLabel) + "</h3>";
 
   // Step 1: Get the full investment list and batch config
-  const listUrl = "/api/scraper/prices/list";
+  const listUrl = "/api/fetch/prices/list";
   const listResult = await apiRequest(listUrl);
   if (!listResult.ok) {
     html += '<p class="text-error">Failed to get investment list: ' + escapeHtml(listResult.data.error || "Unknown error") + "</p>";
@@ -906,7 +906,7 @@ async function fetchPricesStream() {
   const sectionContainer = document.getElementById("section-prices") || document.getElementById("results-container");
   sectionContainer.appendChild(tempContainer);
 
-  // Step 3: Split investments into batches and scrape each with a fresh stream
+  // Step 3: Split investments into batches and fetch each with a fresh stream
   const allIds = allInvestments.map(function (inv) { return inv.investmentId; });
   const completedInvestmentIds = new Set();
   let totalSuccess = 0;
@@ -992,13 +992,13 @@ async function fetchPricesStream() {
  * @description Run a single SSE stream for a batch of benchmark IDs.
  * Resolves when the stream completes (done or error). Updates existing
  * DOM rows as benchmark events arrive.
- * @param {number[]} ids - Benchmark IDs to scrape in this batch
+ * @param {number[]} ids - Benchmark IDs to fetch in this batch
  * @param {Set<number>} completedIds - Set of already-completed benchmark IDs (mutated)
  * @returns {Promise<{successCount: number, failCount: number, failedIds: number[], error: string|null}>}
  */
 function fetchBenchmarkBatch(ids, completedIds) {
   return new Promise(function (resolve) {
-    const streamUrl = "/api/scraper/benchmarks/stream?ids=" + ids.join(",");
+    const streamUrl = "/api/fetch/benchmarks/stream?ids=" + ids.join(",");
     const source = new EventSource(streamUrl);
 
     let batchSuccess = 0;
@@ -1087,7 +1087,7 @@ async function fetchBenchmarksStream() {
   html += '<h3 class="text-lg font-semibold text-brand-700 mb-4">Benchmark Values</h3>';
 
   // Step 1: Get the full benchmark list and batch config
-  const listResult = await apiRequest("/api/scraper/benchmarks/list");
+  const listResult = await apiRequest("/api/fetch/benchmarks/list");
   if (!listResult.ok) {
     html += '<p class="text-error">Failed to get benchmark list: ' + escapeHtml(listResult.data.error || "Unknown error") + "</p>";
     html += '<p class="mt-3"><button onclick="retryBenchmarksSection()" class="bg-amber-500 hover:bg-amber-600 text-white rounded px-3 py-1 text-sm">Retry Benchmark Values</button></p>';
@@ -1134,7 +1134,7 @@ async function fetchBenchmarksStream() {
   const sectionContainer = document.getElementById("section-benchmarks") || document.getElementById("results-container");
   sectionContainer.appendChild(tempContainer);
 
-  // Step 3: Split benchmarks into batches and scrape each with a fresh stream
+  // Step 3: Split benchmarks into batches and fetch each with a fresh stream
   const allIds = allBenchmarks.map(function (bm) { return bm.benchmarkId; });
   const completedBenchmarkIds = new Set();
   let totalSuccess = 0;
@@ -1214,7 +1214,7 @@ async function fetchBenchmarksStream() {
 }
 
 /**
- * @description Retry scraping for failed investment prices.
+ * @description Retry fetching for failed investment prices.
  * Called when user clicks the "Retry Failed" button.
  */
 async function retryFailedPrices() {
@@ -1238,7 +1238,7 @@ async function retryFailedPrices() {
   }
 
   try {
-    const result = await apiRequest("/api/scraper/prices/retry", {
+    const result = await apiRequest("/api/fetch/prices/retry", {
       method: "POST",
       body: JSON.stringify({ ids: failedInvestmentIds }),
     });
@@ -1288,12 +1288,12 @@ async function retryFailedPrices() {
     }
   }
 
-  // Refresh last scrape times
+  // Refresh last fetch times
   await loadLastScrapeTimes();
 }
 
 /**
- * @description Retry scraping for failed benchmark values.
+ * @description Retry fetching for failed benchmark values.
  * Called when user clicks the "Retry Failed" button.
  */
 async function retryFailedBenchmarks() {
@@ -1317,7 +1317,7 @@ async function retryFailedBenchmarks() {
   }
 
   try {
-    const result = await apiRequest("/api/scraper/benchmarks/retry", {
+    const result = await apiRequest("/api/fetch/benchmarks/retry", {
       method: "POST",
       body: JSON.stringify({ ids: failedBenchmarkIds }),
     });
@@ -1367,14 +1367,14 @@ async function retryFailedBenchmarks() {
     }
   }
 
-  // Refresh last scrape times
+  // Refresh last fetch times
   await loadLastScrapeTimes();
 }
 
 /**
  * @description Build the currency rates section for Show Current display.
  * Uses the same layout as Fetch All results but shows the date each rate was stored.
- * @param {Object[]} rates - Array of rate objects from /api/scraper/current-values
+ * @param {Object[]} rates - Array of rate objects from /api/fetch/current-values
  * @returns {string} HTML string for the section
  */
 function buildCurrentCurrencyRatesSection(rates) {
@@ -1419,7 +1419,7 @@ function buildCurrentCurrencyRatesSection(rates) {
 /**
  * @description Build the investment prices section for Show Current display.
  * Uses the same layout as Fetch All results but shows the date each price was stored.
- * @param {Object[]} prices - Array of price objects from /api/scraper/current-values
+ * @param {Object[]} prices - Array of price objects from /api/fetch/current-values
  * @returns {string} HTML string for the section
  */
 function buildCurrentPricesSection(prices) {
@@ -1464,7 +1464,7 @@ function buildCurrentPricesSection(prices) {
 /**
  * @description Build the benchmark values section for Show Current display.
  * Uses the same layout as Fetch All results but shows the date each value was stored.
- * @param {Object[]} benchmarks - Array of benchmark objects from /api/scraper/current-values
+ * @param {Object[]} benchmarks - Array of benchmark objects from /api/fetch/current-values
  * @returns {string} HTML string for the section
  */
 function buildCurrentBenchmarksSection(benchmarks) {
@@ -1508,7 +1508,7 @@ function buildCurrentBenchmarksSection(benchmarks) {
 
 /**
  * @description Show the latest stored currency rates, investment prices and benchmark values.
- * Fetches data from the database (no scraping) and displays using similar layout to Fetch All.
+ * Fetches data from the database (no API calls) and displays using similar layout to Fetch All.
  */
 async function showCurrent() {
   const showBtn = document.getElementById("show-current-btn");
@@ -1520,7 +1520,7 @@ async function showCurrent() {
   resultsContainer.innerHTML = "";
 
   try {
-    const result = await apiRequest("/api/scraper/current-values");
+    const result = await apiRequest("/api/fetch/current-values");
 
     if (!result.ok) {
       resultsContainer.innerHTML = '<div class="bg-red-50 border border-red-300 text-error rounded-lg px-4 py-3">';
@@ -1554,7 +1554,7 @@ async function showCurrent() {
  */
 async function fetchCurrenciesOnly() {
   const btn = document.getElementById("fetch-currencies-btn");
-  const progressDiv = document.getElementById("scrape-progress");
+  const progressDiv = document.getElementById("fetch-progress");
   const resultsContainer = document.getElementById("results-container");
 
   setAllFetchButtonsDisabled(true);
@@ -1580,7 +1580,7 @@ async function fetchCurrenciesOnly() {
  */
 async function fetchPricesOnly() {
   const btn = document.getElementById("fetch-prices-btn");
-  const progressDiv = document.getElementById("scrape-progress");
+  const progressDiv = document.getElementById("fetch-progress");
   const resultsContainer = document.getElementById("results-container");
 
   setAllFetchButtonsDisabled(true);
@@ -1608,7 +1608,7 @@ async function fetchPricesOnly() {
  */
 async function fetchBenchmarksOnly() {
   const btn = document.getElementById("fetch-benchmarks-btn");
-  const progressDiv = document.getElementById("scrape-progress");
+  const progressDiv = document.getElementById("fetch-progress");
   const resultsContainer = document.getElementById("results-container");
 
   setAllFetchButtonsDisabled(true);
@@ -1642,7 +1642,7 @@ let latestFailuresData = { investmentFailures: [], benchmarkFailures: [] };
  */
 async function loadLatestFailures() {
   try {
-    const result = await apiRequest("/api/scraper/latest-failures");
+    const result = await apiRequest("/api/fetch/latest-failures");
     if (!result.ok) return;
 
     latestFailuresData = result.data;
@@ -1699,7 +1699,7 @@ async function retryFailedPricesFromDb() {
   });
   if (ids.length === 0) return;
 
-  const progressDiv = document.getElementById("scrape-progress");
+  const progressDiv = document.getElementById("fetch-progress");
   const resultsContainer = document.getElementById("results-container");
 
   setAllFetchButtonsDisabled(true);
@@ -1708,7 +1708,7 @@ async function retryFailedPricesFromDb() {
   resultsContainer.innerHTML = '<div id="section-prices"></div>';
 
   try {
-    const result = await apiRequest("/api/scraper/prices/retry", {
+    const result = await apiRequest("/api/fetch/prices/retry", {
       method: "POST",
       body: { ids: ids },
     });
@@ -1742,7 +1742,7 @@ async function retryFailedBenchmarksFromDb() {
   });
   if (ids.length === 0) return;
 
-  const progressDiv = document.getElementById("scrape-progress");
+  const progressDiv = document.getElementById("fetch-progress");
   const resultsContainer = document.getElementById("results-container");
 
   setAllFetchButtonsDisabled(true);
@@ -1751,7 +1751,7 @@ async function retryFailedBenchmarksFromDb() {
   resultsContainer.innerHTML = '<div id="section-benchmarks"></div>';
 
   try {
-    const result = await apiRequest("/api/scraper/benchmarks/retry", {
+    const result = await apiRequest("/api/fetch/benchmarks/retry", {
       method: "POST",
       body: { ids: ids },
     });

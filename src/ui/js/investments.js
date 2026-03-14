@@ -364,7 +364,7 @@ async function loadInvestments() {
     const selectorDisplay = inv.selector ? (inv.selector.length > 30 ? inv.selector.substring(0, 30) + "..." : inv.selector) : "";
 
     html += '<tr data-id="' + inv.id + '" class="' + rowClass + ' border-b border-brand-100 hover:bg-brand-100 transition-colors cursor-pointer" ondblclick="viewInvestment(' + inv.id + ')">';
-    const manualBadge = inv.auto_scrape === 0 ? ' <span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">Manually Priced</span>' : "";
+    const manualBadge = inv.auto_fetch === 0 ? ' <span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">Manually Priced</span>' : "";
     html += '<td class="py-3 px-3 text-base">' + escapeHtml(inv.description) + manualBadge + "</td>";
     html += '<td class="py-3 px-3 text-base">' + escapeHtml(getTypeDisplayName(inv.type_short, inv.type_description)) + "</td>";
     html += '<td class="py-3 px-3 text-base">' + escapeHtml(inv.currency_code) + "</td>";
@@ -383,7 +383,7 @@ async function loadInvestments() {
     html += '<button class="bg-brand-100 hover:bg-brand-200 text-brand-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="viewInvestment(' + inv.id + ')">View</button>';
     // Show Test and Load/Replace History buttons if scrapeable (has URL or public_id)
     if (inv.investment_url || inv.public_id) {
-      html += '<button id="test-btn-' + inv.id + '" class="bg-green-100 hover:bg-green-200 text-green-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="testScrapeInvestment(' + inv.id + ', this)">Test</button>';
+      html += '<button id="test-btn-' + inv.id + '" class="bg-green-100 hover:bg-green-200 text-green-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="testFetchInvestment(' + inv.id + ', this)">Test</button>';
       // Hide Load History button when priceMethod is "api" (backfill is automatic)
       if (cachedPriceMethod !== "api") {
         const hasHistory = investmentHasHistory(inv);
@@ -656,7 +656,7 @@ async function editInvestment(id) {
   document.getElementById("public_id").value = inv.public_id || "";
   document.getElementById("investment_url").value = inv.investment_url || "";
   document.getElementById("selector").value = inv.selector || "";
-  document.getElementById("auto-scrape").checked = inv.auto_scrape !== 0;
+  document.getElementById("auto-fetch").checked = inv.auto_fetch !== 0;
   document.getElementById("form-errors").textContent = "";
 
   // Check public ID format and show status
@@ -681,7 +681,7 @@ async function editInvestment(id) {
   // Highlight the corresponding table row
   highlightRow(inv.id);
 
-  // Show/hide manual price section based on auto_scrape state
+  // Show/hide manual price section based on auto_fetch state
   toggleManualPriceSection();
 
   document.getElementById("investment-view-container").classList.add("hidden");
@@ -739,14 +739,14 @@ async function handleFormSubmit(event) {
   }
 
   if (result.ok) {
-    // Update auto_scrape flag separately
-    const autoScrapeChecked = document.getElementById("auto-scrape").checked;
+    // Update auto_fetch flag separately
+    const autoFetchChecked = document.getElementById("auto-fetch").checked;
     const savedId = isEditing ? investmentId : result.data.id;
     if (savedId) {
-      await fetch("/api/investments/" + savedId + "/auto-scrape", {
+      await fetch("/api/investments/" + savedId + "/auto-fetch", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ autoScrape: autoScrapeChecked }),
+        body: JSON.stringify({ autoFetch: autoFetchChecked }),
       });
     }
 
@@ -840,26 +840,26 @@ function buildSpinner(label) {
 }
 
 /**
- * @description Build the result HTML for a live scrape result.
- * @param {Object} scrapeResult - The result from apiRequest
+ * @description Build the result HTML for a live fetch result.
+ * @param {Object} fetchResult - The result from apiRequest
  * @returns {string} HTML string
  */
-function buildScrapeResultHtml(scrapeResult) {
-  if (scrapeResult.ok && scrapeResult.data.price) {
-    const price = scrapeResult.data.price;
+function buildFetchResultHtml(fetchResult) {
+  if (fetchResult.ok && fetchResult.data.price) {
+    const price = fetchResult.data.price;
     if (price.success) {
       return '<div class="bg-green-50 border border-green-200 rounded p-3 text-sm">' + "<p><strong>Investment:</strong> " + escapeHtml(price.description) + "</p>" + "<p><strong>Currency:</strong> " + escapeHtml(price.currency) + "</p>" + "<p><strong>Raw price:</strong> " + escapeHtml(price.rawPrice) + "</p>" + "<p><strong>Parsed (minor unit):</strong> " + escapeHtml(String(price.priceMinorUnit)) + "</p>" + "</div>";
     } else {
       return '<div class="bg-red-50 border border-red-200 rounded p-3 text-sm">' + "<p><strong>Investment:</strong> " + escapeHtml(price.description) + "</p>" + "<p><strong>Error:</strong> " + escapeHtml(price.error) + "</p>" + "</div>";
     }
-  } else if (scrapeResult.data && scrapeResult.data.price) {
-    const price = scrapeResult.data.price;
+  } else if (fetchResult.data && fetchResult.data.price) {
+    const price = fetchResult.data.price;
     return '<div class="bg-red-50 border border-red-200 rounded p-3 text-sm">' + "<p><strong>Investment:</strong> " + escapeHtml(price.description) + "</p>" + "<p><strong>Error:</strong> " + escapeHtml(price.error) + "</p>" + "</div>";
   } else {
     let html = '<div class="bg-red-50 border border-red-200 rounded p-3 text-sm">';
-    html += "<p>" + escapeHtml(scrapeResult.error || "Unknown error") + "</p>";
-    if (scrapeResult.detail) {
-      html += "<p>" + escapeHtml(scrapeResult.detail) + "</p>";
+    html += "<p>" + escapeHtml(fetchResult.error || "Unknown error") + "</p>";
+    if (fetchResult.detail) {
+      html += "<p>" + escapeHtml(fetchResult.detail) + "</p>";
     }
     html += "</div>";
     return html;
@@ -882,34 +882,34 @@ function buildHistoryResultHtml(historyResult) {
 }
 
 /**
- * @description Test scrape a single investment by ID.
+ * @description Test fetch a single investment by ID.
  * Shows a modal immediately with spinners, then progressively updates
- * each section as the live scrape and historic preview results arrive.
+ * each section as the live fetch and historic preview results arrive.
  * Uses testMode=true so no database tables are updated.
- * @param {number} id - The investment ID to scrape
+ * @param {number} id - The investment ID to fetch
  * @param {HTMLElement} button - The button element that was clicked
  */
-async function testScrapeInvestment(id, button) {
+async function testFetchInvestment(id, button) {
   const originalText = button.textContent;
   button.disabled = true;
   button.textContent = "Testing...";
 
   // Show modal immediately with spinners for both sections
-  const initialHtml = '<h4 class="text-base font-semibold text-brand-800 mb-2">Live Scrape Result</h4>' + '<div id="test-scrape-result">' + buildSpinner("Fetching live price...") + "</div>" + '<h4 class="text-base font-semibold text-brand-800 mt-4 mb-2">Historic Data Preview (Morningstar)</h4>' + '<div id="test-history-result">' + buildSpinner("Fetching historic data...") + "</div>";
+  const initialHtml = '<h4 class="text-base font-semibold text-brand-800 mb-2">Live Fetch Result</h4>' + '<div id="test-fetch-result">' + buildSpinner("Fetching live price...") + "</div>" + '<h4 class="text-base font-semibold text-brand-800 mt-4 mb-2">Historic Data Preview (Morningstar)</h4>' + '<div id="test-history-result">' + buildSpinner("Fetching historic data...") + "</div>";
 
   showModalHtml("Test Result (No DB Update)", initialHtml);
 
   // Fire both requests in parallel, update each section as it completes
-  const scrapePromise = apiRequest("/api/scraper/prices/" + id + "?testMode=true", {
+  const fetchPromise = apiRequest("/api/fetch/prices/" + id + "?testMode=true", {
     method: "POST",
     timeout: 120000,
   })
     .then(function (result) {
-      const el = document.getElementById("test-scrape-result");
-      if (el) el.innerHTML = buildScrapeResultHtml(result);
+      const el = document.getElementById("test-fetch-result");
+      if (el) el.innerHTML = buildFetchResultHtml(result);
     })
     .catch(function (err) {
-      const el = document.getElementById("test-scrape-result");
+      const el = document.getElementById("test-fetch-result");
       if (el) el.innerHTML = '<div class="bg-red-50 border border-red-200 rounded p-3 text-sm"><p>' + escapeHtml(err.message) + "</p></div>";
     });
 
@@ -926,7 +926,7 @@ async function testScrapeInvestment(id, button) {
     });
 
   // Wait for both to complete before re-enabling the button
-  await Promise.all([scrapePromise, historyPromise]);
+  await Promise.all([fetchPromise, historyPromise]);
 
   button.disabled = false;
   button.textContent = originalText;
@@ -936,7 +936,7 @@ async function testScrapeInvestment(id, button) {
  * @description Determine if an investment has existing price history (older than 6 days).
  * An investment "has history" if it was loaded during this session, or if its
  * oldest_price_date is at least 7 days before today (indicating backfill data
- * rather than just recent live-scraped prices).
+ * rather than just recent recent fetched prices).
  * @param {Object} inv - The investment object from the API (must have oldest_price_date)
  * @returns {boolean} True if history exists
  */
@@ -1081,15 +1081,15 @@ function updateLoadBadge(id) {
 
 /**
  * @description Show or hide the manual price entry section based on the
- * auto-scrape checkbox state and whether an investment is being edited.
- * Only shown when editing an existing investment with auto_scrape unchecked.
+ * auto-fetch checkbox state and whether an investment is being edited.
+ * Only shown when editing an existing investment with auto_fetch unchecked.
  */
 function toggleManualPriceSection() {
   const section = document.getElementById("manual-price-section");
-  const autoScrapeChecked = document.getElementById("auto-scrape").checked;
+  const autoFetchChecked = document.getElementById("auto-fetch").checked;
   const investmentId = document.getElementById("investment-id").value;
 
-  if (!autoScrapeChecked && investmentId) {
+  if (!autoFetchChecked && investmentId) {
     section.classList.remove("hidden");
     loadLatestPriceForEdit(investmentId);
   } else {
@@ -1215,8 +1215,8 @@ document.addEventListener("DOMContentLoaded", async function () {
   // Handle known site dropdown selection
   document.getElementById("site-select").addEventListener("change", handleSiteSelect);
 
-  // Show/hide manual price section based on auto-scrape checkbox
-  document.getElementById("auto-scrape").addEventListener("change", function () {
+  // Show/hide manual price section based on auto-fetch checkbox
+  document.getElementById("auto-fetch").addEventListener("change", function () {
     toggleManualPriceSection();
   });
 

@@ -12,7 +12,7 @@
         <main class="max-w-7xl mx-auto px-6 py-8 flex-1 w-full" id="main-content">
             <div class="flex items-center justify-between mb-6">
                 <h2 class="text-2xl font-semibold text-brand-800">Fetching History</h2>
-                <a href="/pages/scraping.html" class="text-brand-600 hover:text-brand-800 transition-colors text-base">&larr; Back to Fetching</a>
+                <a href="/pages/fetching.html" class="text-brand-600 hover:text-brand-800 transition-colors text-base">&larr; Back to Fetching</a>
             </div>
 
             <div id="page-messages"></div>
@@ -39,8 +39,8 @@
                         </select>
                     </div>
                     <div>
-                        <label for="filter-auto-scrape" class="block text-sm font-medium text-brand-600 mb-1">Auto-fetch</label>
-                        <select id="filter-auto-scrape" class="px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500">
+                        <label for="filter-auto-fetch" class="block text-sm font-medium text-brand-600 mb-1">Auto-fetch</label>
+                        <select id="filter-auto-fetch" class="px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500">
                             <option value="">All investments</option>
                             <option value="true">Auto-fetched only</option>
                             <option value="false">Manual only (auto-fetch disabled)</option>
@@ -80,6 +80,6 @@
         <app-footer></app-footer>
         <script src="/js/app.js"></script>
         <script src="/js/components.bundle.js"></script>
-        <script src="/js/scraping-history.js"></script>
+        <script src="/js/fetch-history.js"></script>
     </body>
 </html>

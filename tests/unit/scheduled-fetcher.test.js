@@ -3,22 +3,22 @@ import { existsSync, unlinkSync, writeFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
- * @description Tests for the scheduled scraper service
- * (src/server/services/scheduled-scraper.js).
+ * @description Tests for the scheduled fetcher service
+ * (src/server/services/scheduled-fetcher.js).
  *
- * Tests the scheduler initialisation, status reporting, missed-scrape
+ * Tests the scheduler initialisation, status reporting, missed-fetch
  * detection, and shutdown behaviour. Uses a test database and a temporary
  * config file to control scheduling settings.
  *
- * Note: We cannot easily mock Croner or the scraping service in ES module
+ * Note: We cannot easily mock Croner or the fetching service in ES module
  * imports, so these tests focus on the public API behaviour with real
  * Croner instances (using paused/disabled config to avoid triggering
- * actual scrapes during tests).
+ * actual fetches during tests).
  */
 
-const testDbPath = resolve("data/portfolio_60_test/test-scheduled-scraper.db");
+const testDbPath = resolve("data/portfolio_60_test/test-scheduled-fetcher.db");
 const TEMP_DIR = resolve("data/portfolio_60_test");
-const TEMP_CONFIG_PATH = resolve(TEMP_DIR, "test-scheduled-scraper-config.json");
+const TEMP_CONFIG_PATH = resolve(TEMP_DIR, "test-scheduled-fetcher-config.json");
 
 // Set DB_PATH before importing database modules
 process.env.DB_PATH = testDbPath;
@@ -26,10 +26,10 @@ process.env.DB_PATH = testDbPath;
 import { createDatabase, closeDatabase } from "../../src/server/db/connection.js";
 import { setConfigPath, reloadConfig } from "../../src/server/config.js";
 import {
-  initScheduledScraper,
-  stopScheduledScraper,
+  initScheduledFetcher,
+  stopScheduledFetcher,
   getSchedulerStatus,
-} from "../../src/server/services/scheduled-scraper.js";
+} from "../../src/server/services/scheduled-fetcher.js";
 
 /**
  * @description Remove the test database files.
@@ -63,7 +63,7 @@ beforeAll(function () {
 });
 
 afterAll(function () {
-  stopScheduledScraper();
+  stopScheduledFetcher();
   if (existsSync(TEMP_CONFIG_PATH)) {
     unlinkSync(TEMP_CONFIG_PATH);
   }
@@ -75,16 +75,16 @@ afterAll(function () {
 
 afterEach(function () {
   // Always stop the scheduler between tests to clean up cron jobs
-  stopScheduledScraper();
+  stopScheduledFetcher();
 });
 
-describe("initScheduledScraper — scheduling disabled", function () {
+describe("initScheduledFetcher — scheduling disabled", function () {
   test("returns no-op control object when enabled is false", function () {
     writeTestConfig({
       scheduling: { enabled: false },
     });
 
-    const control = initScheduledScraper();
+    const control = initScheduledFetcher();
 
     expect(control).toBeDefined();
     expect(typeof control.stop).toBe("function");
@@ -95,7 +95,7 @@ describe("initScheduledScraper — scheduling disabled", function () {
   });
 });
 
-describe("initScheduledScraper — scheduling enabled", function () {
+describe("initScheduledFetcher — scheduling enabled", function () {
   test("creates a cron job and returns control object with nextRun", function () {
     writeTestConfig({
       scheduling: {
@@ -106,7 +106,7 @@ describe("initScheduledScraper — scheduling enabled", function () {
       },
     });
 
-    const control = initScheduledScraper();
+    const control = initScheduledFetcher();
 
     expect(control).toBeDefined();
     const nextRun = control.getNextRun();
@@ -127,7 +127,7 @@ describe("initScheduledScraper — scheduling enabled", function () {
       },
     });
 
-    const control = initScheduledScraper();
+    const control = initScheduledFetcher();
     const nextRun = control.getNextRun();
 
     // Day 6 = Saturday
@@ -143,7 +143,7 @@ describe("getSchedulerStatus — disabled", function () {
       scheduling: { enabled: false },
     });
 
-    initScheduledScraper();
+    initScheduledFetcher();
     const status = getSchedulerStatus();
 
     expect(status.enabled).toBe(false);
@@ -162,7 +162,7 @@ describe("getSchedulerStatus — enabled", function () {
       },
     });
 
-    initScheduledScraper();
+    initScheduledFetcher();
     const status = getSchedulerStatus();
 
     expect(status.enabled).toBe(true);
@@ -177,7 +177,7 @@ describe("getSchedulerStatus — enabled", function () {
   });
 });
 
-describe("stopScheduledScraper", function () {
+describe("stopScheduledFetcher", function () {
   test("stops the cron job and cleans up", function () {
     writeTestConfig({
       scheduling: {
@@ -187,10 +187,10 @@ describe("stopScheduledScraper", function () {
       },
     });
 
-    const control = initScheduledScraper();
+    const control = initScheduledFetcher();
     expect(control.getNextRun()).not.toBeNull();
 
-    stopScheduledScraper();
+    stopScheduledFetcher();
 
     // After stopping, getNextRun from the control should return null
     // (the cronJob reference is cleared)
@@ -202,16 +202,16 @@ describe("stopScheduledScraper", function () {
       scheduling: { enabled: false },
     });
 
-    initScheduledScraper();
+    initScheduledFetcher();
 
     // Calling stop multiple times should not throw
-    stopScheduledScraper();
-    stopScheduledScraper();
-    stopScheduledScraper();
+    stopScheduledFetcher();
+    stopScheduledFetcher();
+    stopScheduledFetcher();
   });
 });
 
-describe("initScheduledScraper — different cron expressions", function () {
+describe("initScheduledFetcher — different cron expressions", function () {
   test("accepts weekday morning schedule", function () {
     writeTestConfig({
       scheduling: {
@@ -221,7 +221,7 @@ describe("initScheduledScraper — different cron expressions", function () {
       },
     });
 
-    const control = initScheduledScraper();
+    const control = initScheduledFetcher();
     const nextRun = control.getNextRun();
 
     expect(nextRun).not.toBeNull();
@@ -244,7 +244,7 @@ describe("getSchedulerStatus — cronExpression from config", function () {
       },
     });
 
-    initScheduledScraper();
+    initScheduledFetcher();
     const status = getSchedulerStatus();
 
     expect(status.cronExpression).toBe("0 6 * * 0");

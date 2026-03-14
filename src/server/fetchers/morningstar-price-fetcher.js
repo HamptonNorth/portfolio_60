@@ -1,9 +1,7 @@
 /**
- * @description Morningstar API-based price scraper.
- * An alternative to the Playwright web scraper that fetches the latest price
- * for each investment via Morningstar's timeseries API (the same API used by
- * the "Load History" backfill feature). Much more reliable than browser-based
- * scraping — no Playwright, no CSS selectors, no anti-bot detection.
+ * @description Morningstar API-based price fetcher.
+ * Fetches the latest price for each investment via Morningstar's timeseries
+ * API (the same API used by the "Load History" backfill feature).
  *
  * Investments without a resolvable Morningstar ID (no ISIN, no ticker, no
  * cached morningstar_id) are flagged as "manually priced" and skipped.
@@ -126,8 +124,7 @@ async function resolveMorningstarId(investment) {
  * timeseries API. Uses daily frequency over the last 7 days to capture the most
  * recent trading day.
  *
- * Returns a result object in the same shape as scrapeSingleInvestmentPrice() so
- * the SSE handler and UI can process it identically.
+ * Returns a result object compatible with the SSE handler and UI.
  *
  * @param {Object} investment - Investment object (must include morningstar_id,
  *   public_id, type_short, investment_url, currency_code, id, description)
@@ -212,11 +209,11 @@ export async function fetchLatestMorningstarPrice(investment) {
   const price = latest.price;
   const priceDate = latest.date;
   const priceMinorUnit = price * 100;
-  const scrapeTime = new Date().toTimeString().slice(0, 8);
+  const fetchTime = new Date().toTimeString().slice(0, 8);
 
   // Write price to database
   try {
-    upsertPrice(investment.id, priceDate, scrapeTime, priceMinorUnit);
+    upsertPrice(investment.id, priceDate, fetchTime, priceMinorUnit);
   } catch (err) {
     return {
       success: false,
@@ -256,14 +253,13 @@ export async function fetchLatestMorningstarPrice(investment) {
 
 /**
  * @description Get all investments eligible for Morningstar API price fetching.
- * Returns all investments with auto_scrape = 1 (not filtered by URL/selector
- * availability, since Morningstar uses the API not web scraping). Each investment
+ * Returns all investments with auto_fetch = 1. Each investment
  * is tagged with morningstarResolvable: true/false based on whether it has a
  * cached morningstar_id or a public_id that can be looked up.
  *
  * @returns {Object[]} Array of investment objects with morningstarResolvable flag
  */
-export function getMorningstarScrapeableInvestments() {
+export function getMorningstarFetchableInvestments() {
   const db = getDatabase();
   const investments = db
     .query(
@@ -275,7 +271,7 @@ export function getMorningstarScrapeableInvestments() {
         i.public_id,
         i.investment_url,
         i.selector,
-        i.auto_scrape,
+        i.auto_fetch,
         i.morningstar_id,
         c.code AS currency_code,
         c.description AS currency_description,
@@ -284,7 +280,7 @@ export function getMorningstarScrapeableInvestments() {
       FROM investments i
       JOIN currencies c ON i.currencies_id = c.id
       JOIN investment_types it ON i.investment_type_id = it.id
-      WHERE i.auto_scrape = 1
+      WHERE i.auto_fetch = 1
       ORDER BY i.description`,
     )
     .all();

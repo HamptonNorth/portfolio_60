@@ -18,25 +18,13 @@ let getSchedulingConfig;
 /** @type {Function} */
 let getRetryConfig;
 /** @type {Function} */
-let getScrapeDelayProfile;
+let getFetchDelayProfile;
 /** @type {Function} */
 let getAllowedProviders;
 /** @type {Function} */
 let reloadConfig;
 /** @type {Function} */
 let setConfigPath;
-/** @type {Function} */
-let loadSiteConfigs;
-/** @type {Function} */
-let clearSiteCache;
-/** @type {Function} */
-let findSiteConfig;
-/** @type {Function} */
-let getSelector;
-/** @type {Function} */
-let getAllSiteConfigs;
-/** @type {Function} */
-let isKnownSite;
 
 beforeAll(async function () {
   // Ensure temp directory exists
@@ -49,16 +37,10 @@ beforeAll(async function () {
   loadConfig = configModule.loadConfig;
   getSchedulingConfig = configModule.getSchedulingConfig;
   getRetryConfig = configModule.getRetryConfig;
-  getScrapeDelayProfile = configModule.getScrapeDelayProfile;
+  getFetchDelayProfile = configModule.getFetchDelayProfile;
   getAllowedProviders = configModule.getAllowedProviders;
   reloadConfig = configModule.reloadConfig;
   setConfigPath = configModule.setConfigPath;
-  loadSiteConfigs = configModule.loadSiteConfigs;
-  clearSiteCache = configModule.clearSiteCache;
-  findSiteConfig = configModule.findSiteConfig;
-  getSelector = configModule.getSelector;
-  getAllSiteConfigs = configModule.getAllSiteConfigs;
-  isKnownSite = configModule.isKnownSite;
 });
 
 afterAll(function () {
@@ -99,7 +81,7 @@ describe("loadConfig — complete valid config", function () {
         delayMinutes: 10,
         maxAttempts: 3,
       },
-      scrapeDelayProfile: "interactive",
+      fetchDelayProfile: "interactive",
     });
 
     const config = loadConfig();
@@ -112,7 +94,7 @@ describe("loadConfig — complete valid config", function () {
     expect(config.scheduling.startupDelayMinutes).toBe(5);
     expect(config.retry.delayMinutes).toBe(10);
     expect(config.retry.maxAttempts).toBe(3);
-    expect(config.scrapeDelayProfile).toBe("interactive");
+    expect(config.fetchDelayProfile).toBe("interactive");
   });
 });
 
@@ -130,7 +112,7 @@ describe("loadConfig — defaults for missing keys", function () {
     expect(config.scheduling.startupDelayMinutes).toBe(10);
     expect(config.retry.delayMinutes).toBe(5);
     expect(config.retry.maxAttempts).toBe(5);
-    expect(config.scrapeDelayProfile).toBe("cron");
+    expect(config.fetchDelayProfile).toBe("cron");
   });
 
   test("applies defaults for missing scheduling sub-keys", function () {
@@ -231,13 +213,13 @@ describe("loadConfig — invalid values replaced with defaults", function () {
     expect(config.retry.maxAttempts).toBe(5);
   });
 
-  test("replaces invalid scrapeDelayProfile with default", function () {
+  test("replaces invalid fetchDelayProfile with default", function () {
     writeTestConfig({
-      scrapeDelayProfile: "fast",
+      fetchDelayProfile: "fast",
     });
 
     const config = loadConfig();
-    expect(config.scrapeDelayProfile).toBe("cron");
+    expect(config.fetchDelayProfile).toBe("cron");
   });
 
   test("replaces non-array allowed_providers with default", function () {
@@ -261,7 +243,7 @@ describe("loadConfig — missing config file", function () {
     expect(config.scheduling.cron).toBe("0 8 * * 6");
     expect(config.retry.delayMinutes).toBe(5);
     expect(config.retry.maxAttempts).toBe(5);
-    expect(config.scrapeDelayProfile).toBe("cron");
+    expect(config.fetchDelayProfile).toBe("cron");
   });
 });
 
@@ -334,21 +316,21 @@ describe("getRetryConfig", function () {
   });
 });
 
-describe("getScrapeDelayProfile", function () {
+describe("getFetchDelayProfile", function () {
   test("returns 'interactive' when set", function () {
     writeTestConfig({
-      scrapeDelayProfile: "interactive",
+      fetchDelayProfile: "interactive",
     });
 
-    expect(getScrapeDelayProfile()).toBe("interactive");
+    expect(getFetchDelayProfile()).toBe("interactive");
   });
 
   test("returns 'cron' when set", function () {
     writeTestConfig({
-      scrapeDelayProfile: "cron",
+      fetchDelayProfile: "cron",
     });
 
-    expect(getScrapeDelayProfile()).toBe("cron");
+    expect(getFetchDelayProfile()).toBe("cron");
   });
 });
 
@@ -380,257 +362,3 @@ describe("loadConfig — startupDelayMinutes zero is valid", function () {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Scraper site configuration tests
-// ---------------------------------------------------------------------------
-
-/** @description Sample site data used across scraper-sites tests. */
-const TEST_SITES = [
-  {
-    pattern: "google.com/finance",
-    name: "Google Finance",
-    selector: ".fxKbKc",
-    waitStrategy: "domcontentloaded",
-    notes: "Test site",
-  },
-  {
-    pattern: "morningstar.co.uk",
-    name: "Morningstar UK",
-    selector: "div.last-price",
-    waitStrategy: "networkidle",
-  },
-];
-
-/**
- * @description Write a test config with scraperSites data.
- * @param {Object[]} sites - Array of site config objects
- */
-function writeTestConfigWithSites(sites) {
-  writeTestConfig({
-    scraperSites: {
-      _readme: "Test readme",
-      _format: { pattern: "test format" },
-      sites: sites,
-    },
-  });
-}
-
-describe("loadConfig — scraperSites defaults", function () {
-  test("defaults to empty sites array when scraperSites is missing", function () {
-    writeTestConfig({});
-
-    const config = loadConfig();
-
-    expect(config.scraperSites).toBeDefined();
-    expect(Array.isArray(config.scraperSites.sites)).toBe(true);
-    expect(config.scraperSites.sites).toHaveLength(0);
-  });
-
-  test("defaults to empty sites array when scraperSites.sites is not an array", function () {
-    writeTestConfig({
-      scraperSites: { sites: "not an array" },
-    });
-
-    const config = loadConfig();
-
-    expect(Array.isArray(config.scraperSites.sites)).toBe(true);
-    expect(config.scraperSites.sites).toHaveLength(0);
-  });
-
-  test("preserves _readme and _format metadata", function () {
-    writeTestConfig({
-      scraperSites: {
-        _readme: "My custom readme",
-        _format: { pattern: "some format" },
-        sites: [],
-      },
-    });
-
-    const config = loadConfig();
-
-    expect(config.scraperSites._readme).toBe("My custom readme");
-    expect(config.scraperSites._format.pattern).toBe("some format");
-  });
-});
-
-describe("loadSiteConfigs", function () {
-  test("returns sites array from config", function () {
-    writeTestConfigWithSites(TEST_SITES);
-
-    const sites = loadSiteConfigs();
-
-    expect(sites).toHaveLength(2);
-    expect(sites[0].name).toBe("Google Finance");
-    expect(sites[1].name).toBe("Morningstar UK");
-  });
-
-  test("returns empty array when no sites configured", function () {
-    writeTestConfig({});
-
-    const sites = loadSiteConfigs();
-
-    expect(Array.isArray(sites)).toBe(true);
-    expect(sites).toHaveLength(0);
-  });
-});
-
-describe("findSiteConfig", function () {
-  test("returns matching site for a known URL", function () {
-    writeTestConfigWithSites(TEST_SITES);
-
-    const result = findSiteConfig("https://www.google.com/finance/quote/AAPL:NASDAQ");
-
-    expect(result).not.toBeNull();
-    expect(result.name).toBe("Google Finance");
-    expect(result.selector).toBe(".fxKbKc");
-  });
-
-  test("returns null for an unknown URL", function () {
-    writeTestConfigWithSites(TEST_SITES);
-
-    const result = findSiteConfig("https://example.com/prices");
-
-    expect(result).toBeNull();
-  });
-
-  test("returns null for empty URL", function () {
-    writeTestConfigWithSites(TEST_SITES);
-
-    expect(findSiteConfig("")).toBeNull();
-    expect(findSiteConfig(null)).toBeNull();
-    expect(findSiteConfig(undefined)).toBeNull();
-  });
-
-  test("matches case-insensitively", function () {
-    writeTestConfigWithSites(TEST_SITES);
-
-    const result = findSiteConfig("https://GOOGLE.COM/FINANCE/quote/TSLA");
-
-    expect(result).not.toBeNull();
-    expect(result.name).toBe("Google Finance");
-  });
-
-  test("strips www prefix before matching", function () {
-    writeTestConfigWithSites(TEST_SITES);
-
-    const result = findSiteConfig("https://www.morningstar.co.uk/funds/abc");
-
-    expect(result).not.toBeNull();
-    expect(result.name).toBe("Morningstar UK");
-  });
-
-  test("strips protocol before matching", function () {
-    writeTestConfigWithSites(TEST_SITES);
-
-    const result = findSiteConfig("http://google.com/finance/quote/AAPL");
-
-    expect(result).not.toBeNull();
-    expect(result.name).toBe("Google Finance");
-  });
-});
-
-describe("getSelector", function () {
-  test("returns config selector when URL matches known site", function () {
-    writeTestConfigWithSites(TEST_SITES);
-
-    const result = getSelector("https://google.com/finance/quote/AAPL", null);
-
-    expect(result.selector).toBe(".fxKbKc");
-    expect(result.source).toBe("config");
-    expect(result.siteName).toBe("Google Finance");
-    expect(result.waitStrategy).toBe("domcontentloaded");
-  });
-
-  test("returns custom selector when provided, even if URL matches", function () {
-    writeTestConfigWithSites(TEST_SITES);
-
-    const result = getSelector("https://google.com/finance/quote/AAPL", ".my-custom-selector");
-
-    expect(result.selector).toBe(".my-custom-selector");
-    expect(result.source).toBe("custom");
-    expect(result.siteName).toBe("Google Finance");
-  });
-
-  test("returns none when URL does not match and no custom selector", function () {
-    writeTestConfigWithSites(TEST_SITES);
-
-    const result = getSelector("https://example.com/prices", null);
-
-    expect(result.selector).toBeNull();
-    expect(result.source).toBe("none");
-    expect(result.siteName).toBeNull();
-  });
-
-  test("includes waitStrategy from matched site", function () {
-    writeTestConfigWithSites(TEST_SITES);
-
-    const result = getSelector("https://morningstar.co.uk/funds/abc", null);
-
-    expect(result.waitStrategy).toBe("networkidle");
-  });
-
-  test("defaults waitStrategy to domcontentloaded when not specified", function () {
-    writeTestConfig({
-      scraperSites: {
-        sites: [{ pattern: "example.com", name: "Example", selector: ".price" }],
-      },
-    });
-
-    const result = getSelector("https://example.com/page", null);
-
-    expect(result.waitStrategy).toBe("domcontentloaded");
-  });
-});
-
-describe("getAllSiteConfigs", function () {
-  test("returns same result as loadSiteConfigs", function () {
-    writeTestConfigWithSites(TEST_SITES);
-
-    const all = getAllSiteConfigs();
-    const loaded = loadSiteConfigs();
-
-    expect(all).toEqual(loaded);
-    expect(all).toHaveLength(2);
-  });
-});
-
-describe("isKnownSite", function () {
-  test("returns true for matching URL", function () {
-    writeTestConfigWithSites(TEST_SITES);
-
-    expect(isKnownSite("https://google.com/finance/quote/AAPL")).toBe(true);
-  });
-
-  test("returns false for non-matching URL", function () {
-    writeTestConfigWithSites(TEST_SITES);
-
-    expect(isKnownSite("https://example.com/prices")).toBe(false);
-  });
-});
-
-describe("clearSiteCache", function () {
-  test("forces reload on next access", function () {
-    writeTestConfigWithSites(TEST_SITES);
-
-    const before = loadSiteConfigs();
-    expect(before).toHaveLength(2);
-
-    // Overwrite with different sites
-    writeFileSync(
-      TEMP_CONFIG_PATH,
-      JSON.stringify({
-        scraperSites: {
-          sites: [{ pattern: "newsite.com", name: "New Site", selector: ".new" }],
-        },
-      }),
-    );
-
-    // Should still return cached (2 sites)
-    expect(loadSiteConfigs()).toHaveLength(2);
-
-    // After clearing, should pick up new data
-    clearSiteCache();
-    expect(loadSiteConfigs()).toHaveLength(1);
-    expect(loadSiteConfigs()[0].name).toBe("New Site");
-  });
-});

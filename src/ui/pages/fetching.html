@@ -12,26 +12,26 @@
         <main class="max-w-7xl mx-auto px-6 py-8 flex-1 w-full" id="main-content">
             <div class="flex items-center justify-between mb-6">
                 <h2 class="text-2xl font-semibold text-brand-800">Fetching</h2>
-                <a href="/pages/scraping-history.html" class="text-brand-600 hover:text-brand-800 transition-colors text-base">View Fetching History &rarr;</a>
+                <a href="/pages/fetch-history.html" class="text-brand-600 hover:text-brand-800 transition-colors text-base">View Fetching History &rarr;</a>
             </div>
 
             <div id="page-messages"></div>
 
-            <!-- Last scrape indicators -->
-            <div id="last-scrape-indicators" class="bg-white rounded-lg shadow-md p-4 mb-6">
+            <!-- Last fetch indicators -->
+            <div id="last-fetch-indicators" class="bg-white rounded-lg shadow-md p-4 mb-6">
                 <h3 class="text-base font-semibold text-brand-700 mb-3">Last Successful Fetches</h3>
                 <div class="flex flex-wrap gap-6 text-sm">
                     <div>
                         <span class="text-brand-500">Currency rates:</span>
-                        <span id="last-currency-scrape" class="ml-1 text-brand-700">Loading...</span>
+                        <span id="last-currency-fetch" class="ml-1 text-brand-700">Loading...</span>
                     </div>
                     <div>
                         <span class="text-brand-500">Investment prices:</span>
-                        <span id="last-investment-scrape" class="ml-1 text-brand-700">Loading...</span>
+                        <span id="last-investment-fetch" class="ml-1 text-brand-700">Loading...</span>
                     </div>
                     <div>
                         <span class="text-brand-500">Benchmarks:</span>
-                        <span id="last-benchmark-scrape" class="ml-1 text-brand-700">Loading...</span>
+                        <span id="last-benchmark-fetch" class="ml-1 text-brand-700">Loading...</span>
                     </div>
                 </div>
                 <div class="mt-3 pt-3 border-t border-brand-100 text-sm">
@@ -69,13 +69,13 @@
                     </div>
 
                     <!-- Progress indicator -->
-                    <div id="scrape-progress" class="hidden">
+                    <div id="fetch-progress" class="hidden">
                         <div class="flex items-center gap-3 text-brand-600">
                             <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                             </svg>
-                            <span id="scrape-progress-text">Starting...</span>
+                            <span id="fetch-progress-text">Starting...</span>
                         </div>
                     </div>
 
@@ -94,6 +94,6 @@
         <app-footer></app-footer>
         <script src="/js/app.js"></script>
         <script src="/js/components.bundle.js"></script>
-        <script src="/js/scraping.js"></script>
+        <script src="/js/fetching.js"></script>
     </body>
 </html>

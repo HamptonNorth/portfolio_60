@@ -1,8 +1,8 @@
 import { Cron } from "croner";
-import { getSchedulingConfig, getRetryConfig, getScrapeDelayProfile } from "../config.js";
-import { getLastSuccessfulScrapeByType } from "../db/scraping-history-db.js";
+import { getSchedulingConfig, getRetryConfig, getFetchDelayProfile } from "../config.js";
+import { getLastSuccessfulFetchByType } from "../db/fetch-history-db.js";
 import { databaseExists } from "../db/connection.js";
-import { runFullPriceUpdate, retryFailedItems } from "./scraping-service.js";
+import { runFullPriceUpdate, retryFailedItems } from "./fetch-service.js";
 import { writeSchedulerLog, pruneSchedulerLog } from "../db/scheduler-log-db.js";
 
 /**
@@ -12,14 +12,14 @@ import { writeSchedulerLog, pruneSchedulerLog } from "../db/scheduler-log-db.js"
 let cronJob = null;
 
 /**
- * @description Whether a scrape run is currently in progress.
- * Prevents overlapping runs if a scrape takes longer than the cron interval.
+ * @description Whether a fetch run is currently in progress.
+ * Prevents overlapping runs if a fetch takes longer than the cron interval.
  * @type {boolean}
  */
 let isRunning = false;
 
 /**
- * @description Set to true when stopScheduledScraper() is called, signalling
+ * @description Set to true when stopScheduledFetcher() is called, signalling
  * any in-progress retry loop to exit early.
  * @type {boolean}
  */
@@ -27,13 +27,13 @@ let stopRequested = false;
 
 /**
  * @description Array of pending setTimeout IDs for retry delays and startup
- * missed-scrape delays. Cleared on stop for graceful shutdown.
+ * missed-fetch delays. Cleared on stop for graceful shutdown.
  * @type {number[]}
  */
 let pendingTimers = [];
 
 /**
- * @description Summary of the most recent scheduled scrape run, or null
+ * @description Summary of the most recent scheduled fetch run, or null
  * if no run has completed yet.
  * @type {Object|null}
  */
@@ -60,13 +60,13 @@ function trackedSleep(ms) {
 }
 
 /**
- * @description Execute a full scrape run with retry logic for failed items.
- * Called by both the cron job and the missed-scrape handler.
+ * @description Execute a full fetch run with retry logic for failed items.
+ * Called by both the cron job and the missed-fetch handler.
  * @param {number} startedBy - 0 = manual, 1 = scheduled/cron
  */
-async function executeScrapeRun(startedBy) {
+async function executeFetchRun(startedBy) {
   if (isRunning) {
-    writeSchedulerLog("Scrape already in progress, skipping");
+    writeSchedulerLog("Fetch already in progress, skipping");
     return;
   }
 
@@ -74,19 +74,19 @@ async function executeScrapeRun(startedBy) {
   stopRequested = false;
 
   const retryConfig = getRetryConfig();
-  const delayProfile = getScrapeDelayProfile();
+  const delayProfile = getFetchDelayProfile();
 
-  writeSchedulerLog("Starting scrape run (startedBy=" + startedBy + ")");
+  writeSchedulerLog("Starting fetch run (startedBy=" + startedBy + ")");
 
   try {
-    // Run the initial full scrape
+    // Run the initial full fetch
     const summary = await runFullPriceUpdate({
       startedBy: startedBy,
       delayProfile: delayProfile,
     });
 
     writeSchedulerLog(
-      "Initial scrape complete — prices: " +
+      "Initial fetch complete — prices: " +
         summary.priceSuccessCount + "/" + (summary.priceSuccessCount + summary.priceFailCount) +
         ", benchmarks: " + summary.benchmarkSuccessCount + "/" + (summary.benchmarkSuccessCount + summary.benchmarkFailCount) +
         ", currency: " + (summary.currencySuccess ? "OK" : "FAILED"),
@@ -156,16 +156,16 @@ async function executeScrapeRun(startedBy) {
 
     const totalRemaining = failedInvestmentIds.length + failedBenchmarkIds.length;
     if (totalRemaining === 0 && !retryCurrency) {
-      writeSchedulerLog("Scrape run completed — all items successful");
+      writeSchedulerLog("Fetch run completed — all items successful");
     } else {
       writeSchedulerLog(
-        "Scrape run completed — " + totalRemaining + " item(s) still failing after " +
+        "Fetch run completed — " + totalRemaining + " item(s) still failing after " +
           (attempt - 2) + " retry attempt(s)",
         "warn",
       );
     }
   } catch (err) {
-    writeSchedulerLog("Scrape run failed with error: " + err.message, "error");
+    writeSchedulerLog("Fetch run failed with error: " + err.message, "error");
     lastRunResult = {
       completedAt: new Date().toISOString(),
       startedBy: startedBy,
@@ -177,8 +177,8 @@ async function executeScrapeRun(startedBy) {
 }
 
 /**
- * @description Initialise the scheduled scraper. Sets up the cron job
- * based on configuration and optionally runs a missed scrape after the
+ * @description Initialise the scheduled fetcher. Sets up the cron job
+ * based on configuration and optionally runs a missed fetch after the
  * configured startup delay.
  *
  * Should be called once from index.js after the server is listening.
@@ -187,7 +187,7 @@ async function executeScrapeRun(startedBy) {
  *
  * @returns {{ stop: Function, getNextRun: Function, isRunning: Function }}
  */
-export function initScheduledScraper() {
+export function initScheduledFetcher() {
   const schedulingConfig = getSchedulingConfig();
 
   // Prune log entries older than 30 days on every startup
@@ -203,7 +203,7 @@ export function initScheduledScraper() {
   }
 
   if (!schedulingConfig.enabled) {
-    writeSchedulerLog("Scheduled scraping is disabled");
+    writeSchedulerLog("Scheduled fetching is disabled");
     return {
       stop: function () {},
       getNextRun: function () { return null; },
@@ -213,35 +213,35 @@ export function initScheduledScraper() {
 
   // Create the cron job (paused initially so we can log before it runs)
   cronJob = new Cron(schedulingConfig.cron, { protect: true }, function () {
-    executeScrapeRun(1);
+    executeFetchRun(1);
   });
 
   const nextRun = cronJob.nextRun();
-  writeSchedulerLog("Scheduled scraping enabled — cron: " + schedulingConfig.cron);
-  writeSchedulerLog("Next scheduled scrape: " + (nextRun ? nextRun.toISOString() : "unknown"));
+  writeSchedulerLog("Scheduled fetching enabled — cron: " + schedulingConfig.cron);
+  writeSchedulerLog("Next scheduled fetch: " + (nextRun ? nextRun.toISOString() : "unknown"));
 
-  // Check for missed scrape if configured
+  // Check for missed fetch if configured
   if (schedulingConfig.runOnStartupIfMissed) {
-    checkForMissedScrape(schedulingConfig);
+    checkForMissedFetch(schedulingConfig);
   }
 
   return {
-    stop: stopScheduledScraper,
+    stop: stopScheduledFetcher,
     getNextRun: function () { return cronJob ? cronJob.nextRun() : null; },
     isRunning: function () { return isRunning; },
   };
 }
 
 /**
- * @description Check whether a scheduled scrape was missed while the app
- * was not running. If so, schedule a delayed scrape after the configured
+ * @description Check whether a scheduled fetch was missed while the app
+ * was not running. If so, schedule a delayed fetch after the configured
  * startup delay.
  * @param {Object} schedulingConfig - The scheduling configuration
  */
-function checkForMissedScrape(schedulingConfig) {
+function checkForMissedFetch(schedulingConfig) {
   // Guard: if the database doesn't exist yet, skip the check
   if (!databaseExists()) {
-    writeSchedulerLog("Database not yet created, skipping missed-scrape check");
+    writeSchedulerLog("Database not yet created, skipping missed-fetch check");
     return;
   }
 
@@ -254,55 +254,55 @@ function checkForMissedScrape(schedulingConfig) {
 
   const lastScheduledTime = previousScheduledTimes[0];
 
-  // Get the last successful investment scrape from the database
-  const lastSuccessful = getLastSuccessfulScrapeByType("investment");
+  // Get the last successful investment fetch from the database
+  const lastSuccessful = getLastSuccessfulFetchByType("investment");
 
   if (!lastSuccessful) {
-    // No successful scrape ever recorded — treat as missed
-    writeSchedulerLog("No previous successful scrape found — scheduling startup scrape");
-    scheduleMissedScrape(schedulingConfig.startupDelayMinutes);
+    // No successful fetch ever recorded — treat as missed
+    writeSchedulerLog("No previous successful fetch found — scheduling startup fetch");
+    scheduleMissedFetch(schedulingConfig.startupDelayMinutes);
     return;
   }
 
-  // Compare: if the last successful scrape is older than the last scheduled time,
-  // a scrape was missed
+  // Compare: if the last successful fetch is older than the last scheduled time,
+  // a fetch was missed
   const lastSuccessfulDate = new Date(lastSuccessful);
   if (lastSuccessfulDate < lastScheduledTime) {
     writeSchedulerLog(
-      "Missed scrape detected — last success: " + lastSuccessful +
+      "Missed fetch detected — last success: " + lastSuccessful +
         ", last scheduled: " + lastScheduledTime.toISOString(),
     );
-    scheduleMissedScrape(schedulingConfig.startupDelayMinutes);
+    scheduleMissedFetch(schedulingConfig.startupDelayMinutes);
   } else {
-    writeSchedulerLog("No missed scrape — last success is up to date");
+    writeSchedulerLog("No missed fetch — last success is up to date");
   }
 }
 
 /**
- * @description Schedule a delayed scrape to run after the startup delay.
- * @param {number} delayMinutes - Minutes to wait before running the scrape
+ * @description Schedule a delayed fetch to run after the startup delay.
+ * @param {number} delayMinutes - Minutes to wait before running the fetch
  */
-function scheduleMissedScrape(delayMinutes) {
+function scheduleMissedFetch(delayMinutes) {
   const delayMs = delayMinutes * 60 * 1000;
-  writeSchedulerLog("Startup scrape will run in " + delayMinutes + " minute(s)");
+  writeSchedulerLog("Startup fetch will run in " + delayMinutes + " minute(s)");
 
   const timerId = setTimeout(function () {
     pendingTimers = pendingTimers.filter(function (id) {
       return id !== timerId;
     });
-    writeSchedulerLog("Startup scrape timer fired — beginning scrape run");
-    executeScrapeRun(1);
+    writeSchedulerLog("Startup fetch timer fired — beginning fetch run");
+    executeFetchRun(1);
   }, delayMs);
 
   pendingTimers.push(timerId);
 }
 
 /**
- * @description Stop the scheduled scraper. Cancels the cron job and any
+ * @description Stop the scheduled fetcher. Cancels the cron job and any
  * pending retry or startup-delay timers. Signals any in-progress retry
  * loop to exit early.
  */
-export function stopScheduledScraper() {
+export function stopScheduledFetcher() {
   stopRequested = true;
 
   // Cancel the cron job
@@ -320,7 +320,7 @@ export function stopScheduledScraper() {
 }
 
 /**
- * @description Get the current status of the scheduled scraper.
+ * @description Get the current status of the scheduled fetcher.
  * Useful for API endpoints and the future Settings UI.
  * @returns {{ enabled: boolean, cronExpression: string, nextRun: string|null,
  *             isCurrentlyRunning: boolean, lastRunResult: Object|null }}

@@ -1,9 +1,7 @@
 /**
- * @description Yahoo Finance API-based benchmark scraper.
- * An alternative to the Playwright web scraper that fetches the latest value
- * for each benchmark via Yahoo Finance's chart API (the same API used by
- * the "Load History" backfill feature). Much more reliable than browser-based
- * scraping — no Playwright, no CSS selectors, no anti-bot detection.
+ * @description Yahoo Finance API-based benchmark fetcher.
+ * Fetches the latest value for each benchmark via Yahoo Finance's chart API
+ * (the same API used by the "Load History" backfill feature).
  *
  * Benchmarks without a resolvable Yahoo ticker (e.g. MSCI indexes) are
  * flagged as "no API source" and skipped.
@@ -62,8 +60,7 @@ function resolveBenchmarkTicker(benchmark) {
  * Finance chart API. Uses weekly frequency over the last 14 days to capture
  * the most recent trading day.
  *
- * Returns a result object in the same shape as scrapeSingleBenchmarkValue()
- * so the SSE handler and UI can process it identically.
+ * Returns a result object compatible with the SSE handler and UI.
  *
  * @param {Object} benchmark - Benchmark object (must include yahoo_ticker,
  *   id, description, benchmark_type, currency_code)
@@ -82,7 +79,7 @@ export async function fetchLatestYahooBenchmarkValue(benchmark) {
       rawValue: "",
       parsedValue: null,
       currency: benchmark.currency_code || "",
-      error: "No Yahoo Finance ticker — requires web scraping",
+      error: "No Yahoo Finance ticker",
       errorCode: "NO_YAHOO_TICKER",
       valueDate: null,
     };
@@ -136,11 +133,11 @@ export async function fetchLatestYahooBenchmarkValue(benchmark) {
   const latest = history[history.length - 1];
   const value = latest.value;
   const valueDate = latest.date;
-  const scrapeTime = new Date().toTimeString().slice(0, 8);
+  const fetchTime = new Date().toTimeString().slice(0, 8);
 
   // Write value to database
   try {
-    upsertBenchmarkData(benchmark.id, valueDate, scrapeTime, value);
+    upsertBenchmarkData(benchmark.id, valueDate, fetchTime, value);
   } catch (err) {
     return {
       success: false,
@@ -176,14 +173,13 @@ export async function fetchLatestYahooBenchmarkValue(benchmark) {
 
 /**
  * @description Get all benchmarks eligible for Yahoo Finance API value fetching.
- * Returns all benchmarks (not filtered by URL/selector availability, since Yahoo
- * Finance uses the API not web scraping). Each benchmark is tagged with
+ * Returns all benchmarks. Each benchmark is tagged with
  * yahooResolvable: true/false based on whether it has a cached yahoo_ticker
  * or a description that matches the known ticker map.
  *
  * @returns {Object[]} Array of benchmark objects with yahooResolvable flag
  */
-export function getYahooScrapeableBenchmarks() {
+export function getYahooFetchableBenchmarks() {
   const db = getDatabase();
   const benchmarks = db
     .query(

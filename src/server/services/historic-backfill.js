@@ -13,7 +13,7 @@ import { getDatabase } from "../db/connection.js";
 import { upsertRate, scaleRate } from "../db/currency-rates-db.js";
 import { upsertPrice } from "../db/prices-db.js";
 import { upsertBenchmarkData } from "../db/benchmark-data-db.js";
-import { getScrapeBatchConfig } from "../config.js";
+import { getFetchBatchConfig } from "../config.js";
 import { detectPublicIdType, extractTickerFromPublicId, extractExchangeFromPublicId } from "../../shared/public-id-utils.js";
 import YahooFinance from "yahoo-finance2";
 
@@ -766,7 +766,7 @@ export async function backfillInvestmentPrices(progressCallback) {
   const endStr = endDate.toISOString().split("T")[0];
 
   // Use the same batch/cooldown settings as "Fetch All" to avoid rate-limiting
-  const batchConfig = getScrapeBatchConfig();
+  const batchConfig = getFetchBatchConfig();
   const batchSize = batchConfig.batchSize;
   const cooldownSeconds = batchConfig.cooldownSeconds;
 
@@ -1044,7 +1044,7 @@ export async function backfillBenchmarkValues(progressCallback) {
   const endStr = endDate.toISOString().split("T")[0];
 
   // Use the same batch/cooldown settings as "Fetch All" to avoid rate-limiting
-  const batchConfig = getScrapeBatchConfig();
+  const batchConfig = getFetchBatchConfig();
   const batchSize = batchConfig.batchSize;
   const cooldownSeconds = batchConfig.cooldownSeconds;
 

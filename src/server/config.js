@@ -7,15 +7,6 @@ import { DATA_DIR } from "../shared/server-constants.js";
  * or invalid in the config file.
  * @type {Object}
  */
-/**
- * @typedef {Object} SiteConfig
- * @property {string} pattern - Domain or path pattern to match
- * @property {string} name - Human-readable site name
- * @property {string} selector - CSS selector for the price/value element
- * @property {string} waitStrategy - "domcontentloaded" or "networkidle"
- * @property {string} [notes] - Optional notes about the site
- */
-
 const DEFAULTS = {
   allowed_providers: [],
   scheduling: {
@@ -33,16 +24,12 @@ const DEFAULTS = {
     taxYearStartMonth: 4,
     taxYearStartDay: 6,
   },
-  scrapeBatch: {
+  fetchBatch: {
     batchSize: 8,
     cooldownSeconds: 120,
   },
   reportsOpenInNewTab: true,
-  priceMethod: "scrape",
-  scrapeDelayProfile: "cron",
-  scraperSites: {
-    sites: [],
-  },
+  fetchDelayProfile: "cron",
 };
 
 /**
@@ -161,28 +148,19 @@ export function loadConfig() {
     taxYearStartDay: typeof rawIsaAllowance.taxYearStartDay === "number" && Number.isInteger(rawIsaAllowance.taxYearStartDay) && rawIsaAllowance.taxYearStartDay >= 1 && rawIsaAllowance.taxYearStartDay <= 28 ? rawIsaAllowance.taxYearStartDay : DEFAULTS.isaAllowance.taxYearStartDay,
   };
 
-  // priceMethod — must be "scrape" or "api"
-  const validPriceMethods = ["scrape", "api"];
-  config.priceMethod = validPriceMethods.includes(rawConfig.priceMethod) ? rawConfig.priceMethod : DEFAULTS.priceMethod;
-
-  // scrapeDelayProfile — must be "interactive" or "cron"
+  // fetchDelayProfile — must be "interactive" or "cron"
+  // Also accepts legacy key name "scrapeDelayProfile" for backwards compatibility
   const validProfiles = ["interactive", "cron"];
-  config.scrapeDelayProfile = validProfiles.includes(rawConfig.scrapeDelayProfile) ? rawConfig.scrapeDelayProfile : DEFAULTS.scrapeDelayProfile;
+  const rawProfile = rawConfig.fetchDelayProfile || rawConfig.scrapeDelayProfile;
+  config.fetchDelayProfile = validProfiles.includes(rawProfile) ? rawProfile : DEFAULTS.fetchDelayProfile;
 
-  // scrapeBatch — batch size and cooldown between batches during scraping
-  const rawScrapeBatch = rawConfig.scrapeBatch || {};
-  config.scrapeBatch = {
-    batchSize: typeof rawScrapeBatch.batchSize === "number" && Number.isInteger(rawScrapeBatch.batchSize) && rawScrapeBatch.batchSize >= 1 && rawScrapeBatch.batchSize <= 50 ? rawScrapeBatch.batchSize : DEFAULTS.scrapeBatch.batchSize,
+  // fetchBatch — batch size and cooldown between batches during fetching
+  // Also accepts legacy key name "scrapeBatch" for backwards compatibility
+  const rawFetchBatch = rawConfig.fetchBatch || rawConfig.scrapeBatch || {};
+  config.fetchBatch = {
+    batchSize: typeof rawFetchBatch.batchSize === "number" && Number.isInteger(rawFetchBatch.batchSize) && rawFetchBatch.batchSize >= 1 && rawFetchBatch.batchSize <= 50 ? rawFetchBatch.batchSize : DEFAULTS.fetchBatch.batchSize,
 
-    cooldownSeconds: typeof rawScrapeBatch.cooldownSeconds === "number" && Number.isInteger(rawScrapeBatch.cooldownSeconds) && rawScrapeBatch.cooldownSeconds >= 0 && rawScrapeBatch.cooldownSeconds <= 600 ? rawScrapeBatch.cooldownSeconds : DEFAULTS.scrapeBatch.cooldownSeconds,
-  };
-
-  // scraperSites — validate sites is an array, preserve metadata
-  const rawScraperSites = rawConfig.scraperSites || {};
-  config.scraperSites = {
-    _readme: rawScraperSites._readme || "",
-    _format: rawScraperSites._format || {},
-    sites: Array.isArray(rawScraperSites.sites) ? rawScraperSites.sites : DEFAULTS.scraperSites.sites,
+    cooldownSeconds: typeof rawFetchBatch.cooldownSeconds === "number" && Number.isInteger(rawFetchBatch.cooldownSeconds) && rawFetchBatch.cooldownSeconds >= 0 && rawFetchBatch.cooldownSeconds <= 600 ? rawFetchBatch.cooldownSeconds : DEFAULTS.fetchBatch.cooldownSeconds,
   };
 
   // lists — embedded spreadsheet lists for the Lists menu
@@ -225,15 +203,6 @@ export function getRetryConfig() {
 }
 
 /**
- * @description Get the price fetching method from config.
- * @returns {string} Either "scrape" (Playwright) or "api" (Morningstar/Yahoo Finance)
- */
-export function getPriceMethodConfig() {
-  const config = loadConfig();
-  return config.priceMethod;
-}
-
-/**
  * @description Get whether report pages should open in a new browser tab.
  * @returns {boolean} True if reports should open in a new tab
  */
@@ -243,23 +212,23 @@ export function getReportsOpenInNewTab() {
 }
 
 /**
- * @description Get the scrape delay profile name for scheduled runs.
+ * @description Get the fetch delay profile name for scheduled runs.
  * @returns {string} Either "interactive" or "cron"
  */
-export function getScrapeDelayProfile() {
+export function getFetchDelayProfile() {
   const config = loadConfig();
-  return config.scrapeDelayProfile;
+  return config.fetchDelayProfile;
 }
 
 /**
- * @description Get the scrape batch configuration with defaults applied.
- * Controls how many items are scraped per batch and the cooldown pause
- * between batches to avoid rate-limiting by target websites.
+ * @description Get the fetch batch configuration with defaults applied.
+ * Controls how many items are fetched per batch and the cooldown pause
+ * between batches to avoid rate-limiting by target APIs.
  * @returns {{ batchSize: number, cooldownSeconds: number }}
  */
-export function getScrapeBatchConfig() {
+export function getFetchBatchConfig() {
   const config = loadConfig();
-  return config.scrapeBatch;
+  return config.fetchBatch;
 }
 
 /**
@@ -308,114 +277,4 @@ export function getDocsConfig() {
  */
 export function reloadConfig() {
   configCache = null;
-}
-
-// ---------------------------------------------------------------------------
-// Scraper site configuration functions
-// ---------------------------------------------------------------------------
-
-/**
- * @description Load site configurations from the config.
- * Returns the scraperSites.sites array from the cached config.
- * @returns {SiteConfig[]} Array of site configurations
- */
-export function loadSiteConfigs() {
-  const config = loadConfig();
-  return config.scraperSites.sites;
-}
-
-/**
- * @description Clear the cached site configurations.
- * Delegates to reloadConfig() since sites are part of the main config.
- */
-export function clearSiteCache() {
-  reloadConfig();
-}
-
-/**
- * @description Find a matching site configuration for a given URL.
- * Matches the URL against known site patterns (domain + path fragments).
- * @param {string} url - The URL to match
- * @returns {SiteConfig|null} Matching site config, or null if no match
- */
-export function findSiteConfig(url) {
-  if (!url) {
-    return null;
-  }
-
-  const sites = loadSiteConfigs();
-
-  // Normalise the URL for matching (lowercase, remove protocol)
-  const normalisedUrl = url
-    .toLowerCase()
-    .replace(/^https?:\/\//, "")
-    .replace(/^www\./, "");
-
-  for (const site of sites) {
-    const pattern = site.pattern.toLowerCase();
-    if (normalisedUrl.includes(pattern)) {
-      return site;
-    }
-  }
-
-  return null;
-}
-
-/**
- * @description Get the selector for a URL, with custom selector taking priority.
- * Priority order:
- * 1. Custom selector (if provided) - user override always wins
- * 2. Known site config selector (if URL matches a known site)
- * 3. None (no selector available)
- * @param {string} url - The URL to scrape
- * @param {string|null} customSelector - Custom selector provided by user (optional)
- * @returns {{selector: string|null, source: "config"|"custom"|"none", siteName: string|null, waitStrategy: string}}
- */
-export function getSelector(url, customSelector) {
-  const siteConfig = findSiteConfig(url);
-
-  // Custom selector always takes priority (user override)
-  if (customSelector) {
-    return {
-      selector: customSelector,
-      source: "custom",
-      siteName: siteConfig ? siteConfig.name : null,
-      waitStrategy: siteConfig ? siteConfig.waitStrategy || "domcontentloaded" : "domcontentloaded",
-    };
-  }
-
-  // Fall back to config selector if URL matches a known site
-  if (siteConfig) {
-    return {
-      selector: siteConfig.selector,
-      source: "config",
-      siteName: siteConfig.name,
-      waitStrategy: siteConfig.waitStrategy || "domcontentloaded",
-    };
-  }
-
-  return {
-    selector: null,
-    source: "none",
-    siteName: null,
-    waitStrategy: "domcontentloaded",
-  };
-}
-
-/**
- * @description Get all known site configurations.
- * Useful for displaying available sites in the UI.
- * @returns {SiteConfig[]} Array of all site configurations
- */
-export function getAllSiteConfigs() {
-  return loadSiteConfigs();
-}
-
-/**
- * @description Check if a URL matches a known site pattern.
- * @param {string} url - The URL to check
- * @returns {boolean} True if URL matches a known site
- */
-export function isKnownSite(url) {
-  return findSiteConfig(url) !== null;
 }

@@ -3,22 +3,22 @@ import { existsSync, unlinkSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
- * @description Tests for the scraping service (src/server/services/scraping-service.js).
- * Uses a test database and mocks the scraper functions to verify the service
- * correctly orchestrates the scraping pipeline and collects results.
+ * @description Tests for the fetch service (src/server/services/fetch-service.js).
+ * Uses a test database and mocks the fetcher functions to verify the service
+ * correctly orchestrates the fetch pipeline and collects results.
  *
- * The scraping service imports from price-scraper, benchmark-scraper, and
- * currency-scraper. Since we cannot easily mock ES module imports in Bun,
- * these tests mock globalThis.fetch (for currency scraper) and verify the
+ * The fetch service imports from morningstar-price-fetcher, yahoo-benchmark-fetcher,
+ * and currency-fetcher. Since we cannot easily mock ES module imports in Bun,
+ * these tests mock globalThis.fetch (for currency fetcher) and verify the
  * service's coordination logic by testing with an empty database (no
- * scrapeable investments or benchmarks configured, so the browser-based
- * scraping loops are skipped).
+ * fetchable investments or benchmarks configured, so the fetching loops
+ * are skipped).
  *
- * For full integration testing of the scraping pipeline with real browser
- * scraping, see the manual testing checklist in PLAN_v0.2.0.md.
+ * For full integration testing of the fetch pipeline with real browser
+ * fetching, see the manual testing checklist in PLAN_v0.2.0.md.
  */
 
-const testDbPath = resolve("data/portfolio_60_test/test-scraping-service.db");
+const testDbPath = resolve("data/portfolio_60_test/test-fetch-service.db");
 
 // Set DB_PATH before importing any database modules
 process.env.DB_PATH = testDbPath;
@@ -29,7 +29,7 @@ import { createCurrency } from "../../src/server/db/currencies-db.js";
 import { createInvestment } from "../../src/server/db/investments-db.js";
 import { createBenchmark } from "../../src/server/db/benchmarks-db.js";
 import { getAllInvestmentTypes } from "../../src/server/db/investment-types-db.js";
-import { runFullPriceUpdate, retryFailedItems } from "../../src/server/services/scraping-service.js";
+import { runFullPriceUpdate, retryFailedItems } from "../../src/server/services/fetch-service.js";
 
 /**
  * @description Remove the test database files.
@@ -202,9 +202,9 @@ describe("runFullPriceUpdate — error handling", function () {
       },
     });
 
-    // The currency scraper catches network errors internally,
+    // The currency fetcher catches network errors internally,
     // so this should complete without hitting onError
-    // (the currency scraper returns { success: false } instead of throwing)
+    // (the currency fetcher returns { success: false } instead of throwing)
     // If we get here, it means the service handled it gracefully
     expect(true).toBe(true);
   });
@@ -344,8 +344,8 @@ describe("retryFailedItems — currency retry", function () {
   });
 });
 
-describe("retryFailedItems — investment IDs that don't match scrapeable", function () {
-  test("skips investment IDs that are not scrapeable", async function () {
+describe("retryFailedItems — investment IDs that don't match fetchable", function () {
+  test("skips investment IDs that are not fetchable", async function () {
     globalThis.fetch = mock(async function () {
       return {
         ok: true,
@@ -356,7 +356,7 @@ describe("retryFailedItems — investment IDs that don't match scrapeable", func
       };
     });
 
-    // Pass non-existent investment IDs — they won't match any scrapeable investments
+    // Pass non-existent investment IDs — they won't match any fetchable investments
     const result = await retryFailedItems(
       {
         investmentIds: [9999],
@@ -369,7 +369,7 @@ describe("retryFailedItems — investment IDs that don't match scrapeable", func
       },
     );
 
-    // No matching scrapeable investments, so nothing retried and nothing failed
+    // No matching fetchable investments, so nothing retried and nothing failed
     expect(result.failedInvestmentIds).toHaveLength(0);
   });
 });

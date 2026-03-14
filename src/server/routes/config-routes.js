@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync } from "node:fs";
 import { resolve, dirname, basename, join } from "node:path";
-import { getAllSiteConfigs, findSiteConfig, loadConfig, getAllowedProviders, getSchedulingConfig, reloadConfig, getListItems, getConfigFilePath, getWritableConfigPath, getPriceMethodConfig, getReportsOpenInNewTab } from "../config.js";
+import { loadConfig, getAllowedProviders, getSchedulingConfig, reloadConfig, getListItems, getConfigFilePath, getWritableConfigPath, getReportsOpenInNewTab } from "../config.js";
 import { DB_PATH, BACKUP_DIR, APP_NAME, APP_VERSION } from "../../shared/server-constants.js";
 
 /**
@@ -138,28 +138,10 @@ export function handleConfigRoute(method, path) {
     });
   }
 
-  // GET /api/config/scraper-sites — list all known scraper site configurations
-  if (method === "GET" && path === "/api/config/scraper-sites") {
-    const sites = getAllSiteConfigs();
-    return new Response(JSON.stringify(sites), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
   // GET /api/config/scheduling — get scheduling configuration
   if (method === "GET" && path === "/api/config/scheduling") {
     const scheduling = getSchedulingConfig();
     return new Response(JSON.stringify(scheduling), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  // GET /api/config/price-method — get the price fetching method (scrape or api)
-  if (method === "GET" && path === "/api/config/price-method") {
-    const priceMethod = getPriceMethodConfig();
-    return new Response(JSON.stringify({ priceMethod: priceMethod }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
@@ -199,12 +181,6 @@ export function handleConfigRoute(method, path) {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
-  }
-
-  // POST /api/config/scraper-sites/match — check if a URL matches a known site
-  if (method === "POST" && path === "/api/config/scraper-sites/match") {
-    // This will be handled async below
-    return null;
   }
 
   return null;
@@ -336,43 +312,6 @@ export async function handleConfigRouteAsync(method, path, request) {
         status: 500,
         headers: { "Content-Type": "application/json" },
       });
-    }
-  }
-
-  // POST /api/config/scraper-sites/match — check if a URL matches a known site
-  if (method === "POST" && path === "/api/config/scraper-sites/match") {
-    try {
-      const body = await request.json();
-      const url = body.url;
-
-      if (!url) {
-        return new Response(JSON.stringify({ error: "URL is required" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-
-      const siteConfig = findSiteConfig(url);
-
-      if (siteConfig) {
-        return new Response(
-          JSON.stringify({
-            matched: true,
-            site: siteConfig,
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        );
-      } else {
-        return new Response(
-          JSON.stringify({
-            matched: false,
-            site: null,
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        );
-      }
-    } catch (err) {
-      return new Response(JSON.stringify({ error: "Invalid request", detail: err.message }), { status: 400, headers: { "Content-Type": "application/json" } });
     }
   }
 

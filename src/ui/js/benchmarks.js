@@ -327,7 +327,7 @@ async function loadBenchmarks() {
     html += '<button class="bg-brand-100 hover:bg-brand-200 text-brand-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="viewBenchmark(' + bm.id + ')">View</button>';
     // Show Test button if URL exists (selector may come from config for known sites)
     if (bm.benchmark_url) {
-      html += '<button id="test-btn-' + bm.id + '" class="bg-green-100 hover:bg-green-200 text-green-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="testScrapeBenchmark(' + bm.id + ', this)">Test</button>';
+      html += '<button id="test-btn-' + bm.id + '" class="bg-green-100 hover:bg-green-200 text-green-700 text-sm font-medium px-2 py-1 rounded transition-colors whitespace-nowrap" onclick="testFetchBenchmark(' + bm.id + ', this)">Test</button>';
     }
     // Show Load/Replace History for benchmarks with URLs — disabled for MSCI (no free historic data source)
     if (bm.benchmark_url) {
@@ -745,26 +745,26 @@ function buildSpinner(label) {
 }
 
 /**
- * @description Build the result HTML for a live benchmark scrape result.
- * @param {Object} scrapeResult - The result from apiRequest
+ * @description Build the result HTML for a live benchmark fetch result.
+ * @param {Object} fetchResult - The result from apiRequest
  * @returns {string} HTML string
  */
-function buildScrapeResultHtml(scrapeResult) {
-  if (scrapeResult.ok && scrapeResult.data.benchmark) {
-    const bm = scrapeResult.data.benchmark;
+function buildFetchResultHtml(fetchResult) {
+  if (fetchResult.ok && fetchResult.data.benchmark) {
+    const bm = fetchResult.data.benchmark;
     if (bm.success) {
       return '<div class="bg-green-50 border border-green-200 rounded p-3 text-sm">' + "<p><strong>Benchmark:</strong> " + escapeHtml(bm.description) + "</p>" + "<p><strong>Raw value:</strong> " + escapeHtml(bm.rawValue) + "</p>" + "<p><strong>Parsed:</strong> " + escapeHtml(String(bm.parsedValue)) + "</p>" + "</div>";
     } else {
       return '<div class="bg-red-50 border border-red-200 rounded p-3 text-sm">' + "<p><strong>Benchmark:</strong> " + escapeHtml(bm.description) + "</p>" + "<p><strong>Error:</strong> " + escapeHtml(bm.error) + "</p>" + "</div>";
     }
-  } else if (scrapeResult.data && scrapeResult.data.benchmark) {
-    const bm = scrapeResult.data.benchmark;
-    return '<div class="bg-red-50 border border-red-200 rounded p-3 text-sm">' + "<p><strong>Benchmark:</strong> " + escapeHtml(bm.description) + "</p>" + "<p><strong>Error:</strong> " + escapeHtml(bm.error || scrapeResult.detail || scrapeResult.error) + "</p>" + "</div>";
+  } else if (fetchResult.data && fetchResult.data.benchmark) {
+    const bm = fetchResult.data.benchmark;
+    return '<div class="bg-red-50 border border-red-200 rounded p-3 text-sm">' + "<p><strong>Benchmark:</strong> " + escapeHtml(bm.description) + "</p>" + "<p><strong>Error:</strong> " + escapeHtml(bm.error || fetchResult.detail || fetchResult.error) + "</p>" + "</div>";
   } else {
     let html = '<div class="bg-red-50 border border-red-200 rounded p-3 text-sm">';
-    html += "<p>" + escapeHtml(scrapeResult.error || "Unknown error") + "</p>";
-    if (scrapeResult.detail) {
-      html += "<p>" + escapeHtml(scrapeResult.detail) + "</p>";
+    html += "<p>" + escapeHtml(fetchResult.error || "Unknown error") + "</p>";
+    if (fetchResult.detail) {
+      html += "<p>" + escapeHtml(fetchResult.detail) + "</p>";
     }
     html += "</div>";
     return html;
@@ -787,34 +787,34 @@ function buildHistoryResultHtml(historyResult) {
 }
 
 /**
- * @description Test scrape a single benchmark by ID.
+ * @description Test fetch a single benchmark by ID.
  * Shows a modal immediately with spinners, then progressively updates
- * each section as the live scrape and historic preview results arrive.
+ * each section as the live fetch and historic preview results arrive.
  * Uses testMode=true so no database tables are updated.
- * @param {number} id - The benchmark ID to scrape
+ * @param {number} id - The benchmark ID to fetch
  * @param {HTMLElement} button - The button element that was clicked
  */
-async function testScrapeBenchmark(id, button) {
+async function testFetchBenchmark(id, button) {
   const originalText = button.textContent;
   button.disabled = true;
   button.textContent = "Testing...";
 
   // Show modal immediately with spinners for both sections
-  const initialHtml = '<h4 class="text-base font-semibold text-brand-800 mb-2">Live Scrape Result</h4>' + '<div id="test-scrape-result">' + buildSpinner("Fetching live value...") + "</div>" + '<h4 class="text-base font-semibold text-brand-800 mt-4 mb-2">Historic Data Preview (Yahoo Finance)</h4>' + '<div id="test-history-result">' + buildSpinner("Fetching historic data...") + "</div>";
+  const initialHtml = '<h4 class="text-base font-semibold text-brand-800 mb-2">Live Fetch Result</h4>' + '<div id="test-fetch-result">' + buildSpinner("Fetching live value...") + "</div>" + '<h4 class="text-base font-semibold text-brand-800 mt-4 mb-2">Historic Data Preview (Yahoo Finance)</h4>' + '<div id="test-history-result">' + buildSpinner("Fetching historic data...") + "</div>";
 
   showModalHtml("Test Result (No DB Update)", initialHtml);
 
   // Fire both requests in parallel, update each section as it completes
-  const scrapePromise = apiRequest("/api/scraper/benchmarks/" + id + "?testMode=true", {
+  const fetchPromise = apiRequest("/api/fetch/benchmarks/" + id + "?testMode=true", {
     method: "POST",
     timeout: 120000,
   })
     .then(function (result) {
-      const el = document.getElementById("test-scrape-result");
-      if (el) el.innerHTML = buildScrapeResultHtml(result);
+      const el = document.getElementById("test-fetch-result");
+      if (el) el.innerHTML = buildFetchResultHtml(result);
     })
     .catch(function (err) {
-      const el = document.getElementById("test-scrape-result");
+      const el = document.getElementById("test-fetch-result");
       if (el) el.innerHTML = '<div class="bg-red-50 border border-red-200 rounded p-3 text-sm"><p>' + escapeHtml(err.message) + "</p></div>";
     });
 
@@ -831,7 +831,7 @@ async function testScrapeBenchmark(id, button) {
     });
 
   // Wait for both to complete before re-enabling the button
-  await Promise.all([scrapePromise, historyPromise]);
+  await Promise.all([fetchPromise, historyPromise]);
 
   button.disabled = false;
   button.textContent = originalText;

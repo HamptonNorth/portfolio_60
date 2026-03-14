@@ -1,7 +1,7 @@
 import { Router } from "../router.js";
-import { getAllInvestments, getInvestmentById, createInvestment, updateInvestment, deleteInvestment, getManuallyPricedInvestments } from "../db/investments-db.js";
+import { getAllInvestments, getInvestmentById, createInvestment, updateInvestment, deleteInvestment, getManuallyPricedInvestments, updateAutoFetch } from "../db/investments-db.js";
 import { getLatestPrice, getPriceHistory, getPriceCount, upsertPrice } from "../db/prices-db.js";
-import { recordScrapingAttempt } from "../db/scraping-history-db.js";
+import { recordFetchAttempt } from "../db/fetch-history-db.js";
 import { getAllInvestmentTypes } from "../db/investment-types-db.js";
 import { validateInvestment } from "../validation.js";
 
@@ -37,7 +37,7 @@ investmentsRouter.get("/api/investments", function () {
   }
 });
 
-// GET /api/investments/manually-priced — list investments with auto_scrape=0 and their latest price info
+// GET /api/investments/manually-priced — list investments with auto_fetch=0 and their latest price info
 investmentsRouter.get("/api/investments/manually-priced", function () {
   try {
     const investments = getManuallyPricedInvestments();
@@ -76,9 +76,9 @@ investmentsRouter.post("/api/investments/manual-price", async function (request)
     // Store the price (parsedPrice is in pence/minor units, same as scraped prices)
     upsertPrice(investmentId, today, now, parsedPrice);
 
-    // Record in scraping history (started_by 2 = manual entry)
-    recordScrapingAttempt({
-      scrapeType: "investment",
+    // Record in fetch history (started_by 2 = manual entry)
+    recordFetchAttempt({
+      fetchType: "investment",
       referenceId: investmentId,
       startedBy: 2,
       attemptNumber: 1,
@@ -253,6 +253,30 @@ investmentsRouter.delete("/api/investments/:id", function (request, params) {
       return new Response(JSON.stringify({ error: "Investment in use", detail: err.message }), { status: 409, headers: { "Content-Type": "application/json" } });
     }
     return new Response(JSON.stringify({ error: "Failed to delete investment", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+  }
+});
+
+// PATCH /api/investments/:id/auto-fetch — toggle auto-fetch flag
+investmentsRouter.patch("/api/investments/:id/auto-fetch", async function (request, params) {
+  try {
+    const id = parseInt(params.id, 10);
+    if (isNaN(id)) {
+      return new Response(JSON.stringify({ error: "Invalid investment ID" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+
+    const body = await request.json();
+    if (body.autoFetch === undefined) {
+      return new Response(JSON.stringify({ error: "autoFetch field is required (true or false)" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+
+    const updated = updateAutoFetch(id, body.autoFetch);
+    if (!updated) {
+      return new Response(JSON.stringify({ error: "Investment not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
+    }
+
+    return new Response(JSON.stringify(updated), { status: 200, headers: { "Content-Type": "application/json" } });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: "Failed to update auto-fetch setting", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 

@@ -618,11 +618,11 @@ async function showEditSettingsModal() {
         delayMinutes: 5,
         maxAttempts: 5,
       },
-      scrapeDelayProfile: "cron",
-      scraperSites: {
-        _readme: "Known website patterns for price/benchmark scraping.",
-        _format: {},
-        sites: [],
+      fetchDelayProfile: "cron",
+      fetchBatch: {
+        _readme: "Fetch investments/benchmarks in batches to avoid rate-limiting. batchSize is items per batch (1-50), cooldownSeconds is pause between batches (0-600).",
+        batchSize: 10,
+        cooldownSeconds: 25,
       },
     };
     editor.value = JSON.stringify(defaults, null, 2);

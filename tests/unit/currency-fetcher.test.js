@@ -1,5 +1,5 @@
 // Set isolated DB path BEFORE importing connection.js (which reads it lazily on first call)
-process.env.DB_PATH = "data/portfolio_60_test/test-currency-scraper.db";
+process.env.DB_PATH = "data/portfolio_60_test/test-currency-fetcher.db";
 
 import { describe, test, expect, beforeAll, afterAll, mock } from "bun:test";
 import { existsSync, unlinkSync } from "node:fs";
@@ -230,7 +230,7 @@ describe("fetchCurrencyRates", () => {
     });
 
     try {
-      const { fetchCurrencyRates } = await import("../../src/server/scrapers/currency-scraper.js");
+      const { fetchCurrencyRates } = await import("../../src/server/fetchers/currency-fetcher.js");
       const result = await fetchCurrencyRates();
 
       expect(result.success).toBe(true);
@@ -275,7 +275,7 @@ describe("fetchCurrencyRates", () => {
     });
 
     try {
-      const { fetchCurrencyRates } = await import("../../src/server/scrapers/currency-scraper.js");
+      const { fetchCurrencyRates } = await import("../../src/server/fetchers/currency-fetcher.js");
       const result = await fetchCurrencyRates();
       expect(result.success).toBe(true);
       expect(result.rates.length).toBe(3);
@@ -292,7 +292,7 @@ describe("fetchCurrencyRates", () => {
     });
 
     try {
-      const { fetchCurrencyRates } = await import("../../src/server/scrapers/currency-scraper.js");
+      const { fetchCurrencyRates } = await import("../../src/server/fetchers/currency-fetcher.js");
       const result = await fetchCurrencyRates();
 
       expect(result.success).toBe(false);
@@ -317,7 +317,7 @@ describe("fetchCurrencyRates", () => {
     });
 
     try {
-      const { fetchCurrencyRates } = await import("../../src/server/scrapers/currency-scraper.js");
+      const { fetchCurrencyRates } = await import("../../src/server/fetchers/currency-fetcher.js");
       const result = await fetchCurrencyRates();
 
       expect(result.success).toBe(false);
@@ -348,7 +348,7 @@ describe("fetchCurrencyRates", () => {
     });
 
     try {
-      const { fetchCurrencyRates } = await import("../../src/server/scrapers/currency-scraper.js");
+      const { fetchCurrencyRates } = await import("../../src/server/fetchers/currency-fetcher.js");
       const result = await fetchCurrencyRates();
 
       expect(result.success).toBe(true);

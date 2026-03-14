@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS investments (
     public_id TEXT CHECK(public_id IS NULL OR length(public_id) <= 20),
     investment_url TEXT CHECK(investment_url IS NULL OR length(investment_url) <= 255),
     selector TEXT CHECK(selector IS NULL OR length(selector) <= 255),
-    auto_scrape INTEGER NOT NULL DEFAULT 1,
+    auto_fetch INTEGER NOT NULL DEFAULT 1,
     morningstar_id TEXT,
     FOREIGN KEY (currencies_id) REFERENCES currencies(id),
     FOREIGN KEY (investment_type_id) REFERENCES investment_types(id)
@@ -97,12 +97,12 @@ CREATE TABLE IF NOT EXISTS benchmark_data (
     UNIQUE(benchmark_id, benchmark_date)
 );
 
--- Scraping history: log of all scrape attempts for monitoring
-CREATE TABLE IF NOT EXISTS scraping_history (
+-- Fetch history: log of all fetch attempts for monitoring
+CREATE TABLE IF NOT EXISTS fetch_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    scrape_type TEXT NOT NULL CHECK(scrape_type IN ('currency', 'investment', 'benchmark')),
+    fetch_type TEXT NOT NULL CHECK(fetch_type IN ('currency', 'investment', 'benchmark')),
     reference_id INTEGER NOT NULL,
-    scrape_datetime TEXT NOT NULL,
+    fetch_datetime TEXT NOT NULL,
     started_by INTEGER NOT NULL DEFAULT 0,
     attempt_number INTEGER NOT NULL DEFAULT 1,
     max_attempts INTEGER NOT NULL DEFAULT 1,
@@ -203,7 +203,7 @@ CREATE TABLE IF NOT EXISTS other_assets_history (
     FOREIGN KEY (other_asset_id) REFERENCES other_assets(id) ON DELETE CASCADE
 );
 
--- Scheduler log: timestamped log entries from the scheduled scraper
+-- Scheduler log: timestamped log entries from the scheduled fetcher
 CREATE TABLE IF NOT EXISTS scheduler_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     log_datetime TEXT NOT NULL,
@@ -220,8 +220,8 @@ CREATE INDEX IF NOT EXISTS idx_benchmarks_type ON benchmarks(benchmark_type);
 CREATE INDEX IF NOT EXISTS idx_benchmarks_currency ON benchmarks(currencies_id);
 CREATE INDEX IF NOT EXISTS idx_prices_lookup ON prices(investment_id, price_date DESC);
 CREATE INDEX IF NOT EXISTS idx_benchmark_data_lookup ON benchmark_data(benchmark_id, benchmark_date DESC);
-CREATE INDEX IF NOT EXISTS idx_scraping_history_datetime ON scraping_history(scrape_datetime DESC);
-CREATE INDEX IF NOT EXISTS idx_scraping_history_type_ref ON scraping_history(scrape_type, reference_id);
+CREATE INDEX IF NOT EXISTS idx_fetch_history_datetime ON fetch_history(fetch_datetime DESC);
+CREATE INDEX IF NOT EXISTS idx_fetch_history_type_ref ON fetch_history(fetch_type, reference_id);
 CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(user_id);
 CREATE INDEX IF NOT EXISTS idx_holdings_account ON holdings(account_id);
 CREATE INDEX IF NOT EXISTS idx_holdings_investment ON holdings(investment_id);

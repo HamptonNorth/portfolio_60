@@ -1,6 +1,6 @@
 /**
- * @description Scraping History page logic for Portfolio 60.
- * Displays a filterable, paginated history of all scraping attempts.
+ * @description Fetch History page logic for Portfolio 60.
+ * Displays a filterable, paginated history of all fetch attempts.
  */
 
 /** @type {number} Number of records to show per page */
@@ -13,13 +13,13 @@ let currentOffset = 0;
 let totalCount = 0;
 
 /**
- * @description Format a scrape type for display.
- * @param {string} scrapeType - 'currency', 'investment', or 'benchmark'
+ * @description Format a fetch type for display.
+ * @param {string} fetchType - 'currency', 'investment', or 'benchmark'
  * @returns {string} Capitalised display string
  */
-function formatScrapeType(scrapeType) {
-  if (!scrapeType) return "—";
-  return scrapeType.charAt(0).toUpperCase() + scrapeType.slice(1);
+function formatFetchType(fetchType) {
+  if (!fetchType) return "—";
+  return fetchType.charAt(0).toUpperCase() + fetchType.slice(1);
 }
 
 /**
@@ -61,14 +61,14 @@ function formatStartedBy(startedBy) {
 
 /**
  * @description Get current filter values from the form.
- * @returns {Object} Filter object with scrapeType, success, startDate, endDate
+ * @returns {Object} Filter object with fetchType, success, startDate, endDate
  */
 function getFilters() {
   const filters = {};
 
-  const scrapeType = document.getElementById("filter-type").value;
-  if (scrapeType) {
-    filters.scrapeType = scrapeType;
+  const fetchType = document.getElementById("filter-type").value;
+  if (fetchType) {
+    filters.fetchType = fetchType;
   }
 
   const success = document.getElementById("filter-success").value;
@@ -76,9 +76,9 @@ function getFilters() {
     filters.success = success;
   }
 
-  const autoScrape = document.getElementById("filter-auto-scrape").value;
-  if (autoScrape !== "") {
-    filters.autoScrapeOnly = autoScrape;
+  const autoFetch = document.getElementById("filter-auto-fetch").value;
+  if (autoFetch !== "") {
+    filters.autoFetchOnly = autoFetch;
   }
 
   const startDate = document.getElementById("filter-start-date").value;
@@ -103,14 +103,14 @@ function getFilters() {
 function buildQueryString(filters, offset) {
   const params = new URLSearchParams();
 
-  if (filters.scrapeType) {
-    params.set("scrapeType", filters.scrapeType);
+  if (filters.fetchType) {
+    params.set("fetchType", filters.fetchType);
   }
   if (filters.success !== undefined) {
     params.set("success", filters.success);
   }
-  if (filters.autoScrapeOnly !== undefined) {
-    params.set("autoScrapeOnly", filters.autoScrapeOnly);
+  if (filters.autoFetchOnly !== undefined) {
+    params.set("autoFetchOnly", filters.autoFetchOnly);
   }
   if (filters.startDate) {
     params.set("startDate", filters.startDate);
@@ -126,7 +126,7 @@ function buildQueryString(filters, offset) {
 }
 
 /**
- * @description Load and display scraping history with current filters and pagination.
+ * @description Load and display fetch history with current filters and pagination.
  */
 async function loadHistory() {
   const container = document.getElementById("history-table-container");
@@ -138,7 +138,7 @@ async function loadHistory() {
   const filters = getFilters();
   const queryString = buildQueryString(filters, currentOffset);
 
-  const result = await apiRequest("/api/scraper/history?" + queryString);
+  const result = await apiRequest("/api/fetch/history?" + queryString);
 
   if (!result.ok) {
     container.innerHTML = '<div class="bg-red-50 border border-red-300 text-error rounded-lg px-4 py-3">' + '<p class="text-base font-semibold">Failed to load fetching history</p>' + '<p class="text-sm mt-1">' + escapeHtml(result.detail || result.error) + "</p></div>";
@@ -175,8 +175,8 @@ async function loadHistory() {
     const rowClass = i % 2 === 0 ? "bg-white" : "bg-brand-50";
 
     html += '<tr class="' + rowClass + ' border-b border-brand-100">';
-    html += '<td class="py-3 px-3 text-base">' + escapeHtml(formatDatetime(h.scrape_datetime)) + "</td>";
-    html += '<td class="py-3 px-3 text-base">' + escapeHtml(formatScrapeType(h.scrape_type)) + "</td>";
+    html += '<td class="py-3 px-3 text-base">' + escapeHtml(formatDatetime(h.fetch_datetime)) + "</td>";
+    html += '<td class="py-3 px-3 text-base">' + escapeHtml(formatFetchType(h.fetch_type)) + "</td>";
     html += '<td class="py-3 px-3 text-base">' + escapeHtml(h.reference_description || "—") + "</td>";
 
     if (h.success) {
@@ -264,7 +264,7 @@ function applyFilters() {
 function clearFilters() {
   document.getElementById("filter-type").value = "";
   document.getElementById("filter-success").value = "";
-  document.getElementById("filter-auto-scrape").value = "";
+  document.getElementById("filter-auto-fetch").value = "";
   document.getElementById("filter-start-date").value = "";
   document.getElementById("filter-end-date").value = "";
   currentOffset = 0;

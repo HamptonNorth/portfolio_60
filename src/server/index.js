@@ -8,7 +8,7 @@ import { handleConfigRoute, handleConfigRouteAsync } from "./routes/config-route
 import { handleInvestmentsRoute } from "./routes/investments-routes.js";
 import { handleCurrenciesRoute } from "./routes/currencies-routes.js";
 import { handleGlobalEventsRoute } from "./routes/global-events-routes.js";
-import { handleScraperRoute } from "./routes/scraper-routes.js";
+import { handleFetchRoute } from "./routes/fetch-routes.js";
 import { handleBackupRoute } from "./routes/backup-routes.js";
 import { handleBenchmarksRoute } from "./routes/benchmarks-routes.js";
 import { handleBackfillRoute } from "./routes/backfill-routes.js";
@@ -22,8 +22,7 @@ import { handleDocsRoute } from "./routes/docs-routes.js";
 import { handleOtherAssetsRoute } from "./routes/other-assets-routes.js";
 import { handleReportsRoute } from "./routes/reports-routes.js";
 import { handlePortfolioDetailRoute } from "./routes/portfolio-detail-routes.js";
-import { initScheduledScraper, stopScheduledScraper } from "./services/scheduled-scraper.js";
-import { launchBrowser } from "./scrapers/browser-utils.js";
+import { initScheduledFetcher, stopScheduledFetcher } from "./services/scheduled-fetcher.js";
 import { processDrawdowns } from "./services/drawdown-processor.js";
 import { databaseExists, closeDatabase } from "./db/connection.js";
 
@@ -97,7 +96,7 @@ async function serveStaticFile(relativePath) {
  */
 const server = Bun.serve({
   port: port,
-  idleTimeout: 0, // disabled globally — SSE scraping streams are long-lived; per-request server.timeout(req, 0) also applied for stream endpoints
+  idleTimeout: 0, // disabled globally — SSE fetching streams are long-lived; per-request server.timeout(req, 0) also applied for stream endpoints
 
   /**
    * @description Handle incoming HTTP requests.
@@ -112,7 +111,7 @@ const server = Bun.serve({
 
     // --- Auth gate ---
     // Check if the route requires authentication and redirect if not authenticated.
-    // Unprotected routes (auth API, scraper API, static assets) pass through.
+    // Unprotected routes (auth API, fetch API, static assets) pass through.
     const authResponse = checkAuth(path);
     if (authResponse) {
       return authResponse;
@@ -186,7 +185,7 @@ const server = Bun.serve({
       }
     }
 
-    // Config routes (providers list, scraper sites, etc.)
+    // Config routes (providers list, etc.)
     if (path.startsWith("/api/config/")) {
       // Try sync handler first
       const configResult = handleConfigRoute(method, path);
@@ -368,16 +367,16 @@ const server = Bun.serve({
       }
     }
 
-    // Scraper routes (unprotected — no passphrase required)
-    if (path.startsWith("/api/scraper/")) {
+    // Fetch routes (unprotected — no passphrase required)
+    if (path.startsWith("/api/fetch/")) {
       // Disable per-request idle timeout for SSE stream endpoints so Bun
-      // does not close the connection while the server is busy scraping.
+      // does not close the connection while the server is busy fetching.
       if (path.endsWith("/stream")) {
         server.timeout(request, 0);
       }
-      const scraperResult = await handleScraperRoute(method, path, request);
-      if (scraperResult) {
-        return scraperResult;
+      const fetchResult = await handleFetchRoute(method, path, request);
+      if (fetchResult) {
+        return fetchResult;
       }
     }
 
@@ -421,24 +420,12 @@ if (databaseExists()) {
   }
 }
 
-// Initialise scheduled scraping (after server is ready)
-initScheduledScraper();
-
-// Warm up Playwright browser in the background so first scrape is fast
-launchBrowser()
-  .then(function (browser) {
-    return browser.close();
-  })
-  .then(function () {
-    console.log("Playwright browser warmed up");
-  })
-  .catch(function () {
-    // Non-fatal — browser will launch on first scrape instead
-  });
+// Initialise scheduled fetching (after server is ready)
+initScheduledFetcher();
 
 // Graceful shutdown: checkpoint WAL and stop the scheduler before exiting
 process.on("SIGINT", function () {
-  stopScheduledScraper();
+  stopScheduledFetcher();
   closeDatabase();
   process.exit(0);
 });

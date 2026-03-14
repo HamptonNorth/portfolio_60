@@ -118,7 +118,7 @@ export function getDatabase() {
   db = new Database(dbPath);
 
   // Btrfs copy-on-write conflicts with SQLite WAL mode, causing
-  // "disk I/O error" under sustained writes (e.g. scraping 20+ prices).
+  // "disk I/O error" under sustained writes (e.g. fetching 20+ prices).
   // Use DELETE journal mode on btrfs for reliability.
   const dbDir = dirname(dbPath);
   if (isBtrfs(dbDir)) {
@@ -231,16 +231,18 @@ function runMigrations(database) {
     database.exec("CREATE INDEX IF NOT EXISTS idx_benchmark_data_lookup ON benchmark_data(benchmark_id, benchmark_date DESC)");
   }
 
-  // Migration 5: Add scraping_history table (v0.2.0)
-  const scrapingHistoryTable = database.query("SELECT name FROM sqlite_master WHERE type='table' AND name='scraping_history'").get();
+  // Migration 5: Add fetch_history table (v0.2.0, renamed from scraping_history in v0.18.0)
+  // Check for both old and new table names to handle databases at any migration level.
+  const fetchHistoryTable = database.query("SELECT name FROM sqlite_master WHERE type='table' AND name='fetch_history'").get();
+  const legacyScrapingHistoryTable = database.query("SELECT name FROM sqlite_master WHERE type='table' AND name='scraping_history'").get();
 
-  if (!scrapingHistoryTable) {
+  if (!fetchHistoryTable && !legacyScrapingHistoryTable) {
     database.exec(`
-      CREATE TABLE IF NOT EXISTS scraping_history (
+      CREATE TABLE IF NOT EXISTS fetch_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        scrape_type TEXT NOT NULL CHECK(scrape_type IN ('currency', 'investment', 'benchmark')),
+        fetch_type TEXT NOT NULL CHECK(fetch_type IN ('currency', 'investment', 'benchmark')),
         reference_id INTEGER NOT NULL,
-        scrape_datetime TEXT NOT NULL,
+        fetch_datetime TEXT NOT NULL,
         started_by INTEGER NOT NULL DEFAULT 0,
         attempt_number INTEGER NOT NULL DEFAULT 1,
         success INTEGER NOT NULL DEFAULT 0,
@@ -248,8 +250,8 @@ function runMigrations(database) {
         error_message TEXT
       )
     `);
-    database.exec("CREATE INDEX IF NOT EXISTS idx_scraping_history_datetime ON scraping_history(scrape_datetime DESC)");
-    database.exec("CREATE INDEX IF NOT EXISTS idx_scraping_history_type_ref ON scraping_history(scrape_type, reference_id)");
+    database.exec("CREATE INDEX IF NOT EXISTS idx_fetch_history_datetime ON fetch_history(fetch_datetime DESC)");
+    database.exec("CREATE INDEX IF NOT EXISTS idx_fetch_history_type_ref ON fetch_history(fetch_type, reference_id)");
   }
 
   // Migration 6: Add morningstar_id column to investments (v0.3.0)
@@ -489,28 +491,33 @@ function runMigrations(database) {
     `);
   }
 
-  // Migration 18: Add auto_scrape column to investments (v0.12.0)
+  // Migration 18: Add auto_fetch column to investments (v0.12.0, renamed from auto_scrape in v0.18.0)
   // Allows excluding investments from automatic price fetching.
-  // Default 1 (auto-scrape enabled). Set to 0 for manual-only pricing.
+  // Default 1 (auto-fetch enabled). Set to 0 for manual-only pricing.
   const invCols18 = database.query("PRAGMA table_info(investments)").all();
-  const hasAutoScrape = invCols18.some(function (col) {
+  const hasAutoFetch = invCols18.some(function (col) {
+    return col.name === "auto_fetch";
+  });
+  const hasLegacyAutoScrape = invCols18.some(function (col) {
     return col.name === "auto_scrape";
   });
 
-  if (!hasAutoScrape) {
-    database.exec("ALTER TABLE investments ADD COLUMN auto_scrape INTEGER NOT NULL DEFAULT 1");
+  if (!hasAutoFetch && !hasLegacyAutoScrape) {
+    database.exec("ALTER TABLE investments ADD COLUMN auto_fetch INTEGER NOT NULL DEFAULT 1");
   }
 
-  // Migration 19: Add max_attempts column to scraping_history (v0.13.0)
-  // Records how many attempts were available for a scrape run, so history
+  // Migration 19: Add max_attempts column to fetch_history (v0.13.0, table renamed in v0.18.0)
+  // Records how many attempts were available for a fetch run, so history
   // shows "succeeded on attempt 2 of 3" or "failed after 3 of 3 attempts".
-  const shCols19 = database.query("PRAGMA table_info(scraping_history)").all();
+  // Check whichever table name exists (old or new)
+  const historyTableName19 = database.query("SELECT name FROM sqlite_master WHERE type='table' AND name='fetch_history'").get() ? "fetch_history" : "scraping_history";
+  const shCols19 = database.query("PRAGMA table_info(" + historyTableName19 + ")").all();
   const hasMaxAttempts = shCols19.some(function (col) {
     return col.name === "max_attempts";
   });
 
   if (!hasMaxAttempts) {
-    database.exec("ALTER TABLE scraping_history ADD COLUMN max_attempts INTEGER NOT NULL DEFAULT 1");
+    database.exec("ALTER TABLE " + historyTableName19 + " ADD COLUMN max_attempts INTEGER NOT NULL DEFAULT 1");
   }
 
   // Migration 20: Clear all cached morningstar_id values (v0.14.0)
@@ -605,7 +612,7 @@ function runMigrations(database) {
   }
 
   // Migration 23: Add scheduler_log table (v0.17.0)
-  // Timestamped log entries from the scheduled scraper for diagnostics.
+  // Timestamped log entries from the scheduled fetcher for diagnostics.
   const schedulerLogTable = database.query(
     "SELECT name FROM sqlite_master WHERE type='table' AND name='scheduler_log'"
   ).get();
@@ -622,6 +629,30 @@ function runMigrations(database) {
     database.exec(
       "CREATE INDEX IF NOT EXISTS idx_scheduler_log_datetime ON scheduler_log(log_datetime DESC)"
     );
+  }
+
+  // Migration 24: Rename scraping_history → fetch_history, auto_scrape → auto_fetch (v0.18.0)
+  // Renames the table, columns, and indexes to use "fetch" vocabulary.
+  const oldScrapingTable = database.query(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='scraping_history'"
+  ).get();
+
+  if (oldScrapingTable) {
+    database.exec("ALTER TABLE scraping_history RENAME TO fetch_history");
+    database.exec("ALTER TABLE fetch_history RENAME COLUMN scrape_type TO fetch_type");
+    database.exec("ALTER TABLE fetch_history RENAME COLUMN scrape_datetime TO fetch_datetime");
+    database.exec("DROP INDEX IF EXISTS idx_scraping_history_datetime");
+    database.exec("DROP INDEX IF EXISTS idx_scraping_history_type_ref");
+    database.exec("CREATE INDEX IF NOT EXISTS idx_fetch_history_datetime ON fetch_history(fetch_datetime DESC)");
+    database.exec("CREATE INDEX IF NOT EXISTS idx_fetch_history_type_ref ON fetch_history(fetch_type, reference_id)");
+  }
+
+  const oldAutoScrapeCol = database.query("PRAGMA table_info(investments)").all().some(function (col) {
+    return col.name === "auto_scrape";
+  });
+
+  if (oldAutoScrapeCol) {
+    database.exec("ALTER TABLE investments RENAME COLUMN auto_scrape TO auto_fetch");
   }
 }
 

@@ -144,8 +144,8 @@ describe("Auth Routes - verify passphrase", () => {
 });
 
 describe("Auth Routes - auth gate", () => {
-  test("scraper routes are accessible without authentication", async () => {
-    const response = await fetch(`${BASE_URL}/api/scraper/anything`, { redirect: "manual" });
+  test("fetch routes are accessible without authentication", async () => {
+    const response = await fetch(`${BASE_URL}/api/fetch/anything`, { redirect: "manual" });
     expect(response.status).toBe(501);
   });
 

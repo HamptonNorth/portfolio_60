@@ -4,7 +4,7 @@ import { getAuthStatus } from "../auth.js";
  * @description List of URL path prefixes that do NOT require authentication.
  * These routes are accessible without entering the passphrase.
  * - /api/auth/ — needed to perform the authentication itself
- * - /api/scraper/ — scraper routes are unprotected for future cron use
+ * - /api/fetch/ — fetch routes are unprotected for cron-scheduled fetching
  * - /api/backfill/ — historic data backfill (fetches from external APIs)
  * - /css/ — stylesheets needed for the passphrase page
  * - /js/ — scripts needed for the passphrase page
@@ -12,7 +12,7 @@ import { getAuthStatus } from "../auth.js";
  * - /pages/passphrase.html — the passphrase page itself
  * @type {string[]}
  */
-const UNPROTECTED_PREFIXES = ["/api/auth/", "/api/scraper/", "/api/backfill/", "/api/docs/", "/css/", "/js/", "/images/", "/docs/media/", "/pages/passphrase.html"];
+const UNPROTECTED_PREFIXES = ["/api/auth/", "/api/fetch/", "/api/backfill/", "/api/docs/", "/css/", "/js/", "/images/", "/docs/media/", "/pages/passphrase.html"];
 
 /**
  * @description Check whether a given URL path requires authentication.
