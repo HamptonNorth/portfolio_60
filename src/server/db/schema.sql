@@ -203,6 +203,14 @@ CREATE TABLE IF NOT EXISTS other_assets_history (
     FOREIGN KEY (other_asset_id) REFERENCES other_assets(id) ON DELETE CASCADE
 );
 
+-- Scheduler log: timestamped log entries from the scheduled scraper
+CREATE TABLE IF NOT EXISTS scheduler_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    log_datetime TEXT NOT NULL,
+    level TEXT NOT NULL DEFAULT 'info' CHECK(level IN ('info', 'warn', 'error')),
+    message TEXT NOT NULL
+);
+
 -- Indexes for query performance
 CREATE INDEX IF NOT EXISTS idx_currency_rates_lookup ON currency_rates(currencies_id, rate_date DESC);
 CREATE INDEX IF NOT EXISTS idx_investments_type ON investments(investment_type_id);
@@ -223,3 +231,4 @@ CREATE INDEX IF NOT EXISTS idx_drawdown_schedules_account ON drawdown_schedules(
 CREATE INDEX IF NOT EXISTS idx_other_assets_user ON other_assets(user_id);
 CREATE INDEX IF NOT EXISTS idx_other_assets_category ON other_assets(category);
 CREATE INDEX IF NOT EXISTS idx_other_assets_history_asset ON other_assets_history(other_asset_id, change_date DESC);
+CREATE INDEX IF NOT EXISTS idx_scheduler_log_datetime ON scheduler_log(log_datetime DESC);

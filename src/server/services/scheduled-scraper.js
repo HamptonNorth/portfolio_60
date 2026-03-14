@@ -3,6 +3,7 @@ import { getSchedulingConfig, getRetryConfig, getScrapeDelayProfile } from "../c
 import { getLastSuccessfulScrapeByType } from "../db/scraping-history-db.js";
 import { databaseExists } from "../db/connection.js";
 import { runFullPriceUpdate, retryFailedItems } from "./scraping-service.js";
+import { writeSchedulerLog, pruneSchedulerLog } from "../db/scheduler-log-db.js";
 
 /**
  * @description The active Croner job instance, or null if scheduling is disabled.
@@ -65,7 +66,7 @@ function trackedSleep(ms) {
  */
 async function executeScrapeRun(startedBy) {
   if (isRunning) {
-    console.log("[Scheduler] Scrape already in progress, skipping");
+    writeSchedulerLog("Scrape already in progress, skipping");
     return;
   }
 
@@ -75,7 +76,7 @@ async function executeScrapeRun(startedBy) {
   const retryConfig = getRetryConfig();
   const delayProfile = getScrapeDelayProfile();
 
-  console.log("[Scheduler] Starting scrape run (startedBy=" + startedBy + ")");
+  writeSchedulerLog("Starting scrape run (startedBy=" + startedBy + ")");
 
   try {
     // Run the initial full scrape
@@ -84,8 +85,8 @@ async function executeScrapeRun(startedBy) {
       delayProfile: delayProfile,
     });
 
-    console.log(
-      "[Scheduler] Initial scrape complete — prices: " +
+    writeSchedulerLog(
+      "Initial scrape complete — prices: " +
         summary.priceSuccessCount + "/" + (summary.priceSuccessCount + summary.priceFailCount) +
         ", benchmarks: " + summary.benchmarkSuccessCount + "/" + (summary.benchmarkSuccessCount + summary.benchmarkFailCount) +
         ", currency: " + (summary.currencySuccess ? "OK" : "FAILED"),
@@ -104,15 +105,15 @@ async function executeScrapeRun(startedBy) {
       (failedInvestmentIds.length > 0 || failedBenchmarkIds.length > 0 || retryCurrency)
     ) {
       const totalFailed = failedInvestmentIds.length + failedBenchmarkIds.length + (retryCurrency ? 1 : 0);
-      console.log(
-        "[Scheduler] Retry attempt " + attempt + "/" + retryConfig.maxAttempts +
+      writeSchedulerLog(
+        "Retry attempt " + attempt + "/" + retryConfig.maxAttempts +
           " — " + totalFailed + " item(s) to retry in " + retryConfig.delayMinutes + " minute(s)",
       );
 
       // Wait before retrying
       const sleptOk = await trackedSleep(retryConfig.delayMinutes * 60 * 1000);
       if (!sleptOk || stopRequested) {
-        console.log("[Scheduler] Retry interrupted by shutdown");
+        writeSchedulerLog("Retry interrupted by shutdown", "warn");
         break;
       }
 
@@ -135,8 +136,8 @@ async function executeScrapeRun(startedBy) {
       retryCurrency = !retryResult.currencySuccess && retryCurrency;
 
       const remainingFailed = failedInvestmentIds.length + failedBenchmarkIds.length + (retryCurrency ? 1 : 0);
-      console.log(
-        "[Scheduler] After retry " + attempt + ": " + remainingFailed + " item(s) still failing",
+      writeSchedulerLog(
+        "After retry " + attempt + ": " + remainingFailed + " item(s) still failing",
       );
 
       attempt++;
@@ -155,15 +156,16 @@ async function executeScrapeRun(startedBy) {
 
     const totalRemaining = failedInvestmentIds.length + failedBenchmarkIds.length;
     if (totalRemaining === 0 && !retryCurrency) {
-      console.log("[Scheduler] Scrape run completed — all items successful");
+      writeSchedulerLog("Scrape run completed — all items successful");
     } else {
-      console.log(
-        "[Scheduler] Scrape run completed — " + totalRemaining + " item(s) still failing after " +
+      writeSchedulerLog(
+        "Scrape run completed — " + totalRemaining + " item(s) still failing after " +
           (attempt - 2) + " retry attempt(s)",
+        "warn",
       );
     }
   } catch (err) {
-    console.error("[Scheduler] Scrape run failed with error:", err.message);
+    writeSchedulerLog("Scrape run failed with error: " + err.message, "error");
     lastRunResult = {
       completedAt: new Date().toISOString(),
       startedBy: startedBy,
@@ -188,8 +190,20 @@ async function executeScrapeRun(startedBy) {
 export function initScheduledScraper() {
   const schedulingConfig = getSchedulingConfig();
 
+  // Prune log entries older than 30 days on every startup
+  if (databaseExists()) {
+    try {
+      const pruned = pruneSchedulerLog(30);
+      if (pruned > 0) {
+        writeSchedulerLog("Pruned " + pruned + " log entries older than 30 days");
+      }
+    } catch (err) {
+      console.warn("[Scheduler] Failed to prune scheduler log: " + err.message);
+    }
+  }
+
   if (!schedulingConfig.enabled) {
-    console.log("[Scheduler] Scheduled scraping is disabled");
+    writeSchedulerLog("Scheduled scraping is disabled");
     return {
       stop: function () {},
       getNextRun: function () { return null; },
@@ -203,8 +217,8 @@ export function initScheduledScraper() {
   });
 
   const nextRun = cronJob.nextRun();
-  console.log("[Scheduler] Scheduled scraping enabled — cron: " + schedulingConfig.cron);
-  console.log("[Scheduler] Next scheduled scrape: " + (nextRun ? nextRun.toISOString() : "unknown"));
+  writeSchedulerLog("Scheduled scraping enabled — cron: " + schedulingConfig.cron);
+  writeSchedulerLog("Next scheduled scrape: " + (nextRun ? nextRun.toISOString() : "unknown"));
 
   // Check for missed scrape if configured
   if (schedulingConfig.runOnStartupIfMissed) {
@@ -227,7 +241,7 @@ export function initScheduledScraper() {
 function checkForMissedScrape(schedulingConfig) {
   // Guard: if the database doesn't exist yet, skip the check
   if (!databaseExists()) {
-    console.log("[Scheduler] Database not yet created, skipping missed-scrape check");
+    writeSchedulerLog("Database not yet created, skipping missed-scrape check");
     return;
   }
 
@@ -245,7 +259,7 @@ function checkForMissedScrape(schedulingConfig) {
 
   if (!lastSuccessful) {
     // No successful scrape ever recorded — treat as missed
-    console.log("[Scheduler] No previous successful scrape found — scheduling startup scrape");
+    writeSchedulerLog("No previous successful scrape found — scheduling startup scrape");
     scheduleMissedScrape(schedulingConfig.startupDelayMinutes);
     return;
   }
@@ -254,13 +268,13 @@ function checkForMissedScrape(schedulingConfig) {
   // a scrape was missed
   const lastSuccessfulDate = new Date(lastSuccessful);
   if (lastSuccessfulDate < lastScheduledTime) {
-    console.log(
-      "[Scheduler] Missed scrape detected — last success: " + lastSuccessful +
+    writeSchedulerLog(
+      "Missed scrape detected — last success: " + lastSuccessful +
         ", last scheduled: " + lastScheduledTime.toISOString(),
     );
     scheduleMissedScrape(schedulingConfig.startupDelayMinutes);
   } else {
-    console.log("[Scheduler] No missed scrape — last success is up to date");
+    writeSchedulerLog("No missed scrape — last success is up to date");
   }
 }
 
@@ -270,12 +284,13 @@ function checkForMissedScrape(schedulingConfig) {
  */
 function scheduleMissedScrape(delayMinutes) {
   const delayMs = delayMinutes * 60 * 1000;
-  console.log("[Scheduler] Startup scrape will run in " + delayMinutes + " minute(s)");
+  writeSchedulerLog("Startup scrape will run in " + delayMinutes + " minute(s)");
 
   const timerId = setTimeout(function () {
     pendingTimers = pendingTimers.filter(function (id) {
       return id !== timerId;
     });
+    writeSchedulerLog("Startup scrape timer fired — beginning scrape run");
     executeScrapeRun(1);
   }, delayMs);
 
@@ -294,7 +309,7 @@ export function stopScheduledScraper() {
   if (cronJob) {
     cronJob.stop();
     cronJob = null;
-    console.log("[Scheduler] Cron job stopped");
+    writeSchedulerLog("Cron job stopped");
   }
 
   // Cancel all pending timers

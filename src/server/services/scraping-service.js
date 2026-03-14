@@ -22,6 +22,7 @@ import { getTotalBenchmarkDataCount, getBenchmarkDataCount } from "../db/benchma
 import { backfillInvestmentPrices, backfillBenchmarkValues, backfillCurrencyRates, backfillSingleInvestment, backfillSingleBenchmark, backfillSingleCurrency } from "./historic-backfill.js";
 import { getDatabase } from "../db/connection.js";
 import { checkpointDatabase } from "../db/connection.js";
+import { recordScrapingAttempt } from "../db/scraping-history-db.js";
 
 /**
  * @description Sleep for a given number of milliseconds.
@@ -196,9 +197,38 @@ export async function runFullPriceUpdate(options = {}) {
           const priceResult = await fetchLatestMorningstarPrice(investment);
           if (priceResult.success) {
             summary.priceSuccessCount++;
+            try {
+              recordScrapingAttempt({
+                scrapeType: "investment",
+                referenceId: investment.id,
+                startedBy: startedBy,
+                attemptNumber: 1,
+                maxAttempts: 1,
+                success: true,
+              });
+            } catch (historyErr) {
+              console.warn("[ScrapeService] Failed to record history for investment " + investment.id + ": " + historyErr.message);
+            }
           } else {
             summary.priceFailCount++;
             summary.failedInvestmentIds.push(investment.id);
+            // Only record non-manually-priced failures in history
+            if (priceResult.errorCode !== "MANUALLY_PRICED") {
+              try {
+                recordScrapingAttempt({
+                  scrapeType: "investment",
+                  referenceId: investment.id,
+                  startedBy: startedBy,
+                  attemptNumber: 1,
+                  maxAttempts: 1,
+                  success: false,
+                  errorCode: priceResult.errorCode,
+                  errorMessage: priceResult.error,
+                });
+              } catch (historyErr) {
+                console.warn("[ScrapeService] Failed to record history for investment " + investment.id + ": " + historyErr.message);
+              }
+            }
           }
           if (onPriceResult) {
             onPriceResult(priceResult);
@@ -206,6 +236,20 @@ export async function runFullPriceUpdate(options = {}) {
         } catch (err) {
           summary.priceFailCount++;
           summary.failedInvestmentIds.push(investment.id);
+          try {
+            recordScrapingAttempt({
+              scrapeType: "investment",
+              referenceId: investment.id,
+              startedBy: startedBy,
+              attemptNumber: 1,
+              maxAttempts: 1,
+              success: false,
+              errorCode: "API_ERROR",
+              errorMessage: err.message,
+            });
+          } catch (historyErr) {
+            console.warn("[ScrapeService] Failed to record history for investment " + investment.id + ": " + historyErr.message);
+          }
           if (onPriceResult) {
             onPriceResult({
               success: false,
@@ -263,9 +307,38 @@ export async function runFullPriceUpdate(options = {}) {
           const benchmarkResult = await fetchLatestYahooBenchmarkValue(benchmark);
           if (benchmarkResult.success) {
             summary.benchmarkSuccessCount++;
+            try {
+              recordScrapingAttempt({
+                scrapeType: "benchmark",
+                referenceId: benchmark.id,
+                startedBy: startedBy,
+                attemptNumber: 1,
+                maxAttempts: 1,
+                success: true,
+              });
+            } catch (historyErr) {
+              console.warn("[ScrapeService] Failed to record history for benchmark " + benchmark.id + ": " + historyErr.message);
+            }
           } else {
             summary.benchmarkFailCount++;
             summary.failedBenchmarkIds.push(benchmark.id);
+            // Only record non-ticker-missing failures in history
+            if (benchmarkResult.errorCode !== "NO_YAHOO_TICKER") {
+              try {
+                recordScrapingAttempt({
+                  scrapeType: "benchmark",
+                  referenceId: benchmark.id,
+                  startedBy: startedBy,
+                  attemptNumber: 1,
+                  maxAttempts: 1,
+                  success: false,
+                  errorCode: benchmarkResult.errorCode,
+                  errorMessage: benchmarkResult.error,
+                });
+              } catch (historyErr) {
+                console.warn("[ScrapeService] Failed to record history for benchmark " + benchmark.id + ": " + historyErr.message);
+              }
+            }
           }
           if (onBenchmarkResult) {
             onBenchmarkResult(benchmarkResult);
@@ -273,6 +346,20 @@ export async function runFullPriceUpdate(options = {}) {
         } catch (err) {
           summary.benchmarkFailCount++;
           summary.failedBenchmarkIds.push(benchmark.id);
+          try {
+            recordScrapingAttempt({
+              scrapeType: "benchmark",
+              referenceId: benchmark.id,
+              startedBy: startedBy,
+              attemptNumber: 1,
+              maxAttempts: 1,
+              success: false,
+              errorCode: "API_ERROR",
+              errorMessage: err.message,
+            });
+          } catch (historyErr) {
+            console.warn("[ScrapeService] Failed to record history for benchmark " + benchmark.id + ": " + historyErr.message);
+          }
           if (onBenchmarkResult) {
             onBenchmarkResult({
               success: false,
@@ -421,9 +508,9 @@ export async function runFullPriceUpdate(options = {}) {
 
 /**
  * @description Retry specific failed items from a previous scrape run.
- * Launches a browser and retries each failed investment and benchmark
- * individually. Currency rates are re-fetched as a whole (the API call
- * is cheap since it fetches all currencies in one request).
+ * Uses the same price method (API or web scrape) as the initial run.
+ * Currency rates are re-fetched as a whole (the API call is cheap since
+ * it fetches all currencies in one request).
  *
  * @param {Object} failedItems - IDs of items to retry
  * @param {number[]} failedItems.investmentIds - Investment IDs to retry
@@ -448,6 +535,7 @@ export async function retryFailedItems(failedItems, options = {}) {
     process.env.SCRAPE_DELAY_PROFILE = delayProfile;
   }
 
+  const priceMethod = getPriceMethodConfig();
   const scrapeTime = new Date().toTimeString().slice(0, 8);
   const result = {
     currencySuccess: true,
@@ -474,76 +562,241 @@ export async function retryFailedItems(failedItems, options = {}) {
     // Retry failed investments
     const investmentIds = failedItems.investmentIds || [];
     if (investmentIds.length > 0) {
-      // Get the full investment objects for the failed IDs
-      const allInvestments = getScrapeableInvestments();
-      const investmentsToRetry = allInvestments.filter(function (inv) {
-        return investmentIds.includes(inv.id);
-      });
-
-      browser = await launchBrowser();
-      let previousDomain = "";
-
-      for (const investment of investmentsToRetry) {
-        const currentDomain = extractPriceDomain(investment.investment_url);
-        const delayMs = calculatePriceDelay(previousDomain, currentDomain);
-        if (delayMs > 0) {
-          await sleep(delayMs);
-        }
-
-        const priceResult = await scrapeSingleInvestmentPrice(investment, browser, {
-          scrapeTime: scrapeTime,
-          startedBy: startedBy,
-          attemptNumber: attemptNumber,
+      if (priceMethod === "api") {
+        // API mode: retry via Morningstar API (no browser needed)
+        const allInvestments = getMorningstarScrapeableInvestments();
+        const investmentsToRetry = allInvestments.filter(function (inv) {
+          return investmentIds.includes(inv.id);
         });
 
-        if (!priceResult.success) {
-          result.failedInvestmentIds.push(investment.id);
-        }
+        let isFirst = true;
+        for (const investment of investmentsToRetry) {
+          // Random delay of 5-30 seconds between API calls
+          if (!isFirst) {
+            const delayMs = Math.floor(Math.random() * 25001) + 5000;
+            await sleep(delayMs);
+          }
+          isFirst = false;
 
-        if (onRetryResult) {
-          onRetryResult("investment", investment.id, priceResult);
+          try {
+            const priceResult = await fetchLatestMorningstarPrice(investment);
+            if (priceResult.success) {
+              try {
+                recordScrapingAttempt({
+                  scrapeType: "investment",
+                  referenceId: investment.id,
+                  startedBy: startedBy,
+                  attemptNumber: attemptNumber,
+                  maxAttempts: options.maxAttempts || attemptNumber,
+                  success: true,
+                });
+              } catch (historyErr) {
+                console.warn("[ScrapeService] Failed to record retry history for investment " + investment.id + ": " + historyErr.message);
+              }
+            } else {
+              result.failedInvestmentIds.push(investment.id);
+              if (priceResult.errorCode !== "MANUALLY_PRICED") {
+                try {
+                  recordScrapingAttempt({
+                    scrapeType: "investment",
+                    referenceId: investment.id,
+                    startedBy: startedBy,
+                    attemptNumber: attemptNumber,
+                    maxAttempts: options.maxAttempts || attemptNumber,
+                    success: false,
+                    errorCode: priceResult.errorCode,
+                    errorMessage: priceResult.error,
+                  });
+                } catch (historyErr) {
+                  console.warn("[ScrapeService] Failed to record retry history for investment " + investment.id + ": " + historyErr.message);
+                }
+              }
+            }
+            if (onRetryResult) {
+              onRetryResult("investment", investment.id, priceResult);
+            }
+          } catch (err) {
+            result.failedInvestmentIds.push(investment.id);
+            try {
+              recordScrapingAttempt({
+                scrapeType: "investment",
+                referenceId: investment.id,
+                startedBy: startedBy,
+                attemptNumber: attemptNumber,
+                maxAttempts: options.maxAttempts || attemptNumber,
+                success: false,
+                errorCode: "API_ERROR",
+                errorMessage: err.message,
+              });
+            } catch (historyErr) {
+              console.warn("[ScrapeService] Failed to record retry history for investment " + investment.id + ": " + historyErr.message);
+            }
+            if (onRetryResult) {
+              onRetryResult("investment", investment.id, {
+                success: false,
+                investmentId: investment.id,
+                description: investment.description,
+                error: "Unexpected error: " + err.message,
+                errorCode: "API_ERROR",
+              });
+            }
+          }
         }
+      } else {
+        // Web scrape mode: retry via Playwright browser
+        const allInvestments = getScrapeableInvestments();
+        const investmentsToRetry = allInvestments.filter(function (inv) {
+          return investmentIds.includes(inv.id);
+        });
 
-        previousDomain = currentDomain;
+        browser = await launchBrowser();
+        let previousDomain = "";
+
+        for (const investment of investmentsToRetry) {
+          const currentDomain = extractPriceDomain(investment.investment_url);
+          const delayMs = calculatePriceDelay(previousDomain, currentDomain);
+          if (delayMs > 0) {
+            await sleep(delayMs);
+          }
+
+          const priceResult = await scrapeSingleInvestmentPrice(investment, browser, {
+            scrapeTime: scrapeTime,
+            startedBy: startedBy,
+            attemptNumber: attemptNumber,
+          });
+
+          if (!priceResult.success) {
+            result.failedInvestmentIds.push(investment.id);
+          }
+
+          if (onRetryResult) {
+            onRetryResult("investment", investment.id, priceResult);
+          }
+
+          previousDomain = currentDomain;
+        }
       }
     }
 
     // Retry failed benchmarks
     const benchmarkIds = failedItems.benchmarkIds || [];
     if (benchmarkIds.length > 0) {
-      const allBenchmarks = getScrapeableBenchmarks();
-      const benchmarksToRetry = allBenchmarks.filter(function (bm) {
-        return benchmarkIds.includes(bm.id);
-      });
-
-      // Reuse browser if already launched
-      if (!browser) {
-        browser = await launchBrowser();
-      }
-      let previousDomain = "";
-
-      for (const benchmark of benchmarksToRetry) {
-        const currentDomain = extractBenchmarkDomain(benchmark.benchmark_url);
-        const delayMs = calculateBenchmarkDelay(previousDomain, currentDomain);
-        if (delayMs > 0) {
-          await sleep(delayMs);
-        }
-
-        const benchmarkResult = await scrapeSingleBenchmarkValue(benchmark, browser, {
-          scrapeTime: scrapeTime,
-          startedBy: startedBy,
-          attemptNumber: attemptNumber,
+      if (priceMethod === "api") {
+        // API mode: retry via Yahoo Finance API (no browser needed)
+        const allBenchmarks = getYahooScrapeableBenchmarks();
+        const benchmarksToRetry = allBenchmarks.filter(function (bm) {
+          return benchmarkIds.includes(bm.id);
         });
 
-        if (!benchmarkResult.success) {
-          result.failedBenchmarkIds.push(benchmark.id);
-        }
+        let isFirst = true;
+        for (const benchmark of benchmarksToRetry) {
+          // Random delay of 5-30 seconds between API calls
+          if (!isFirst) {
+            const delayMs = Math.floor(Math.random() * 25001) + 5000;
+            await sleep(delayMs);
+          }
+          isFirst = false;
 
-        if (onRetryResult) {
-          onRetryResult("benchmark", benchmark.id, benchmarkResult);
+          try {
+            const benchmarkResult = await fetchLatestYahooBenchmarkValue(benchmark);
+            if (benchmarkResult.success) {
+              try {
+                recordScrapingAttempt({
+                  scrapeType: "benchmark",
+                  referenceId: benchmark.id,
+                  startedBy: startedBy,
+                  attemptNumber: attemptNumber,
+                  maxAttempts: options.maxAttempts || attemptNumber,
+                  success: true,
+                });
+              } catch (historyErr) {
+                console.warn("[ScrapeService] Failed to record retry history for benchmark " + benchmark.id + ": " + historyErr.message);
+              }
+            } else {
+              result.failedBenchmarkIds.push(benchmark.id);
+              if (benchmarkResult.errorCode !== "NO_YAHOO_TICKER") {
+                try {
+                  recordScrapingAttempt({
+                    scrapeType: "benchmark",
+                    referenceId: benchmark.id,
+                    startedBy: startedBy,
+                    attemptNumber: attemptNumber,
+                    maxAttempts: options.maxAttempts || attemptNumber,
+                    success: false,
+                    errorCode: benchmarkResult.errorCode,
+                    errorMessage: benchmarkResult.error,
+                  });
+                } catch (historyErr) {
+                  console.warn("[ScrapeService] Failed to record retry history for benchmark " + benchmark.id + ": " + historyErr.message);
+                }
+              }
+            }
+            if (onRetryResult) {
+              onRetryResult("benchmark", benchmark.id, benchmarkResult);
+            }
+          } catch (err) {
+            result.failedBenchmarkIds.push(benchmark.id);
+            try {
+              recordScrapingAttempt({
+                scrapeType: "benchmark",
+                referenceId: benchmark.id,
+                startedBy: startedBy,
+                attemptNumber: attemptNumber,
+                maxAttempts: options.maxAttempts || attemptNumber,
+                success: false,
+                errorCode: "API_ERROR",
+                errorMessage: err.message,
+              });
+            } catch (historyErr) {
+              console.warn("[ScrapeService] Failed to record retry history for benchmark " + benchmark.id + ": " + historyErr.message);
+            }
+            if (onRetryResult) {
+              onRetryResult("benchmark", benchmark.id, {
+                success: false,
+                benchmarkId: benchmark.id,
+                description: benchmark.description,
+                error: "Unexpected error: " + err.message,
+                errorCode: "API_ERROR",
+              });
+            }
+          }
         }
+      } else {
+        // Web scrape mode: retry via Playwright browser
+        const allBenchmarks = getScrapeableBenchmarks();
+        const benchmarksToRetry = allBenchmarks.filter(function (bm) {
+          return benchmarkIds.includes(bm.id);
+        });
 
-        previousDomain = currentDomain;
+        // Reuse browser if already launched
+        if (!browser) {
+          browser = await launchBrowser();
+        }
+        let previousDomain = "";
+
+        for (const benchmark of benchmarksToRetry) {
+          const currentDomain = extractBenchmarkDomain(benchmark.benchmark_url);
+          const delayMs = calculateBenchmarkDelay(previousDomain, currentDomain);
+          if (delayMs > 0) {
+            await sleep(delayMs);
+          }
+
+          const benchmarkResult = await scrapeSingleBenchmarkValue(benchmark, browser, {
+            scrapeTime: scrapeTime,
+            startedBy: startedBy,
+            attemptNumber: attemptNumber,
+          });
+
+          if (!benchmarkResult.success) {
+            result.failedBenchmarkIds.push(benchmark.id);
+          }
+
+          if (onRetryResult) {
+            onRetryResult("benchmark", benchmark.id, benchmarkResult);
+          }
+
+          previousDomain = currentDomain;
+        }
       }
     }
   } finally {

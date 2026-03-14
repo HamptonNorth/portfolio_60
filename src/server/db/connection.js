@@ -603,6 +603,26 @@ function runMigrations(database) {
       )
     `);
   }
+
+  // Migration 23: Add scheduler_log table (v0.17.0)
+  // Timestamped log entries from the scheduled scraper for diagnostics.
+  const schedulerLogTable = database.query(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='scheduler_log'"
+  ).get();
+
+  if (!schedulerLogTable) {
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS scheduler_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        log_datetime TEXT NOT NULL,
+        level TEXT NOT NULL DEFAULT 'info' CHECK(level IN ('info', 'warn', 'error')),
+        message TEXT NOT NULL
+      )
+    `);
+    database.exec(
+      "CREATE INDEX IF NOT EXISTS idx_scheduler_log_datetime ON scheduler_log(log_datetime DESC)"
+    );
+  }
 }
 
 /**
