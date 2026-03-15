@@ -227,3 +227,11 @@ INSERT INTO other_assets (user_id, description, category, value_type, frequency,
 INSERT INTO report_params (param_key, param_value) VALUES
     ('USER1', 'BW'),
     ('USER2', 'AW');
+
+-- ============================================================================
+-- GLOBAL EVENTS
+-- Sample entries
+-- ============================================================================
+INSERT INTO global_events (event_date, description) VALUES
+    ('2025-04-01', 'US Tarrifs start'),
+    ('0206-03-01', 'Iran conflict');
