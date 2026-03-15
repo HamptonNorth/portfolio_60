@@ -2,6 +2,7 @@ import { PDF, rgb, StandardFonts, Standard14Font } from "@libpdf/core";
 import { getChartData } from "../services/chart-data-service.js";
 import { isTestMode } from "../test-mode.js";
 import { drawPageHeader, drawPageFooters } from "./pdf-common.js";
+import { buildFtMarketsUrl, buildMorningstarUrl } from "../../shared/public-id-utils.js";
 
 /**
  * @description A4 page dimensions in points.
@@ -31,6 +32,7 @@ const COLOURS = {
   white: rgb(1, 1, 1),
   gridLine: rgb(0.9, 0.9, 0.9),
   zeroLine: rgb(0.75, 0.75, 0.75),
+  linkBlue: rgb(0.05, 0.27, 0.63),
 };
 
 /**
@@ -365,16 +367,55 @@ function drawLegendRow(page, items, displayLabels, startX, legendY) {
     }
 
     x += boxSize + 3;
+
+    // Investment labels: blue text with clickable research links
+    var hasAnyLink = !item.isBenchmark && (item.publicId || item.morningstarId);
+    var textColour = hasAnyLink ? COLOURS.linkBlue : COLOURS.brand800;
+
     page.drawText(label, {
       x: x,
       y: legendY + 1,
       font: StandardFonts.Helvetica,
       size: FONT_SIZE_LEGEND,
-      color: COLOURS.brand800,
+      color: textColour,
     });
 
     var font = Standard14Font.of(StandardFonts.Helvetica);
     var textWidth = font.widthOfTextAtSize(label, FONT_SIZE_LEGEND);
+
+    // Add clickable link annotations for investment research pages
+    if (hasAnyLink) {
+      var ftLinkUrl = item.publicId ? buildFtMarketsUrl(item.publicId, item.currencyCode) : null;
+      var msLinkUrl = item.morningstarId ? buildMorningstarUrl(item.morningstarId) : null;
+
+      if (ftLinkUrl && msLinkUrl) {
+        // Both links: FT Markets on left half of label, Morningstar on right half
+        var halfWidth = textWidth / 2;
+        page.addLinkAnnotation({
+          rect: { x: x, y: legendY - 1, width: halfWidth, height: FONT_SIZE_LEGEND + 3 },
+          uri: ftLinkUrl,
+          borderWidth: 0,
+        });
+        page.addLinkAnnotation({
+          rect: { x: x + halfWidth, y: legendY - 1, width: halfWidth, height: FONT_SIZE_LEGEND + 3 },
+          uri: msLinkUrl,
+          borderWidth: 0,
+        });
+      } else if (ftLinkUrl) {
+        page.addLinkAnnotation({
+          rect: { x: x, y: legendY - 1, width: textWidth, height: FONT_SIZE_LEGEND + 3 },
+          uri: ftLinkUrl,
+          borderWidth: 0,
+        });
+      } else if (msLinkUrl) {
+        page.addLinkAnnotation({
+          rect: { x: x, y: legendY - 1, width: textWidth, height: FONT_SIZE_LEGEND + 3 },
+          uri: msLinkUrl,
+          borderWidth: 0,
+        });
+      }
+    }
+
     x += textWidth + gap;
   }
 }
@@ -405,6 +446,9 @@ function drawLegend(page, series, startX, y, availableWidth) {
       colour: LINE_COLOURS[i % LINE_COLOURS.length],
       isBenchmark: series[i].type === "benchmark",
       seriesIndex: i,
+      publicId: series[i].publicId || null,
+      morningstarId: series[i].morningstarId || null,
+      currencyCode: series[i].currencyCode || null,
     };
     if (item.isBenchmark) {
       benchmarks.push(item);

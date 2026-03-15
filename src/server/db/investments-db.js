@@ -16,6 +16,7 @@ export function getAllInvestments() {
         i.investment_type_id,
         i.description,
         i.public_id,
+        i.morningstar_id,
         i.investment_url,
         i.selector,
         i.auto_fetch,
@@ -47,6 +48,7 @@ export function getInvestmentById(id) {
         i.investment_type_id,
         i.description,
         i.public_id,
+        i.morningstar_id,
         i.investment_url,
         i.selector,
         i.auto_fetch,
@@ -131,7 +133,7 @@ export function getInvestmentByPublicId(publicId) {
   const db = getDatabase();
   return db
     .query(
-      `SELECT i.id, i.description, i.public_id, i.currencies_id, c.code AS currency_code
+      `SELECT i.id, i.description, i.public_id, i.morningstar_id, i.currencies_id, c.code AS currency_code
        FROM investments i
        JOIN currencies c ON i.currencies_id = c.id
        WHERE i.public_id = ?`,

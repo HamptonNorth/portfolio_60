@@ -3,6 +3,7 @@ import { getPortfolioDetail } from "../services/portfolio-detail-service.js";
 import { getReportParams } from "../db/report-params-db.js";
 import { isTestMode } from "../test-mode.js";
 import { drawPageHeader, drawPageFooters } from "./pdf-common.js";
+import { buildFtMarketsUrl, buildMorningstarUrl } from "../../shared/public-id-utils.js";
 
 /**
  * @description Brand colours converted to RGB 0-1 range for PDF rendering.
@@ -20,6 +21,7 @@ const COLOURS = {
   green100: rgb(0.86, 0.94, 0.87),
   green700: rgb(0.09, 0.46, 0.2),
   red600: rgb(0.86, 0.15, 0.15),
+  linkBlue: rgb(0.05, 0.27, 0.63),
 };
 
 /** @description A4 landscape page dimensions in points */
@@ -422,6 +424,12 @@ export function renderPortfolioDetailBlock(ctx, params) {
           fontName = StandardFonts.HelveticaBold;
         }
 
+        // Investment name: blue text with clickable research links
+        var isInvestmentLink = colDef.key === "investment" && (holding.public_id || holding.morningstar_id);
+        if (isInvestmentLink) {
+          cellColour = COLOURS.linkBlue;
+        }
+
         cellText = truncateText(cellText, fontName, FONT_SIZE_ROW, colDef.width - 4);
 
         if (colDef.align === "right") {
@@ -437,6 +445,42 @@ export function renderPortfolioDetailBlock(ctx, params) {
             size: FONT_SIZE_ROW,
             color: cellColour,
           });
+
+          // Add clickable link annotations for investment research pages
+          if (isInvestmentLink) {
+            var ftLinkUrl = holding.public_id ? buildFtMarketsUrl(holding.public_id, holding.currency_code) : null;
+            var msLinkUrl = holding.morningstar_id ? buildMorningstarUrl(holding.morningstar_id) : null;
+            var cellFont = Standard14Font.of(fontName);
+            var cellTextWidth = cellFont.widthOfTextAtSize(cellText, FONT_SIZE_ROW);
+            var linkX = MARGIN_LEFT + colDef.x + 2;
+
+            if (ftLinkUrl && msLinkUrl) {
+              // Both links: FT Markets on left half, Morningstar on right half
+              var halfW = cellTextWidth / 2;
+              page.addLinkAnnotation({
+                rect: { x: linkX, y: textY - 1, width: halfW, height: FONT_SIZE_ROW + 3 },
+                uri: ftLinkUrl,
+                borderWidth: 0,
+              });
+              page.addLinkAnnotation({
+                rect: { x: linkX + halfW, y: textY - 1, width: halfW, height: FONT_SIZE_ROW + 3 },
+                uri: msLinkUrl,
+                borderWidth: 0,
+              });
+            } else if (ftLinkUrl) {
+              page.addLinkAnnotation({
+                rect: { x: linkX, y: textY - 1, width: cellTextWidth, height: FONT_SIZE_ROW + 3 },
+                uri: ftLinkUrl,
+                borderWidth: 0,
+              });
+            } else if (msLinkUrl) {
+              page.addLinkAnnotation({
+                rect: { x: linkX, y: textY - 1, width: cellTextWidth, height: FONT_SIZE_ROW + 3 },
+                uri: msLinkUrl,
+                borderWidth: 0,
+              });
+            }
+          }
         }
       }
 

@@ -110,6 +110,9 @@ function buildInvestmentSeries(publicId, fromStr, toStr, sampleDates) {
   return {
     label: inv.description,
     type: "investment",
+    publicId: inv.public_id || null,
+    morningstarId: inv.morningstar_id || null,
+    currencyCode: inv.currency_code || null,
     values: rebased,
   };
 }

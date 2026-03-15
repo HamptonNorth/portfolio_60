@@ -18,6 +18,7 @@ export function getHoldingsByAccountId(accountId) {
         h.average_cost,
         i.description AS investment_description,
         i.public_id AS investment_public_id,
+        i.morningstar_id AS investment_morningstar_id,
         c.code AS currency_code,
         c.description AS currency_description
       FROM holdings h
@@ -48,6 +49,7 @@ export function getHoldingById(id) {
         h.average_cost,
         i.description AS investment_description,
         i.public_id AS investment_public_id,
+        i.morningstar_id AS investment_morningstar_id,
         c.code AS currency_code,
         c.description AS currency_description
       FROM holdings h
@@ -154,6 +156,7 @@ function unscaleHoldingRow(row) {
     average_cost_scaled: row.average_cost,
     investment_description: row.investment_description,
     investment_public_id: row.investment_public_id,
+    investment_morningstar_id: row.investment_morningstar_id || null,
     currency_code: row.currency_code,
     currency_description: row.currency_description,
   };

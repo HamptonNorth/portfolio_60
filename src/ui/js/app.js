@@ -218,6 +218,101 @@ function escapeHtml(text) {
 }
 
 /**
+ * @description Build an FT Markets research URL for a given public_id and currency code.
+ * Returns null if the publicId is not recognised or empty.
+ * @param {string} publicId - ISIN, Exchange:Ticker, or Ticker:Exchange:Currency
+ * @param {string} currencyCode - 3-letter currency code (e.g. "GBP")
+ * @returns {string|null} The FT Markets tearsheet URL, or null
+ */
+function buildFtMarketsUrl(publicId, currencyCode) {
+  if (!publicId || typeof publicId !== "string") return null;
+  var trimmed = publicId.trim().toUpperCase();
+  if (!trimmed) return null;
+
+  // ISIN: 2 uppercase letters + 10 alphanumeric
+  if (/^[A-Z]{2}[A-Z0-9]{10}$/.test(trimmed)) {
+    if (!currencyCode) return null;
+    return "https://markets.ft.com/data/funds/tearsheet/summary?s=" + trimmed + ":" + currencyCode.trim().toUpperCase();
+  }
+
+  // ETF: TICKER:EXCHANGE:CURRENCY (two colons)
+  if (/^[A-Z0-9.]{1,10}:[A-Z]{1,10}:[A-Z]{3}$/.test(trimmed)) {
+    return "https://markets.ft.com/data/etfs/tearsheet/summary?s=" + trimmed;
+  }
+
+  // Ticker: EXCHANGE:TICKER (one colon)
+  if (/^[A-Z]{1,10}:[A-Z0-9.]{1,10}$/.test(trimmed)) {
+    var parts = trimmed.split(":");
+    return "https://markets.ft.com/data/equities/tearsheet/summary?s=" + parts[1] + ":" + parts[0];
+  }
+
+  return null;
+}
+
+/**
+ * @description Build research link HTML for an investment description. If both
+ * FT Markets and Morningstar URLs are available, renders a hover tooltip with
+ * both links. If only one is available, renders a direct link. If neither,
+ * returns the plain escaped description text.
+ * @param {string} description - The investment description text
+ * @param {string|null} publicId - ISIN, Exchange:Ticker, or ETF code
+ * @param {string|null} currencyCode - 3-letter currency code
+ * @param {string|null} morningstarId - Cached morningstar_id (secId|universe)
+ * @param {Object} [options] - Optional settings
+ * @param {boolean} [options.stopPropagation] - Add onclick="event.stopPropagation()" to links
+ * @returns {string} HTML string for the research link(s)
+ */
+function buildResearchLinkHtml(description, publicId, currencyCode, morningstarId, options) {
+  var escaped = escapeHtml(description);
+  var ftUrl = buildFtMarketsUrl(publicId, currencyCode);
+  var msUrl = buildMorningstarUrl(morningstarId);
+  var stopClick = (options && options.stopPropagation) ? ' onclick="event.stopPropagation()"' : "";
+
+  if (ftUrl && msUrl) {
+    // Both links available — show hover tooltip with both options
+    var html = '<span class="relative inline-block research-link-wrapper"' + stopClick + ">";
+    html += '<span class="text-blue-700 cursor-pointer hover:underline">' + escaped + "</span>";
+    html += '<div class="research-link-tooltip hidden absolute left-0 top-full z-50 mt-0.5 bg-white border border-brand-200 rounded shadow-lg py-1 min-w-[180px]">';
+    html += '<a href="' + escapeHtml(ftUrl) + '" target="_blank" rel="noopener" class="block px-3 py-1.5 text-sm text-blue-700 hover:bg-brand-50 hover:underline"' + stopClick + ">FT Markets</a>";
+    html += '<a href="' + escapeHtml(msUrl) + '" target="_blank" rel="noopener" class="block px-3 py-1.5 text-sm text-blue-700 hover:bg-brand-50 hover:underline"' + stopClick + ">Morningstar</a>";
+    html += "</div></span>";
+    return html;
+  }
+
+  if (ftUrl) {
+    return '<a href="' + escapeHtml(ftUrl) + '" target="_blank" rel="noopener" class="text-blue-700 hover:underline" title="Open FT Markets research page"' + stopClick + ">" + escaped + "</a>";
+  }
+
+  if (msUrl) {
+    return '<a href="' + escapeHtml(msUrl) + '" target="_blank" rel="noopener" class="text-blue-700 hover:underline" title="Open Morningstar research page"' + stopClick + ">" + escaped + "</a>";
+  }
+
+  return escaped;
+}
+
+/**
+ * @description Build a Morningstar UK research page URL from a cached morningstar_id.
+ * The morningstar_id is stored as "secId|universe" (e.g. "0P0000X3IO|FOGBR$$ALL").
+ * The universe prefix determines the page category (funds, etf, or stocks).
+ * @param {string} morningstarId - The cached morningstar_id (format "secId|universe")
+ * @returns {string|null} The Morningstar research URL, or null if input is invalid
+ */
+function buildMorningstarUrl(morningstarId) {
+  if (!morningstarId || typeof morningstarId !== "string") return null;
+  var parts = morningstarId.split("|");
+  var secId = parts[0].trim();
+  if (!secId) return null;
+  var universe = (parts[1] || "").trim();
+  var category = "funds";
+  if (universe.substring(0, 2) === "FE") {
+    category = "etf";
+  } else if (universe.substring(0, 2) === "E0") {
+    category = "stocks";
+  }
+  return "https://www.morningstar.co.uk/uk/" + category + "/snapshot/snapshot.aspx?id=" + secId;
+}
+
+/**
  * @description Create a line-numbered editor wrapper around a textarea.
  * Adds a line-number gutter on the left that scrolls in sync with the textarea.
  * Call this after the textarea is in the DOM.

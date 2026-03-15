@@ -365,7 +365,8 @@ async function loadInvestments() {
 
     html += '<tr data-id="' + inv.id + '" class="' + rowClass + ' border-b border-brand-100 hover:bg-brand-100 transition-colors cursor-pointer" ondblclick="viewInvestment(' + inv.id + ')">';
     const manualBadge = inv.auto_fetch === 0 ? ' <span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">Manually Priced</span>' : "";
-    html += '<td class="py-3 px-3 text-base">' + escapeHtml(inv.description) + manualBadge + "</td>";
+    var descriptionLink = buildResearchLinkHtml(inv.description, inv.public_id, inv.currency_code, inv.morningstar_id, { stopPropagation: true });
+    html += '<td class="py-3 px-3 text-base">' + descriptionLink + manualBadge + "</td>";
     html += '<td class="py-3 px-3 text-base">' + escapeHtml(getTypeDisplayName(inv.type_short, inv.type_description)) + "</td>";
     html += '<td class="py-3 px-3 text-base">' + escapeHtml(inv.currency_code) + "</td>";
     if (inv.public_id) {

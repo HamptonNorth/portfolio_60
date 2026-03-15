@@ -234,6 +234,8 @@ export function getPortfolioDetail(userInitials, accountType, periods) {
     holdingDetails.push({
       investment_id: holding.investment_id,
       description: holding.investment_description,
+      public_id: holding.investment_public_id || null,
+      morningstar_id: holding.investment_morningstar_id || null,
       currency_code: currencyCode,
       currency_symbol: currencySymbol,
       quantity: holding.quantity,

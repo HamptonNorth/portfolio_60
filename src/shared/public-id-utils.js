@@ -259,6 +259,40 @@ export function getFtMarketsSelector() {
 }
 
 /**
+ * @description Build a Morningstar UK research page URL from a cached morningstar_id.
+ * The morningstar_id is stored as "secId|universe" (e.g. "0P0000X3IO|FOGBR$$ALL").
+ * The universe prefix determines the page category:
+ *   - "FO" prefix → open-end funds → /uk/funds/snapshot/snapshot.aspx
+ *   - "FE" prefix → ETFs → /uk/etf/snapshot/snapshot.aspx
+ *   - "E0" prefix → equities → /uk/stocks/snapshot/snapshot.aspx
+ *   - Other/unknown → defaults to funds page
+ *
+ * @param {string} morningstarId - The cached morningstar_id (format "secId|universe")
+ * @returns {string|null} The Morningstar research URL, or null if input is invalid
+ */
+export function buildMorningstarUrl(morningstarId) {
+  if (!morningstarId || typeof morningstarId !== "string") {
+    return null;
+  }
+
+  var parts = morningstarId.split("|");
+  var secId = parts[0].trim();
+  if (!secId) return null;
+
+  var universe = (parts[1] || "").trim();
+
+  // Determine the page category from the universe prefix
+  var category = "funds";
+  if (universe.substring(0, 2) === "FE") {
+    category = "etf";
+  } else if (universe.substring(0, 2) === "E0") {
+    category = "stocks";
+  }
+
+  return "https://www.morningstar.co.uk/uk/" + category + "/snapshot/snapshot.aspx?id=" + secId;
+}
+
+/**
  * @description Build a Fidelity UK search URL for a given ISIN code.
  * Used as the first step in the Fidelity fallback: search by ISIN to discover
  * the factsheet URL, then scrape the price from the factsheet page.

@@ -342,12 +342,13 @@ function renderDetailHoldings(account) {
     html += "&#8942;"; // vertical ellipsis
     html += "</button></td>";
 
-    // Investment: public_id on line 1, name on line 2
+    // Investment: public_id on line 1, name on line 2 (linked to research page(s) if possible)
+    var descriptionLink = buildResearchLinkHtml(h.description, h.public_id, h.currency_code, h.morningstar_id);
     html += '<td class="py-2 px-3">';
     if (publicIdText) {
       html += '<div class="text-sm font-medium text-brand-500">' + escapeHtml(publicIdText) + "</div>";
     }
-    html += '<div class="text-base">' + escapeHtml(h.description) + "</div>";
+    html += '<div class="text-base">' + descriptionLink + "</div>";
     if (priceDate) {
       html += '<div class="text-xs text-brand-400">Price date: ' + formatDateUK(priceDate) + "</div>";
     }
@@ -809,7 +810,8 @@ async function loadHoldings() {
     const publicIdText = h.investment_public_id ? " (" + h.investment_public_id + ")" : "";
 
     html += '<tr class="' + rowClass + ' border-b border-brand-100 hover:bg-brand-100 transition-colors">';
-    html += '<td class="py-3 px-3 text-base">' + escapeHtml(h.investment_description) + '<span class="text-brand-400 text-sm">' + escapeHtml(publicIdText) + "</span></td>";
+    var holdingDescLink = buildResearchLinkHtml(h.investment_description, h.investment_public_id, h.currency_code, h.investment_morningstar_id);
+    html += '<td class="py-3 px-3 text-base">' + holdingDescLink + '<span class="text-brand-400 text-sm">' + escapeHtml(publicIdText) + "</span></td>";
     html += '<td class="py-3 px-3 text-base">' + escapeHtml(h.currency_code) + "</td>";
     html += '<td class="py-3 px-3 text-base text-right font-mono">' + formatQuantity(h.quantity) + "</td>";
     html += '<td class="py-3 px-3 text-base text-right font-mono">' + formatPrice(h.average_cost) + "</td>";

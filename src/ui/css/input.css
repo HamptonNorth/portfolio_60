@@ -44,6 +44,12 @@
 /* Responsive container for embedded Google Sheets / Excel Online iframes.
    Uses viewport height minus navbar (~64px), heading+padding (~88px),
    and footer (~52px) to fill available space. */
+/* Research link tooltip — appears on hover over investment descriptions
+   that have both FT Markets and Morningstar research URLs available. */
+.research-link-wrapper:hover .research-link-tooltip {
+    display: block;
+}
+
 .responsive-sheet-container {
     height: calc(100vh - 210px);
     min-height: 400px;
