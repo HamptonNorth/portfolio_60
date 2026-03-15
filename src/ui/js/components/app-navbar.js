@@ -60,7 +60,7 @@ class AppNavbar extends LitElement {
             <li class="relative group">
               <span class="hover:text-brand-200 transition-colors cursor-pointer select-none" data-nav-parent="reports">Reports <span class="text-xs">&#9662;</span></span>
               <div class="hidden group-hover:block absolute left-0 top-full pt-1 z-50">
-                <div class="bg-white text-brand-800 rounded-md shadow-lg border border-brand-200 py-1 min-w-48" id="nav-reports-dropdown">
+                <div class="bg-white text-brand-800 rounded-md shadow-lg border border-brand-200 py-1 min-w-72 max-w-80" id="nav-reports-dropdown">
                 </div>
               </div>
             </li>
@@ -245,9 +245,10 @@ class AppNavbar extends LitElement {
         }
 
         link.setAttribute("target", "_blank");
-        link.className = "block px-4 py-2 hover:bg-brand-50 transition-colors text-brand-600";
+        link.className = "block px-4 py-2 hover:bg-brand-50 transition-colors text-brand-600 truncate";
         link.setAttribute("data-nav", "report-" + report.id);
         link.textContent = report.title;
+        link.setAttribute("title", report.title);
         dropdown.appendChild(link);
       }
     } catch (err) {

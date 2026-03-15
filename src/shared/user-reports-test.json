@@ -1,35 +1,185 @@
 [
   {
-    "id": "pdf_household_assets",
-    "title": "Household Assets",
+    "id": "ex1_household_assets",
+    "title": "Example 1: Household Assets",
     "pdfEndpoint": "/api/reports/pdf/household-assets",
     "params": []
   },
   {
-    "id": "pdf_portfolio_summary",
-    "title": "Portfolio Summary",
+    "id": "ex2_portfolio_summary",
+    "title": "Example 2: Portfolio Summary",
     "pdfEndpoint": "/api/reports/pdf/portfolio-summary",
     "params": ["USER2", "USER1", "USER2 + USER1"]
   },
   {
-    "id": "pdf_portfolio_detail",
-    "title": "Portfolio Detail",
+    "id": "ex3_portfolio_detail",
+    "title": "Example 3: Portfolio Detail",
+    "pdfEndpoint": "/api/reports/pdf/portfolio-detail",
+    "params": [
+      "USER1:ISA:1m,3m,1y",
+      "USER1:sipp:1m,3m,1y",
+      "USER1:trading:1m,3m,1y"
+    ]
+  },
+  {
+    "id": "ex3b_detail_with_page_break",
+    "title": "Example 3b: Detail with Page Break",
     "pdfEndpoint": "/api/reports/pdf/portfolio-detail",
     "params": [
       "USER2:ISA:1m,3m,1y,3y",
       "USER2:sipp:1m,3m,1y,3y",
-      "USER2:trading:1m,3m,1y,3y",
       "USER2:isa+sipp+trading:1m,3m,1y,3y",
       "new_page",
       "USER1:ISA:1m,3m,1y,3y",
       "USER1:sipp:1m,3m,1y,3y",
-      "USER1:trading:1m,3m,1y,3y",
       "USER1:isa+sipp+trading:1m,3m,1y,3y"
     ]
   },
   {
-    "id": "weekly_pdf",
-    "title": "Weekly Report",
+    "id": "ex4_single_chart",
+    "title": "Example 4: Performance Chart",
+    "subTitle": "12 month performance versus FTSE 100",
+    "pdfEndpoint": "/api/reports/pdf/chart",
+    "monthsToShow": "12",
+    "smooth": true,
+    "params": [
+      "inv:GB00B41YBW71",
+      "inv:GB00B4PQW151",
+      "bm:FTSE 100"
+    ]
+  },
+  {
+    "id": "ex4b_chart_with_events",
+    "title": "Example 4b: Chart with Global Events",
+    "subTitle": "36 month performance versus FTSE 100 and S&P 500",
+    "pdfEndpoint": "/api/reports/pdf/chart",
+    "monthsToShow": "36",
+    "smooth": true,
+    "showGlobalEvents": true,
+    "params": [
+      "inv:GB00B41YBW71",
+      "inv:GB00B4PQW151",
+      "inv:GB00BD3RZ582",
+      "inv:LSE:RR.",
+      "inv:NSQ:NVDA",
+      "inv:AEX:ASML",
+      "bm:FTSE 100",
+      "bm:S&P 500"
+    ]
+  },
+  {
+    "id": "ex5_chart_group_2",
+    "title": "Example 5: Two Charts (portrait)",
+    "pdfEndpoint": "/api/reports/pdf/chart-group",
+    "charts": [
+      {
+        "title": "Key Funds",
+        "subTitle": "36 month performance",
+        "monthsToShow": "36",
+        "smooth": true,
+        "params": [
+          "inv:GB00B41YBW71",
+          "inv:GB00B4PQW151",
+          "bm:FTSE 100"
+        ]
+      },
+      {
+        "title": "Key Funds",
+        "subTitle": "12 month performance",
+        "monthsToShow": "12",
+        "smooth": true,
+        "params": [
+          "inv:GB00B41YBW71",
+          "inv:GB00B4PQW151",
+          "bm:FTSE 100"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "ex5b_chart_group_4",
+    "title": "Example 5b: Four Charts (landscape grid)",
+    "pdfEndpoint": "/api/reports/pdf/chart-group",
+    "charts": [
+      {
+        "title": "UK Funds",
+        "subTitle": "36 month performance",
+        "monthsToShow": "36",
+        "smooth": true,
+        "params": [
+          "inv:GB00B41YBW71",
+          "inv:GB00B4PQW151",
+          "inv:GB00BD3RZ582",
+          "bm:FTSE 100",
+          "bm:FTSE 250"
+        ]
+      },
+      {
+        "title": "UK Funds",
+        "subTitle": "12 month performance",
+        "monthsToShow": "12",
+        "smooth": true,
+        "params": [
+          "inv:GB00B41YBW71",
+          "inv:GB00B4PQW151",
+          "inv:GB00BD3RZ582",
+          "bm:FTSE 100",
+          "bm:FTSE 250"
+        ]
+      },
+      {
+        "title": "UK Shares",
+        "subTitle": "36 month performance",
+        "monthsToShow": "36",
+        "smooth": true,
+        "params": [
+          "inv:LSE:RR.",
+          "inv:LSE:BA.",
+          "inv:LSE:AZN",
+          "inv:LSE:SHEL",
+          "bm:FTSE 100"
+        ]
+      },
+      {
+        "title": "UK Shares",
+        "subTitle": "12 month performance",
+        "monthsToShow": "12",
+        "smooth": true,
+        "params": [
+          "inv:LSE:RR.",
+          "inv:LSE:BA.",
+          "inv:LSE:AZN",
+          "inv:LSE:SHEL",
+          "bm:FTSE 100"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "ex6_simple_composite",
+    "title": "Example 6: Simple Composite (2 pages)",
+    "blocks": [
+      {
+        "type": "portfolio_summary",
+        "params": ["USER2", "USER1", "USER2 + USER1"]
+      },
+      {
+        "type": "chart",
+        "title": "Fund Performance",
+        "subTitle": "12 month trend",
+        "monthsToShow": "12",
+        "smooth": true,
+        "params": [
+          "inv:GB00B41YBW71",
+          "inv:GB00B4PQW151",
+          "bm:FTSE 100"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "ex7_weekly_report",
+    "title": "Example 7: Weekly Report (6 pages)",
     "blocks": [
       { "type": "household_assets" },
       {
@@ -53,27 +203,51 @@
           "USER1:trading:1m,3m,1y,3y",
           "USER1:isa+sipp+trading:1m,3m,1y,3y"
         ]
+      },
+      {
+        "type": "chart",
+        "title": "UK Funds & Shares",
+        "subTitle": "36 month performance versus FTSE 100 and S&P 500",
+        "monthsToShow": "36",
+        "smooth": true,
+        "showGlobalEvents": true,
+        "params": [
+          "inv:GB00B41YBW71",
+          "inv:GB00B4PQW151",
+          "inv:LSE:RR.",
+          "bm:FTSE 100",
+          "bm:S&P 500"
+        ]
+      },
+      {
+        "type": "chart_group",
+        "charts": [
+          {
+            "title": "Key Funds",
+            "subTitle": "12 month trend",
+            "monthsToShow": "12",
+            "smooth": true,
+            "params": [
+              "inv:GB00B41YBW71",
+              "inv:GB00B4PQW151",
+              "inv:GB00BD3RZ582",
+              "bm:FTSE 100"
+            ]
+          },
+          {
+            "title": "Key Funds",
+            "subTitle": "6 month trend",
+            "monthsToShow": "6",
+            "smooth": true,
+            "params": [
+              "inv:GB00B41YBW71",
+              "inv:GB00B4PQW151",
+              "inv:GB00BD3RZ582",
+              "bm:FTSE 100"
+            ]
+          }
+        ]
       }
-    ]
-  },
-  {
-    "id": "chart_uk_funds",
-    "title": "UK Funds & Shares Performance",
-    "subTitle": "36 month performance versus FTSE 100 and S&P 500",
-    "pdfEndpoint": "/api/reports/pdf/chart",
-    "fromMonthsAgo": "0",
-    "monthsToShow": "36",
-    "smooth": true,
-    "showGlobalEvents": true,
-    "params": [
-      "inv:GB00B41YBW71",
-      "inv:GB00B4PQW151",
-      "inv:GB00BD3RZ582",
-      "inv:LSE:RR.",
-      "inv:NSQ:NVDA",
-      "inv:AEX:ASML",
-      "bm:FTSE 100",
-      "bm:S&P 500"
     ]
   }
 ]

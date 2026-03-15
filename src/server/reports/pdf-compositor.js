@@ -3,7 +3,7 @@ import { drawPageHeader, drawPageFooters } from "./pdf-common.js";
 import { renderHouseholdAssetsBlock } from "./pdf-household-assets.js";
 import { renderPortfolioSummaryBlock } from "./pdf-portfolio-summary.js";
 import { renderPortfolioDetailBlock } from "./pdf-portfolio-detail.js";
-import { renderChartBlock } from "./pdf-chart.js";
+import { renderChartBlock, renderChartGroupBlock, getChartGroupLayout } from "./pdf-chart.js";
 
 /**
  * @description Block type registry mapping type names to their renderer
@@ -39,6 +39,10 @@ const BLOCK_TYPES = {
     orientation: "landscape",
     pageHeight: 595.28,
     usableWidth: 761.89,
+  },
+  chart_group: {
+    render: renderChartGroupBlock,
+    getLayout: getChartGroupLayout,
   },
 };
 
@@ -90,13 +94,16 @@ export async function generateCompositePdf(reportDef) {
       continue;
     }
 
+    // Determine layout — static for most block types, dynamic for chart_group
+    var layout = blockType.getLayout ? blockType.getLayout(block) : blockType;
+
     // Start a new page for each block with the correct orientation
-    var page = pdf.addPage({ size: "a4", orientation: blockType.orientation });
+    var page = pdf.addPage({ size: "a4", orientation: layout.orientation });
     pages.push(page);
-    pageWidths.push(blockType.usableWidth);
+    pageWidths.push(layout.usableWidth);
 
     // Draw page header and get starting y position
-    var y = drawPageHeader(pdf, page, MARGIN_LEFT, blockType.pageHeight, MARGIN_TOP);
+    var y = drawPageHeader(pdf, page, MARGIN_LEFT, layout.pageHeight, MARGIN_TOP);
 
     // Build context for the block renderer
     var ctx = {

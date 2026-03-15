@@ -58,7 +58,7 @@
   },
   {
     "id": "chart_uk_funds",
-    "title": "UK Investments Performance",
+    "title": "UK Investments Performance (1)",
     "subTitle": "36 month performance versus FTSE100, FTSE 250 and S&P World Index",
     "pdfEndpoint": "/api/reports/pdf/chart",
     "fromMonthsAgo": "0",
@@ -74,6 +74,174 @@
       "bm:FTSE 100",
       "bm:FTSE 250",
       "bm:S&P World Index"
+    ]
+  },
+  {
+    "id": "chart_group_uk_funds_4",
+    "title": "UK Funds Multi-Period (4)",
+    "pdfEndpoint": "/api/reports/pdf/chart-group",
+    "showGlobalEvents": false,
+    "charts": [
+      {
+        "title": "UK Funds 36m",
+        "subTitle": "36 month performance",
+        "monthsToShow": "36",
+        "smooth": true,
+        "params": [
+          "inv:GB00B2PLJQ03",
+          "inv:GB00B888FR33",
+          "inv:GB00B8F8YX59",
+          "inv:GB00B18B9X76",
+          "inv:ISF:LSE:GBX",
+          "bm:FTSE 100",
+          "bm:FTSE 250",
+          "bm:S&P World Index"
+        ]
+      },
+      {
+        "title": "UK Funds 24m",
+        "subTitle": "24 month performance",
+        "monthsToShow": "24",
+        "smooth": true,
+        "params": [
+          "inv:GB00B2PLJQ03",
+          "inv:GB00B888FR33",
+          "inv:GB00B8F8YX59",
+          "inv:GB00B18B9X76",
+          "inv:ISF:LSE:GBX",
+          "bm:FTSE 100",
+          "bm:FTSE 250",
+          "bm:S&P World Index"
+        ]
+      },
+      {
+        "title": "UK Funds 12m",
+        "subTitle": "12 month performance",
+        "monthsToShow": "12",
+        "smooth": true,
+        "params": [
+          "inv:GB00B2PLJQ03",
+          "inv:GB00B888FR33",
+          "inv:GB00B8F8YX59",
+          "inv:GB00B18B9X76",
+          "inv:ISF:LSE:GBX",
+          "bm:FTSE 100",
+          "bm:FTSE 250",
+          "bm:S&P World Index"
+        ]
+      },
+      {
+        "title": "UK Funds 6m",
+        "subTitle": "6 month performance",
+        "monthsToShow": "6",
+        "smooth": true,
+        "params": [
+          "inv:GB00B2PLJQ03",
+          "inv:GB00B888FR33",
+          "inv:GB00B8F8YX59",
+          "inv:GB00B18B9X76",
+          "inv:ISF:LSE:GBX",
+          "bm:FTSE 100",
+          "bm:FTSE 250",
+          "bm:S&P World Index"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "chart_group_uk_funds_3",
+    "title": "UK Funds Multi-Period (3)",
+    "showGlobalEvents": true,
+    "pdfEndpoint": "/api/reports/pdf/chart-group",
+    "charts": [
+      {
+        "title": "UK Funds 24m",
+        "subTitle": "24 month performance",
+        "monthsToShow": "24",
+        "smooth": true,
+        "params": [
+          "inv:GB00B2PLJQ03",
+          "inv:GB00B888FR33",
+          "inv:GB00B8F8YX59",
+          "inv:GB00B18B9X76",
+          "inv:ISF:LSE:GBX",
+          "bm:FTSE 100",
+          "bm:FTSE 250",
+          "bm:S&P World Index"
+        ]
+      },
+      {
+        "title": "UK Funds 12m",
+        "subTitle": "12 month performance",
+        "monthsToShow": "12",
+        "smooth": true,
+        "params": [
+          "inv:GB00B2PLJQ03",
+          "inv:GB00B888FR33",
+          "inv:GB00B8F8YX59",
+          "inv:GB00B18B9X76",
+          "inv:ISF:LSE:GBX",
+          "bm:FTSE 100",
+          "bm:FTSE 250",
+          "bm:S&P World Index"
+        ]
+      },
+      {
+        "title": "UK Funds 6m",
+        "subTitle": "6 month performance",
+        "monthsToShow": "6",
+        "smooth": true,
+        "params": [
+          "inv:GB00B2PLJQ03",
+          "inv:GB00B888FR33",
+          "inv:GB00B8F8YX59",
+          "inv:GB00B18B9X76",
+          "inv:ISF:LSE:GBX",
+          "bm:FTSE 100",
+          "bm:FTSE 250",
+          "bm:S&P World Index"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "chart_group_uk_funds_2",
+    "title": "UK Funds Multi-Period (2)",
+    "showGlobalEvents": false,
+    "pdfEndpoint": "/api/reports/pdf/chart-group",
+    "charts": [
+      {
+        "title": "UK Funds 12m",
+        "subTitle": "12 month performance",
+        "monthsToShow": "12",
+        "smooth": true,
+        "params": [
+          "inv:GB00B2PLJQ03",
+          "inv:GB00B888FR33",
+          "inv:GB00B8F8YX59",
+          "inv:GB00B18B9X76",
+          "inv:ISF:LSE:GBX",
+          "bm:FTSE 100",
+          "bm:FTSE 250",
+          "bm:S&P World Index"
+        ]
+      },
+      {
+        "title": "UK Funds 6m",
+        "subTitle": "6 month performance",
+        "monthsToShow": "6",
+        "smooth": true,
+        "params": [
+          "inv:GB00B2PLJQ03",
+          "inv:GB00B888FR33",
+          "inv:GB00B8F8YX59",
+          "inv:GB00B18B9X76",
+          "inv:ISF:LSE:GBX",
+          "bm:FTSE 100",
+          "bm:FTSE 250",
+          "bm:S&P World Index"
+        ]
+      }
     ]
   }
 ]

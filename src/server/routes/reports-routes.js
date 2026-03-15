@@ -6,7 +6,7 @@ import { generateHouseholdAssetsPdf } from "../reports/pdf-household-assets.js";
 import { generatePortfolioSummaryPdf } from "../reports/pdf-portfolio-summary.js";
 import { generatePortfolioDetailPdf } from "../reports/pdf-portfolio-detail.js";
 import { generateCompositePdf } from "../reports/pdf-compositor.js";
-import { generateChartPdf } from "../reports/pdf-chart.js";
+import { generateChartPdf, generateChartGroupPdf } from "../reports/pdf-chart.js";
 import { isTestMode } from "../test-mode.js";
 
 /**
@@ -418,6 +418,50 @@ reportsRouter.get("/api/reports/pdf/chart", async function (request) {
   } catch (err) {
     return new Response(
       JSON.stringify({ error: "Failed to generate chart PDF", detail: err.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+});
+
+// GET /api/reports/pdf/chart-group — generate a multi-chart PDF (1-4 charts on one page).
+// Accepts the report ID as a query parameter (e.g. /api/reports/pdf/chart-group?id=multi_charts).
+// Layout depends on chart count: 1→landscape, 2→portrait stacked, 3-4→landscape 2×2 grid.
+reportsRouter.get("/api/reports/pdf/chart-group", async function (request) {
+  try {
+    const url = new URL(request.url);
+    const reportId = url.searchParams.get("id");
+
+    if (!reportId) {
+      return new Response(
+        JSON.stringify({ error: "Report ID is required (use ?id=...)" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    const reports = loadReportDefinitions();
+    const report = reports.find(function (r) {
+      return r.id === reportId;
+    });
+
+    if (!report) {
+      return new Response(
+        JSON.stringify({ error: "Report not found: " + reportId }),
+        { status: 404, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    const pdfBytes = await generateChartGroupPdf(report);
+    var filename = (report.id || "chart-group").replace(/[^a-z0-9_-]/gi, "-") + ".pdf";
+    return new Response(pdfBytes, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": 'inline; filename="' + filename + '"',
+      },
+    });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Failed to generate chart group PDF", detail: err.message }),
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }

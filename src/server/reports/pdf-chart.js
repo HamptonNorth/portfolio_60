@@ -4,16 +4,20 @@ import { isTestMode } from "../test-mode.js";
 import { drawPageHeader, drawPageFooters } from "./pdf-common.js";
 
 /**
- * @description A4 landscape page dimensions in points.
- * Charts default to landscape for maximum plot width.
+ * @description A4 page dimensions in points.
+ * Single charts default to landscape for maximum plot width.
+ * Chart groups may use portrait (2 charts stacked) or landscape (2×2 grid).
  */
 const A4_LANDSCAPE_WIDTH = 841.89;
 const A4_LANDSCAPE_HEIGHT = 595.28;
+const A4_PORTRAIT_WIDTH = 595.28;
+const A4_PORTRAIT_HEIGHT = 841.89;
 const MARGIN_LEFT = 40;
 const MARGIN_RIGHT = 40;
 const MARGIN_TOP = 40;
 const MARGIN_BOTTOM = 40;
 const USABLE_WIDTH = A4_LANDSCAPE_WIDTH - MARGIN_LEFT - MARGIN_RIGHT;
+const A4_PORTRAIT_USABLE_WIDTH = A4_PORTRAIT_WIDTH - MARGIN_LEFT - MARGIN_RIGHT;
 
 /**
  * @description Brand colours for chart elements.
@@ -63,7 +67,49 @@ const Y_AXIS_WIDTH = 45;
 const CHART_RIGHT_PAD = 10;
 
 /**
- * @description Render a performance comparison chart into a shared PDF context.
+ * @description Chart type renderer registry. Maps chartType names to their
+ * rendering functions. Each renderer accepts (ctx, params, blockDef) and
+ * draws one chart into the shared PDF context.
+ *
+ * When adding a new chart type, add a renderer function and register it here.
+ * The renderer must respect blockDef._bounds for multi-chart layouts.
+ * @type {Object<string, Function>}
+ */
+const CHART_RENDERERS = {
+  line: renderLineChart,
+};
+
+/**
+ * @description Dispatch a chart render to the appropriate renderer based on
+ * blockDef.chartType. Defaults to "line" (comparative line chart) when
+ * chartType is not specified. Unknown chart types are silently skipped.
+ * @param {Object} ctx - Shared rendering context
+ * @param {Array<string>} params - Params array (inv:ID or bm:DESC entries)
+ * @param {Object} [blockDef] - Block definition with optional chartType field
+ */
+export function renderChartBlock(ctx, params, blockDef) {
+  var chartType = (blockDef && blockDef.chartType) || "line";
+  var renderer = CHART_RENDERERS[chartType];
+
+  if (!renderer) {
+    // Unknown chart type — draw a message and skip
+    var page = ctx.page;
+    page.drawText("Unknown chart type: " + chartType, {
+      x: 40,
+      y: ctx.y - 14,
+      font: StandardFonts.Helvetica,
+      size: 10,
+      color: COLOURS.brand800,
+    });
+    ctx.y -= 30;
+    return;
+  }
+
+  renderer(ctx, params, blockDef);
+}
+
+/**
+ * @description Render a comparative line chart into a shared PDF context.
  * Draws title bar, subtitle, legend, axes, grid, and data lines.
  * Does not add footers — the caller is responsible for that.
  * @param {Object} ctx - Shared rendering context
@@ -75,10 +121,19 @@ const CHART_RIGHT_PAD = 10;
  * @param {Array<string>} params - Params array (inv:ID or bm:DESC entries)
  * @param {Object} [blockDef] - Optional block definition with title, subTitle, etc.
  */
-export function renderChartBlock(ctx, params, blockDef) {
+function renderLineChart(ctx, params, blockDef) {
   var pdf = ctx.pdf;
   var page = ctx.page;
   var y = ctx.y;
+
+  // Support bounded rendering for multi-chart layouts.
+  // _bounds overrides the module-level margin/width constants so that
+  // multiple charts can share a single page.
+  var bounds = (blockDef && blockDef._bounds) || null;
+  var areaLeft = bounds ? bounds.left : MARGIN_LEFT;
+  var areaWidth = bounds ? bounds.width : USABLE_WIDTH;
+  var areaBottom = bounds ? bounds.bottom : MARGIN_BOTTOM;
+  var footerClearance = bounds ? 5 : 20;
 
   // Build chart definition from blockDef + params
   var chartDef = {
@@ -95,7 +150,7 @@ export function renderChartBlock(ctx, params, blockDef) {
 
   if (!data.series || data.series.length === 0) {
     page.drawText(chartDef.title + " \u2014 no data available.", {
-      x: MARGIN_LEFT,
+      x: areaLeft,
       y: y - 14,
       font: StandardFonts.Helvetica,
       size: 14,
@@ -106,24 +161,29 @@ export function renderChartBlock(ctx, params, blockDef) {
   }
 
   // Calculate chart area
-  var chartLeft = MARGIN_LEFT + Y_AXIS_WIDTH;
-  var chartRight = MARGIN_LEFT + USABLE_WIDTH - CHART_RIGHT_PAD;
+  var chartLeft = areaLeft + Y_AXIS_WIDTH;
+  var chartRight = areaLeft + areaWidth - CHART_RIGHT_PAD;
   var chartWidth = chartRight - chartLeft;
 
-  // Reserve extra space below X-axis for event legend when events are present
+  // Reserve extra space below X-axis for event legend when events are present.
+  // In chart groups, the legend is drawn once at page level, so individual
+  // charts suppress the legend and don't reserve space for it.
   var hasEvents = data.events && data.events.length > 0;
-  var eventAreaHeight = hasEvents ? 24 : 0;
+  var suppressEventLegend = blockDef && blockDef._suppressEventLegend === true;
+  var eventAreaHeight = (hasEvents && !suppressEventLegend) ? 24 : 0;
 
   // Determine legend row count before calculating chart area
   var legendRows = calculateLegendRows(data.series);
   var legendHeight = legendRows * LEGEND_ROW_HEIGHT + LEGEND_PADDING;
 
   var chartTop = y - TITLE_BAR_HEIGHT - SUBTITLE_HEIGHT - legendHeight;
-  var chartBottom = MARGIN_BOTTOM + X_AXIS_HEIGHT + eventAreaHeight + 20; // 20pt for footer clearance
+  var chartBottom = areaBottom + X_AXIS_HEIGHT + eventAreaHeight + footerClearance;
   var chartHeight = chartTop - chartBottom;
 
-  if (chartHeight < 100) {
-    // Not enough space — should not happen on a fresh page but just in case
+  // Minimum chart height: 60pt for bounded (multi-chart) layouts where space
+  // is tight, 100pt for standalone charts where we have a full page.
+  var minChartHeight = bounds ? 60 : 100;
+  if (chartHeight < minChartHeight) {
     ctx.y = y;
     return;
   }
@@ -131,14 +191,14 @@ export function renderChartBlock(ctx, params, blockDef) {
   // --- Title bar (white text on coloured rectangle — emerald in test mode) ---
   var titleBarColour = isTestMode() ? COLOURS.emerald900 : COLOURS.brand800;
   page.drawRectangle({
-    x: MARGIN_LEFT,
+    x: areaLeft,
     y: y - TITLE_BAR_HEIGHT,
-    width: USABLE_WIDTH,
+    width: areaWidth,
     height: TITLE_BAR_HEIGHT,
     color: titleBarColour,
   });
   page.drawText(data.title, {
-    x: MARGIN_LEFT + 10,
+    x: areaLeft + 10,
     y: y - TITLE_BAR_HEIGHT + 9,
     font: StandardFonts.HelveticaBold,
     size: FONT_SIZE_TITLE,
@@ -146,10 +206,10 @@ export function renderChartBlock(ctx, params, blockDef) {
   });
   y -= TITLE_BAR_HEIGHT;
 
-  // --- Subtitle ---
+  // --- Subtitle (full width, aligned with title banner) ---
   if (data.subTitle) {
     page.drawText(data.subTitle, {
-      x: MARGIN_LEFT + 10,
+      x: areaLeft + 4,
       y: y - SUBTITLE_HEIGHT + 4,
       font: StandardFonts.Helvetica,
       size: FONT_SIZE_SUBTITLE,
@@ -158,8 +218,8 @@ export function renderChartBlock(ctx, params, blockDef) {
   }
   y -= SUBTITLE_HEIGHT;
 
-  // --- Legend ---
-  drawLegend(page, data.series, MARGIN_LEFT + Y_AXIS_WIDTH, y, chartWidth);
+  // --- Legend (full width, aligned with title banner) ---
+  drawLegend(page, data.series, areaLeft + 4, y, areaWidth - 8);
   y -= legendHeight;
 
   // --- Determine Y-axis range ---
@@ -186,7 +246,12 @@ export function renderChartBlock(ctx, params, blockDef) {
   // --- Draw global event markers ---
   if (hasEvents) {
     drawEventMarkers(page, data.events, data.sampleDates, chartLeft, chartBottom,
-      chartWidth, chartBottom - X_AXIS_HEIGHT - 4);
+      chartWidth, chartBottom - X_AXIS_HEIGHT - 4, suppressEventLegend);
+  }
+
+  // Expose events on ctx so chart group can draw a shared legend
+  if (hasEvents && suppressEventLegend) {
+    ctx._events = data.events;
   }
 
   // Update ctx.y to below the chart
@@ -196,16 +261,24 @@ export function renderChartBlock(ctx, params, blockDef) {
 
 /**
  * @description Calculate the number of legend rows needed.
- * Benchmarks always go on a separate row from investments.
- * If there are only investments and 4 or fewer, use a single row.
+ * Investments and benchmarks are always on separate rows.
+ * Each category is split into rows of at most 4 items.
  * @param {Array<Object>} series - Data series with label and type
- * @returns {number} Number of legend rows (1 or 2)
+ * @returns {number} Number of legend rows
  */
 function calculateLegendRows(series) {
-  var hasBenchmarks = series.some(function (s) { return s.type === "benchmark"; });
-  if (hasBenchmarks) return 2;
-  if (series.length > 4) return 2;
-  return 1;
+  var invCount = 0;
+  var bmCount = 0;
+  for (var i = 0; i < series.length; i++) {
+    if (series[i].type === "benchmark") {
+      bmCount++;
+    } else {
+      invCount++;
+    }
+  }
+  var invRows = invCount > 0 ? Math.ceil(invCount / 4) : 0;
+  var bmRows = bmCount > 0 ? Math.ceil(bmCount / 4) : 0;
+  return Math.max(invRows + bmRows, 1);
 }
 
 /**
@@ -308,9 +381,9 @@ function drawLegendRow(page, items, displayLabels, startX, legendY) {
 
 /**
  * @description Draw the legend showing coloured squares/lines and series labels.
- * Investments are drawn on row 1, benchmarks on row 2. If all series are
- * investments and there are 4 or fewer, a single row is used. Labels are
- * truncated with ellipsis if a row would overflow the available width.
+ * Investments and benchmarks are drawn on separate rows. Each category is
+ * split into rows of at most 4 items. Labels are truncated with ellipsis
+ * if a row would overflow the available width.
  * @param {Object} page - PDFPage instance
  * @param {Array<Object>} series - Data series with label and type
  * @param {number} startX - Left edge of legend area
@@ -321,7 +394,7 @@ function drawLegend(page, series, startX, y, availableWidth) {
   var font = Standard14Font.of(StandardFonts.Helvetica);
   var boxSize = 8;
   var gap = 14;
-  var rowCount = calculateLegendRows(series);
+  var maxPerRow = 4;
 
   // Split series into investments and benchmarks, preserving original colour index
   var investments = [];
@@ -340,22 +413,25 @@ function drawLegend(page, series, startX, y, availableWidth) {
     }
   }
 
-  if (rowCount === 1) {
-    // Single row — all investments (no benchmarks, <= 4 items)
-    var labels = investments.map(function (item) { return item.label; });
-    truncateLabelsToFit(font, labels, availableWidth, boxSize, gap);
-    drawLegendRow(page, investments, labels, startX, y - 12);
-  } else {
-    // Two rows — investments on row 1, benchmarks on row 2
-    var invLabels = investments.map(function (item) { return item.label; });
-    truncateLabelsToFit(font, invLabels, availableWidth, boxSize, gap);
-    drawLegendRow(page, investments, invLabels, startX, y - 12);
+  // Split a list of items into chunks of maxPerRow and draw each chunk as a row
+  var currentY = y - 12;
 
-    if (benchmarks.length > 0) {
-      var bmLabels = benchmarks.map(function (item) { return item.label; });
-      truncateLabelsToFit(font, bmLabels, availableWidth, boxSize, gap);
-      drawLegendRow(page, benchmarks, bmLabels, startX, y - 12 - LEGEND_ROW_HEIGHT);
-    }
+  // Draw investment rows
+  for (var r = 0; r < investments.length; r += maxPerRow) {
+    var chunk = investments.slice(r, r + maxPerRow);
+    var labels = chunk.map(function (item) { return item.label; });
+    truncateLabelsToFit(font, labels, availableWidth, boxSize, gap);
+    drawLegendRow(page, chunk, labels, startX, currentY);
+    currentY -= LEGEND_ROW_HEIGHT;
+  }
+
+  // Draw benchmark rows
+  for (var b = 0; b < benchmarks.length; b += maxPerRow) {
+    var bmChunk = benchmarks.slice(b, b + maxPerRow);
+    var bmLabels = bmChunk.map(function (item) { return item.label; });
+    truncateLabelsToFit(font, bmLabels, availableWidth, boxSize, gap);
+    drawLegendRow(page, bmChunk, bmLabels, startX, currentY);
+    currentY -= LEGEND_ROW_HEIGHT;
   }
 }
 
@@ -611,10 +687,10 @@ function plotLine(page, values, dates, chartLeft, bottom, chartWidth, chartHeigh
 }
 
 /**
- * @description Draw numbered event markers on the chart and a legend row below
- * the X-axis labels. Each event gets a small vertical arrow at its date position
- * with a number, and a numbered legend entry below showing the first 15 chars
- * of the event description.
+ * @description Draw numbered event markers on the chart and optionally a
+ * legend row below the X-axis. Each event gets a circled number at its
+ * date position on the X-axis, and (unless suppressLegend is true) a
+ * numbered legend entry below showing the event description.
  * @param {Object} page - PDFPage instance
  * @param {Array<Object>} events - Array of {date, description} objects
  * @param {Array<string>} sampleDates - Weekly sample dates for X-axis mapping
@@ -622,12 +698,14 @@ function plotLine(page, values, dates, chartLeft, bottom, chartWidth, chartHeigh
  * @param {number} chartBottom - Bottom edge of chart area
  * @param {number} chartWidth - Chart area width
  * @param {number} legendY - Y position for the event legend row
+ * @param {boolean} [suppressLegend] - If true, draw only the circled numbers
+ *   on the chart without the descriptive legend row below. Used when a shared
+ *   legend is drawn separately (e.g. chart groups).
  */
 function drawEventMarkers(page, events, sampleDates, chartLeft, chartBottom,
-  chartWidth, legendY) {
+  chartWidth, legendY, suppressLegend) {
   if (events.length === 0 || sampleDates.length < 2) return;
 
-  var font = Standard14Font.of(StandardFonts.Helvetica);
   var fontBold = Standard14Font.of(StandardFonts.HelveticaBold);
   var totalPoints = sampleDates.length;
   var firstDate = sampleDates[0];
@@ -650,23 +728,7 @@ function drawEventMarkers(page, events, sampleDates, chartLeft, chartBottom,
     var centreY = chartBottom - 1;
 
     // Draw circle outline using short line segments (approximate circle)
-    var segments = 24;
-    for (var seg = 0; seg < segments; seg++) {
-      var angle1 = (seg / segments) * 2 * Math.PI;
-      var angle2 = ((seg + 1) / segments) * 2 * Math.PI;
-      page.drawLine({
-        start: {
-          x: px + Math.cos(angle1) * circleRadius,
-          y: centreY + Math.sin(angle1) * circleRadius,
-        },
-        end: {
-          x: px + Math.cos(angle2) * circleRadius,
-          y: centreY + Math.sin(angle2) * circleRadius,
-        },
-        color: markerColour,
-        thickness: 0.7,
-      });
-    }
+    drawCircle(page, px, centreY, circleRadius, markerColour, 0.7);
 
     // Draw number centred in the circle
     page.drawText(num, {
@@ -678,11 +740,52 @@ function drawEventMarkers(page, events, sampleDates, chartLeft, chartBottom,
     });
   }
 
-  // Draw event legend row below X-axis labels with matching circled numbers
-  var legendX = chartLeft;
+  // Draw event legend row unless suppressed (chart groups draw a shared legend)
+  if (!suppressLegend) {
+    drawEventLegendRow(page, events, chartLeft, legendY);
+  }
+}
+
+/**
+ * @description Draw a circle outline using short line segments.
+ * @param {Object} page - PDFPage instance
+ * @param {number} cx - Centre X
+ * @param {number} cy - Centre Y
+ * @param {number} radius - Circle radius
+ * @param {Object} colour - RGB colour
+ * @param {number} thickness - Line thickness
+ */
+function drawCircle(page, cx, cy, radius, colour, thickness) {
+  var segments = 24;
+  for (var seg = 0; seg < segments; seg++) {
+    var angle1 = (seg / segments) * 2 * Math.PI;
+    var angle2 = ((seg + 1) / segments) * 2 * Math.PI;
+    page.drawLine({
+      start: { x: cx + Math.cos(angle1) * radius, y: cy + Math.sin(angle1) * radius },
+      end: { x: cx + Math.cos(angle2) * radius, y: cy + Math.sin(angle2) * radius },
+      color: colour,
+      thickness: thickness,
+    });
+  }
+}
+
+/**
+ * @description Draw the event legend row — circled numbers with description text.
+ * Called by drawEventMarkers for standalone charts, or separately by
+ * renderChartGroupBlock for a shared legend below all charts.
+ * @param {Object} page - PDFPage instance
+ * @param {Array<Object>} events - Array of {date, description} objects
+ * @param {number} startX - Left edge for the legend row
+ * @param {number} legendY - Y position for the legend row
+ */
+function drawEventLegendRow(page, events, startX, legendY) {
+  var font = Standard14Font.of(StandardFonts.Helvetica);
+  var fontBold = Standard14Font.of(StandardFonts.HelveticaBold);
+  var markerColour = rgb(0.75, 0.15, 0.15);
   var eventFontSize = 6.5;
   var legendCircleR = 4.5;
   var legendNumSize = 6;
+  var legendX = startX;
 
   for (var j = 0; j < events.length; j++) {
     var legendNum = String(j + 1);
@@ -691,22 +794,7 @@ function drawEventMarkers(page, events, sampleDates, chartLeft, chartBottom,
     var circleCentreY = legendY + 2;
 
     // Draw small circled number in legend
-    for (var ls = 0; ls < 24; ls++) {
-      var la1 = (ls / 24) * 2 * Math.PI;
-      var la2 = ((ls + 1) / 24) * 2 * Math.PI;
-      page.drawLine({
-        start: {
-          x: circleCentreX + Math.cos(la1) * legendCircleR,
-          y: circleCentreY + Math.sin(la1) * legendCircleR,
-        },
-        end: {
-          x: circleCentreX + Math.cos(la2) * legendCircleR,
-          y: circleCentreY + Math.sin(la2) * legendCircleR,
-        },
-        color: markerColour,
-        thickness: 0.6,
-      });
-    }
+    drawCircle(page, circleCentreX, circleCentreY, legendCircleR, markerColour, 0.6);
 
     page.drawText(legendNum, {
       x: circleCentreX - legendNumW / 2,
@@ -879,6 +967,137 @@ function catmullRomSmooth(points, subdivisions) {
 }
 
 /**
+ * @description Determine the page orientation for a chart group based on
+ * the number of charts. 1 chart → landscape, 2 charts → portrait,
+ * 3-4 charts → landscape (2x2 grid).
+ * @param {Object} blockDef - Block definition with charts array
+ * @returns {{ orientation: string, pageHeight: number, usableWidth: number }}
+ */
+export function getChartGroupLayout(blockDef) {
+  var count = (blockDef.charts || []).length;
+  if (count === 2) {
+    return { orientation: "portrait", pageHeight: A4_PORTRAIT_HEIGHT, usableWidth: A4_PORTRAIT_USABLE_WIDTH };
+  }
+  return { orientation: "landscape", pageHeight: A4_LANDSCAPE_HEIGHT, usableWidth: USABLE_WIDTH };
+}
+
+/**
+ * @description Render a group of 1-4 charts on a single page.
+ * Layout depends on the number of charts:
+ *   1 chart  → full landscape page
+ *   2 charts → portrait, stacked vertically
+ *   3-4 charts → landscape, 2×2 grid
+ * @param {Object} ctx - Shared rendering context
+ * @param {Array<string>} params - Unused (charts carry their own params)
+ * @param {Object} blockDef - Block definition with charts array
+ */
+export function renderChartGroupBlock(ctx, params, blockDef) {
+  var charts = blockDef.charts || [];
+  if (charts.length === 0) return;
+
+  var page = ctx.page;
+  var startY = ctx.y;
+  var count = Math.min(charts.length, 4);
+  // Tighter gap for grid layouts (3-4 charts) to maximise chart area
+  var gap = count <= 2 ? 20 : 14;
+
+  if (count === 1) {
+    // Single chart — render full page, no bounds needed
+    renderChartBlock(ctx, charts[0].params || [], charts[0]);
+    return;
+  }
+
+  if (count === 2) {
+    // Portrait — two charts stacked vertically.
+    // Check if any sub-chart requests global events. If so, reserve space
+    // at the bottom of the page for a single shared event legend and pass
+    // showGlobalEvents + _suppressEventLegend to each sub-chart so they
+    // draw circled markers but not individual legend rows.
+    var showGroupEvents = blockDef.showGlobalEvents === true ||
+      charts.some(function (c) { return c.showGlobalEvents === true; });
+    var eventLegendHeight = showGroupEvents ? 24 : 0;
+    var availableHeight = startY - MARGIN_BOTTOM - eventLegendHeight;
+    var cellHeight = (availableHeight - gap) / 2;
+
+    // Chart 1 — top half
+    ctx.y = startY;
+    ctx._events = null;
+    renderChartBlock(ctx, charts[0].params || [], Object.assign({}, charts[0], {
+      showGlobalEvents: showGroupEvents,
+      _suppressEventLegend: showGroupEvents,
+      _bounds: { left: MARGIN_LEFT, width: A4_PORTRAIT_USABLE_WIDTH, bottom: startY - cellHeight },
+    }));
+    var collectedEvents = ctx._events;
+
+    // Chart 2 — bottom half
+    ctx.y = startY - cellHeight - gap;
+    ctx.page = page;
+    ctx._events = null;
+    renderChartBlock(ctx, charts[1].params || [], Object.assign({}, charts[1], {
+      showGlobalEvents: showGroupEvents,
+      _suppressEventLegend: showGroupEvents,
+      _bounds: { left: MARGIN_LEFT, width: A4_PORTRAIT_USABLE_WIDTH, bottom: MARGIN_BOTTOM + eventLegendHeight },
+    }));
+    // Use events from whichever chart had data (prefer first, fall back to second)
+    if (!collectedEvents && ctx._events) {
+      collectedEvents = ctx._events;
+    }
+
+    // Draw shared event legend at the bottom of the page
+    if (showGroupEvents && collectedEvents && collectedEvents.length > 0) {
+      drawEventLegendRow(page, collectedEvents, MARGIN_LEFT + Y_AXIS_WIDTH, MARGIN_BOTTOM + 4);
+    }
+
+    ctx.y = MARGIN_BOTTOM;
+    ctx._events = null;
+    return;
+  }
+
+  // 3-4 charts — landscape 2×2 grid.
+  // Check for global events — same pattern as the 2-chart case.
+  var showGridEvents = blockDef.showGlobalEvents === true ||
+    charts.some(function (c) { return c.showGlobalEvents === true; });
+  var gridEventHeight = showGridEvents ? 24 : 0;
+  var availH = startY - MARGIN_BOTTOM - gridEventHeight;
+  var cellW = (USABLE_WIDTH - gap) / 2;
+  var cellH = (availH - gap) / 2;
+
+  // Bottom row sits above the shared event legend area
+  var bottomRowBase = MARGIN_BOTTOM + gridEventHeight;
+
+  var positions = [
+    { left: MARGIN_LEFT, top: startY, bottom: startY - cellH },
+    { left: MARGIN_LEFT + cellW + gap, top: startY, bottom: startY - cellH },
+    { left: MARGIN_LEFT, top: startY - cellH - gap, bottom: bottomRowBase },
+    { left: MARGIN_LEFT + cellW + gap, top: startY - cellH - gap, bottom: bottomRowBase },
+  ];
+
+  var gridCollectedEvents = null;
+  for (var i = 0; i < count; i++) {
+    var pos = positions[i];
+    ctx.y = pos.top;
+    ctx.page = page;
+    ctx._events = null;
+    renderChartBlock(ctx, charts[i].params || [], Object.assign({}, charts[i], {
+      showGlobalEvents: showGridEvents,
+      _suppressEventLegend: showGridEvents,
+      _bounds: { left: pos.left, width: cellW, bottom: pos.bottom },
+    }));
+    if (!gridCollectedEvents && ctx._events) {
+      gridCollectedEvents = ctx._events;
+    }
+  }
+
+  // Draw shared event legend at the bottom of the page
+  if (showGridEvents && gridCollectedEvents && gridCollectedEvents.length > 0) {
+    drawEventLegendRow(page, gridCollectedEvents, MARGIN_LEFT + Y_AXIS_WIDTH, MARGIN_BOTTOM + 4);
+  }
+
+  ctx.y = MARGIN_BOTTOM;
+  ctx._events = null;
+}
+
+/**
  * @description Generate a standalone PDF for a single performance chart.
  * Creates a landscape A4 PDF with the chart rendered full-page.
  * @param {Object} chartDef - Chart definition from user-reports.json
@@ -894,5 +1113,25 @@ export async function generateChartPdf(chartDef) {
   renderChartBlock(ctx, chartDef.params || [], chartDef);
 
   drawPageFooters(ctx.pages, chartDef.title || "Performance Chart", MARGIN_LEFT, USABLE_WIDTH);
+  return await pdf.save();
+}
+
+/**
+ * @description Generate a standalone PDF for a chart group (1-4 charts on one page).
+ * Determines orientation based on chart count and renders all charts.
+ * @param {Object} groupDef - Chart group definition from user-reports.json
+ * @returns {Promise<Uint8Array>} The PDF file bytes
+ */
+export async function generateChartGroupPdf(groupDef) {
+  var layout = getChartGroupLayout(groupDef);
+  const pdf = PDF.create();
+  var page = pdf.addPage({ size: "a4", orientation: layout.orientation });
+  var pages = [page];
+  var y = drawPageHeader(pdf, page, MARGIN_LEFT, layout.pageHeight, MARGIN_TOP);
+
+  var ctx = { pdf: pdf, page: page, pages: pages, y: y, pageWidths: [layout.usableWidth] };
+  renderChartGroupBlock(ctx, [], groupDef);
+
+  drawPageFooters(ctx.pages, groupDef.title || "Performance Charts", MARGIN_LEFT, layout.usableWidth);
   return await pdf.save();
 }
