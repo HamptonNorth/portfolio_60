@@ -19,6 +19,7 @@
     "taxYearStartDay": 6
   },
   "reportsOpenInNewTab": true,
+  "cronUpdateTestDatabase": true,
   "fetchDelayProfile": "cron",
   "fetchBatch": {
     "_readme": "Fetch investments/benchmarks in batches to avoid rate-limiting. batchSize is items per batch (1-50), cooldownSeconds is pause between batches (0-600).",

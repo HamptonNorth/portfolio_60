@@ -1,7 +1,8 @@
 import { Cron } from "croner";
-import { getSchedulingConfig, getRetryConfig, getFetchDelayProfile } from "../config.js";
+import { getSchedulingConfig, getRetryConfig, getFetchDelayProfile, getCronUpdateTestDatabase } from "../config.js";
 import { getLastSuccessfulFetchByType } from "../db/fetch-history-db.js";
-import { databaseExists } from "../db/connection.js";
+import { closeDatabase, databaseExists, resetDatabasePath } from "../db/connection.js";
+import { testReferenceExists } from "../test-mode.js";
 import { runFullPriceUpdate, retryFailedItems } from "./fetch-service.js";
 import { writeSchedulerLog, pruneSchedulerLog } from "../db/scheduler-log-db.js";
 
@@ -164,6 +165,10 @@ async function executeFetchRun(startedBy) {
         "warn",
       );
     }
+    // After live fetch completes, optionally update the test database
+    if (getCronUpdateTestDatabase() && testReferenceExists()) {
+      await updateTestDatabase(startedBy, delayProfile);
+    }
   } catch (err) {
     writeSchedulerLog("Fetch run failed with error: " + err.message, "error");
     lastRunResult = {
@@ -173,6 +178,57 @@ async function executeFetchRun(startedBy) {
     };
   } finally {
     isRunning = false;
+  }
+}
+
+/**
+ * @description Switch to the test database, run a full price update, then
+ * switch back to the live database. Called after the live cron fetch completes
+ * when cronUpdateTestDatabase is enabled and a test database exists.
+ * No retry loop is run for the test database — only the initial fetch.
+ * @param {number} startedBy - 0 = manual, 1 = scheduled/cron
+ * @param {string} delayProfile - The fetch delay profile to use
+ */
+async function updateTestDatabase(startedBy, delayProfile) {
+  const { resolve, join } = await import("node:path");
+  const { DATA_DIR } = await import("../../shared/server-constants.js");
+
+  const testDbPath = resolve(join(DATA_DIR, "data", "test_reference", "portfolio60.db"));
+
+  writeSchedulerLog("Switching to test database for cron update");
+
+  // Save current DB_PATH so we can restore it
+  const savedDbPath = process.env.DB_PATH;
+
+  try {
+    // Close live database and switch to test
+    closeDatabase();
+    process.env.DB_PATH = testDbPath;
+    resetDatabasePath();
+
+    const testSummary = await runFullPriceUpdate({
+      startedBy: startedBy,
+      delayProfile: delayProfile,
+    });
+
+    writeSchedulerLog(
+      "Test database fetch complete — prices: " +
+        testSummary.priceSuccessCount + "/" + (testSummary.priceSuccessCount + testSummary.priceFailCount) +
+        ", benchmarks: " + testSummary.benchmarkSuccessCount + "/" + (testSummary.benchmarkSuccessCount + testSummary.benchmarkFailCount) +
+        ", currency: " + (testSummary.currencySuccess ? "OK" : "FAILED"),
+    );
+  } catch (err) {
+    writeSchedulerLog("Test database fetch failed: " + err.message, "error");
+  } finally {
+    // Always switch back to the live database
+    closeDatabase();
+    if (savedDbPath) {
+      process.env.DB_PATH = savedDbPath;
+    } else {
+      delete process.env.DB_PATH;
+    }
+    resetDatabasePath();
+    writeSchedulerLog("Switched back to live database");
   }
 }
 

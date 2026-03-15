@@ -29,6 +29,7 @@ const DEFAULTS = {
     cooldownSeconds: 120,
   },
   reportsOpenInNewTab: true,
+  cronUpdateTestDatabase: false,
   fetchDelayProfile: "cron",
 };
 
@@ -180,6 +181,9 @@ export function loadConfig() {
   // reportsOpenInNewTab — boolean flag for opening report pages in a new tab
   config.reportsOpenInNewTab = typeof rawConfig.reportsOpenInNewTab === "boolean" ? rawConfig.reportsOpenInNewTab : DEFAULTS.reportsOpenInNewTab;
 
+  // cronUpdateTestDatabase — whether cron-initiated fetches also update the test database
+  config.cronUpdateTestDatabase = typeof rawConfig.cronUpdateTestDatabase === "boolean" ? rawConfig.cronUpdateTestDatabase : DEFAULTS.cronUpdateTestDatabase;
+
   configCache = config;
   return config;
 }
@@ -247,6 +251,15 @@ export function getAllowedProviders() {
 export function getIsaAllowanceConfig() {
   const config = loadConfig();
   return config.isaAllowance;
+}
+
+/**
+ * @description Get whether cron-initiated fetches should also update the test database.
+ * @returns {boolean} True if the test database should be updated after live fetch
+ */
+export function getCronUpdateTestDatabase() {
+  const config = loadConfig();
+  return config.cronUpdateTestDatabase === true;
 }
 
 /**
