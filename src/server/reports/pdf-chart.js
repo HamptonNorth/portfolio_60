@@ -56,7 +56,8 @@ const FONT_SIZE_AXIS = 7;
 /** @description Chart layout dimensions */
 const TITLE_BAR_HEIGHT = 28;
 const SUBTITLE_HEIGHT = 16;
-const LEGEND_HEIGHT = 18;
+const LEGEND_ROW_HEIGHT = 14;
+const LEGEND_PADDING = 4;
 const X_AXIS_HEIGHT = 28;
 const Y_AXIS_WIDTH = 45;
 const CHART_RIGHT_PAD = 10;
@@ -113,7 +114,11 @@ export function renderChartBlock(ctx, params, blockDef) {
   var hasEvents = data.events && data.events.length > 0;
   var eventAreaHeight = hasEvents ? 24 : 0;
 
-  var chartTop = y - TITLE_BAR_HEIGHT - SUBTITLE_HEIGHT - LEGEND_HEIGHT;
+  // Determine legend row count before calculating chart area
+  var legendRows = calculateLegendRows(data.series);
+  var legendHeight = legendRows * LEGEND_ROW_HEIGHT + LEGEND_PADDING;
+
+  var chartTop = y - TITLE_BAR_HEIGHT - SUBTITLE_HEIGHT - legendHeight;
   var chartBottom = MARGIN_BOTTOM + X_AXIS_HEIGHT + eventAreaHeight + 20; // 20pt for footer clearance
   var chartHeight = chartTop - chartBottom;
 
@@ -154,8 +159,8 @@ export function renderChartBlock(ctx, params, blockDef) {
   y -= SUBTITLE_HEIGHT;
 
   // --- Legend ---
-  drawLegend(page, data.series, MARGIN_LEFT + Y_AXIS_WIDTH, y);
-  y -= LEGEND_HEIGHT;
+  drawLegend(page, data.series, MARGIN_LEFT + Y_AXIS_WIDTH, y, chartWidth);
+  y -= legendHeight;
 
   // --- Determine Y-axis range ---
   var yRange = calculateYRange(data.series);
@@ -190,25 +195,80 @@ export function renderChartBlock(ctx, params, blockDef) {
 }
 
 /**
- * @description Draw the legend showing coloured squares/lines and series labels.
- * @param {Object} page - PDFPage instance
+ * @description Calculate the number of legend rows needed.
+ * Benchmarks always go on a separate row from investments.
+ * If there are only investments and 4 or fewer, use a single row.
  * @param {Array<Object>} series - Data series with label and type
- * @param {number} startX - Left edge of legend area
- * @param {number} y - Y position for the legend row
+ * @returns {number} Number of legend rows (1 or 2)
  */
-function drawLegend(page, series, startX, y) {
-  var font = Standard14Font.of(StandardFonts.Helvetica);
-  var x = startX;
-  var legendY = y - 12;
+function calculateLegendRows(series) {
+  var hasBenchmarks = series.some(function (s) { return s.type === "benchmark"; });
+  if (hasBenchmarks) return 2;
+  if (series.length > 4) return 2;
+  return 1;
+}
+
+/**
+ * @description Measure the total width of a row of legend items.
+ * @param {Object} font - Standard14Font instance for text measurement
+ * @param {Array<string>} labels - Display labels for each item
+ * @param {number} boxSize - Width of the colour indicator
+ * @param {number} gap - Gap between items
+ * @returns {number} Total width in points
+ */
+function measureLegendRow(font, labels, boxSize, gap) {
+  var width = 0;
+  for (var i = 0; i < labels.length; i++) {
+    width += boxSize + 3 + font.widthOfTextAtSize(labels[i], FONT_SIZE_LEGEND);
+    if (i < labels.length - 1) width += gap;
+  }
+  return width;
+}
+
+/**
+ * @description Truncate labels evenly until the row fits within the available
+ * width. Removes characters from the end of each label and adds an ellipsis.
+ * @param {Object} font - Standard14Font instance for text measurement
+ * @param {Array<string>} labels - Labels to truncate (modified in place)
+ * @param {number} availableWidth - Maximum row width in points
+ * @param {number} boxSize - Width of the colour indicator
+ * @param {number} gap - Gap between items
+ */
+function truncateLabelsToFit(font, labels, availableWidth, boxSize, gap) {
+  var maxChars = Math.max.apply(null, labels.map(function (l) { return l.length; }));
+
+  // Progressively shorten all labels until row fits
+  while (maxChars > 5) {
+    var totalWidth = measureLegendRow(font, labels, boxSize, gap);
+    if (totalWidth <= availableWidth) return;
+
+    maxChars -= 1;
+    for (var i = 0; i < labels.length; i++) {
+      if (labels[i].length > maxChars) {
+        labels[i] = labels[i].substring(0, maxChars - 1) + "\u2026";
+      }
+    }
+  }
+}
+
+/**
+ * @description Draw one row of legend items at the given Y position.
+ * @param {Object} page - PDFPage instance
+ * @param {Array<Object>} items - Items to draw, each with {label, colour, isBenchmark, seriesIndex}
+ * @param {Array<string>} displayLabels - Possibly truncated display labels
+ * @param {number} startX - Left edge of legend area
+ * @param {number} legendY - Y position for this row
+ */
+function drawLegendRow(page, items, displayLabels, startX, legendY) {
   var boxSize = 8;
   var gap = 14;
+  var x = startX;
 
-  for (var i = 0; i < series.length; i++) {
-    var colour = LINE_COLOURS[i % LINE_COLOURS.length];
-    var label = series[i].label;
-    var isBenchmark = series[i].type === "benchmark";
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    var label = displayLabels[i];
 
-    if (isBenchmark) {
+    if (item.isBenchmark) {
       // Dotted line indicator for benchmarks
       var dotY = legendY + boxSize / 2 - 1;
       for (var d = 0; d < 3; d++) {
@@ -217,7 +277,7 @@ function drawLegend(page, series, startX, y) {
           y: dotY,
           width: 1.5,
           height: 1.5,
-          color: colour,
+          color: item.colour,
         });
       }
     } else {
@@ -227,7 +287,7 @@ function drawLegend(page, series, startX, y) {
         y: legendY,
         width: boxSize,
         height: boxSize,
-        color: colour,
+        color: item.colour,
       });
     }
 
@@ -240,8 +300,62 @@ function drawLegend(page, series, startX, y) {
       color: COLOURS.brand800,
     });
 
+    var font = Standard14Font.of(StandardFonts.Helvetica);
     var textWidth = font.widthOfTextAtSize(label, FONT_SIZE_LEGEND);
     x += textWidth + gap;
+  }
+}
+
+/**
+ * @description Draw the legend showing coloured squares/lines and series labels.
+ * Investments are drawn on row 1, benchmarks on row 2. If all series are
+ * investments and there are 4 or fewer, a single row is used. Labels are
+ * truncated with ellipsis if a row would overflow the available width.
+ * @param {Object} page - PDFPage instance
+ * @param {Array<Object>} series - Data series with label and type
+ * @param {number} startX - Left edge of legend area
+ * @param {number} y - Y position for the first legend row
+ * @param {number} availableWidth - Maximum width for legend content
+ */
+function drawLegend(page, series, startX, y, availableWidth) {
+  var font = Standard14Font.of(StandardFonts.Helvetica);
+  var boxSize = 8;
+  var gap = 14;
+  var rowCount = calculateLegendRows(series);
+
+  // Split series into investments and benchmarks, preserving original colour index
+  var investments = [];
+  var benchmarks = [];
+  for (var i = 0; i < series.length; i++) {
+    var item = {
+      label: series[i].label,
+      colour: LINE_COLOURS[i % LINE_COLOURS.length],
+      isBenchmark: series[i].type === "benchmark",
+      seriesIndex: i,
+    };
+    if (item.isBenchmark) {
+      benchmarks.push(item);
+    } else {
+      investments.push(item);
+    }
+  }
+
+  if (rowCount === 1) {
+    // Single row — all investments (no benchmarks, <= 4 items)
+    var labels = investments.map(function (item) { return item.label; });
+    truncateLabelsToFit(font, labels, availableWidth, boxSize, gap);
+    drawLegendRow(page, investments, labels, startX, y - 12);
+  } else {
+    // Two rows — investments on row 1, benchmarks on row 2
+    var invLabels = investments.map(function (item) { return item.label; });
+    truncateLabelsToFit(font, invLabels, availableWidth, boxSize, gap);
+    drawLegendRow(page, investments, invLabels, startX, y - 12);
+
+    if (benchmarks.length > 0) {
+      var bmLabels = benchmarks.map(function (item) { return item.label; });
+      truncateLabelsToFit(font, bmLabels, availableWidth, boxSize, gap);
+      drawLegendRow(page, benchmarks, bmLabels, startX, y - 12 - LEGEND_ROW_HEIGHT);
+    }
   }
 }
 
