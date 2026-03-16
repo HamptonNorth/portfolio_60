@@ -115,6 +115,27 @@ export function getRateHistory(currenciesId, limit = 30, offset = 0) {
 }
 
 /**
+ * @description Get the most recent rate date for a specific currency.
+ * Returns the latest rate record, or null if no rates exist.
+ * @param {number} currenciesId - The currency ID
+ * @returns {Object|null} Rate record with rate_date, or null if none found
+ */
+export function getLatestRate(currenciesId) {
+  const db = getDatabase();
+  const row = db
+    .query(
+      `SELECT cr.id, cr.currencies_id, cr.rate_date, cr.rate_time, cr.rate
+       FROM currency_rates cr
+       WHERE cr.currencies_id = ?
+       ORDER BY cr.rate_date DESC
+       LIMIT 1`,
+    )
+    .get(currenciesId);
+
+  return row || null;
+}
+
+/**
  * @description Get total number of rate records for a currency.
  * @param {number} currenciesId - The currency ID
  * @returns {number} Total count of rate records

@@ -1416,6 +1416,57 @@ export async function backfillSingleCurrency(currency, progressCallback) {
   return { success: true, ratesInserted: countForCurrency };
 }
 
+/**
+ * @description Backfill currency rates for a custom date range (all supported
+ * currencies). Fetches daily rates from the Bank of England, filters to weekly
+ * Fridays, and upserts into the currency_rates table. Used for gap-fill when
+ * the app has been offline and missed weekly data points.
+ * @param {string} startDate - ISO-8601 start date (YYYY-MM-DD)
+ * @param {string} endDate - ISO-8601 end date (YYYY-MM-DD)
+ * @returns {Promise<{totalRates: number, currenciesUpdated: string[]}>} Summary of what was inserted
+ */
+export async function backfillCurrencyRatesForRange(startDate, endDate) {
+  const db = getDatabase();
+
+  // Look up currency IDs for each non-GBP currency that has a BoE series
+  const currencies = db.query("SELECT id, code FROM currencies WHERE code != 'GBP' ORDER BY code").all();
+  const supportedCurrencies = currencies.filter(function (c) {
+    return BOE_SERIES_CODES[c.code];
+  });
+
+  if (supportedCurrencies.length === 0) {
+    return { totalRates: 0, currenciesUpdated: [] };
+  }
+
+  // Fetch daily rates from BoE, then filter to weekly (Fridays)
+  const dailyRows = await fetchBoeRateHistory(startDate, endDate);
+  const rateRows = filterToWeeklyFridays(dailyRows);
+
+  // Insert weekly rates for all supported currencies
+  let totalRates = 0;
+  const currenciesUpdated = [];
+
+  for (const c of supportedCurrencies) {
+    let countForCurrency = 0;
+
+    for (const row of rateRows) {
+      const rate = row.rates[c.code];
+      if (rate === undefined) continue;
+
+      const scaledRate = scaleRate(rate);
+      upsertRate(c.id, row.date, "00:00:00", scaledRate);
+      countForCurrency++;
+    }
+
+    totalRates += countForCurrency;
+    if (countForCurrency > 0) {
+      currenciesUpdated.push(c.code);
+    }
+  }
+
+  return { totalRates: totalRates, currenciesUpdated: currenciesUpdated };
+}
+
 // ---------------------------------------------------------------------------
 // Single-record test and load functions (Phase 4b)
 // ---------------------------------------------------------------------------

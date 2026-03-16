@@ -145,9 +145,12 @@ describe("runFullPriceUpdate — with non-GBP currency", function () {
     // Add a USD currency
     createCurrency({ code: "USD", description: "US Dollar" });
 
-    let fetchUrl = null;
+    let firstFetchUrl = null;
     globalThis.fetch = mock(async function (url) {
-      fetchUrl = url;
+      if (!firstFetchUrl) {
+        firstFetchUrl = url;
+      }
+      // Return a response that works for both Frankfurter (json) and BoE (text) APIs
       return {
         ok: true,
         status: 200,
@@ -158,6 +161,9 @@ describe("runFullPriceUpdate — with non-GBP currency", function () {
             rates: { USD: 1.2543 },
           };
         },
+        text: async function () {
+          return "DATE,XUDLUSS\n";
+        },
       };
     });
 
@@ -165,7 +171,7 @@ describe("runFullPriceUpdate — with non-GBP currency", function () {
 
     expect(summary.currencySuccess).toBe(true);
     // Verify the Frankfurter API was called with USD
-    expect(fetchUrl).toContain("USD");
+    expect(firstFetchUrl).toContain("USD");
   });
 });
 
@@ -222,6 +228,9 @@ describe("runFullPriceUpdate — delay profile", function () {
         status: 200,
         json: async function () {
           return { base: "GBP", date: "2026-02-06", rates: {} };
+        },
+        text: async function () {
+          return "DATE,XUDLUSS\n";
         },
       };
     });

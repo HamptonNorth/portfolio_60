@@ -1,13 +1,18 @@
 import { fetchCurrencyRates } from "../fetchers/currency-fetcher.js";
 import { fetchLatestMorningstarPrice, getMorningstarFetchableInvestments } from "../fetchers/morningstar-price-fetcher.js";
 import { fetchLatestYahooBenchmarkValue, getYahooFetchableBenchmarks } from "../fetchers/yahoo-benchmark-fetcher.js";
-import { getTotalPriceCount, getPriceCount } from "../db/prices-db.js";
-import { getTotalRateCount, getRateCount } from "../db/currency-rates-db.js";
-import { getTotalBenchmarkDataCount, getBenchmarkDataCount } from "../db/benchmark-data-db.js";
-import { backfillInvestmentPrices, backfillBenchmarkValues, backfillCurrencyRates, backfillSingleInvestment, backfillSingleBenchmark, backfillSingleCurrency } from "./historic-backfill.js";
+import { getTotalPriceCount, getPriceCount, getLatestPrice } from "../db/prices-db.js";
+import { getTotalRateCount, getRateCount, getLatestRate } from "../db/currency-rates-db.js";
+import { getTotalBenchmarkDataCount, getBenchmarkDataCount, getLatestBenchmarkData } from "../db/benchmark-data-db.js";
+import { backfillInvestmentPrices, backfillBenchmarkValues, backfillCurrencyRates, backfillSingleInvestment, backfillSingleBenchmark, backfillSingleCurrency, backfillCurrencyRatesForRange, fetchMorningstarHistory, fetchYahooBenchmarkHistory } from "./historic-backfill.js";
 import { getDatabase } from "../db/connection.js";
 import { checkpointDatabase } from "../db/connection.js";
 import { recordFetchAttempt } from "../db/fetch-history-db.js";
+import { upsertPrice } from "../db/prices-db.js";
+import { upsertBenchmarkData } from "../db/benchmark-data-db.js";
+
+/** @description Trigger gap-fill if last data is older than this many days */
+const GAP_THRESHOLD_DAYS = 10;
 
 /**
  * @description Sleep for a given number of milliseconds.
@@ -18,6 +23,29 @@ function sleep(ms) {
   return new Promise(function (resolve) {
     setTimeout(resolve, ms);
   });
+}
+
+/**
+ * @description Calculate the number of days between two ISO-8601 date strings.
+ * @param {string} dateStr - ISO-8601 date string (YYYY-MM-DD)
+ * @param {Date} now - Current date
+ * @returns {number} Number of days between the date and now
+ */
+function daysSince(dateStr, now) {
+  const then = new Date(dateStr + "T00:00:00");
+  const diffMs = now.getTime() - then.getTime();
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+}
+
+/**
+ * @description Add one day to an ISO-8601 date string.
+ * @param {string} dateStr - ISO-8601 date string (YYYY-MM-DD)
+ * @returns {string} The next day as ISO-8601 string
+ */
+function nextDay(dateStr) {
+  const d = new Date(dateStr + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().split("T")[0];
 }
 
 /**
@@ -102,6 +130,51 @@ export async function runFullPriceUpdate(options = {}) {
       }
     }
 
+    // Gap-fill for currency rates: if any currency has a gap > threshold,
+    // fetch missing data from BoE (one request covers all currencies)
+    {
+      const db = getDatabase();
+      const now = new Date();
+      const todayStr = now.toISOString().split("T")[0];
+      const allCurrencies = db.query("SELECT id, code FROM currencies WHERE code != 'GBP' ORDER BY code").all();
+      let currencyGapDetected = false;
+      let oldestGapStart = todayStr;
+
+      for (const c of allCurrencies) {
+        if (getRateCount(c.id) === 0) continue; // handled by backfill above
+        const latest = getLatestRate(c.id);
+        if (latest) {
+          const gap = daysSince(latest.rate_date, now);
+          if (gap > GAP_THRESHOLD_DAYS) {
+            console.log("[FetchService] Gap detected for currency " + c.code + ": last rate " + latest.rate_date + ", " + gap + " days ago — will gap-fill");
+            currencyGapDetected = true;
+            const gapStart = nextDay(latest.rate_date);
+            if (gapStart < oldestGapStart) {
+              oldestGapStart = gapStart;
+            }
+          }
+        }
+      }
+
+      if (currencyGapDetected) {
+        console.log("[FetchService] Gap-filling currency rates from " + oldestGapStart + " to " + todayStr + "...");
+        try {
+          const gapResult = await backfillCurrencyRatesForRange(oldestGapStart, todayStr);
+          checkpointDatabase();
+          console.log("[FetchService] Currency gap-fill complete: " + gapResult.totalRates + " rates for " + gapResult.currenciesUpdated.join(", "));
+          if (onCurrencyRates) {
+            onCurrencyRates({
+              success: true,
+              gapFill: true,
+              message: "Gap-filled " + gapResult.totalRates + " currency rates (" + oldestGapStart + " to " + todayStr + ")",
+            });
+          }
+        } catch (err) {
+          console.warn("[FetchService] Currency gap-fill failed: " + err.message);
+        }
+      }
+    }
+
     if (getTotalPriceCount() === 0) {
       try {
         await backfillInvestmentPrices(function () {});
@@ -158,6 +231,44 @@ export async function runFullPriceUpdate(options = {}) {
           checkpointDatabase();
         } catch (err) {
           console.warn("[FetchService] Price backfill for " + investment.description + " failed: " + err.message);
+        }
+      } else {
+        // Gap-fill: if the latest price is older than the threshold, fetch the missing range
+        const latestPrice = getLatestPrice(investment.id);
+        if (latestPrice) {
+          const now = new Date();
+          const gap = daysSince(latestPrice.price_date, now);
+          if (gap > GAP_THRESHOLD_DAYS) {
+            const gapStartDate = nextDay(latestPrice.price_date);
+            const todayStr = now.toISOString().split("T")[0];
+            console.log("[FetchService] Gap detected for " + investment.description + ": last price " + latestPrice.price_date + ", fetching " + gap + " days of missing data...");
+            try {
+              // Parse the cached morningstar_id to get secId and universe
+              const parts = (investment.morningstar_id || "").split("|");
+              const secId = parts[0];
+              const universe = parts[1] || "FOGBR$$ALL";
+              if (secId) {
+                const gapPrices = await fetchMorningstarHistory(secId, universe, investment.currency_code, gapStartDate, todayStr, "weekly");
+                for (const entry of gapPrices) {
+                  const priceInMinorUnits = entry.price * 100;
+                  upsertPrice(investment.id, entry.date, "00:00:00", priceInMinorUnits);
+                }
+                checkpointDatabase();
+                console.log("[FetchService] Gap-fill for " + investment.description + ": " + gapPrices.length + " prices inserted");
+                if (onPriceResult) {
+                  onPriceResult({
+                    success: true,
+                    gapFill: true,
+                    investmentId: investment.id,
+                    description: investment.description,
+                    message: "Gap-filled " + gapPrices.length + " prices (" + gapStartDate + " to " + todayStr + ")",
+                  });
+                }
+              }
+            } catch (err) {
+              console.warn("[FetchService] Price gap-fill for " + investment.description + " failed: " + err.message);
+            }
+          }
         }
       }
 
@@ -268,6 +379,40 @@ export async function runFullPriceUpdate(options = {}) {
           checkpointDatabase();
         } catch (err) {
           console.warn("[FetchService] Benchmark backfill for " + benchmark.description + " failed: " + err.message);
+        }
+      } else {
+        // Gap-fill: if the latest benchmark value is older than the threshold, fetch the missing range
+        const latestBm = getLatestBenchmarkData(benchmark.id);
+        if (latestBm) {
+          const now = new Date();
+          const gap = daysSince(latestBm.benchmark_date, now);
+          if (gap > GAP_THRESHOLD_DAYS) {
+            const gapStartDate = nextDay(latestBm.benchmark_date);
+            const todayStr = now.toISOString().split("T")[0];
+            console.log("[FetchService] Gap detected for " + benchmark.description + ": last value " + latestBm.benchmark_date + ", fetching " + gap + " days of missing data...");
+            try {
+              const yahooTicker = benchmark.yahoo_ticker;
+              if (yahooTicker) {
+                const gapValues = await fetchYahooBenchmarkHistory(yahooTicker, gapStartDate, todayStr, "1wk");
+                for (const entry of gapValues) {
+                  upsertBenchmarkData(benchmark.id, entry.date, "00:00:00", entry.value);
+                }
+                checkpointDatabase();
+                console.log("[FetchService] Gap-fill for " + benchmark.description + ": " + gapValues.length + " values inserted");
+                if (onBenchmarkResult) {
+                  onBenchmarkResult({
+                    success: true,
+                    gapFill: true,
+                    benchmarkId: benchmark.id,
+                    description: benchmark.description,
+                    message: "Gap-filled " + gapValues.length + " values (" + gapStartDate + " to " + todayStr + ")",
+                  });
+                }
+              }
+            } catch (err) {
+              console.warn("[FetchService] Benchmark gap-fill for " + benchmark.description + " failed: " + err.message);
+            }
+          }
         }
       }
 
