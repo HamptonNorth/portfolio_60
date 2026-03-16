@@ -291,10 +291,11 @@ function calculateLegendRows(series) {
  * @param {number} gap - Gap between items
  * @returns {number} Total width in points
  */
-function measureLegendRow(font, labels, boxSize, gap) {
+function measureLegendRow(font, labels, boxSize, gap, extraWidths) {
   var width = 0;
   for (var i = 0; i < labels.length; i++) {
     width += boxSize + 3 + font.widthOfTextAtSize(labels[i], FONT_SIZE_LEGEND);
+    if (extraWidths && extraWidths[i]) width += extraWidths[i];
     if (i < labels.length - 1) width += gap;
   }
   return width;
@@ -309,12 +310,12 @@ function measureLegendRow(font, labels, boxSize, gap) {
  * @param {number} boxSize - Width of the colour indicator
  * @param {number} gap - Gap between items
  */
-function truncateLabelsToFit(font, labels, availableWidth, boxSize, gap) {
+function truncateLabelsToFit(font, labels, availableWidth, boxSize, gap, extraWidths) {
   var maxChars = Math.max.apply(null, labels.map(function (l) { return l.length; }));
 
   // Progressively shorten all labels until row fits
   while (maxChars > 5) {
-    var totalWidth = measureLegendRow(font, labels, boxSize, gap);
+    var totalWidth = measureLegendRow(font, labels, boxSize, gap, extraWidths);
     if (totalWidth <= availableWidth) return;
 
     maxChars -= 1;
@@ -383,31 +384,58 @@ function drawLegendRow(page, items, displayLabels, startX, legendY) {
     var font = Standard14Font.of(StandardFonts.Helvetica);
     var textWidth = font.widthOfTextAtSize(label, FONT_SIZE_LEGEND);
 
-    // Add clickable link annotations for investment research pages
+    // Add visible clickable link indicators after the label text
     if (hasAnyLink) {
       var ftLinkUrl = item.publicId ? buildFtMarketsUrl(item.publicId, item.currencyCode) : null;
       var msLinkUrl = item.morningstarId ? buildMorningstarUrl(item.morningstarId) : null;
+      var linkTagSize = FONT_SIZE_LEGEND - 1;
+      var linkX = x + textWidth + 2;
 
       if (ftLinkUrl && msLinkUrl) {
-        // Both links: FT Markets on left half of label, Morningstar on right half
-        var halfWidth = textWidth / 2;
+        // Both links: draw "(FT)" and "(MS)" with underlined letters only
+        var parenOpenW = font.widthOfTextAtSize("(", linkTagSize);
+        var parenCloseW = font.widthOfTextAtSize(")", linkTagSize);
+        var ftLettersW = font.widthOfTextAtSize("FT", linkTagSize);
+        var msLettersW = font.widthOfTextAtSize("MS", linkTagSize);
+        var ftTagWidth = parenOpenW + ftLettersW + parenCloseW;
+        var msTagWidth = parenOpenW + msLettersW + parenCloseW;
+        var underlineY = legendY;
+
+        // Draw "(FT)" — underline only the "FT" letters
+        page.drawText("(", { x: linkX, y: legendY + 1, font: StandardFonts.Helvetica, size: linkTagSize, color: COLOURS.linkBlue });
+        var ftLettersX = linkX + parenOpenW;
+        page.drawText("FT", { x: ftLettersX, y: legendY + 1, font: StandardFonts.Helvetica, size: linkTagSize, color: COLOURS.linkBlue });
+        page.drawLine({ start: { x: ftLettersX, y: underlineY }, end: { x: ftLettersX + ftLettersW, y: underlineY }, color: COLOURS.linkBlue, thickness: 0.5 });
+        page.drawText(")", { x: ftLettersX + ftLettersW, y: legendY + 1, font: StandardFonts.Helvetica, size: linkTagSize, color: COLOURS.linkBlue });
         page.addLinkAnnotation({
-          rect: { x: x, y: legendY - 1, width: halfWidth, height: FONT_SIZE_LEGEND + 3 },
+          rect: { x: linkX, y: legendY - 1, width: ftTagWidth, height: FONT_SIZE_LEGEND + 3 },
           uri: ftLinkUrl,
           borderWidth: 0,
         });
+
+        // Draw "(MS)" — underline only the "MS" letters
+        linkX += ftTagWidth + 2;
+        page.drawText("(", { x: linkX, y: legendY + 1, font: StandardFonts.Helvetica, size: linkTagSize, color: COLOURS.linkBlue });
+        var msLettersX = linkX + parenOpenW;
+        page.drawText("MS", { x: msLettersX, y: legendY + 1, font: StandardFonts.Helvetica, size: linkTagSize, color: COLOURS.linkBlue });
+        page.drawLine({ start: { x: msLettersX, y: underlineY }, end: { x: msLettersX + msLettersW, y: underlineY }, color: COLOURS.linkBlue, thickness: 0.5 });
+        page.drawText(")", { x: msLettersX + msLettersW, y: legendY + 1, font: StandardFonts.Helvetica, size: linkTagSize, color: COLOURS.linkBlue });
         page.addLinkAnnotation({
-          rect: { x: x + halfWidth, y: legendY - 1, width: halfWidth, height: FONT_SIZE_LEGEND + 3 },
+          rect: { x: linkX, y: legendY - 1, width: msTagWidth, height: FONT_SIZE_LEGEND + 3 },
           uri: msLinkUrl,
           borderWidth: 0,
         });
+
+        textWidth += 2 + ftTagWidth + 2 + msTagWidth;
       } else if (ftLinkUrl) {
+        // Single link: make the label text itself clickable
         page.addLinkAnnotation({
           rect: { x: x, y: legendY - 1, width: textWidth, height: FONT_SIZE_LEGEND + 3 },
           uri: ftLinkUrl,
           borderWidth: 0,
         });
       } else if (msLinkUrl) {
+        // Single link: make the label text itself clickable
         page.addLinkAnnotation({
           rect: { x: x, y: legendY - 1, width: textWidth, height: FONT_SIZE_LEGEND + 3 },
           uri: msLinkUrl,
@@ -460,11 +488,20 @@ function drawLegend(page, series, startX, y, availableWidth) {
   // Split a list of items into chunks of maxPerRow and draw each chunk as a row
   var currentY = y - 12;
 
+  // Pre-calculate extra width for "(FT) (MS)" link tags on investments with both links
+  var linkTagSize = FONT_SIZE_LEGEND - 1;
+  var ftTagWidth = font.widthOfTextAtSize("(FT)", linkTagSize);
+  var msTagWidth = font.widthOfTextAtSize("(MS)", linkTagSize);
+  var dualLinkExtra = 2 + ftTagWidth + 2 + msTagWidth;
+
   // Draw investment rows
   for (var r = 0; r < investments.length; r += maxPerRow) {
     var chunk = investments.slice(r, r + maxPerRow);
     var labels = chunk.map(function (item) { return item.label; });
-    truncateLabelsToFit(font, labels, availableWidth, boxSize, gap);
+    var extraWidths = chunk.map(function (item) {
+      return (item.publicId && item.morningstarId) ? dualLinkExtra : 0;
+    });
+    truncateLabelsToFit(font, labels, availableWidth, boxSize, gap, extraWidths);
     drawLegendRow(page, chunk, labels, startX, currentY);
     currentY -= LEGEND_ROW_HEIGHT;
   }
