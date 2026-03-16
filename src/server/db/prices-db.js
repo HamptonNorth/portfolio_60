@@ -196,6 +196,40 @@ export function getPricesInRange(investmentId, fromDate, toDate) {
 }
 
 /**
+ * @description Get all prices for all investments within a date range in one query.
+ * Returns a Map keyed by investment_id, each value an array of price records
+ * sorted by date ascending. Used by the analysis service to avoid N+1 queries.
+ * @param {string} fromDate - ISO-8601 start date (inclusive)
+ * @param {string} toDate - ISO-8601 end date (inclusive)
+ * @returns {Map<number, Array<Object>>} Map of investmentId → price records
+ */
+export function getAllInvestmentPricesInRange(fromDate, toDate) {
+  const db = getDatabase();
+  const rows = db
+    .query(
+      `SELECT investment_id, price_date, price
+       FROM prices
+       WHERE price_date >= ? AND price_date <= ?
+       ORDER BY investment_id, price_date ASC`,
+    )
+    .all(fromDate, toDate);
+
+  var result = new Map();
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    var invId = row.investment_id;
+    if (!result.has(invId)) {
+      result.set(invId, []);
+    }
+    result.get(invId).push({
+      price_date: row.price_date,
+      price: row.price / CURRENCY_SCALE_FACTOR,
+    });
+  }
+  return result;
+}
+
+/**
  * @description Scale a price value for storage (multiply by CURRENCY_SCALE_FACTOR).
  * @param {number} price - The price in minor units
  * @returns {number} Scaled integer value

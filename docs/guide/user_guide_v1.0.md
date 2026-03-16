@@ -153,6 +153,8 @@ This page lets you manually fetch current prices, currency rates and benchmark v
 
 A fetch always runs in this order: currency rates first, then investment prices, then benchmarks. This ensures prices and exchange rates are contemporaneous.
 
+If the application detects gaps in your data (for example, because the computer was switched off for several weeks), it will automatically fetch the missing data before collecting today's values. This happens silently as part of the normal fetch process — you do not need to take any action. See [Automatic Gap Detection](#automatic-gap-detection) below for details.
+
 Click **View Fetching History** to see a log of all past fetch attempts, including any errors.
 
 ### Portfolio Setup
@@ -260,6 +262,20 @@ If any items fail, the scheduler will retry them automatically according to the 
 ```
 
 This means failed items are retried every 5 minutes, up to 5 total attempts.
+
+### Automatic Gap Detection
+
+Because Portfolio 60 runs on your desktop computer rather than a server, data gaps can occur if the computer is switched off or the application is not running for an extended period. For example, if you go on holiday for several weeks, the weekly scheduled fetches will not run and you will have missing price, currency rate and benchmark data for that period.
+
+Portfolio 60 detects these gaps automatically. Every time a fetch runs (whether manual or scheduled), the application checks each investment, currency and benchmark for the date of the most recent stored data. If the gap between that date and today is greater than 10 days, the application fetches the missing data from the relevant API before collecting today's values.
+
+This targeted gap-fill is much faster than a full historic backfill because it only fetches the specific date range that is missing. The data sources used are the same as for the initial 3-year backfill:
+
+- **Investment prices** — Morningstar API (weekly data points)
+- **Benchmark values** — Yahoo Finance API (weekly data points)
+- **Currency rates** — Bank of England (daily data filtered to weekly Fridays)
+
+Gap-fill happens automatically and requires no action from you. Progress messages appear in the fetch results alongside the normal price updates. You do not need to run a manual backfill after returning from an absence — the next scheduled or manual fetch will fill in any missing weeks before fetching the latest values.
 
 ### Cron Settings for Fees
 

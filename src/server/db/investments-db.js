@@ -201,6 +201,28 @@ export function updateAutoFetch(id, autoFetch) {
 }
 
 /**
+ * @description Get all investments that have at least one price record,
+ * joined with currency info. Used by the analysis service to determine
+ * which investments can be included in league tables and charts.
+ * @returns {Object[]} Array of investment objects with currency details
+ */
+export function getInvestmentsWithPrices() {
+  const db = getDatabase();
+  return db
+    .query(
+      `SELECT DISTINCT i.id, i.description, i.public_id, i.morningstar_id,
+              i.currencies_id, c.code AS currency_code,
+              it.short_description AS type_short
+       FROM investments i
+       JOIN currencies c ON i.currencies_id = c.id
+       JOIN investment_types it ON i.investment_type_id = it.id
+       JOIN prices p ON p.investment_id = i.id
+       ORDER BY i.description`,
+    )
+    .all();
+}
+
+/**
  * @description Get all manually-priced investments (auto_fetch = 0) with their
  * latest price date and how the last price was obtained.
  * Used by the home page alert table to show investments that need manual price updates.

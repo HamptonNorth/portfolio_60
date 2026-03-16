@@ -54,6 +54,8 @@ class AppNavbar extends LitElement {
                 <div class="bg-white text-brand-800 rounded-md shadow-lg border border-brand-200 py-1 min-w-48" id="nav-views-dropdown">
                   <a href="/pages/reports.html?block=portfolio_summary" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="view-portfolio-summary">Portfolio Summary</a>
                   <a href="/pages/reports.html?block=household_assets" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="view-household">Household Assets</a>
+                  <hr class="my-1 border-brand-200" />
+                  <a href="/pages/analysis.html" class="block px-4 py-2 hover:bg-brand-50 transition-colors" data-nav="analysis">Analysis</a>
                 </div>
               </div>
             </li>

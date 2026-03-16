@@ -22,6 +22,7 @@ import { handleDocsRoute } from "./routes/docs-routes.js";
 import { handleOtherAssetsRoute } from "./routes/other-assets-routes.js";
 import { handleReportsRoute } from "./routes/reports-routes.js";
 import { handlePortfolioDetailRoute } from "./routes/portfolio-detail-routes.js";
+import { handleAnalysisRoute } from "./routes/analysis-routes.js";
 import { initScheduledFetcher, stopScheduledFetcher } from "./services/scheduled-fetcher.js";
 import { processDrawdowns } from "./services/drawdown-processor.js";
 import { databaseExists, closeDatabase } from "./db/connection.js";
@@ -196,6 +197,14 @@ const server = Bun.serve({
       const configResultAsync = await handleConfigRouteAsync(method, path, request);
       if (configResultAsync) {
         return configResultAsync;
+      }
+    }
+
+    // Analysis routes (league table, risk/return, top/bottom)
+    if (path.startsWith("/api/analysis/")) {
+      const analysisResult = await handleAnalysisRoute(method, path, request);
+      if (analysisResult) {
+        return analysisResult;
       }
     }
 
