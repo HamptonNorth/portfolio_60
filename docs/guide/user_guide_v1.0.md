@@ -14,12 +14,12 @@ sticky: true
 
 Portfolio 60 is a desktop application for UK families to track investments across multiple people and account types. It supports shares, mutual funds, investment trusts, savings accounts and other instruments. All valuations and reports are in GBP, with automatic currency conversion for foreign-currency investments.
 
-The application runs on your desktop and stores all data locally in a SQLite database. It connects to the internet to fetch current prices, currency exchange rates and benchmark index values from public financial websites.
+The application runs on your desktop and stores all data locally in a SQLite database. It connects to the internet to fetch current prices, currency exchange rates and benchmark index values from public financial data APIs.
 
 Key features:
 
 - Track investments across multiple family members and account types (Trading, ISA, SIPP)
-- Automatic price fetching from public financial websites
+- Automatic price fetching via public financial data APIs
 - Currency conversion for non-GBP investments
 - Portfolio valuation with drill-down to individual holdings
 - Buy/sell transaction recording with automatic cash balance updates
@@ -111,27 +111,23 @@ Required fields:
 - **Investment Type** — Select from: Shares, Mutual Funds, Investment Trusts, Savings Accounts, Other
 - **Currency** — The currency in which this investment is priced (e.g. GBP, USD)
 
-Optional fields for price scraping:
-- **Public ID** — The ISIN code for mutual funds (e.g. GB00B4PQW151), or an Exchange:Ticker code for shares and investment trusts (e.g. LSE:AZN). For ETFs, use the format Ticker:Exchange:Currency (e.g. ISF:LSE:GBX). Click the info icon for full details.
-- **Known Site** — If your price source is one of the pre-configured websites, select it here. This will auto-fill the CSS Selector field.
-- **Price Page URL** — The public web page where the current price is displayed. This is the page the scraper will visit to read the price.
-- **CSS Selector** — The CSS selector that identifies the price element on the page. To find this: right-click the price on the web page, choose "Inspect", then right-click the highlighted HTML element and choose "Copy > Copy selector".
+Optional fields:
+- **Public ID** — The ISIN code for mutual funds (e.g. GB00B4PQW151), or an Exchange:Ticker code for shares and investment trusts (e.g. LSE:AZN). For ETFs, use the format Ticker:Exchange:Currency (e.g. ISF:LSE:GBX). Click the info icon for full details. This is the key field for automatic price fetching — the system uses it to look up the investment on Morningstar.
 
-You do not need to set up price scraping immediately. You can add the basic investment details first and configure scraping later once you have tested the selectors.
+The form also shows **Price Page URL**, **Known Site** and **CSS Selector** fields. These are legacy fields from an earlier version that fetched prices by visiting web pages. They are no longer used for price fetching and can be left blank.
 
 ### Add Benchmarks
 
 Navigate to **Set Up > Benchmarks**.
 
-Benchmarks are market indices or reference points you want to track alongside your portfolio (e.g. FTSE 100, S&P 500). They work similarly to investments — you provide a URL and CSS selector for the scraper to fetch the current value.
+Benchmarks are market indices or reference points you want to track alongside your portfolio (e.g. FTSE 100, S&P 500). Live values are fetched automatically via the Yahoo Finance API.
 
 Required fields:
-- **Description** — The name of the benchmark (e.g. "FTSE 100 Index")
+- **Description** — The name of the benchmark (e.g. "FTSE 100 Index"). The system matches this to a Yahoo Finance ticker symbol automatically.
 - **Benchmark Type** — Select the appropriate type
 - **Currency** — The currency of the benchmark value
 
-Optional fields (for value scraping):
-- **Known Site**, **Benchmark URL**, **CSS Selector** — Same pattern as investments
+The form also shows **Benchmark URL**, **Known Site** and **CSS Selector** fields. These are legacy fields from an earlier version and can be left blank.
 
 ### Add Currencies
 
@@ -143,19 +139,6 @@ GBP is pre-configured. Add any other currencies used by your investments (e.g. U
 - **Description** — A readable name (e.g. "US Dollar")
 
 Currency exchange rates (to GBP) are fetched automatically when you run a price fetch.
-
-### Test Scraping
-
-Navigate to **Set Up > Scraper Testing** (if enabled in Settings).
-
-The Scraper Testing sandbox lets you try out URLs and CSS selectors without affecting your live portfolio data. This is the recommended way to verify that your scraping configuration works before applying it to real investments.
-
-1. Click **Add** to create a test investment
-2. Fill in the URL and CSS selector (or select a Known Site to auto-fill the selector)
-3. Click **Test** to run a single scrape and see the result
-4. If the price looks correct, copy the URL and selector to your real investment record
-
-You can also use **Test All** to run all test investments, or **Test Stalest 20** to re-test the ones that haven't been checked recently.
 
 ### Fetching
 
@@ -233,7 +216,7 @@ When you first set up Portfolio 60, compare the valuations shown here against yo
 
 If the values are significantly different, check:
 
-- The correct price is being scraped (test with Scraper Testing)
+- The Public ID is correct and the system can resolve it on Morningstar
 - The currency is set correctly on the investment
 - The quantity matches what your provider shows
 - Currency exchange rates have been fetched recently
@@ -251,14 +234,14 @@ The fetch schedule is configured in **Settings > Edit Settings** under the `sche
 ```json
 "scheduling": {
   "enabled": true,
-  "cron": "0 6,11,20 * * *",
+  "cron": "10 8 * * 6",
   "runOnStartupIfMissed": true,
   "startupDelayMinutes": 10
 }
 ```
 
 - **enabled** — Set to `true` to activate scheduled fetching, or `false` to disable it
-- **cron** — A cron expression defining when fetches run. The default `"0 6,11,20 * * *"` means "at 6:00, 11:00 and 20:00 every day". Common alternatives:
+- **cron** — A cron expression defining when fetches run. The default `"10 8 * * 6"` means "at 8:10am every Saturday". Common alternatives:
   - `"0 8 * * 1-5"` — 8am on weekdays only
   - `"0 8 * * 6"` — 8am on Saturdays only
   - `"0 7,19 * * *"` — 7am and 7pm daily
@@ -290,7 +273,18 @@ This means failed items are retried every 5 minutes, up to 5 total attempts.
 
 ## Reports
 
-*This feature is planned for a future release.* The Reports section will provide performance analysis, benchmark comparison, and other portfolio analytics.
+Navigate to **Reports**.
+
+The Reports page provides PDF reports and performance charts for your portfolio. Available report types include:
+
+- **Portfolio Summary** — A one-page overview of all accounts and their current values
+- **Portfolio Detail Valuation** — A detailed breakdown of every holding across all accounts, with current prices, exchange rates and GBP values
+- **Household Assets** — A combined view of investment accounts and other assets
+- **Performance Charts** — Line charts showing investment and benchmark performance over time, rebased to a common starting point for comparison
+
+Reports open as PDF documents in your browser. Investment names in the reports are clickable links to external research pages (FT Markets and Morningstar) where available.
+
+Charts can be configured as individual charts or chart groups (multiple charts on one page). Chart definitions are managed in **Settings > Edit Settings** under the report parameters.
 
 ---
 
@@ -485,9 +479,9 @@ Other common UK providers you might add:
 ### Scheduling
 
 ```json
-"scheduling": {
+prepare "scheduling": {
   "enabled": true,
-  "cron": "0 6,11,20 * * *",
+  "cron": "10 8 * * 6",
   "runOnStartupIfMissed": true,
   "startupDelayMinutes": 10
 }
@@ -495,7 +489,7 @@ Other common UK providers you might add:
 
 Controls automatic price, rate and benchmark fetching. See the [Auto Fetch of Prices](#auto-fetch-of-prices) section for full details.
 
-The default schedule fetches at 6:00, 11:00 and 20:00 every day. Adjust the cron expression to suit your needs. A useful resource for building cron expressions is [crontab.guru](https://crontab.guru/).
+The default schedule fetches at 8:10am every Saturday. Adjust the cron expression to suit your needs. A useful resource for building cron expressions is [crontab.guru](https://crontab.guru/).
 
 ### Retry on Price Fetching
 
@@ -506,7 +500,7 @@ The default schedule fetches at 6:00, 11:00 and 20:00 every day. Adjust the cron
 }
 ```
 
-When a scheduled fetch fails for one or more items (e.g. a website is temporarily unavailable), the scheduler retries the failed items:
+When a scheduled fetch fails for one or more items (e.g. an API is temporarily unavailable), the scheduler retries the failed items:
 
 - **delayMinutes** — Wait this many minutes between retry attempts (default: 5)
 - **maxAttempts** — Maximum total attempts including the initial one (default: 5)
@@ -525,20 +519,21 @@ Only failed items are retried — successful items are not re-fetched.
 
 Configures the UK ISA annual contribution limit and the tax year start date. The current UK ISA allowance is £20,000 per tax year, starting on 6th April. Update the `annualLimit` if the government changes the allowance.
 
-### Scraper Tuning
+### Fetch Batching
 
 ```json
-"scrapeDelayProfile": "cron"
+"fetchBatch": {
+  "batchSize": 10,
+  "cooldownSeconds": 25
+}
 ```
 
-Controls how politely the scraper behaves when fetching prices from websites. Two profiles are available:
+Controls how investment prices and benchmark values are fetched in batches to avoid rate-limiting by the data APIs:
 
-- **`"cron"`** — Polite mode (default for scheduled fetches). Waits 5–30 seconds between requests to the same website. This is the recommended setting for unattended scraping.
-- **`"interactive"`** — Faster mode (used for manual fetches). Waits 2–5 seconds between requests. Suitable when you are actively watching and want quicker results.
+- **batchSize** — The number of items fetched per batch (1–50). Default: 10.
+- **cooldownSeconds** — The pause in seconds between batches (0–600). Default: 25.
 
-Manual fetches from the Fetching page always use the "interactive" profile regardless of this setting. This setting only affects scheduled (cron) fetches.
-
-**Being a good user:** The scraper visits public websites to read prices, much like you would in a web browser. The delay settings ensure it does not make requests too quickly, which could be disruptive to the website. Do not reduce the delays below the defaults — the built-in values are designed to be respectful of the websites you are scraping.
+The default settings are designed to be respectful of the public APIs. Reducing the cooldown or increasing the batch size may result in requests being blocked by the API providers.
 
 ### Lists
 
@@ -547,38 +542,6 @@ See the [Lists](#lists) section above for full details on configuring embedded s
 ### Docs
 
 See the [Docs](#docs) section above for full details on configuring documentation categories.
-
-### Scraper Sites
-
-```json
-"scraperSites": [
-  {
-    "pattern": "markets.ft.com/data/funds",
-    "name": "FT Markets (Funds)",
-    "selector": "...",
-    "waitStrategy": "domcontentloaded",
-    "notes": "..."
-  }
-]
-```
-
-This section lists the pre-configured websites that the scraper knows how to read prices from. Each entry defines a URL pattern, a CSS selector for the price element, and a wait strategy.
-
-You generally do not need to edit this section. When you select a **Known Site** on the investment or benchmark form, the application matches your URL against these patterns and auto-fills the CSS selector.
-
-The pre-configured sites include:
-
-- FT Markets (Funds and Equities)
-- Google Finance
-- London Stock Exchange (Indices and Stocks)
-- Fidelity UK
-- Vanguard UK
-- Hargreaves Lansdown (Shares and Funds)
-- Morningstar UK
-- Interactive Investor
-- AJ Bell
-
-If a website changes its layout, you may need to update the CSS selector here. Use the Scraper Testing sandbox to test new selectors before applying them.
 
 ---
 
@@ -630,7 +593,7 @@ On the passphrase screen (either the first-run "Set passphrase" screen or the no
 
 The application opens immediately with a pre-loaded set of anonymised sample data, including:
 
-- Two example users (Alice Smith and Bob Smith) with accounts and holdings
+- Two example users (Ben Wilson and Alexis Wilson) with accounts and holdings
 - A selection of investments covering shares, mutual funds and investment trusts in both GBP and foreign currencies
 - Recent prices, currency rates and benchmark values
 - Sample documents and configuration
