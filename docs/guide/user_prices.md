@@ -23,17 +23,15 @@ This guide explains where this data comes from, how to fetch it, and how to revi
 
 ### Investment prices
 
-Live prices are fetched from public financial websites by visiting the web page and reading the price shown on screen. Portfolio 60 uses three sources, tried in this order:
+Live prices are fetched from the **Morningstar API** — the same data provider used for loading historical prices. The system looks up each investment using its Public ID (ISIN or exchange:ticker) or a previously cached Morningstar identifier, then retrieves the most recent price from Morningstar's timeseries data feed.
 
-1. **FT Markets** — if the investment has an ISIN or ticker code in the Public ID field, the system builds a Financial Times URL automatically
-2. **Fidelity UK** — if FT Markets fails for an ISIN-based investment, the system searches the Fidelity website to find the fund factsheet and reads the price from there
-3. **Custom URL** — if you have entered a URL and CSS selector manually on the investment record, the system visits that page instead
-
-You do not need to understand how CSS selectors work in most cases. The system handles FT Markets and Fidelity automatically using the Public ID. Custom URLs are only needed for investments not listed on those sites.
+You do not need to configure anything beyond the Public ID on each investment. The system resolves the Morningstar identifier automatically and caches it for future fetches.
 
 ### Benchmark values
 
-Live benchmark values are fetched from the web page URL and CSS selector you entered on the benchmark record. There is no automatic lookup — you must provide the URL where the current value is displayed.
+Live benchmark values are fetched from the **Yahoo Finance API** — the same data provider used for loading historical benchmark data. The system matches each benchmark to its Yahoo Finance ticker symbol automatically (for example, FTSE 100 maps to ^FTSE) and retrieves the most recent value from Yahoo's chart data feed.
+
+You do not need to configure anything beyond the benchmark description. The system resolves the Yahoo ticker automatically and caches it for future fetches.
 
 ### Currency exchange rates
 
@@ -49,7 +47,7 @@ There are two ways to fetch the latest prices, values and rates.
 
 ### Manual fetch
 
-From the **Scraper** page you can start a fetch at any time. The system works through each investment and benchmark one at a time, showing you the result for each as it completes. If any fail on the first attempt, the system automatically retries them (up to five times) before reporting the final result.
+From the **Fetching** page you can start a fetch at any time. The system works through each investment and benchmark one at a time, showing you the result for each as it completes. If any fail on the first attempt, the system automatically retries them before reporting the final result.
 
 You can also fetch a single investment or benchmark price from its row on the Investments or Benchmarks page.
 
@@ -114,8 +112,8 @@ This viewer is useful for:
 
 | What | Live source | Historical source | Frequency |
 |---|---|---|---|
-| Investment prices | FT Markets, Fidelity or custom URL | Morningstar UK | On demand or scheduled |
-| Benchmark values | Custom URL with CSS selector | Yahoo Finance | On demand or scheduled |
+| Investment prices | Morningstar API | Morningstar API | On demand or scheduled |
+| Benchmark values | Yahoo Finance API | Yahoo Finance API | On demand or scheduled |
 | Currency rates | Frankfurter API (ECB rates) | Bank of England | On demand or scheduled |
 
 All data is stored locally in your database. No account or login is needed with any of these external services — they all provide public data freely.
