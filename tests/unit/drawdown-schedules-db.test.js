@@ -14,6 +14,7 @@ import {
   getDrawdownSchedulesByAccountId,
   getActiveDrawdownSchedules,
   getDueDrawdownDates,
+  getOverlappingSchedule,
   scaleAmount,
   unscaleAmount,
 } from "../../src/server/db/drawdown-schedules-db.js";
@@ -448,5 +449,98 @@ describe("getDueDrawdownDates", () => {
       "2027-01-01",
       "2027-04-01",
     ]);
+  });
+});
+
+// --- getOverlappingSchedule ---
+
+describe("getOverlappingSchedule", () => {
+  /** @type {Object} Active schedule used for overlap checks */
+  let overlapSchedule;
+
+  beforeAll(() => {
+    // Create a known active schedule: 2028-01 to 2028-12 on sippAccount
+    overlapSchedule = createDrawdownSchedule({
+      account_id: sippAccount.id,
+      frequency: "monthly",
+      trigger_day: 10,
+      from_date: "2028-01-01",
+      to_date: "2028-12-01",
+      amount: 800,
+      notes: "Overlap test base",
+    });
+  });
+
+  test("detects overlap when new range falls within existing range", () => {
+    const result = getOverlappingSchedule(sippAccount.id, "2028-03-01", "2028-06-01");
+    expect(result).not.toBeNull();
+    expect(result.id).toBe(overlapSchedule.id);
+  });
+
+  test("detects overlap when new range starts before and ends during existing", () => {
+    const result = getOverlappingSchedule(sippAccount.id, "2027-10-01", "2028-03-01");
+    expect(result).not.toBeNull();
+    expect(result.id).toBe(overlapSchedule.id);
+  });
+
+  test("detects overlap when new range starts during and ends after existing", () => {
+    const result = getOverlappingSchedule(sippAccount.id, "2028-10-01", "2029-06-01");
+    expect(result).not.toBeNull();
+    expect(result.id).toBe(overlapSchedule.id);
+  });
+
+  test("detects overlap when new range completely encloses existing", () => {
+    const result = getOverlappingSchedule(sippAccount.id, "2027-06-01", "2029-06-01");
+    expect(result).not.toBeNull();
+    expect(result.id).toBe(overlapSchedule.id);
+  });
+
+  test("returns null when new range is entirely before existing", () => {
+    // Must be before ALL active schedules on sippAccount (earliest is 2026-05)
+    const result = getOverlappingSchedule(sippAccount.id, "2025-01-01", "2025-06-01");
+    expect(result).toBeNull();
+  });
+
+  test("returns null when new range is entirely after existing", () => {
+    // Must be after ALL active schedules on sippAccount (latest ends 2028-12)
+    const result = getOverlappingSchedule(sippAccount.id, "2029-02-01", "2029-12-01");
+    expect(result).toBeNull();
+  });
+
+  test("excludes self when excludeId is provided", () => {
+    const result = getOverlappingSchedule(sippAccount.id, "2028-01-01", "2028-12-01", overlapSchedule.id);
+    // The only other active schedule (monthly 2026-05 to 2027-04) does not overlap 2028
+    expect(result).toBeNull();
+  });
+
+  test("returns null for different account with non-overlapping dates", () => {
+    // sippAccount2 has an annual schedule from 2026-06 to 2030-06, so use dates outside that
+    const result = getOverlappingSchedule(sippAccount2.id, "2031-01-01", "2031-12-01");
+    expect(result).toBeNull();
+  });
+
+  test("ignores inactive schedules", () => {
+    // Deactivate the schedule
+    updateDrawdownSchedule(overlapSchedule.id, {
+      frequency: overlapSchedule.frequency,
+      trigger_day: overlapSchedule.trigger_day,
+      from_date: overlapSchedule.from_date,
+      to_date: overlapSchedule.to_date,
+      amount: overlapSchedule.amount,
+      active: 0,
+    });
+
+    const result = getOverlappingSchedule(sippAccount.id, "2028-03-01", "2028-06-01");
+    expect(result).toBeNull();
+
+    // Reactivate for any subsequent tests
+    updateDrawdownSchedule(overlapSchedule.id, {
+      frequency: overlapSchedule.frequency,
+      trigger_day: overlapSchedule.trigger_day,
+      from_date: overlapSchedule.from_date,
+      to_date: overlapSchedule.to_date,
+      amount: overlapSchedule.amount,
+      active: 1,
+    });
   });
 });

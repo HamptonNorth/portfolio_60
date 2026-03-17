@@ -14,6 +14,12 @@ import {
   buildComparisonTable,
   PERIOD_WEEKS,
 } from "../services/analysis-service.js";
+import {
+  generateComparisonPdf,
+  generateLeagueTablePdf,
+  generateTopBottomPdf,
+  generateRiskReturnPdf,
+} from "../reports/pdf-analysis.js";
 
 const analysisRouter = new Router();
 
@@ -139,6 +145,110 @@ analysisRouter.get("/api/analysis/comparison", function (request) {
   } catch (err) {
     return new Response(
       JSON.stringify({ error: "Failed to build comparison data", detail: err.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+});
+
+// ─── PDF endpoints ──────────────────────────────────────────────
+
+// GET /api/analysis/pdf/comparison?periods=3m,6m,1y,3y&benchmarks=1,3
+analysisRouter.get("/api/analysis/pdf/comparison", async function (request) {
+  try {
+    var url = new URL(request.url);
+    var periodsParam = url.searchParams.get("periods") || "3m,6m,1y,3y";
+    var benchmarkIds = parseBenchmarkIds(url.searchParams.get("benchmarks"));
+
+    var periodCodes = [];
+    var parts = periodsParam.split(",");
+    for (var i = 0; i < parts.length && periodCodes.length < 4; i++) {
+      var validated = validatePeriod(parts[i].trim());
+      if (validated) periodCodes.push(validated);
+    }
+    if (periodCodes.length === 0) periodCodes = ["3m", "6m", "1y", "3y"];
+
+    var pdfBytes = await generateComparisonPdf(periodCodes, benchmarkIds);
+    return new Response(pdfBytes, {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": 'inline; filename="analysis-comparison.pdf"',
+      },
+    });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Failed to generate comparison PDF", detail: err.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+});
+
+// GET /api/analysis/pdf/league-table?period=1y&sort=return&dir=desc&limit=all&benchmarks=1,3
+analysisRouter.get("/api/analysis/pdf/league-table", async function (request) {
+  try {
+    var url = new URL(request.url);
+    var period = validatePeriod(url.searchParams.get("period")) || "1y";
+    var sort = url.searchParams.get("sort") || "return";
+    var dir = url.searchParams.get("dir") || "desc";
+    var limit = url.searchParams.get("limit") || "all";
+    var benchmarkIds = parseBenchmarkIds(url.searchParams.get("benchmarks"));
+
+    var pdfBytes = await generateLeagueTablePdf(period, sort, dir, limit, benchmarkIds);
+    return new Response(pdfBytes, {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": 'inline; filename="analysis-league-table.pdf"',
+      },
+    });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Failed to generate league table PDF", detail: err.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+});
+
+// GET /api/analysis/pdf/risk-return?period=1y&benchmarks=1,3
+analysisRouter.get("/api/analysis/pdf/risk-return", async function (request) {
+  try {
+    var url = new URL(request.url);
+    var period = validatePeriod(url.searchParams.get("period")) || "1y";
+    var benchmarkIds = parseBenchmarkIds(url.searchParams.get("benchmarks"));
+
+    var pdfBytes = await generateRiskReturnPdf(period, benchmarkIds);
+    return new Response(pdfBytes, {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": 'inline; filename="analysis-risk-return.pdf"',
+      },
+    });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Failed to generate risk/return PDF", detail: err.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+});
+
+// GET /api/analysis/pdf/top-bottom?period=1y&count=5&benchmarks=1,3
+analysisRouter.get("/api/analysis/pdf/top-bottom", async function (request) {
+  try {
+    var url = new URL(request.url);
+    var period = validatePeriod(url.searchParams.get("period")) || "1y";
+    var count = parseInt(url.searchParams.get("count"), 10) || 5;
+    if (count < 1) count = 1;
+    if (count > 20) count = 20;
+    var benchmarkIds = parseBenchmarkIds(url.searchParams.get("benchmarks"));
+
+    var pdfBytes = await generateTopBottomPdf(period, count, benchmarkIds);
+    return new Response(pdfBytes, {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": 'inline; filename="analysis-top-bottom.pdf"',
+      },
+    });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Failed to generate top/bottom PDF", detail: err.message }),
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }

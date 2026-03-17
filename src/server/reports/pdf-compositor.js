@@ -1,5 +1,6 @@
 import { PDF } from "@libpdf/core";
 import { drawPageHeader, drawPageFooters } from "./pdf-common.js";
+import { embedRobotoFonts } from "./pdf-fonts.js";
 import { renderHouseholdAssetsBlock } from "./pdf-household-assets.js";
 import { renderPortfolioSummaryBlock } from "./pdf-portfolio-summary.js";
 import { renderPortfolioDetailBlock } from "./pdf-portfolio-detail.js";
@@ -68,20 +69,22 @@ export async function generateCompositePdf(reportDef) {
   if (blocks.length === 0) {
     // Return a minimal PDF with a "no blocks" message
     const pdf = PDF.create();
+    var fonts = embedRobotoFonts(pdf);
     const page = pdf.addPage({ size: "a4", orientation: "portrait" });
-    var emptyY = drawPageHeader(pdf, page, MARGIN_LEFT, 841.89, MARGIN_TOP);
+    var emptyY = drawPageHeader(pdf, page, MARGIN_LEFT, 841.89, MARGIN_TOP, fonts);
     page.drawText(reportDef.title + " \u2014 no blocks defined.", {
       x: MARGIN_LEFT,
       y: emptyY - 14,
-      font: "Helvetica",
+      font: fonts.medium,
       size: 14,
       color: { r: 0.15, g: 0.23, b: 0.42 },
     });
-    drawPageFooters([page], reportDef.title, MARGIN_LEFT, 515.28);
+    drawPageFooters([page], reportDef.title, MARGIN_LEFT, 515.28, fonts);
     return await pdf.save();
   }
 
   const pdf = PDF.create();
+  var fonts = embedRobotoFonts(pdf);
   var pages = [];
   var pageWidths = [];
 
@@ -103,7 +106,7 @@ export async function generateCompositePdf(reportDef) {
     pageWidths.push(layout.usableWidth);
 
     // Draw page header and get starting y position
-    var y = drawPageHeader(pdf, page, MARGIN_LEFT, layout.pageHeight, MARGIN_TOP);
+    var y = drawPageHeader(pdf, page, MARGIN_LEFT, layout.pageHeight, MARGIN_TOP, fonts);
 
     // Build context for the block renderer
     var ctx = {
@@ -112,6 +115,7 @@ export async function generateCompositePdf(reportDef) {
       pages: pages,
       y: y,
       pageWidths: pageWidths,
+      fonts: fonts,
     };
 
     // Call the block renderer (chart blocks also receive the full block definition)
@@ -122,7 +126,7 @@ export async function generateCompositePdf(reportDef) {
   }
 
   // Draw unified footers across all pages with per-page widths
-  drawPageFooters(pages, reportDef.title, MARGIN_LEFT, pageWidths);
+  drawPageFooters(pages, reportDef.title, MARGIN_LEFT, pageWidths, fonts);
 
   return await pdf.save();
 }

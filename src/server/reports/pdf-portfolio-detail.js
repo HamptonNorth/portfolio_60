@@ -1,4 +1,5 @@
-import { PDF, rgb, StandardFonts, Standard14Font } from "@libpdf/core";
+import { PDF, rgb } from "@libpdf/core";
+import { embedRobotoFonts } from "./pdf-fonts.js";
 import { getPortfolioDetail } from "../services/portfolio-detail-service.js";
 import { getReportParams } from "../db/report-params-db.js";
 import { isTestMode } from "../test-mode.js";
@@ -137,17 +138,16 @@ function changeColour(pct) {
  * @param {number} x - Left edge of column (absolute)
  * @param {number} colWidth - Column width in points
  * @param {number} y - Y position (baseline)
- * @param {string} fontName - Standard font name
+ * @param {Object} font - Embedded font object
  * @param {number} fontSize - Font size in points
  * @param {Object} color - RGB colour
  */
-function drawRightAligned(page, text, x, colWidth, y, fontName, fontSize, color) {
-  const font = Standard14Font.of(fontName);
+function drawRightAligned(page, text, x, colWidth, y, font, fontSize, color) {
   const textWidth = font.widthOfTextAtSize(text, fontSize);
   page.drawText(text, {
     x: x + colWidth - textWidth - 2,
     y: y,
-    font: fontName,
+    font: font,
     size: fontSize,
     color: color,
   });
@@ -156,13 +156,12 @@ function drawRightAligned(page, text, x, colWidth, y, fontName, fontSize, color)
 /**
  * @description Truncate text to fit within a given width, appending "..." if needed.
  * @param {string} text - The text to truncate
- * @param {string} fontName - Standard font name
+ * @param {Object} font - Embedded font object
  * @param {number} fontSize - Font size in points
  * @param {number} maxWidth - Maximum width in points
  * @returns {string} Truncated text
  */
-function truncateText(text, fontName, fontSize, maxWidth) {
-  const font = Standard14Font.of(fontName);
+function truncateText(text, font, fontSize, maxWidth) {
   if (font.widthOfTextAtSize(text, fontSize) <= maxWidth) return text;
 
   var truncated = text;
@@ -256,6 +255,7 @@ function buildColumns(periods) {
  * @param {Object} ctx.page - Current page (updated in place on ctx)
  * @param {Array<Object>} ctx.pages - Array of all pages (pushed to when new pages added)
  * @param {number} ctx.y - Current y position (updated in place on ctx)
+ * @param {Object} ctx.fonts - Roboto font objects from embedRobotoFonts()
  * @param {Array<number>} ctx.pageWidths - Per-page usable widths (pushed to when new pages added)
  * @param {Array<string>} params - Params array controlling which accounts to render.
  *   Format: "USER:ACCOUNT_TYPE:periods" or "USER:isa+sipp+trading:periods".
@@ -267,6 +267,7 @@ export function renderPortfolioDetailBlock(ctx, params) {
   var page = ctx.page;
   var pages = ctx.pages;
   var y = ctx.y;
+  var fonts = ctx.fonts;
 
   var resolvedParams = resolveParams(params);
 
@@ -274,7 +275,7 @@ export function renderPortfolioDetailBlock(ctx, params) {
     page.drawText("Portfolio Detail Valuation \u2014 no parameters provided.", {
       x: MARGIN_LEFT,
       y: y - FONT_SIZE_TITLE,
-      font: StandardFonts.Helvetica,
+      font: fonts.medium,
       size: FONT_SIZE_TITLE,
       color: COLOURS.brand800,
     });
@@ -296,7 +297,7 @@ export function renderPortfolioDetailBlock(ctx, params) {
       page = pdf.addPage({ size: "a4", orientation: "landscape" });
       pages.push(page);
       if (ctx.pageWidths) ctx.pageWidths.push(USABLE_WIDTH);
-      y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_LANDSCAPE_HEIGHT, MARGIN_TOP);
+      y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_LANDSCAPE_HEIGHT, MARGIN_TOP, fonts);
     }
   }
 
@@ -304,7 +305,7 @@ export function renderPortfolioDetailBlock(ctx, params) {
   page.drawText("Portfolio Detail Valuation", {
     x: MARGIN_LEFT,
     y: y - FONT_SIZE_TITLE,
-    font: StandardFonts.HelveticaBold,
+    font: fonts.bold,
     size: FONT_SIZE_TITLE,
     color: COLOURS.brand800,
   });
@@ -317,11 +318,11 @@ export function renderPortfolioDetailBlock(ctx, params) {
       page = pdf.addPage({ size: "a4", orientation: "landscape" });
       pages.push(page);
       if (ctx.pageWidths) ctx.pageWidths.push(USABLE_WIDTH);
-      y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_LANDSCAPE_HEIGHT, MARGIN_TOP);
+      y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_LANDSCAPE_HEIGHT, MARGIN_TOP, fonts);
       page.drawText("Portfolio Detail Valuation", {
         x: MARGIN_LEFT,
         y: y - FONT_SIZE_TITLE,
-        font: StandardFonts.HelveticaBold,
+        font: fonts.bold,
         size: FONT_SIZE_TITLE,
         color: COLOURS.brand800,
       });
@@ -363,7 +364,7 @@ export function renderPortfolioDetailBlock(ctx, params) {
     page.drawText(heading, {
       x: MARGIN_LEFT,
       y: y - FONT_SIZE_SECTION_HEADING,
-      font: StandardFonts.HelveticaBold,
+      font: fonts.bold,
       size: FONT_SIZE_SECTION_HEADING,
       color: COLOURS.brand800,
     });
@@ -405,7 +406,7 @@ export function renderPortfolioDetailBlock(ctx, params) {
       for (var col = 0; col < columns.length; col++) {
         var colDef = columns[col];
         var cellText = values[colDef.key] || "";
-        var fontName = StandardFonts.Helvetica;
+        var font = fonts.medium;
         var cellColour = COLOURS.black;
 
         // Change columns get colour coding
@@ -421,7 +422,7 @@ export function renderPortfolioDetailBlock(ctx, params) {
 
         // Value GBP is bold
         if (colDef.key === "valueGBP") {
-          fontName = StandardFonts.HelveticaBold;
+          font = fonts.bold;
         }
 
         // Investment name: blue text with clickable research links
@@ -430,18 +431,18 @@ export function renderPortfolioDetailBlock(ctx, params) {
           cellColour = COLOURS.linkBlue;
         }
 
-        cellText = truncateText(cellText, fontName, FONT_SIZE_ROW, colDef.width - 4);
+        cellText = truncateText(cellText, font, FONT_SIZE_ROW, colDef.width - 4);
 
         if (colDef.align === "right") {
           drawRightAligned(
             page, cellText, MARGIN_LEFT + colDef.x, colDef.width,
-            textY, fontName, FONT_SIZE_ROW, cellColour,
+            textY, font, FONT_SIZE_ROW, cellColour,
           );
         } else {
           page.drawText(cellText, {
             x: MARGIN_LEFT + colDef.x + 2,
             y: textY,
-            font: fontName,
+            font: font,
             size: FONT_SIZE_ROW,
             color: cellColour,
           });
@@ -450,8 +451,7 @@ export function renderPortfolioDetailBlock(ctx, params) {
           if (isInvestmentLink) {
             var ftLinkUrl = holding.public_id ? buildFtMarketsUrl(holding.public_id, holding.currency_code) : null;
             var msLinkUrl = holding.morningstar_id ? buildMorningstarUrl(holding.morningstar_id) : null;
-            var cellFont = Standard14Font.of(fontName);
-            var cellTextWidth = cellFont.widthOfTextAtSize(cellText, FONT_SIZE_ROW);
+            var cellTextWidth = font.widthOfTextAtSize(cellText, FONT_SIZE_ROW);
             var linkX = MARGIN_LEFT + colDef.x + 2;
 
             if (ftLinkUrl && msLinkUrl) {
@@ -513,7 +513,7 @@ export function renderPortfolioDetailBlock(ctx, params) {
     if (valueLocalCol) {
       drawRightAligned(
         page, "Total GBP", MARGIN_LEFT + valueLocalCol.x, valueLocalCol.width,
-        totalsTextY, StandardFonts.HelveticaBold, FONT_SIZE_ROW, COLOURS.black,
+        totalsTextY, fonts.bold, FONT_SIZE_ROW, COLOURS.black,
       );
     }
 
@@ -523,7 +523,7 @@ export function renderPortfolioDetailBlock(ctx, params) {
       drawRightAligned(
         page, formatNumber(data.totals.value_gbp),
         MARGIN_LEFT + valueGBPCol.x, valueGBPCol.width,
-        totalsTextY, StandardFonts.HelveticaBold, FONT_SIZE_ROW, COLOURS.black,
+        totalsTextY, fonts.bold, FONT_SIZE_ROW, COLOURS.black,
       );
     }
 
@@ -537,14 +537,14 @@ export function renderPortfolioDetailBlock(ctx, params) {
         drawRightAligned(
           page, formatChange(totalChange.change_percent),
           MARGIN_LEFT + changeCol.x, changeCol.width,
-          totalsTextY, StandardFonts.HelveticaBold, FONT_SIZE_ROW,
+          totalsTextY, fonts.bold, FONT_SIZE_ROW,
           changeColour(totalChange.change_percent),
         );
       } else {
         drawRightAligned(
           page, "\u2014",
           MARGIN_LEFT + changeCol.x, changeCol.width,
-          totalsTextY, StandardFonts.Helvetica, FONT_SIZE_ROW, COLOURS.brand300,
+          totalsTextY, fonts.medium, FONT_SIZE_ROW, COLOURS.brand300,
         );
       }
     }
@@ -643,7 +643,7 @@ export function renderPortfolioDetailBlock(ctx, params) {
     page.drawText(heading, {
       x: MARGIN_LEFT,
       y: y - FONT_SIZE_SECTION_HEADING,
-      font: StandardFonts.HelveticaBold,
+      font: fonts.bold,
       size: FONT_SIZE_SECTION_HEADING,
       color: COLOURS.brand800,
     });
@@ -683,7 +683,7 @@ export function renderPortfolioDetailBlock(ctx, params) {
         drawRightAligned(
           page, combinedCols[hc].label, MARGIN_LEFT + combinedCols[hc].x,
           combinedCols[hc].width, y - HEADER_ROW_HEIGHT + 5,
-          StandardFonts.HelveticaBold, FONT_SIZE_HEADER, COLOURS.brand700,
+          fonts.bold, FONT_SIZE_HEADER, COLOURS.brand700,
         );
       }
 
@@ -714,7 +714,7 @@ export function renderPortfolioDetailBlock(ctx, params) {
     drawRightAligned(
       page, formatNumber(combinedValueGBP),
       MARGIN_LEFT + combinedCols[0].x, combinedCols[0].width,
-      textY, StandardFonts.HelveticaBold, FONT_SIZE_ROW, COLOURS.black,
+      textY, fonts.bold, FONT_SIZE_ROW, COLOURS.black,
     );
 
     // Change columns
@@ -726,14 +726,14 @@ export function renderPortfolioDetailBlock(ctx, params) {
         drawRightAligned(
           page, formatChange(cc.change_percent),
           MARGIN_LEFT + colDef.x, colDef.width,
-          textY, StandardFonts.HelveticaBold, FONT_SIZE_ROW,
+          textY, fonts.bold, FONT_SIZE_ROW,
           changeColour(cc.change_percent),
         );
       } else {
         drawRightAligned(
           page, "\u2014",
           MARGIN_LEFT + colDef.x, colDef.width,
-          textY, StandardFonts.Helvetica, FONT_SIZE_ROW, COLOURS.brand300,
+          textY, fonts.medium, FONT_SIZE_ROW, COLOURS.brand300,
         );
       }
     }
@@ -770,14 +770,14 @@ export function renderPortfolioDetailBlock(ctx, params) {
       if (colDef.align === "right") {
         drawRightAligned(
           page, colDef.label, MARGIN_LEFT + colDef.x, colDef.width,
-          y - HEADER_ROW_HEIGHT + 5, StandardFonts.HelveticaBold,
+          y - HEADER_ROW_HEIGHT + 5, fonts.bold,
           FONT_SIZE_HEADER, COLOURS.brand700,
         );
       } else {
         page.drawText(colDef.label, {
           x: MARGIN_LEFT + colDef.x + 2,
           y: y - HEADER_ROW_HEIGHT + 5,
-          font: StandardFonts.HelveticaBold,
+          font: fonts.bold,
           size: FONT_SIZE_HEADER,
           color: COLOURS.brand700,
         });
@@ -806,13 +806,14 @@ export function renderPortfolioDetailBlock(ctx, params) {
  */
 export async function generatePortfolioDetailPdf(params) {
   const pdf = PDF.create();
+  var fonts = embedRobotoFonts(pdf);
   var page = pdf.addPage({ size: "a4", orientation: "landscape" });
   var pages = [page];
-  var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_LANDSCAPE_HEIGHT, MARGIN_TOP);
+  var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_LANDSCAPE_HEIGHT, MARGIN_TOP, fonts);
 
-  var ctx = { pdf: pdf, page: page, pages: pages, y: y };
+  var ctx = { pdf: pdf, page: page, pages: pages, y: y, fonts: fonts };
   renderPortfolioDetailBlock(ctx, params);
 
-  drawPageFooters(ctx.pages, "Portfolio Detail Valuation", MARGIN_LEFT, USABLE_WIDTH);
+  drawPageFooters(ctx.pages, "Portfolio Detail Valuation", MARGIN_LEFT, USABLE_WIDTH, fonts);
   return await pdf.save();
 }

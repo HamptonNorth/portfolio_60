@@ -1,7 +1,8 @@
-import { PDF, rgb, StandardFonts, Standard14Font, measureText } from "@libpdf/core";
+import { PDF, rgb } from "@libpdf/core";
 import { getHouseholdAssetsSummary } from "../db/other-assets-db.js";
 import { isTestMode } from "../test-mode.js";
 import { drawPageHeader, drawPageFooters } from "./pdf-common.js";
+import { embedRobotoFonts } from "./pdf-fonts.js";
 
 /**
  * @description Frequency display labels matching the HTML report block.
@@ -110,17 +111,16 @@ function getUserDisplay(item) {
  * @param {number} x - Left edge of column (absolute)
  * @param {number} colWidth - Column width in points
  * @param {number} y - Y position (baseline)
- * @param {string} fontName - Standard font name
+ * @param {Object} font - Embedded font instance
  * @param {number} fontSize - Font size in points
  * @param {Object} color - RGB colour
  */
-function drawRightAligned(page, text, x, colWidth, y, fontName, fontSize, color) {
-  const font = Standard14Font.of(fontName);
+function drawRightAligned(page, text, x, colWidth, y, font, fontSize, color) {
   const textWidth = font.widthOfTextAtSize(text, fontSize);
   page.drawText(text, {
     x: x + colWidth - textWidth - 2,
     y: y,
-    font: fontName,
+    font: font,
     size: fontSize,
     color: color,
   });
@@ -129,13 +129,12 @@ function drawRightAligned(page, text, x, colWidth, y, fontName, fontSize, color)
 /**
  * @description Truncate text to fit within a given width, appending "..." if needed.
  * @param {string} text - The text to truncate
- * @param {string} fontName - Standard font name
+ * @param {Object} font - Embedded font instance
  * @param {number} fontSize - Font size in points
  * @param {number} maxWidth - Maximum width in points
  * @returns {string} Truncated text
  */
-function truncateText(text, fontName, fontSize, maxWidth) {
-  const font = Standard14Font.of(fontName);
+function truncateText(text, font, fontSize, maxWidth) {
   if (font.widthOfTextAtSize(text, fontSize) <= maxWidth) return text;
 
   var truncated = text;
@@ -161,6 +160,7 @@ export function renderHouseholdAssetsBlock(ctx) {
   var page = ctx.page;
   var pages = ctx.pages;
   var y = ctx.y;
+  var fonts = ctx.fonts;
 
   const data = getHouseholdAssetsSummary();
   const categoryOrder = ["pension", "property", "savings", "alternative"];
@@ -182,7 +182,7 @@ export function renderHouseholdAssetsBlock(ctx) {
       page = pdf.addPage({ size: "a4", orientation: "portrait" });
       pages.push(page);
       if (ctx.pageWidths) ctx.pageWidths.push(USABLE_WIDTH);
-      y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_HEIGHT, MARGIN_TOP);
+      y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_HEIGHT, MARGIN_TOP, fonts);
     }
   }
 
@@ -190,7 +190,7 @@ export function renderHouseholdAssetsBlock(ctx) {
   page.drawText("Household Assets", {
     x: MARGIN_LEFT,
     y: y - FONT_SIZE_TITLE,
-    font: StandardFonts.HelveticaBold,
+    font: fonts.bold,
     size: FONT_SIZE_TITLE,
     color: COLOURS.brand800,
   });
@@ -207,7 +207,7 @@ export function renderHouseholdAssetsBlock(ctx) {
     page.drawText(cat.label, {
       x: MARGIN_LEFT,
       y: y - FONT_SIZE_CATEGORY,
-      font: StandardFonts.HelveticaBold,
+      font: fonts.bold,
       size: FONT_SIZE_CATEGORY,
       color: COLOURS.brand800,
     });
@@ -232,7 +232,7 @@ export function renderHouseholdAssetsBlock(ctx) {
           MARGIN_LEFT + col.x,
           col.width,
           y - HEADER_ROW_HEIGHT + 5,
-          StandardFonts.HelveticaBold,
+          fonts.bold,
           FONT_SIZE_HEADER,
           COLOURS.brand700,
         );
@@ -240,7 +240,7 @@ export function renderHouseholdAssetsBlock(ctx) {
         page.drawText(col.label, {
           x: textX,
           y: y - HEADER_ROW_HEIGHT + 5,
-          font: StandardFonts.HelveticaBold,
+          font: fonts.bold,
           size: FONT_SIZE_HEADER,
           color: COLOURS.brand700,
         });
@@ -263,7 +263,7 @@ export function renderHouseholdAssetsBlock(ctx) {
       const item = cat.items[i];
       const rowY = y - ROW_HEIGHT;
       const textY = rowY + 4;
-      const fontName = StandardFonts.Helvetica;
+      var font = fonts.medium;
 
       // Row values
       const cellValues = {
@@ -278,7 +278,7 @@ export function renderHouseholdAssetsBlock(ctx) {
       for (const col of COLUMNS) {
         var cellText = cellValues[col.key] || "";
         // Truncate to fit column width (with 4pt padding)
-        cellText = truncateText(cellText, fontName, FONT_SIZE_ROW, col.width - 4);
+        cellText = truncateText(cellText, font, FONT_SIZE_ROW, col.width - 4);
 
         if (col.align === "right") {
           drawRightAligned(
@@ -287,7 +287,7 @@ export function renderHouseholdAssetsBlock(ctx) {
             MARGIN_LEFT + col.x,
             col.width,
             textY,
-            fontName,
+            font,
             FONT_SIZE_ROW,
             COLOURS.black,
           );
@@ -295,7 +295,7 @@ export function renderHouseholdAssetsBlock(ctx) {
           page.drawText(cellText, {
             x: MARGIN_LEFT + col.x + 2,
             y: textY,
-            font: fontName,
+            font: font,
             size: FONT_SIZE_ROW,
             color: COLOURS.black,
           });
@@ -332,7 +332,7 @@ export function renderHouseholdAssetsBlock(ctx) {
   page.drawText("Summary", {
     x: MARGIN_LEFT,
     y: y - FONT_SIZE_CATEGORY,
-    font: StandardFonts.HelveticaBold,
+    font: fonts.bold,
     size: FONT_SIZE_CATEGORY,
     color: COLOURS.brand800,
   });
@@ -342,7 +342,7 @@ export function renderHouseholdAssetsBlock(ctx) {
   page.drawText("Recurring", {
     x: MARGIN_LEFT,
     y: y,
-    font: StandardFonts.Helvetica,
+    font: fonts.medium,
     size: FONT_SIZE_SUMMARY_LABEL,
     color: COLOURS.black,
   });
@@ -352,14 +352,14 @@ export function renderHouseholdAssetsBlock(ctx) {
     MARGIN_LEFT + 80,
     80,
     y,
-    StandardFonts.HelveticaBold,
+    fonts.bold,
     FONT_SIZE_SUMMARY_VALUE,
     COLOURS.black,
   );
   page.drawText("Annually", {
     x: MARGIN_LEFT + 165,
     y: y,
-    font: StandardFonts.Helvetica,
+    font: fonts.medium,
     size: FONT_SIZE_FOOTER,
     color: COLOURS.brand600,
   });
@@ -369,7 +369,7 @@ export function renderHouseholdAssetsBlock(ctx) {
   page.drawText("Assets", {
     x: MARGIN_LEFT,
     y: y,
-    font: StandardFonts.Helvetica,
+    font: fonts.medium,
     size: FONT_SIZE_SUMMARY_LABEL,
     color: COLOURS.black,
   });
@@ -379,7 +379,7 @@ export function renderHouseholdAssetsBlock(ctx) {
     MARGIN_LEFT + 80,
     80,
     y,
-    StandardFonts.HelveticaBold,
+    fonts.bold,
     FONT_SIZE_SUMMARY_VALUE,
     COLOURS.black,
   );
@@ -397,13 +397,14 @@ export function renderHouseholdAssetsBlock(ctx) {
  */
 export async function generateHouseholdAssetsPdf() {
   const pdf = PDF.create();
+  var fonts = embedRobotoFonts(pdf);
   var page = pdf.addPage({ size: "a4", orientation: "portrait" });
   var pages = [page];
-  var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_HEIGHT, MARGIN_TOP);
+  var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_HEIGHT, MARGIN_TOP, fonts);
 
-  var ctx = { pdf: pdf, page: page, pages: pages, y: y };
+  var ctx = { pdf: pdf, page: page, pages: pages, y: y, fonts: fonts };
   renderHouseholdAssetsBlock(ctx);
 
-  drawPageFooters(ctx.pages, "Household Assets", MARGIN_LEFT, USABLE_WIDTH);
+  drawPageFooters(ctx.pages, "Household Assets", MARGIN_LEFT, USABLE_WIDTH, fonts);
   return await pdf.save();
 }

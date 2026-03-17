@@ -1,5 +1,5 @@
 import { Router } from "../router.js";
-import { createDrawdownSchedule, updateDrawdownSchedule, deleteDrawdownSchedule, getDrawdownScheduleById, getDrawdownSchedulesByAccountId } from "../db/drawdown-schedules-db.js";
+import { createDrawdownSchedule, updateDrawdownSchedule, deleteDrawdownSchedule, getDrawdownScheduleById, getDrawdownSchedulesByAccountId, getOverlappingSchedule } from "../db/drawdown-schedules-db.js";
 import { getAccountById } from "../db/accounts-db.js";
 import { validateDrawdownSchedule } from "../validation.js";
 import { previewDrawdowns } from "../services/drawdown-processor.js";
@@ -83,6 +83,16 @@ drawdownRouter.post("/api/accounts/:accountId/drawdown-schedules", async functio
     return new Response(JSON.stringify({ error: "Validation failed", detail: errors.join("; ") }), { status: 400, headers: { "Content-Type": "application/json" } });
   }
 
+  // Check for overlapping active schedule on this account
+  const overlap = getOverlappingSchedule(accountId, body.from_date, body.to_date);
+  if (overlap) {
+    return new Response(JSON.stringify({
+      error: "Overlap",
+      detail: "Date range overlaps with an existing active schedule",
+      overlapping_schedule: overlap,
+    }), { status: 409, headers: { "Content-Type": "application/json" } });
+  }
+
   try {
     const schedule = createDrawdownSchedule({
       account_id: accountId,
@@ -116,8 +126,28 @@ drawdownRouter.put("/api/drawdown-schedules/:id", async function (request, param
     return new Response(JSON.stringify({ error: "Validation failed", detail: errors.join("; ") }), { status: 400, headers: { "Content-Type": "application/json" } });
   }
 
+  // Check for overlapping active schedule (exclude self)
+  const scheduleId = Number(params.id);
+  const existing = getDrawdownScheduleById(scheduleId);
+  if (!existing) {
+    return new Response(JSON.stringify({ error: "Schedule not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
+  }
+
+  // Only check overlap if the schedule will be active
+  const willBeActive = body.active !== undefined ? Number(body.active) : 1;
+  if (willBeActive) {
+    const overlap = getOverlappingSchedule(existing.account_id, body.from_date, body.to_date, scheduleId);
+    if (overlap) {
+      return new Response(JSON.stringify({
+        error: "Overlap",
+        detail: "Date range overlaps with an existing active schedule",
+        overlapping_schedule: overlap,
+      }), { status: 409, headers: { "Content-Type": "application/json" } });
+    }
+  }
+
   try {
-    const schedule = updateDrawdownSchedule(Number(params.id), {
+    const schedule = updateDrawdownSchedule(scheduleId, {
       frequency: body.frequency,
       trigger_day: Number(body.trigger_day),
       from_date: body.from_date,

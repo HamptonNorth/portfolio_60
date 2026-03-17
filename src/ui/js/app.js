@@ -138,8 +138,10 @@ async function apiRequest(url, options = {}) {
     if (!response.ok) {
       return {
         ok: false,
+        status: response.status,
         error: data.error || "Request failed",
         detail: data.detail || "",
+        data: data,
       };
     }
 

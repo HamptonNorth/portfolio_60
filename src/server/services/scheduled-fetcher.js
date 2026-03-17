@@ -5,6 +5,7 @@ import { closeDatabase, databaseExists, resetDatabasePath } from "../db/connecti
 import { testReferenceExists } from "../test-mode.js";
 import { runFullPriceUpdate, retryFailedItems } from "./fetch-service.js";
 import { writeSchedulerLog, pruneSchedulerLog } from "../db/scheduler-log-db.js";
+import { processDrawdowns } from "./drawdown-processor.js";
 
 /**
  * @description The active Croner job instance, or null if scheduling is disabled.
@@ -168,6 +169,20 @@ async function executeFetchRun(startedBy) {
     // After live fetch completes, optionally update the test database
     if (getCronUpdateTestDatabase() && testReferenceExists()) {
       await updateTestDatabase(startedBy, delayProfile);
+    }
+
+    // Process any due drawdown schedules
+    try {
+      const drawdownResult = processDrawdowns();
+      if (drawdownResult.processed > 0) {
+        writeSchedulerLog("Drawdown processing: " + drawdownResult.processed + " transaction(s) created");
+      }
+      if (drawdownResult.warnings.length > 0) {
+        writeSchedulerLog("Drawdown warnings: " + drawdownResult.warnings.join("; "), "warn");
+      }
+      lastRunResult.drawdown = drawdownResult;
+    } catch (drawdownErr) {
+      writeSchedulerLog("Drawdown processing failed: " + drawdownErr.message, "error");
     }
   } catch (err) {
     writeSchedulerLog("Fetch run failed with error: " + err.message, "error");

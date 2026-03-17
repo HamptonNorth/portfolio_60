@@ -1,4 +1,4 @@
-import { rgb, StandardFonts, Standard14Font } from "@libpdf/core";
+import { rgb } from "@libpdf/core";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -62,9 +62,10 @@ export function todayFormatted() {
  * @param {number} marginLeft - Left margin in points
  * @param {number} pageHeight - Total page height in points
  * @param {number} marginTop - Top margin in points
+ * @param {Object} fonts - Roboto font objects from embedRobotoFonts()
  * @returns {number} The y position after the header (for content to start from)
  */
-export function drawPageHeader(pdf, page, marginLeft, pageHeight, marginTop) {
+export function drawPageHeader(pdf, page, marginLeft, pageHeight, marginTop, fonts) {
   const headerY = pageHeight - marginTop;
   const logoSize = 16;
 
@@ -84,7 +85,7 @@ export function drawPageHeader(pdf, page, marginLeft, pageHeight, marginTop) {
   page.drawText("Portfolio 60", {
     x: marginLeft + logoSize + 6,
     y: headerY - FONT_SIZE_HEADER_TITLE - 1,
-    font: StandardFonts.HelveticaBold,
+    font: fonts.bold,
     size: FONT_SIZE_HEADER_TITLE,
     color: COLOURS.brand800,
   });
@@ -103,13 +104,13 @@ export function drawPageHeader(pdf, page, marginLeft, pageHeight, marginTop) {
  * @param {number} marginLeft - Left margin in points
  * @param {number|Array<number>} usableWidth - Usable content width in points,
  *   either a single value for all pages or an array with one value per page
+ * @param {Object} fonts - Roboto font objects from embedRobotoFonts()
  */
-export function drawPageFooters(pages, reportTitle, marginLeft, usableWidth) {
+export function drawPageFooters(pages, reportTitle, marginLeft, usableWidth, fonts) {
   const footerTextY = 20;
   const footerLineY = footerTextY + 8;
   const dateStr = todayFormatted();
   const totalPages = pages.length;
-  const footerFont = Standard14Font.of(StandardFonts.Helvetica);
 
   for (var p = 0; p < pages.length; p++) {
     var pageWidth = Array.isArray(usableWidth) ? usableWidth[p] : usableWidth;
@@ -126,29 +127,29 @@ export function drawPageFooters(pages, reportTitle, marginLeft, usableWidth) {
     pages[p].drawText(dateStr, {
       x: marginLeft,
       y: footerTextY,
-      font: StandardFonts.Helvetica,
+      font: fonts.regular,
       size: FONT_SIZE_FOOTER,
       color: COLOURS.brand600,
     });
 
     // Report title centred
-    var titleWidth = footerFont.widthOfTextAtSize(reportTitle, FONT_SIZE_FOOTER);
+    var titleWidth = fonts.regular.widthOfTextAtSize(reportTitle, FONT_SIZE_FOOTER);
     var titleX = marginLeft + (pageWidth - titleWidth) / 2;
     pages[p].drawText(reportTitle, {
       x: titleX,
       y: footerTextY,
-      font: StandardFonts.Helvetica,
+      font: fonts.regular,
       size: FONT_SIZE_FOOTER,
       color: COLOURS.brand600,
     });
 
     // Page number on the right
     var pageStr = "page " + (p + 1) + "/" + totalPages;
-    var pageNumWidth = footerFont.widthOfTextAtSize(pageStr, FONT_SIZE_FOOTER);
+    var pageNumWidth = fonts.regular.widthOfTextAtSize(pageStr, FONT_SIZE_FOOTER);
     pages[p].drawText(pageStr, {
       x: marginLeft + pageWidth - pageNumWidth,
       y: footerTextY,
-      font: StandardFonts.Helvetica,
+      font: fonts.regular,
       size: FONT_SIZE_FOOTER,
       color: COLOURS.brand600,
     });

@@ -479,14 +479,12 @@ async function onUserSelected() {
   if (!userId) {
     selectedUserId = null;
     document.getElementById("add-account-btn").classList.add("hidden");
-    document.getElementById("test-drawdown-btn").classList.add("hidden");
     document.getElementById("accounts-table-container").innerHTML = '<p class="text-brand-500">Select a user to view their accounts.</p>';
     return;
   }
 
   selectedUserId = userId;
   document.getElementById("add-account-btn").classList.remove("hidden");
-  document.getElementById("test-drawdown-btn").classList.remove("hidden");
   await loadAccounts();
 }
 
@@ -565,6 +563,10 @@ async function showAddAccountForm() {
 
   // Reset ref dropdown
   populateAccountRefDropdown("");
+
+  // Hide drawdown section when adding a new account
+  document.getElementById("drawdown-section").classList.add("hidden");
+  hideDrawdownForm();
 
   document.getElementById("account-form-container").classList.remove("hidden");
   setTimeout(function () {
@@ -665,6 +667,16 @@ async function editAccount(id) {
   deleteBtn.onclick = function () {
     confirmDelete("account", acct.id, formatAccountType(acct.account_type) + " account " + acct.account_ref);
   };
+
+  // Show drawdown section only for SIPP accounts
+  const drawdownSection = document.getElementById("drawdown-section");
+  if (acct.account_type === "sipp") {
+    drawdownSection.classList.remove("hidden");
+    hideDrawdownForm();
+    loadDrawdownSchedules(acct.id);
+  } else {
+    drawdownSection.classList.add("hidden");
+  }
 
   document.getElementById("account-form-container").classList.remove("hidden");
   setTimeout(function () {
@@ -2052,117 +2064,259 @@ async function handleMovementSubmit(event) {
   }
 }
 
-// ─── Drawdown Preview ────────────────────────────────────────────────
+// ─── Drawdown Schedule Management ────────────────────────────────────
 
 /**
- * @description Call the drawdown processor dry-run endpoint and display
- * the results in a modal. No database changes are made.
+ * @description Load and display drawdown schedules for the current account.
+ * Shows the most recent 10 schedules sorted by from_date descending.
+ * @param {number} accountId - The SIPP account ID
  */
-async function testDrawdownProcessor() {
-  const btn = document.getElementById("test-drawdown-btn");
-  const originalText = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = "Testing...";
+async function loadDrawdownSchedules(accountId) {
+  const container = document.getElementById("drawdown-list");
+  const result = await apiRequest("/api/accounts/" + accountId + "/drawdown-schedules");
 
-  try {
-    const result = await apiRequest("/api/drawdown-schedules/preview", {
-      method: "POST",
-    });
-
-    if (result.ok) {
-      showDrawdownPreviewResults(result.data);
-    } else {
-      showError("page-messages", "Drawdown test failed", result.detail || result.error);
-    }
-  } catch (error) {
-    showError("page-messages", "Drawdown test failed", error.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalText;
-  }
-}
-
-/**
- * @description Render the drawdown preview results inside the modal and show it.
- * @param {Object} data - The preview response from the API
- */
-function showDrawdownPreviewResults(data) {
-  const container = document.getElementById("drawdown-preview-content");
-  const items = data.would_process || [];
-  const alreadyExist = data.already_exist || 0;
-  const totalAmount = data.total_amount || 0;
-
-  let html = "";
-
-  // Summary counts
-  html += '<div class="grid grid-cols-3 gap-3 mb-4">';
-  html += '<div class="bg-green-50 border border-green-200 rounded-lg p-3 text-center">';
-  html += '<div class="text-sm text-green-700">Would Create</div>';
-  html += '<div class="text-2xl font-semibold text-green-800">' + items.length + "</div>";
-  html += "</div>";
-  html += '<div class="bg-brand-50 border border-brand-200 rounded-lg p-3 text-center">';
-  html += '<div class="text-sm text-brand-600">Already Exist</div>';
-  html += '<div class="text-2xl font-semibold text-brand-800">' + alreadyExist + "</div>";
-  html += "</div>";
-  html += '<div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">';
-  html += '<div class="text-sm text-amber-700">Total Amount</div>';
-  html += '<div class="text-2xl font-semibold text-amber-800">&pound;' + formatDetailValue(totalAmount) + "</div>";
-  html += "</div>";
-  html += "</div>";
-
-  if (items.length === 0 && alreadyExist === 0) {
-    html += '<p class="text-brand-500">No active drawdown schedules found.</p>';
-  } else if (items.length === 0) {
-    html += '<p class="text-brand-500">All due drawdowns have already been processed. Nothing new to create.</p>';
-  } else {
-    // Warnings
-    const warnings = items.filter(function (item) {
-      return item.warning !== null;
-    });
-    if (warnings.length > 0) {
-      html += '<div class="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">';
-      html += '<div class="text-sm font-semibold text-red-700 mb-2">Warnings (' + warnings.length + ")</div>";
-      html += '<ul class="text-sm text-red-700 space-y-1">';
-      for (const w of warnings) {
-        html += "<li>" + escapeHtml(w.account_ref + " on " + formatDateUK(w.date) + ": " + w.warning) + "</li>";
-      }
-      html += "</ul></div>";
-    }
-
-    // Detail table
-    html += '<table class="w-full text-left border-collapse">';
-    html += '<thead><tr class="border-b-2 border-brand-200">';
-    html += '<th class="py-2 px-2 text-sm font-semibold text-brand-700">Date</th>';
-    html += '<th class="py-2 px-2 text-sm font-semibold text-brand-700">Account</th>';
-    html += '<th class="py-2 px-2 text-sm font-semibold text-brand-700 text-right">Amount</th>';
-    html += '<th class="py-2 px-2 text-sm font-semibold text-brand-700">Notes</th>';
-    html += "</tr></thead><tbody>";
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      const rowClass = i % 2 === 1 ? ' class="bg-brand-25"' : "";
-      const warningClass = item.warning ? ' class="text-red-700"' : "";
-      html += "<tr" + rowClass + ">";
-      html += '<td class="py-1.5 px-2 text-sm"' + warningClass + ">" + formatDateUK(item.date) + "</td>";
-      html += '<td class="py-1.5 px-2 text-sm">' + escapeHtml(item.account_ref) + "</td>";
-      html += '<td class="py-1.5 px-2 text-sm text-right">&pound;' + formatDetailValue(item.amount) + "</td>";
-      html += '<td class="py-1.5 px-2 text-sm text-brand-500">' + escapeHtml(item.notes || "") + "</td>";
-      html += "</tr>";
-    }
-
-    html += "</tbody></table>";
+  if (!result.ok) {
+    container.innerHTML = '<p class="text-red-600 text-sm">Failed to load schedules.</p>';
+    return;
   }
 
+  const schedules = result.data || [];
+  if (schedules.length === 0) {
+    container.innerHTML = '<p class="text-brand-500 text-sm">No drawdown schedules.</p>';
+    return;
+  }
+
+  // Sort by from_date descending, limit to 10
+  const sorted = schedules.slice().sort(function (a, b) {
+    return b.from_date.localeCompare(a.from_date);
+  }).slice(0, 10);
+
+  let html = '<table class="w-full text-left border-collapse text-sm">';
+  html += '<thead><tr class="border-b border-brand-200">';
+  html += '<th class="py-1.5 px-1 text-xs font-semibold text-brand-600">Frequency</th>';
+  html += '<th class="py-1.5 px-1 text-xs font-semibold text-brand-600">Day</th>';
+  html += '<th class="py-1.5 px-1 text-xs font-semibold text-brand-600">From</th>';
+  html += '<th class="py-1.5 px-1 text-xs font-semibold text-brand-600">To</th>';
+  html += '<th class="py-1.5 px-1 text-xs font-semibold text-brand-600 text-right">Amount</th>';
+  html += '<th class="py-1.5 px-1 text-xs font-semibold text-brand-600">Status</th>';
+  html += '<th class="py-1.5 px-1 text-xs font-semibold text-brand-600"></th>';
+  html += "</tr></thead><tbody>";
+
+  for (let i = 0; i < sorted.length; i++) {
+    const s = sorted[i];
+    const isActive = s.active === 1;
+    const rowBg = isActive ? "bg-green-50" : (i % 2 === 1 ? "bg-brand-25" : "");
+    const statusLabel = isActive ? '<span class="text-green-700 font-medium">Active</span>' : '<span class="text-brand-400">Inactive</span>';
+
+    html += '<tr class="' + rowBg + ' border-b border-brand-100">';
+    html += '<td class="py-1.5 px-1">' + capitaliseFirst(s.frequency) + "</td>";
+    html += '<td class="py-1.5 px-1">' + s.trigger_day + "</td>";
+    html += '<td class="py-1.5 px-1">' + formatYearMonth(s.from_date) + "</td>";
+    html += '<td class="py-1.5 px-1">' + formatYearMonth(s.to_date) + "</td>";
+    html += '<td class="py-1.5 px-1 text-right">&pound;' + formatDetailValue(s.amount) + "</td>";
+    html += '<td class="py-1.5 px-1">' + statusLabel + "</td>";
+    html += '<td class="py-1.5 px-1 text-right">';
+    html += '<button type="button" class="text-brand-500 hover:text-brand-700 text-xs mr-2" onclick="editDrawdownSchedule(' + s.id + ')">Edit</button>';
+    html += '<button type="button" class="text-brand-400 hover:text-red-600 text-xs" onclick="deleteDrawdownSchedule(' + s.id + ')">Delete</button>';
+    html += "</td></tr>";
+  }
+
+  html += "</tbody></table>";
   container.innerHTML = html;
-  document.getElementById("drawdown-preview-modal").classList.remove("hidden");
 }
 
 /**
- * @description Hide the drawdown preview modal.
+ * @description Format a YYYY-MM-DD date as a short year-month display (e.g. "Apr 2026").
+ * @param {string} dateStr - ISO date string
+ * @returns {string} Formatted month-year
  */
-function hideDrawdownPreview() {
-  document.getElementById("drawdown-preview-modal").classList.add("hidden");
+function formatYearMonth(dateStr) {
+  const parts = dateStr.split("-");
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return monthNames[parseInt(parts[1], 10) - 1] + " " + parts[0];
 }
+
+/**
+ * @description Capitalise the first letter of a string.
+ * @param {string} str - Input string
+ * @returns {string} Capitalised string
+ */
+function capitaliseFirst(str) {
+  if (!str) return "";
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+/**
+ * @description Show the drawdown schedule form for adding a new schedule.
+ */
+function showDrawdownForm() {
+  document.getElementById("drawdown-schedule-id").value = "";
+  document.getElementById("drawdown-frequency").value = "monthly";
+  document.getElementById("drawdown-trigger-day").value = "";
+  document.getElementById("drawdown-from").value = "";
+  document.getElementById("drawdown-to").value = "";
+  document.getElementById("drawdown-amount").value = "";
+  document.getElementById("drawdown-notes").value = "";
+  document.getElementById("drawdown-form-errors").textContent = "";
+  document.getElementById("drawdown-form-container").classList.remove("hidden");
+  document.getElementById("drawdown-trigger-day").focus();
+}
+
+/**
+ * @description Load a drawdown schedule into the form for editing.
+ * @param {number} scheduleId - The schedule ID to edit
+ */
+async function editDrawdownSchedule(scheduleId) {
+  const result = await apiRequest("/api/drawdown-schedules/" + scheduleId);
+  if (!result.ok) {
+    document.getElementById("drawdown-form-errors").textContent = "Failed to load schedule.";
+    return;
+  }
+
+  const s = result.data;
+  document.getElementById("drawdown-schedule-id").value = s.id;
+  document.getElementById("drawdown-frequency").value = s.frequency;
+  document.getElementById("drawdown-trigger-day").value = s.trigger_day;
+  // from_date is YYYY-MM-01, input type=month needs YYYY-MM
+  document.getElementById("drawdown-from").value = s.from_date.substring(0, 7);
+  document.getElementById("drawdown-to").value = s.to_date.substring(0, 7);
+  document.getElementById("drawdown-amount").value = s.amount;
+  document.getElementById("drawdown-notes").value = s.notes || "";
+  document.getElementById("drawdown-form-errors").textContent = "";
+  document.getElementById("drawdown-form-container").classList.remove("hidden");
+  document.getElementById("drawdown-frequency").focus();
+}
+// Expose to inline onclick handlers in the schedule table
+window.editDrawdownSchedule = editDrawdownSchedule;
+
+/**
+ * @description Hide the drawdown schedule form.
+ */
+function hideDrawdownForm() {
+  document.getElementById("drawdown-form-container").classList.add("hidden");
+  document.getElementById("drawdown-form-errors").textContent = "";
+}
+
+/**
+ * @description Handle saving a drawdown schedule (create or update).
+ * If an overlap is detected (409), prompts the user to replace the existing schedule.
+ */
+async function handleDrawdownSave() {
+  const errorsDiv = document.getElementById("drawdown-form-errors");
+  errorsDiv.textContent = "";
+
+  const accountId = document.getElementById("account-id").value;
+  const scheduleId = document.getElementById("drawdown-schedule-id").value;
+  const isEditing = scheduleId !== "";
+
+  const fromMonth = document.getElementById("drawdown-from").value; // YYYY-MM
+  const toMonth = document.getElementById("drawdown-to").value;
+
+  const data = {
+    frequency: document.getElementById("drawdown-frequency").value,
+    trigger_day: Number(document.getElementById("drawdown-trigger-day").value),
+    from_date: fromMonth ? fromMonth + "-01" : "",
+    to_date: toMonth ? toMonth + "-01" : "",
+    amount: Number(document.getElementById("drawdown-amount").value),
+    notes: document.getElementById("drawdown-notes").value.trim() || null,
+  };
+
+  let result;
+  if (isEditing) {
+    result = await apiRequest("/api/drawdown-schedules/" + scheduleId, {
+      method: "PUT",
+      body: data,
+    });
+  } else {
+    result = await apiRequest("/api/accounts/" + accountId + "/drawdown-schedules", {
+      method: "POST",
+      body: data,
+    });
+  }
+
+  if (result.ok) {
+    hideDrawdownForm();
+    await loadDrawdownSchedules(accountId);
+    return;
+  }
+
+  // Handle overlap conflict (409)
+  if (result.status === 409 && result.data && result.data.overlapping_schedule) {
+    const overlap = result.data.overlapping_schedule;
+    const toDateDisplay = formatYearMonth(overlap.to_date);
+    const confirmed = confirm("Replace drawdown schedule finishing " + toDateDisplay + "?");
+
+    if (confirmed) {
+      // Deactivate the overlapping schedule
+      const deactivateResult = await apiRequest("/api/drawdown-schedules/" + overlap.id, {
+        method: "PUT",
+        body: {
+          frequency: overlap.frequency,
+          trigger_day: overlap.trigger_day,
+          from_date: overlap.from_date,
+          to_date: overlap.to_date,
+          amount: overlap.amount,
+          notes: overlap.notes,
+          active: 0,
+        },
+      });
+
+      if (!deactivateResult.ok) {
+        errorsDiv.textContent = "Failed to deactivate existing schedule.";
+        return;
+      }
+
+      // Retry the create/update
+      let retryResult;
+      if (isEditing) {
+        retryResult = await apiRequest("/api/drawdown-schedules/" + scheduleId, {
+          method: "PUT",
+          body: data,
+        });
+      } else {
+        retryResult = await apiRequest("/api/accounts/" + accountId + "/drawdown-schedules", {
+          method: "POST",
+          body: data,
+        });
+      }
+
+      if (retryResult.ok) {
+        hideDrawdownForm();
+        await loadDrawdownSchedules(accountId);
+        return;
+      }
+
+      errorsDiv.textContent = retryResult.detail || retryResult.error || "Failed to save schedule.";
+      return;
+    }
+
+    // User declined replacement — do nothing
+    return;
+  }
+
+  errorsDiv.textContent = result.detail || result.error || "Failed to save schedule.";
+}
+
+/**
+ * @description Delete a drawdown schedule after user confirmation.
+ * @param {number} scheduleId - The schedule ID to delete
+ */
+async function deleteDrawdownSchedule(scheduleId) {
+  if (!confirm("Delete this drawdown schedule?")) return;
+
+  const accountId = document.getElementById("account-id").value;
+  const result = await apiRequest("/api/drawdown-schedules/" + scheduleId, {
+    method: "DELETE",
+  });
+
+  if (result.ok) {
+    await loadDrawdownSchedules(accountId);
+  } else {
+    document.getElementById("drawdown-form-errors").textContent = result.detail || result.error || "Failed to delete schedule.";
+  }
+}
+// Expose to inline onclick handlers in the schedule table
+window.deleteDrawdownSchedule = deleteDrawdownSchedule;
 
 // ─── Initialisation ──────────────────────────────────────────────────
 
@@ -2300,9 +2454,10 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
   });
 
-  // Drawdown preview
-  document.getElementById("test-drawdown-btn").addEventListener("click", testDrawdownProcessor);
-  document.getElementById("drawdown-preview-close-btn").addEventListener("click", hideDrawdownPreview);
+  // Drawdown schedule management
+  document.getElementById("drawdown-add-btn").addEventListener("click", showDrawdownForm);
+  document.getElementById("drawdown-save-btn").addEventListener("click", handleDrawdownSave);
+  document.getElementById("drawdown-cancel-btn").addEventListener("click", hideDrawdownForm);
 
   // Delete dialog
   document.getElementById("delete-cancel-btn").addEventListener("click", hideDeleteDialog);
@@ -2317,9 +2472,6 @@ document.addEventListener("DOMContentLoaded", async function () {
   });
   document.getElementById("delete-dialog").addEventListener("click", function (event) {
     if (event.target === this) hideDeleteDialog();
-  });
-  document.getElementById("drawdown-preview-modal").addEventListener("click", function (event) {
-    if (event.target === this) hideDrawdownPreview();
   });
   document.getElementById("cash-tx-form-container").addEventListener("click", function (event) {
     if (event.target === this) hideCashTxForm();
@@ -2340,7 +2492,6 @@ document.addEventListener("DOMContentLoaded", async function () {
       const deleteDialog = document.getElementById("delete-dialog");
       const accountForm = document.getElementById("account-form-container");
       const holdingForm = document.getElementById("holding-form-container");
-      const drawdownPreview = document.getElementById("drawdown-preview-modal");
       const actionMenu = document.getElementById("holding-action-menu");
 
       if (!actionMenu.classList.contains("hidden")) {
@@ -2351,8 +2502,6 @@ document.addEventListener("DOMContentLoaded", async function () {
         hideCashTxDeleteDialog();
       } else if (!cashTxForm.classList.contains("hidden")) {
         hideCashTxForm();
-      } else if (!drawdownPreview.classList.contains("hidden")) {
-        hideDrawdownPreview();
       } else if (!deleteDialog.classList.contains("hidden")) {
         hideDeleteDialog();
       } else if (!holdingForm.classList.contains("hidden")) {

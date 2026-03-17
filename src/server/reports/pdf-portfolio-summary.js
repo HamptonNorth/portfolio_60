@@ -1,4 +1,5 @@
-import { PDF, rgb, StandardFonts, Standard14Font } from "@libpdf/core";
+import { PDF, rgb } from "@libpdf/core";
+import { embedRobotoFonts } from "./pdf-fonts.js";
 import { getPortfolioSummary } from "../services/portfolio-service.js";
 import { getAllUsers } from "../db/users-db.js";
 import { getReportParams } from "../db/report-params-db.js";
@@ -85,17 +86,16 @@ function formatGBP(value) {
  * @param {number} x - Left edge of column (absolute)
  * @param {number} colWidth - Column width in points
  * @param {number} y - Y position (baseline)
- * @param {string} fontName - Standard font name
+ * @param {Object} font - Embedded font object
  * @param {number} fontSize - Font size in points
  * @param {Object} color - RGB colour
  */
-function drawRightAligned(page, text, x, colWidth, y, fontName, fontSize, color) {
-  const font = Standard14Font.of(fontName);
+function drawRightAligned(page, text, x, colWidth, y, font, fontSize, color) {
   const textWidth = font.widthOfTextAtSize(text, fontSize);
   page.drawText(text, {
     x: x + colWidth - textWidth - 2,
     y: y,
-    font: fontName,
+    font: font,
     size: fontSize,
     color: color,
   });
@@ -104,13 +104,12 @@ function drawRightAligned(page, text, x, colWidth, y, fontName, fontSize, color)
 /**
  * @description Truncate text to fit within a given width, appending "..." if needed.
  * @param {string} text - The text to truncate
- * @param {string} fontName - Standard font name
+ * @param {Object} font - Embedded font object
  * @param {number} fontSize - Font size in points
  * @param {number} maxWidth - Maximum width in points
  * @returns {string} Truncated text
  */
-function truncateText(text, fontName, fontSize, maxWidth) {
-  const font = Standard14Font.of(fontName);
+function truncateText(text, font, fontSize, maxWidth) {
   if (font.widthOfTextAtSize(text, fontSize) <= maxWidth) return text;
 
   var truncated = text;
@@ -180,6 +179,7 @@ export function renderPortfolioSummaryBlock(ctx, params) {
   var page = ctx.page;
   var pages = ctx.pages;
   var y = ctx.y;
+  var fonts = ctx.fonts;
 
   // Fetch all user summaries
   const users = getAllUsers();
@@ -209,7 +209,7 @@ export function renderPortfolioSummaryBlock(ctx, params) {
       page = pdf.addPage({ size: "a4", orientation: "portrait" });
       pages.push(page);
       if (ctx.pageWidths) ctx.pageWidths.push(USABLE_WIDTH);
-      y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_HEIGHT, MARGIN_TOP);
+      y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_HEIGHT, MARGIN_TOP, fonts);
     }
   }
 
@@ -233,14 +233,14 @@ export function renderPortfolioSummaryBlock(ctx, params) {
       if (col.align === "right") {
         drawRightAligned(
           page, col.label, MARGIN_LEFT + col.x, col.width,
-          y - HEADER_ROW_HEIGHT + 5, StandardFonts.HelveticaBold,
+          y - HEADER_ROW_HEIGHT + 5, fonts.bold,
           FONT_SIZE_HEADER, COLOURS.brand700,
         );
       } else {
         page.drawText(col.label, {
           x: MARGIN_LEFT + col.x + 2,
           y: y - HEADER_ROW_HEIGHT + 5,
-          font: StandardFonts.HelveticaBold,
+          font: fonts.bold,
           size: FONT_SIZE_HEADER,
           color: COLOURS.brand700,
         });
@@ -267,7 +267,7 @@ export function renderPortfolioSummaryBlock(ctx, params) {
     ensureSpace(ROW_HEIGHT + 2);
     const rowY = y - ROW_HEIGHT;
     const textY = rowY + 4;
-    const fontName = isBold ? StandardFonts.HelveticaBold : StandardFonts.Helvetica;
+    var font = isBold ? fonts.bold : fonts.medium;
 
     if (bgColour) {
       page.drawRectangle({
@@ -281,18 +281,18 @@ export function renderPortfolioSummaryBlock(ctx, params) {
 
     for (const col of COLUMNS) {
       var cellText = values[col.key] || "";
-      cellText = truncateText(cellText, fontName, FONT_SIZE_ROW, col.width - 4);
+      cellText = truncateText(cellText, font, FONT_SIZE_ROW, col.width - 4);
 
       if (col.align === "right") {
         drawRightAligned(
           page, cellText, MARGIN_LEFT + col.x, col.width,
-          textY, fontName, FONT_SIZE_ROW, COLOURS.black,
+          textY, font, FONT_SIZE_ROW, COLOURS.black,
         );
       } else {
         page.drawText(cellText, {
           x: MARGIN_LEFT + col.x + 2,
           y: textY,
-          font: fontName,
+          font: font,
           size: FONT_SIZE_ROW,
           color: COLOURS.black,
         });
@@ -322,7 +322,7 @@ export function renderPortfolioSummaryBlock(ctx, params) {
     page.drawText(user.first_name + " " + user.last_name, {
       x: MARGIN_LEFT,
       y: y - FONT_SIZE_USER_HEADING,
-      font: StandardFonts.HelveticaBold,
+      font: fonts.bold,
       size: FONT_SIZE_USER_HEADING,
       color: COLOURS.brand800,
     });
@@ -399,7 +399,7 @@ export function renderPortfolioSummaryBlock(ctx, params) {
     page.drawText("Combined Totals", {
       x: MARGIN_LEFT,
       y: y - FONT_SIZE_COMBINED_HEADING,
-      font: StandardFonts.HelveticaBold,
+      font: fonts.bold,
       size: FONT_SIZE_COMBINED_HEADING,
       color: COLOURS.brand800,
     });
@@ -438,7 +438,7 @@ export function renderPortfolioSummaryBlock(ctx, params) {
   page.drawText("Portfolio Summary Valuation", {
     x: MARGIN_LEFT,
     y: y - FONT_SIZE_TITLE,
-    font: StandardFonts.HelveticaBold,
+    font: fonts.bold,
     size: FONT_SIZE_TITLE,
     color: COLOURS.brand800,
   });
@@ -498,13 +498,14 @@ export function renderPortfolioSummaryBlock(ctx, params) {
  */
 export async function generatePortfolioSummaryPdf(params) {
   const pdf = PDF.create();
+  var fonts = embedRobotoFonts(pdf);
   var page = pdf.addPage({ size: "a4", orientation: "portrait" });
   var pages = [page];
-  var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_HEIGHT, MARGIN_TOP);
+  var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_HEIGHT, MARGIN_TOP, fonts);
 
-  var ctx = { pdf: pdf, page: page, pages: pages, y: y };
+  var ctx = { pdf: pdf, page: page, pages: pages, y: y, fonts: fonts };
   renderPortfolioSummaryBlock(ctx, params);
 
-  drawPageFooters(ctx.pages, "Portfolio Summary Valuation", MARGIN_LEFT, USABLE_WIDTH);
+  drawPageFooters(ctx.pages, "Portfolio Summary Valuation", MARGIN_LEFT, USABLE_WIDTH, fonts);
   return await pdf.save();
 }

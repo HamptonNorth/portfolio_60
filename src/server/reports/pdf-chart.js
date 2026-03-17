@@ -1,4 +1,5 @@
-import { PDF, rgb, StandardFonts, Standard14Font } from "@libpdf/core";
+import { PDF, rgb } from "@libpdf/core";
+import { embedRobotoFonts } from "./pdf-fonts.js";
 import { getChartData } from "../services/chart-data-service.js";
 import { isTestMode } from "../test-mode.js";
 import { drawPageHeader, drawPageFooters } from "./pdf-common.js";
@@ -96,10 +97,11 @@ export function renderChartBlock(ctx, params, blockDef) {
   if (!renderer) {
     // Unknown chart type — draw a message and skip
     var page = ctx.page;
+    var fonts = ctx.fonts;
     page.drawText("Unknown chart type: " + chartType, {
       x: 40,
       y: ctx.y - 14,
-      font: StandardFonts.Helvetica,
+      font: fonts.regular,
       size: 10,
       color: COLOURS.brand800,
     });
@@ -127,6 +129,7 @@ function renderLineChart(ctx, params, blockDef) {
   var pdf = ctx.pdf;
   var page = ctx.page;
   var y = ctx.y;
+  var fonts = ctx.fonts;
 
   // Support bounded rendering for multi-chart layouts.
   // _bounds overrides the module-level margin/width constants so that
@@ -154,7 +157,7 @@ function renderLineChart(ctx, params, blockDef) {
     page.drawText(chartDef.title + " \u2014 no data available.", {
       x: areaLeft,
       y: y - 14,
-      font: StandardFonts.Helvetica,
+      font: fonts.regular,
       size: 14,
       color: COLOURS.brand800,
     });
@@ -202,7 +205,7 @@ function renderLineChart(ctx, params, blockDef) {
   page.drawText(data.title, {
     x: areaLeft + 10,
     y: y - TITLE_BAR_HEIGHT + 9,
-    font: StandardFonts.HelveticaBold,
+    font: fonts.bold,
     size: FONT_SIZE_TITLE,
     color: COLOURS.white,
   });
@@ -213,7 +216,7 @@ function renderLineChart(ctx, params, blockDef) {
     page.drawText(data.subTitle, {
       x: areaLeft + 4,
       y: y - SUBTITLE_HEIGHT + 4,
-      font: StandardFonts.Helvetica,
+      font: fonts.regular,
       size: FONT_SIZE_SUBTITLE,
       color: COLOURS.brand600,
     });
@@ -221,7 +224,7 @@ function renderLineChart(ctx, params, blockDef) {
   y -= SUBTITLE_HEIGHT;
 
   // --- Legend (full width, aligned with title banner) ---
-  drawLegend(page, data.series, areaLeft + 4, y, areaWidth - 8);
+  drawLegend(page, data.series, areaLeft + 4, y, areaWidth - 8, fonts);
   y -= legendHeight;
 
   // --- Determine Y-axis range ---
@@ -232,8 +235,8 @@ function renderLineChart(ctx, params, blockDef) {
 
   // --- Draw grid and axes ---
   drawGrid(page, chartLeft, chartBottom, chartWidth, chartHeight, yMin, yMax, yTicks);
-  drawYAxis(page, chartLeft, chartBottom, chartHeight, yMin, yMax, yTicks);
-  drawXAxis(page, data.sampleDates, chartLeft, chartBottom, chartWidth, data.monthsToShow);
+  drawYAxis(page, chartLeft, chartBottom, chartHeight, yMin, yMax, yTicks, fonts);
+  drawXAxis(page, data.sampleDates, chartLeft, chartBottom, chartWidth, data.monthsToShow, fonts);
 
   // --- Plot data lines ---
   for (var s = 0; s < data.series.length; s++) {
@@ -248,7 +251,7 @@ function renderLineChart(ctx, params, blockDef) {
   // --- Draw global event markers ---
   if (hasEvents) {
     drawEventMarkers(page, data.events, data.sampleDates, chartLeft, chartBottom,
-      chartWidth, chartBottom - X_AXIS_HEIGHT - 4, suppressEventLegend);
+      chartWidth, chartBottom - X_AXIS_HEIGHT - 4, suppressEventLegend, fonts);
   }
 
   // Expose events on ctx so chart group can draw a shared legend
@@ -285,7 +288,7 @@ function calculateLegendRows(series) {
 
 /**
  * @description Measure the total width of a row of legend items.
- * @param {Object} font - Standard14Font instance for text measurement
+ * @param {Object} font - Embedded font instance for text measurement
  * @param {Array<string>} labels - Display labels for each item
  * @param {number} boxSize - Width of the colour indicator
  * @param {number} gap - Gap between items
@@ -304,7 +307,7 @@ function measureLegendRow(font, labels, boxSize, gap, extraWidths) {
 /**
  * @description Truncate labels evenly until the row fits within the available
  * width. Removes characters from the end of each label and adds an ellipsis.
- * @param {Object} font - Standard14Font instance for text measurement
+ * @param {Object} font - Embedded font instance for text measurement
  * @param {Array<string>} labels - Labels to truncate (modified in place)
  * @param {number} availableWidth - Maximum row width in points
  * @param {number} boxSize - Width of the colour indicator
@@ -335,7 +338,7 @@ function truncateLabelsToFit(font, labels, availableWidth, boxSize, gap, extraWi
  * @param {number} startX - Left edge of legend area
  * @param {number} legendY - Y position for this row
  */
-function drawLegendRow(page, items, displayLabels, startX, legendY) {
+function drawLegendRow(page, items, displayLabels, startX, legendY, fonts) {
   var boxSize = 8;
   var gap = 14;
   var x = startX;
@@ -376,13 +379,12 @@ function drawLegendRow(page, items, displayLabels, startX, legendY) {
     page.drawText(label, {
       x: x,
       y: legendY + 1,
-      font: StandardFonts.Helvetica,
+      font: fonts.regular,
       size: FONT_SIZE_LEGEND,
       color: textColour,
     });
 
-    var font = Standard14Font.of(StandardFonts.Helvetica);
-    var textWidth = font.widthOfTextAtSize(label, FONT_SIZE_LEGEND);
+    var textWidth = fonts.regular.widthOfTextAtSize(label, FONT_SIZE_LEGEND);
 
     // Add visible clickable link indicators after the label text
     if (hasAnyLink) {
@@ -393,20 +395,20 @@ function drawLegendRow(page, items, displayLabels, startX, legendY) {
 
       if (ftLinkUrl && msLinkUrl) {
         // Both links: draw "(FT)" and "(MS)" with underlined letters only
-        var parenOpenW = font.widthOfTextAtSize("(", linkTagSize);
-        var parenCloseW = font.widthOfTextAtSize(")", linkTagSize);
-        var ftLettersW = font.widthOfTextAtSize("FT", linkTagSize);
-        var msLettersW = font.widthOfTextAtSize("MS", linkTagSize);
+        var parenOpenW = fonts.regular.widthOfTextAtSize("(", linkTagSize);
+        var parenCloseW = fonts.regular.widthOfTextAtSize(")", linkTagSize);
+        var ftLettersW = fonts.regular.widthOfTextAtSize("FT", linkTagSize);
+        var msLettersW = fonts.regular.widthOfTextAtSize("MS", linkTagSize);
         var ftTagWidth = parenOpenW + ftLettersW + parenCloseW;
         var msTagWidth = parenOpenW + msLettersW + parenCloseW;
         var underlineY = legendY;
 
         // Draw "(FT)" — underline only the "FT" letters
-        page.drawText("(", { x: linkX, y: legendY + 1, font: StandardFonts.Helvetica, size: linkTagSize, color: COLOURS.linkBlue });
+        page.drawText("(", { x: linkX, y: legendY + 1, font: fonts.regular, size: linkTagSize, color: COLOURS.linkBlue });
         var ftLettersX = linkX + parenOpenW;
-        page.drawText("FT", { x: ftLettersX, y: legendY + 1, font: StandardFonts.Helvetica, size: linkTagSize, color: COLOURS.linkBlue });
+        page.drawText("FT", { x: ftLettersX, y: legendY + 1, font: fonts.regular, size: linkTagSize, color: COLOURS.linkBlue });
         page.drawLine({ start: { x: ftLettersX, y: underlineY }, end: { x: ftLettersX + ftLettersW, y: underlineY }, color: COLOURS.linkBlue, thickness: 0.5 });
-        page.drawText(")", { x: ftLettersX + ftLettersW, y: legendY + 1, font: StandardFonts.Helvetica, size: linkTagSize, color: COLOURS.linkBlue });
+        page.drawText(")", { x: ftLettersX + ftLettersW, y: legendY + 1, font: fonts.regular, size: linkTagSize, color: COLOURS.linkBlue });
         page.addLinkAnnotation({
           rect: { x: linkX, y: legendY - 1, width: ftTagWidth, height: FONT_SIZE_LEGEND + 3 },
           uri: ftLinkUrl,
@@ -415,11 +417,11 @@ function drawLegendRow(page, items, displayLabels, startX, legendY) {
 
         // Draw "(MS)" — underline only the "MS" letters
         linkX += ftTagWidth + 2;
-        page.drawText("(", { x: linkX, y: legendY + 1, font: StandardFonts.Helvetica, size: linkTagSize, color: COLOURS.linkBlue });
+        page.drawText("(", { x: linkX, y: legendY + 1, font: fonts.regular, size: linkTagSize, color: COLOURS.linkBlue });
         var msLettersX = linkX + parenOpenW;
-        page.drawText("MS", { x: msLettersX, y: legendY + 1, font: StandardFonts.Helvetica, size: linkTagSize, color: COLOURS.linkBlue });
+        page.drawText("MS", { x: msLettersX, y: legendY + 1, font: fonts.regular, size: linkTagSize, color: COLOURS.linkBlue });
         page.drawLine({ start: { x: msLettersX, y: underlineY }, end: { x: msLettersX + msLettersW, y: underlineY }, color: COLOURS.linkBlue, thickness: 0.5 });
-        page.drawText(")", { x: msLettersX + msLettersW, y: legendY + 1, font: StandardFonts.Helvetica, size: linkTagSize, color: COLOURS.linkBlue });
+        page.drawText(")", { x: msLettersX + msLettersW, y: legendY + 1, font: fonts.regular, size: linkTagSize, color: COLOURS.linkBlue });
         page.addLinkAnnotation({
           rect: { x: linkX, y: legendY - 1, width: msTagWidth, height: FONT_SIZE_LEGEND + 3 },
           uri: msLinkUrl,
@@ -459,8 +461,8 @@ function drawLegendRow(page, items, displayLabels, startX, legendY) {
  * @param {number} y - Y position for the first legend row
  * @param {number} availableWidth - Maximum width for legend content
  */
-function drawLegend(page, series, startX, y, availableWidth) {
-  var font = Standard14Font.of(StandardFonts.Helvetica);
+function drawLegend(page, series, startX, y, availableWidth, fonts) {
+  var font = fonts.regular;
   var boxSize = 8;
   var gap = 14;
   var maxPerRow = 4;
@@ -502,7 +504,7 @@ function drawLegend(page, series, startX, y, availableWidth) {
       return (item.publicId && item.morningstarId) ? dualLinkExtra : 0;
     });
     truncateLabelsToFit(font, labels, availableWidth, boxSize, gap, extraWidths);
-    drawLegendRow(page, chunk, labels, startX, currentY);
+    drawLegendRow(page, chunk, labels, startX, currentY, fonts);
     currentY -= LEGEND_ROW_HEIGHT;
   }
 
@@ -511,7 +513,7 @@ function drawLegend(page, series, startX, y, availableWidth) {
     var bmChunk = benchmarks.slice(b, b + maxPerRow);
     var bmLabels = bmChunk.map(function (item) { return item.label; });
     truncateLabelsToFit(font, bmLabels, availableWidth, boxSize, gap);
-    drawLegendRow(page, bmChunk, bmLabels, startX, currentY);
+    drawLegendRow(page, bmChunk, bmLabels, startX, currentY, fonts);
     currentY -= LEGEND_ROW_HEIGHT;
   }
 }
@@ -620,8 +622,8 @@ function drawGrid(page, left, bottom, width, height, yMin, yMax, ticks) {
  * @param {number} yMax - Y-axis maximum value
  * @param {Array<number>} ticks - Y-axis tick values
  */
-function drawYAxis(page, chartLeft, bottom, height, yMin, yMax, ticks) {
-  var font = Standard14Font.of(StandardFonts.Helvetica);
+function drawYAxis(page, chartLeft, bottom, height, yMin, yMax, ticks, fonts) {
+  var font = fonts.regular;
   var yRange = yMax - yMin;
   if (yRange === 0) return;
 
@@ -634,7 +636,7 @@ function drawYAxis(page, chartLeft, bottom, height, yMin, yMax, ticks) {
     page.drawText(label, {
       x: chartLeft - textWidth - 4,
       y: py - 3,
-      font: StandardFonts.Helvetica,
+      font: fonts.regular,
       size: FONT_SIZE_AXIS,
       color: COLOURS.brand600,
     });
@@ -651,10 +653,10 @@ function drawYAxis(page, chartLeft, bottom, height, yMin, yMax, ticks) {
  * @param {number} chartWidth - Chart area width
  * @param {number} monthsToShow - Total months displayed
  */
-function drawXAxis(page, sampleDates, chartLeft, bottom, chartWidth, monthsToShow) {
+function drawXAxis(page, sampleDates, chartLeft, bottom, chartWidth, monthsToShow, fonts) {
   if (sampleDates.length < 2) return;
 
-  var font = Standard14Font.of(StandardFonts.Helvetica);
+  var font = fonts.regular;
   var totalPoints = sampleDates.length;
 
   // Determine which months to label to keep 12-16 labels max
@@ -692,7 +694,7 @@ function drawXAxis(page, sampleDates, chartLeft, bottom, chartWidth, monthsToSho
       page.drawText(monthKey, {
         x: px - textWidth / 2,
         y: bottom - 14,
-        font: StandardFonts.Helvetica,
+        font: fonts.regular,
         size: FONT_SIZE_AXIS,
         color: COLOURS.brand600,
       });
@@ -784,10 +786,10 @@ function plotLine(page, values, dates, chartLeft, bottom, chartWidth, chartHeigh
  *   legend is drawn separately (e.g. chart groups).
  */
 function drawEventMarkers(page, events, sampleDates, chartLeft, chartBottom,
-  chartWidth, legendY, suppressLegend) {
+  chartWidth, legendY, suppressLegend, fonts) {
   if (events.length === 0 || sampleDates.length < 2) return;
 
-  var fontBold = Standard14Font.of(StandardFonts.HelveticaBold);
+  var fontBold = fonts.bold;
   var totalPoints = sampleDates.length;
   var firstDate = sampleDates[0];
   var lastDate = sampleDates[totalPoints - 1];
@@ -815,7 +817,7 @@ function drawEventMarkers(page, events, sampleDates, chartLeft, chartBottom,
     page.drawText(num, {
       x: px - numWidth / 2,
       y: centreY - numberSize / 2 + 1,
-      font: StandardFonts.HelveticaBold,
+      font: fonts.bold,
       size: numberSize,
       color: markerColour,
     });
@@ -823,7 +825,7 @@ function drawEventMarkers(page, events, sampleDates, chartLeft, chartBottom,
 
   // Draw event legend row unless suppressed (chart groups draw a shared legend)
   if (!suppressLegend) {
-    drawEventLegendRow(page, events, chartLeft, legendY);
+    drawEventLegendRow(page, events, chartLeft, legendY, fonts);
   }
 }
 
@@ -859,9 +861,9 @@ function drawCircle(page, cx, cy, radius, colour, thickness) {
  * @param {number} startX - Left edge for the legend row
  * @param {number} legendY - Y position for the legend row
  */
-function drawEventLegendRow(page, events, startX, legendY) {
-  var font = Standard14Font.of(StandardFonts.Helvetica);
-  var fontBold = Standard14Font.of(StandardFonts.HelveticaBold);
+function drawEventLegendRow(page, events, startX, legendY, fonts) {
+  var font = fonts.regular;
+  var fontBold = fonts.bold;
   var markerColour = rgb(0.75, 0.15, 0.15);
   var eventFontSize = 6.5;
   var legendCircleR = 4.5;
@@ -880,7 +882,7 @@ function drawEventLegendRow(page, events, startX, legendY) {
     page.drawText(legendNum, {
       x: circleCentreX - legendNumW / 2,
       y: circleCentreY - legendNumSize / 2 + 1,
-      font: StandardFonts.HelveticaBold,
+      font: fonts.bold,
       size: legendNumSize,
       color: markerColour,
     });
@@ -890,7 +892,7 @@ function drawEventLegendRow(page, events, startX, legendY) {
     page.drawText(events[j].description, {
       x: legendX,
       y: legendY,
-      font: StandardFonts.Helvetica,
+      font: fonts.regular,
       size: eventFontSize,
       color: markerColour,
     });
@@ -1126,7 +1128,7 @@ export function renderChartGroupBlock(ctx, params, blockDef) {
 
     // Draw shared event legend at the bottom of the page
     if (showGroupEvents && collectedEvents && collectedEvents.length > 0) {
-      drawEventLegendRow(page, collectedEvents, MARGIN_LEFT + Y_AXIS_WIDTH, MARGIN_BOTTOM + 4);
+      drawEventLegendRow(page, collectedEvents, MARGIN_LEFT + Y_AXIS_WIDTH, MARGIN_BOTTOM + 4, ctx.fonts);
     }
 
     ctx.y = MARGIN_BOTTOM;
@@ -1171,7 +1173,7 @@ export function renderChartGroupBlock(ctx, params, blockDef) {
 
   // Draw shared event legend at the bottom of the page
   if (showGridEvents && gridCollectedEvents && gridCollectedEvents.length > 0) {
-    drawEventLegendRow(page, gridCollectedEvents, MARGIN_LEFT + Y_AXIS_WIDTH, MARGIN_BOTTOM + 4);
+    drawEventLegendRow(page, gridCollectedEvents, MARGIN_LEFT + Y_AXIS_WIDTH, MARGIN_BOTTOM + 4, ctx.fonts);
   }
 
   ctx.y = MARGIN_BOTTOM;
@@ -1186,14 +1188,15 @@ export function renderChartGroupBlock(ctx, params, blockDef) {
  */
 export async function generateChartPdf(chartDef) {
   const pdf = PDF.create();
+  var fonts = embedRobotoFonts(pdf);
   var page = pdf.addPage({ size: "a4", orientation: "landscape" });
   var pages = [page];
-  var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_LANDSCAPE_HEIGHT, MARGIN_TOP);
+  var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_LANDSCAPE_HEIGHT, MARGIN_TOP, fonts);
 
-  var ctx = { pdf: pdf, page: page, pages: pages, y: y, pageWidths: [USABLE_WIDTH] };
+  var ctx = { pdf: pdf, page: page, pages: pages, y: y, pageWidths: [USABLE_WIDTH], fonts: fonts };
   renderChartBlock(ctx, chartDef.params || [], chartDef);
 
-  drawPageFooters(ctx.pages, chartDef.title || "Performance Chart", MARGIN_LEFT, USABLE_WIDTH);
+  drawPageFooters(ctx.pages, chartDef.title || "Performance Chart", MARGIN_LEFT, USABLE_WIDTH, fonts);
   return await pdf.save();
 }
 
@@ -1206,13 +1209,14 @@ export async function generateChartPdf(chartDef) {
 export async function generateChartGroupPdf(groupDef) {
   var layout = getChartGroupLayout(groupDef);
   const pdf = PDF.create();
+  var fonts = embedRobotoFonts(pdf);
   var page = pdf.addPage({ size: "a4", orientation: layout.orientation });
   var pages = [page];
-  var y = drawPageHeader(pdf, page, MARGIN_LEFT, layout.pageHeight, MARGIN_TOP);
+  var y = drawPageHeader(pdf, page, MARGIN_LEFT, layout.pageHeight, MARGIN_TOP, fonts);
 
-  var ctx = { pdf: pdf, page: page, pages: pages, y: y, pageWidths: [layout.usableWidth] };
+  var ctx = { pdf: pdf, page: page, pages: pages, y: y, pageWidths: [layout.usableWidth], fonts: fonts };
   renderChartGroupBlock(ctx, [], groupDef);
 
-  drawPageFooters(ctx.pages, groupDef.title || "Performance Charts", MARGIN_LEFT, layout.usableWidth);
+  drawPageFooters(ctx.pages, groupDef.title || "Performance Charts", MARGIN_LEFT, layout.usableWidth, fonts);
   return await pdf.save();
 }

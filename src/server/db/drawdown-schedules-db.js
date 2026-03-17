@@ -212,6 +212,39 @@ export function getDueDrawdownDates(schedule, upToDate) {
 }
 
 /**
+ * @description Check if a new or updated drawdown schedule would overlap with
+ * an existing active schedule on the same account. Two date ranges overlap when
+ * one starts before the other ends and vice-versa.
+ * @param {number} accountId - The account to check
+ * @param {string} fromDate - Proposed start date (YYYY-MM-DD, will be normalised)
+ * @param {string} toDate - Proposed end date (YYYY-MM-DD, will be normalised)
+ * @param {number} [excludeId] - Schedule ID to exclude (for updates — don't conflict with self)
+ * @returns {Object|null} The overlapping schedule (unscaled) if one exists, or null
+ */
+export function getOverlappingSchedule(accountId, fromDate, toDate, excludeId) {
+  const db = getDatabase();
+  const normFrom = normaliseToFirstOfMonth(fromDate);
+  const normTo = normaliseToFirstOfMonth(toDate);
+
+  let sql = `SELECT id, account_id, frequency, trigger_day, from_date, to_date, amount, notes, active
+     FROM drawdown_schedules
+     WHERE account_id = ? AND active = 1
+       AND from_date <= ? AND to_date >= ?`;
+  const params = [accountId, normTo, normFrom];
+
+  if (excludeId !== undefined && excludeId !== null) {
+    sql += " AND id != ?";
+    params.push(excludeId);
+  }
+
+  sql += " LIMIT 1";
+
+  const row = db.query(sql).get(...params);
+  if (!row) return null;
+  return unscaleScheduleRow(row);
+}
+
+/**
  * @description Normalise a date string to the first day of its month.
  * E.g. "2026-04-15" becomes "2026-04-01".
  * @param {string} dateStr - ISO-8601 date string (YYYY-MM-DD)
