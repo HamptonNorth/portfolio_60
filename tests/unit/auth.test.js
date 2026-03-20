@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { existsSync, unlinkSync, writeFileSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { isFirstRun, hashPassphrase, verifyPassphrase, loadHashFromEnv, saveHashToEnv, getAuthStatus, setAuthStatus } from "../../src/server/auth.js";
+import { isFirstRun, hashPassphrase, verifyPassphrase, loadHashFromEnv, saveHashToEnv, getAuthStatus, setAuthStatus, checkLockout, recordFailedAttempt, resetFailedAttempts, getFailedAttemptCount } from "../../src/server/auth.js";
 
 /**
  * @description Path to the .env file used in tests.
@@ -25,8 +25,9 @@ beforeEach(() => {
   } else {
     envBackup = null;
   }
-  // Reset auth status
+  // Reset auth status and failed attempts
   setAuthStatus(false);
+  resetFailedAttempts();
 });
 
 afterEach(() => {
@@ -109,5 +110,60 @@ describe("Auth - getAuthStatus and setAuthStatus", () => {
 
     setAuthStatus(false);
     expect(getAuthStatus()).toBe(false);
+  });
+});
+
+describe("Auth - brute-force protection", () => {
+  test("checkLockout returns not locked initially", () => {
+    const result = checkLockout();
+    expect(result.locked).toBe(false);
+    expect(result.remainingMs).toBe(0);
+  });
+
+  test("failed attempts are counted", () => {
+    expect(getFailedAttemptCount()).toBe(0);
+    recordFailedAttempt();
+    expect(getFailedAttemptCount()).toBe(1);
+    recordFailedAttempt();
+    expect(getFailedAttemptCount()).toBe(2);
+  });
+
+  test("lockout triggers after 5 failed attempts", () => {
+    for (let i = 0; i < 5; i++) {
+      recordFailedAttempt();
+    }
+    const result = checkLockout();
+    expect(result.locked).toBe(true);
+    expect(result.remainingMs).toBeGreaterThan(0);
+  });
+
+  test("4 failed attempts do not trigger lockout", () => {
+    for (let i = 0; i < 4; i++) {
+      recordFailedAttempt();
+    }
+    const result = checkLockout();
+    expect(result.locked).toBe(false);
+  });
+
+  test("resetFailedAttempts clears the counter and lockout", () => {
+    for (let i = 0; i < 5; i++) {
+      recordFailedAttempt();
+    }
+    expect(checkLockout().locked).toBe(true);
+
+    resetFailedAttempts();
+    expect(getFailedAttemptCount()).toBe(0);
+    expect(checkLockout().locked).toBe(false);
+  });
+
+  test("lockout remainingMs is approximately 4 hours", () => {
+    for (let i = 0; i < 5; i++) {
+      recordFailedAttempt();
+    }
+    const result = checkLockout();
+    const fourHoursMs = 4 * 60 * 60 * 1000;
+    // Should be within 5 seconds of 4 hours (accounting for test execution time)
+    expect(result.remainingMs).toBeGreaterThan(fourHoursMs - 5000);
+    expect(result.remainingMs).toBeLessThanOrEqual(fourHoursMs);
   });
 });

@@ -1,4 +1,4 @@
-import { isFirstRun, getAuthStatus, setAuthStatus, hashPassphrase, verifyPassphrase, loadHashFromEnv, saveHashToEnv } from "../auth.js";
+import { isFirstRun, getAuthStatus, setAuthStatus, hashPassphrase, verifyPassphrase, loadHashFromEnv, saveHashToEnv, checkLockout, recordFailedAttempt, resetFailedAttempts } from "../auth.js";
 import { databaseExists, createDatabase } from "../db/connection.js";
 import { isTestMode, activateTestMode, deactivateTestMode, isTestDatabaseFresh } from "../test-mode.js";
 
@@ -146,6 +146,27 @@ export async function handleAuthRoute(method, path, request) {
 
   // POST /api/auth/verify — verify passphrase on subsequent runs
   if (method === "POST" && path === "/api/auth/verify") {
+    // Brute-force protection — check lockout before doing anything
+    const lockout = checkLockout();
+    if (lockout.locked) {
+      const remainingMinutes = Math.ceil(lockout.remainingMs / 60000);
+      const hours = Math.floor(remainingMinutes / 60);
+      const minutes = remainingMinutes % 60;
+      const timeText = hours > 0
+        ? `${hours} hour${hours !== 1 ? "s" : ""}${minutes > 0 ? ` ${minutes} minute${minutes !== 1 ? "s" : ""}` : ""}`
+        : `${minutes} minute${minutes !== 1 ? "s" : ""}`;
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Too many failed attempts",
+          detail: `Account locked. Try again in ${timeText}.`,
+          locked: true,
+          remainingMs: lockout.remainingMs,
+        }),
+        { status: 429, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
     let body;
     try {
       body = await request.json();
@@ -192,12 +213,30 @@ export async function handleAuthRoute(method, path, request) {
     const isValid = await verifyPassphrase(passphrase, storedHash);
 
     if (isValid) {
+      resetFailedAttempts();
       // If switching from test mode back to live, deactivate test mode first
       if (isTestMode()) {
         deactivateTestMode();
       }
       setAuthStatus(true);
       return new Response(JSON.stringify({ success: true, message: "Passphrase verified" }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+
+    recordFailedAttempt();
+
+    // Check if this failure triggered a lockout
+    const newLockout = checkLockout();
+    if (newLockout.locked) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Too many failed attempts",
+          detail: "Account locked for 4 hours due to repeated incorrect attempts.",
+          locked: true,
+          remainingMs: newLockout.remainingMs,
+        }),
+        { status: 429, headers: { "Content-Type": "application/json" } },
+      );
     }
 
     return new Response(JSON.stringify({ success: false, error: "Incorrect passphrase" }), { status: 401, headers: { "Content-Type": "application/json" } });

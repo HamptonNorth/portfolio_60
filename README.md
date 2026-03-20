@@ -1,3 +1,7 @@
+Warning
+
+Portfolio 60  is beta-quality until v1.0. Versions before 1.0 do not strictly follow semantic versioning. The core API should be relatively stable after 0.1.4, but expect breaking changes between minor releases.
+
 # Portfolio 60
 
 A browser-based application for UK families to track investments across multiple people and account types.

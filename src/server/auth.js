@@ -18,6 +18,25 @@ const ENV_PATH = resolve(join(DATA_DIR, ".env"));
 let isAuthenticated = false;
 
 /**
+ * @description Maximum number of failed passphrase attempts before lockout.
+ * @type {number}
+ */
+const MAX_FAILED_ATTEMPTS = 5;
+
+/**
+ * @description Lockout duration in milliseconds (4 hours).
+ * @type {number}
+ */
+const LOCKOUT_DURATION_MS = 4 * 60 * 60 * 1000;
+
+/**
+ * @description Tracks failed verification attempts for brute-force protection.
+ * Resets on successful auth or server restart.
+ * @type {{ count: number, lockedUntil: number | null }}
+ */
+const failedAttempts = { count: 0, lockedUntil: null };
+
+/**
  * @description Check if this is the first run (no passphrase hash stored).
  * Reads the .env file and checks for a non-empty APP_PASSPHRASE_HASH value.
  * @returns {boolean} True if no hash has been set yet
@@ -93,6 +112,53 @@ export function loadHashFromEnv() {
  * If the file doesn't exist, creates it with the hash.
  * @param {string} hash - The hash string to save
  */
+/**
+ * @description Check whether the verify endpoint is currently locked out
+ * due to too many failed attempts.
+ * @returns {{ locked: boolean, remainingMs: number }} locked is true if
+ *   currently in lockout period; remainingMs is milliseconds until unlock
+ */
+export function checkLockout() {
+  if (failedAttempts.lockedUntil === null) {
+    return { locked: false, remainingMs: 0 };
+  }
+  const now = Date.now();
+  if (now >= failedAttempts.lockedUntil) {
+    // Lockout has expired — reset
+    failedAttempts.count = 0;
+    failedAttempts.lockedUntil = null;
+    return { locked: false, remainingMs: 0 };
+  }
+  return { locked: true, remainingMs: failedAttempts.lockedUntil - now };
+}
+
+/**
+ * @description Record a failed passphrase attempt. If the failure count
+ * reaches MAX_FAILED_ATTEMPTS, starts a lockout period.
+ */
+export function recordFailedAttempt() {
+  failedAttempts.count += 1;
+  if (failedAttempts.count >= MAX_FAILED_ATTEMPTS) {
+    failedAttempts.lockedUntil = Date.now() + LOCKOUT_DURATION_MS;
+  }
+}
+
+/**
+ * @description Reset the failed-attempt counter (called on successful auth).
+ */
+export function resetFailedAttempts() {
+  failedAttempts.count = 0;
+  failedAttempts.lockedUntil = null;
+}
+
+/**
+ * @description Get the current number of failed attempts (for testing/diagnostics).
+ * @returns {number}
+ */
+export function getFailedAttemptCount() {
+  return failedAttempts.count;
+}
+
 export function saveHashToEnv(hash) {
   if (!existsSync(ENV_PATH)) {
     // Create a new .env file with the hash

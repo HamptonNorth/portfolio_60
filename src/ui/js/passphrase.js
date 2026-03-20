@@ -46,6 +46,53 @@ function showTestDbComplete(contentDiv, dotsInterval) {
   }, 2000);
 }
 
+/**
+ * @description Show a lockout message with a countdown timer.
+ * Replaces the form content and re-shows the verify form when the lockout expires.
+ * @param {HTMLElement} contentDiv - The container to show the message in
+ * @param {number} remainingMs - Milliseconds remaining in the lockout period
+ */
+function showLockoutMessage(contentDiv, remainingMs) {
+  const messagesDiv = document.getElementById("passphrase-messages");
+
+  /**
+   * @description Format milliseconds as "Xh Ym" or "Ym" text.
+   * @param {number} ms - Milliseconds to format
+   * @returns {string} Human-readable time string
+   */
+  function formatRemaining(ms) {
+    const totalMinutes = Math.ceil(ms / 60000);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (hours > 0 && minutes > 0) {
+      return hours + "h " + minutes + "m";
+    } else if (hours > 0) {
+      return hours + "h";
+    }
+    return minutes + "m";
+  }
+
+  contentDiv.innerHTML =
+    '<div class="text-center py-6 space-y-3">' +
+    '<p class="text-error font-medium text-lg">Too many failed attempts</p>' +
+    '<p class="text-brand-600">Access has been temporarily locked for security.</p>' +
+    '<p class="text-brand-700 font-medium">Try again in: <span id="lockout-countdown">' + formatRemaining(remainingMs) + '</span></p>' +
+    '</div>';
+
+  var endTime = Date.now() + remainingMs;
+  var countdownSpan = document.getElementById("lockout-countdown");
+
+  var countdownInterval = setInterval(function () {
+    var remaining = endTime - Date.now();
+    if (remaining <= 0) {
+      clearInterval(countdownInterval);
+      showVerifyPassphraseForm(contentDiv, messagesDiv);
+      return;
+    }
+    countdownSpan.textContent = formatRemaining(remaining);
+  }, 30000);
+}
+
 document.addEventListener("DOMContentLoaded", async function () {
   const messagesDiv = document.getElementById("passphrase-messages");
   const contentDiv = document.getElementById("passphrase-content");
@@ -245,7 +292,12 @@ function showVerifyPassphraseForm(contentDiv, messagesDiv) {
       window.location.href = "/";
     } else {
       clearInterval(dotsInterval);
-      errorsDiv.textContent = result.error || "Incorrect passphrase. Please try again.";
+      // Handle lockout — disable the form and show remaining time
+      if (result.data && result.data.locked) {
+        showLockoutMessage(contentDiv, result.data.remainingMs);
+      } else {
+        errorsDiv.textContent = result.error || "Incorrect passphrase. Please try again.";
+      }
     }
   });
 }

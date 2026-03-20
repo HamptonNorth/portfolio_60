@@ -36,6 +36,15 @@ import { databaseExists, closeDatabase } from "./db/connection.js";
 const port = parseInt(process.env.PORT, 10) || SERVER_PORT;
 
 /**
+ * @description The hostname/IP address the server binds to.
+ * Uses the HOST environment variable if set. Defaults to "0.0.0.0" (all
+ * interfaces). Set to "127.0.0.1" to restrict access to localhost only —
+ * useful when the instance should not be reachable from the network.
+ * @type {string}
+ */
+const hostname = process.env.HOST || "0.0.0.0";
+
+/**
  * @description Root directory for serving static UI files
  * @type {string}
  */
@@ -97,6 +106,7 @@ async function serveStaticFile(relativePath) {
  */
 const server = Bun.serve({
   port: port,
+  hostname: hostname,
   idleTimeout: 0, // disabled globally — SSE fetching streams are long-lived; per-request server.timeout(req, 0) also applied for stream endpoints
 
   /**
@@ -418,7 +428,7 @@ const server = Bun.serve({
   },
 });
 
-console.log(`Portfolio 60 server running on http://localhost:${server.port}`);
+console.log(`Portfolio 60 server running on http://${hostname === "0.0.0.0" ? "localhost" : hostname}:${server.port}`);
 
 // Process any due drawdowns (only if database already exists — skipped on fresh installs)
 if (databaseExists()) {
