@@ -1,19 +1,19 @@
 [
   {
     "id": "ex1_household_assets",
-    "title": "Example 1: Household Assets",
+    "title": "1: Household Assets",
     "pdfEndpoint": "/api/reports/pdf/household-assets",
     "params": []
   },
   {
     "id": "ex2_portfolio_summary",
-    "title": "Example 2: Portfolio Summary",
+    "title": "2: Portfolio Summary",
     "pdfEndpoint": "/api/reports/pdf/portfolio-summary",
     "params": ["USER2", "USER1", "USER2 + USER1"]
   },
   {
     "id": "ex3_portfolio_detail",
-    "title": "Example 3: Portfolio Detail",
+    "title": "3: Portfolio Detail",
     "pdfEndpoint": "/api/reports/pdf/portfolio-detail",
     "params": [
       "USER1:ISA:1m,3m,1y",
@@ -23,7 +23,7 @@
   },
   {
     "id": "ex3b_detail_with_page_break",
-    "title": "Example 3b: Detail with Page Break",
+    "title": "3b: Detail with Page Break",
     "pdfEndpoint": "/api/reports/pdf/portfolio-detail",
     "params": [
       "USER2:ISA:1m,3m,1y,3y",
@@ -37,20 +37,16 @@
   },
   {
     "id": "ex4_single_chart",
-    "title": "Example 4: Performance Chart",
+    "title": "4: Performance Chart",
     "subTitle": "12 month performance versus FTSE 100",
     "pdfEndpoint": "/api/reports/pdf/chart",
     "monthsToShow": "12",
     "smooth": true,
-    "params": [
-      "inv:GB00B41YBW71",
-      "inv:GB00B4PQW151",
-      "bm:FTSE 100"
-    ]
+    "params": ["inv:GB00B41YBW71", "inv:GB00B4PQW151", "bm:FTSE 100"]
   },
   {
     "id": "ex4b_chart_with_events",
-    "title": "Example 4b: Chart with Global Events",
+    "title": "4b: Chart with Global Events",
     "subTitle": "36 month performance versus FTSE 100 and S&P 500",
     "pdfEndpoint": "/api/reports/pdf/chart",
     "monthsToShow": "36",
@@ -69,7 +65,7 @@
   },
   {
     "id": "ex5_chart_group_2",
-    "title": "Example 5: Two Charts (portrait)",
+    "title": "5: Two Charts (portrait)",
     "pdfEndpoint": "/api/reports/pdf/chart-group",
     "charts": [
       {
@@ -77,28 +73,20 @@
         "subTitle": "36 month performance",
         "monthsToShow": "36",
         "smooth": true,
-        "params": [
-          "inv:GB00B41YBW71",
-          "inv:GB00B4PQW151",
-          "bm:FTSE 100"
-        ]
+        "params": ["inv:GB00B41YBW71", "inv:GB00B4PQW151", "bm:FTSE 100"]
       },
       {
         "title": "Key Funds",
         "subTitle": "12 month performance",
         "monthsToShow": "12",
         "smooth": true,
-        "params": [
-          "inv:GB00B41YBW71",
-          "inv:GB00B4PQW151",
-          "bm:FTSE 100"
-        ]
+        "params": ["inv:GB00B41YBW71", "inv:GB00B4PQW151", "bm:FTSE 100"]
       }
     ]
   },
   {
     "id": "ex5b_chart_group_4",
-    "title": "Example 5b: Four Charts (landscape grid)",
+    "title": "5b: Four Charts (landscape grid)",
     "pdfEndpoint": "/api/reports/pdf/chart-group",
     "charts": [
       {
@@ -157,7 +145,7 @@
   },
   {
     "id": "ex6_simple_composite",
-    "title": "Example 6: Simple Composite (2 pages)",
+    "title": "6: Simple Composite (2 pages)",
     "blocks": [
       {
         "type": "portfolio_summary",
@@ -169,17 +157,13 @@
         "subTitle": "12 month trend",
         "monthsToShow": "12",
         "smooth": true,
-        "params": [
-          "inv:GB00B41YBW71",
-          "inv:GB00B4PQW151",
-          "bm:FTSE 100"
-        ]
+        "params": ["inv:GB00B41YBW71", "inv:GB00B4PQW151", "bm:FTSE 100"]
       }
     ]
   },
   {
     "id": "ex7_weekly_report",
-    "title": "Example 7: Weekly Report (6 pages)",
+    "title": "7: Weekly Report (6 pages)",
     "blocks": [
       { "type": "household_assets" },
       {
