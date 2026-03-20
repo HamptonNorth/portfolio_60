@@ -555,6 +555,15 @@ async function showAddAccountForm() {
   document.getElementById("account-form-errors").textContent = "";
   document.getElementById("account-delete-btn").classList.add("hidden");
 
+  // Cash balance is editable for new accounts (sets the opening balance)
+  var cashBalanceInput = document.getElementById("cash-balance");
+  cashBalanceInput.readOnly = false;
+  cashBalanceInput.classList.remove("bg-brand-50", "text-brand-500");
+
+  // Hide Edit Cash Balance button and sub-form for new accounts
+  document.getElementById("edit-cash-balance-btn").classList.add("hidden");
+  hideCashTxSubForm();
+
   // Disable account types already in use
   await filterAvailableAccountTypes();
 
@@ -659,8 +668,14 @@ async function editAccount(id) {
   document.getElementById("account-type").disabled = true; // Type cannot be changed
   populateAccountRefDropdown(acct.account_type, acct.account_ref);
   document.getElementById("cash-balance").value = acct.cash_balance;
+  document.getElementById("cash-balance").readOnly = true;
+  document.getElementById("cash-balance").classList.add("bg-brand-50", "text-brand-500");
   document.getElementById("warn-cash").value = acct.warn_cash || "";
   document.getElementById("account-form-errors").textContent = "";
+
+  // Show the Edit Cash Balance button when editing
+  document.getElementById("edit-cash-balance-btn").classList.remove("hidden");
+  hideCashTxSubForm();
 
   const deleteBtn = document.getElementById("account-delete-btn");
   deleteBtn.classList.remove("hidden");
@@ -689,6 +704,169 @@ async function editAccount(id) {
  */
 function hideAccountForm() {
   document.getElementById("account-form-container").classList.add("hidden");
+}
+
+// ─── Cash Transaction Sub-form (within Edit Account) ────────────────
+
+/**
+ * @description Show the cash transaction sub-form within the Edit Account modal.
+ * Sets the date to today and resets all fields.
+ */
+function showCashTxSubForm() {
+  var section = document.getElementById("cash-tx-section");
+  section.classList.remove("hidden");
+  document.getElementById("cash-tx-type").value = "";
+  document.getElementById("cash-tx-amount").value = "";
+  document.getElementById("cash-tx-notes").value = "";
+  document.getElementById("cash-tx-errors").textContent = "";
+  document.getElementById("cash-tx-direction-group").classList.add("hidden");
+  document.getElementById("cash-tx-replace-group").classList.add("hidden");
+  document.getElementById("cash-tx-replace").checked = false;
+  document.getElementById("cash-tx-amount-label").textContent = "Amount (£) *";
+
+  // Default date to today
+  var today = new Date().toISOString().slice(0, 10);
+  document.getElementById("cash-tx-date").value = today;
+
+  setTimeout(function () {
+    document.getElementById("cash-tx-type").focus();
+  }, 50);
+}
+
+/**
+ * @description Hide the cash transaction sub-form and reset its state.
+ */
+function hideCashTxSubForm() {
+  document.getElementById("cash-tx-section").classList.add("hidden");
+  document.getElementById("cash-tx-errors").textContent = "";
+}
+
+/**
+ * @description Handle changes to the cash transaction type dropdown.
+ * Shows/hides the direction selector and replace-balance checkbox for adjustments.
+ */
+function onCashTxTypeChange() {
+  var txType = document.getElementById("cash-tx-type").value;
+  var dirGroup = document.getElementById("cash-tx-direction-group");
+  var replaceGroup = document.getElementById("cash-tx-replace-group");
+  var replaceCheckbox = document.getElementById("cash-tx-replace");
+
+  if (txType === "adjustment") {
+    dirGroup.classList.remove("hidden");
+    replaceGroup.classList.remove("hidden");
+  } else {
+    dirGroup.classList.add("hidden");
+    replaceGroup.classList.add("hidden");
+    replaceCheckbox.checked = false;
+    document.getElementById("cash-tx-amount-label").textContent = "Amount (£) *";
+  }
+}
+
+/**
+ * @description Handle toggling the "Replace current balance" checkbox.
+ * When checked, hides the direction selector and changes the amount label.
+ */
+function onCashTxReplaceToggle() {
+  var isReplace = document.getElementById("cash-tx-replace").checked;
+  var dirGroup = document.getElementById("cash-tx-direction-group");
+  var amountLabel = document.getElementById("cash-tx-amount-label");
+
+  if (isReplace) {
+    dirGroup.classList.add("hidden");
+    amountLabel.textContent = "New Balance (£) *";
+  } else {
+    dirGroup.classList.remove("hidden");
+    amountLabel.textContent = "Amount (£) *";
+  }
+}
+
+/**
+ * @description Handle the Save Transaction button within the Edit Account modal.
+ * Creates a cash transaction via the API and refreshes the cash balance display.
+ */
+async function handleCashTxSubFormSave() {
+  var errorsDiv = document.getElementById("cash-tx-errors");
+  errorsDiv.textContent = "";
+
+  var accountId = document.getElementById("account-id").value;
+  if (!accountId) {
+    errorsDiv.textContent = "No account selected.";
+    return;
+  }
+
+  var txType = document.getElementById("cash-tx-type").value;
+  var txDate = document.getElementById("cash-tx-date").value;
+  var rawAmount = Number(document.getElementById("cash-tx-amount").value);
+  var notes = document.getElementById("cash-tx-notes").value.trim();
+  var isReplace = document.getElementById("cash-tx-replace").checked;
+  var direction = document.getElementById("cash-tx-direction").value;
+
+  // Client-side validation
+  if (!txType) {
+    errorsDiv.textContent = "Please select a transaction type.";
+    return;
+  }
+  if (!txDate) {
+    errorsDiv.textContent = "Please enter a date.";
+    return;
+  }
+  if (!rawAmount || rawAmount <= 0) {
+    errorsDiv.textContent = "Please enter a positive amount.";
+    return;
+  }
+
+  // Build the request body
+  var body = {
+    transaction_type: txType,
+    transaction_date: txDate,
+    amount: rawAmount,
+    notes: notes || null,
+  };
+
+  // Handle adjustment with "replace balance" — calculate the delta
+  if (txType === "adjustment" && isReplace) {
+    var currentBalance = Number(document.getElementById("cash-balance").value) || 0;
+    var delta = rawAmount - currentBalance;
+    if (delta === 0) {
+      errorsDiv.textContent = "New balance is the same as the current balance.";
+      return;
+    }
+    body.amount = Math.abs(delta);
+    body.direction = delta > 0 ? "credit" : "debit";
+    if (!body.notes) {
+      body.notes = "Balance replaced: £" + currentBalance.toFixed(2) + " → £" + rawAmount.toFixed(2);
+    }
+  } else if (txType === "adjustment") {
+    body.direction = direction;
+  }
+
+  var result = await apiRequest("/api/accounts/" + accountId + "/cash-transactions", {
+    method: "POST",
+    body: body,
+  });
+
+  if (result.ok) {
+    // Refresh the account to get the updated cash balance
+    var acctResult = await apiRequest("/api/accounts/" + accountId);
+    if (acctResult.ok) {
+      document.getElementById("cash-balance").value = acctResult.data.cash_balance;
+      // Also update the holdings/detail view cash balance if visible
+      if (selectedAccount && selectedAccount.id === Number(accountId)) {
+        selectedAccount = acctResult.data;
+        updateCashBalanceDisplay();
+      }
+    }
+    hideCashTxSubForm();
+    var holdingsVisible = !document.getElementById("holdings-view").classList.contains("hidden");
+    var detailVisible = !document.getElementById("detail-view").classList.contains("hidden");
+    var msgTarget = holdingsVisible ? "holdings-messages" : detailVisible ? "page-messages" : "page-messages";
+    showSuccess(msgTarget, "Cash transaction recorded successfully");
+    if (!holdingsVisible && !detailVisible) {
+      await loadAccounts();
+    }
+  } else {
+    errorsDiv.textContent = result.detail || result.error || "Failed to create transaction";
+  }
 }
 
 /**
@@ -726,8 +904,22 @@ async function handleAccountSubmit(event) {
 
   if (result.ok) {
     hideAccountForm();
-    await loadAccounts();
-    showSuccess("page-messages", isEditing ? "Account updated successfully" : "Account added successfully");
+
+    // If we're on the holdings or detail view, refresh account data and cash balance display
+    const holdingsVisible = !document.getElementById("holdings-view").classList.contains("hidden");
+    const detailVisible = !document.getElementById("detail-view").classList.contains("hidden");
+    if ((holdingsVisible || detailVisible) && selectedAccount) {
+      const refreshed = await apiRequest("/api/accounts/" + selectedAccount.id);
+      if (refreshed.ok) {
+        selectedAccount = refreshed.data;
+        updateCashBalanceDisplay();
+      }
+      const msgTarget = holdingsVisible ? "holdings-messages" : "page-messages";
+      showSuccess(msgTarget, "Account updated successfully");
+    } else {
+      await loadAccounts();
+      showSuccess("page-messages", isEditing ? "Account updated successfully" : "Account added successfully");
+    }
   } else {
     errorsDiv.textContent = result.detail || result.error;
   }
@@ -2346,6 +2538,13 @@ document.addEventListener("DOMContentLoaded", async function () {
     populateAccountRefDropdown(this.value);
   });
 
+  // Cash transaction sub-form (within Edit Account)
+  document.getElementById("edit-cash-balance-btn").addEventListener("click", showCashTxSubForm);
+  document.getElementById("cash-tx-save-btn").addEventListener("click", handleCashTxSubFormSave);
+  document.getElementById("cash-tx-cancel-btn").addEventListener("click", hideCashTxSubForm);
+  document.getElementById("cash-tx-type").addEventListener("change", onCashTxTypeChange);
+  document.getElementById("cash-tx-replace").addEventListener("change", onCashTxReplaceToggle);
+
   // Holdings view
   document.getElementById("back-to-accounts-btn").addEventListener("click", backToAccounts);
   document.getElementById("add-holding-btn").addEventListener("click", showAddHoldingForm);
@@ -2398,9 +2597,9 @@ document.addEventListener("DOMContentLoaded", async function () {
   });
 
   // Cash movements — holdings view
-  document.getElementById("deposit-btn").addEventListener("click", showDepositForm);
-  document.getElementById("withdraw-btn").addEventListener("click", showWithdrawForm);
-  document.getElementById("fees-btn").addEventListener("click", showFeesForm);
+  document.getElementById("holdings-edit-cash-btn").addEventListener("click", function () {
+    if (selectedAccount) editAccount(selectedAccount.id);
+  });
   document.getElementById("cash-tx-toggle").addEventListener("click", toggleCashTransactions);
   document.getElementById("cash-tx-more-btn").addEventListener("click", function () {
     cashTxLimit += 20;
@@ -2408,9 +2607,9 @@ document.addEventListener("DOMContentLoaded", async function () {
   });
 
   // Cash movements — detail view
-  document.getElementById("detail-deposit-btn").addEventListener("click", showDepositForm);
-  document.getElementById("detail-withdraw-btn").addEventListener("click", showWithdrawForm);
-  document.getElementById("detail-fees-btn").addEventListener("click", showFeesForm);
+  document.getElementById("detail-edit-cash-btn").addEventListener("click", function () {
+    if (selectedAccount) editAccount(selectedAccount.id);
+  });
   document.getElementById("detail-cash-tx-toggle").addEventListener("click", toggleCashTransactions);
   document.getElementById("detail-cash-tx-more-btn").addEventListener("click", function () {
     cashTxLimit += 20;

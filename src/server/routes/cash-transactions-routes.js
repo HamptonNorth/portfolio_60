@@ -67,8 +67,18 @@ cashTxRouter.post("/api/accounts/:accountId/cash-transactions", async function (
     return new Response(JSON.stringify({ error: "Validation failed", detail: errors.join("; ") }), { status: 400, headers: { "Content-Type": "application/json" } });
   }
 
-  // Hard check: withdrawals and adjustment debits must not exceed available cash balance
+  // Hard check: withdrawals, drawdowns and adjustment debits must not exceed available cash balance
   const amount = Number(body.amount);
+  if (body.transaction_type === "drawdown" && amount > account.cash_balance) {
+    return new Response(
+      JSON.stringify({
+        error: "Insufficient cash",
+        detail: `Drawdown of £${amount.toFixed(2)} exceeds available balance of £${account.cash_balance.toFixed(2)}`,
+      }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
   if (body.transaction_type === "withdrawal" && amount > account.cash_balance) {
     return new Response(
       JSON.stringify({

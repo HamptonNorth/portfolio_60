@@ -302,11 +302,11 @@ export function validateCashTransaction(data) {
     if (error) errors.push(error);
   }
 
-  // transaction_type must be 'deposit', 'withdrawal', or 'adjustment' (drawdowns are system-created)
+  // transaction_type must be 'deposit', 'withdrawal', 'drawdown', or 'adjustment'
   if (data.transaction_type !== undefined && data.transaction_type !== null) {
     const txType = String(data.transaction_type).trim();
-    if (txType !== "" && txType !== "deposit" && txType !== "withdrawal" && txType !== "adjustment") {
-      errors.push("Transaction type must be 'deposit', 'withdrawal', or 'adjustment'");
+    if (txType !== "" && txType !== "deposit" && txType !== "withdrawal" && txType !== "drawdown" && txType !== "adjustment") {
+      errors.push("Transaction type must be 'deposit', 'withdrawal', 'drawdown', or 'adjustment'");
     }
   }
 

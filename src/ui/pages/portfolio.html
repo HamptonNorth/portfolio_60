@@ -47,11 +47,7 @@
                         <span id="detail-cash-balance-display" class="text-xl font-semibold font-mono text-brand-800">£0</span>
                         <span id="detail-cash-balance-warning" class="hidden text-red-600 font-medium text-sm"></span>
                     </div>
-                    <div class="flex items-center gap-3">
-                        <button id="detail-deposit-btn" class="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">Deposit</button>
-                        <button id="detail-withdraw-btn" class="bg-amber-600 hover:bg-amber-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">Withdraw</button>
-                        <button id="detail-fees-btn" class="bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">Fees</button>
-                    </div>
+                    <button id="detail-edit-cash-btn" class="bg-brand-700 hover:bg-brand-800 text-white font-medium px-4 py-2 rounded-lg transition-colors">Edit Cash Balance</button>
                 </div>
 
                 <!-- Cash transaction history (detail view) -->
@@ -117,11 +113,7 @@
                         <span id="cash-balance-display" class="text-xl font-semibold font-mono text-brand-800">£0</span>
                         <span id="cash-balance-warning" class="hidden text-red-600 font-medium text-sm"></span>
                     </div>
-                    <div class="flex items-center gap-3">
-                        <button id="deposit-btn" class="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">Deposit</button>
-                        <button id="withdraw-btn" class="bg-amber-600 hover:bg-amber-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">Withdraw</button>
-                        <button id="fees-btn" class="bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">Fees</button>
-                    </div>
+                    <button id="holdings-edit-cash-btn" class="bg-brand-700 hover:bg-brand-800 text-white font-medium px-4 py-2 rounded-lg transition-colors">Edit Cash Balance</button>
                 </div>
 
                 <!-- Cash transaction history -->
@@ -165,14 +157,64 @@
                             </select>
                         </div>
 
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
+                        <div class="flex gap-3 items-end">
+                            <div class="flex-1">
                                 <label for="cash-balance" class="block text-sm font-medium text-brand-700 mb-1">Cash Balance (GBP)</label>
                                 <input type="number" id="cash-balance" name="cash_balance" step="0.01" min="0" class="w-full px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="0.00" />
                             </div>
-                            <div>
-                                <label for="warn-cash" class="block text-sm font-medium text-brand-700 mb-1">Warning Threshold (GBP)</label>
-                                <input type="number" id="warn-cash" name="warn_cash" step="0.01" min="0" class="w-full px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="0.00" />
+                            <button type="button" id="edit-cash-balance-btn" class="hidden bg-brand-100 hover:bg-brand-200 text-brand-700 font-medium px-3 py-2 rounded-md text-sm transition-colors whitespace-nowrap">Edit Cash Balance</button>
+                        </div>
+                        <div>
+                            <label for="warn-cash" class="block text-sm font-medium text-brand-700 mb-1">Warning Threshold (GBP)</label>
+                            <input type="number" id="warn-cash" name="warn_cash" step="0.01" min="0" class="w-full px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="0.00" />
+                        </div>
+
+                        <!-- Cash transaction sub-form — visible when Edit Cash Balance clicked -->
+                        <div id="cash-tx-section" class="hidden bg-brand-50 rounded-md p-4 border border-brand-200">
+                            <h4 class="text-base font-semibold text-brand-700 mb-3">Cash Transaction</h4>
+                            <div class="grid grid-cols-2 gap-3 mb-3">
+                                <div>
+                                    <label for="cash-tx-type" class="block text-sm font-medium text-brand-700 mb-1">Type *</label>
+                                    <select id="cash-tx-type" class="w-full px-3 py-2 border border-brand-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white">
+                                        <option value="">Select...</option>
+                                        <option value="deposit">Deposit</option>
+                                        <option value="withdrawal">Withdrawal</option>
+                                        <option value="drawdown">Drawdown</option>
+                                        <option value="adjustment">Adjustment</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="cash-tx-date" class="block text-sm font-medium text-brand-700 mb-1">Date *</label>
+                                    <input type="date" id="cash-tx-date" class="w-full px-3 py-2 border border-brand-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3 mb-3">
+                                <div>
+                                    <label for="cash-tx-amount" id="cash-tx-amount-label" class="block text-sm font-medium text-brand-700 mb-1">Amount (£) *</label>
+                                    <input type="number" id="cash-tx-amount" step="0.01" min="0.01" class="w-full px-3 py-2 border border-brand-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="0.00" />
+                                </div>
+                                <div id="cash-tx-direction-group" class="hidden">
+                                    <label class="block text-sm font-medium text-brand-700 mb-1">Direction *</label>
+                                    <select id="cash-tx-direction" class="w-full px-3 py-2 border border-brand-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white">
+                                        <option value="debit">Subtract from balance</option>
+                                        <option value="credit">Add to balance</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div id="cash-tx-replace-group" class="hidden mb-3">
+                                <label class="inline-flex items-center gap-2 text-sm text-brand-700 cursor-pointer">
+                                    <input type="checkbox" id="cash-tx-replace" class="rounded border-brand-300 text-brand-600 focus:ring-brand-500" />
+                                    Replace current balance (set balance to the amount entered)
+                                </label>
+                            </div>
+                            <div class="mb-3">
+                                <label for="cash-tx-notes" class="block text-sm font-medium text-brand-700 mb-1">Notes</label>
+                                <input type="text" id="cash-tx-notes" maxlength="255" class="w-full px-3 py-2 border border-brand-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Optional description" />
+                            </div>
+                            <div id="cash-tx-errors" class="text-error text-sm mb-2"></div>
+                            <div class="flex gap-2">
+                                <button type="button" id="cash-tx-save-btn" class="bg-brand-700 hover:bg-brand-800 text-white font-medium px-4 py-1.5 rounded-md text-sm transition-colors">Save Transaction</button>
+                                <button type="button" id="cash-tx-cancel-btn" class="bg-brand-100 hover:bg-brand-200 text-brand-700 font-medium px-4 py-1.5 rounded-md text-sm transition-colors">Cancel</button>
                             </div>
                         </div>
 
