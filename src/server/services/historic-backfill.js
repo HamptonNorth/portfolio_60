@@ -14,6 +14,7 @@ import { upsertRate, scaleRate } from "../db/currency-rates-db.js";
 import { upsertPrice } from "../db/prices-db.js";
 import { upsertBenchmarkData } from "../db/benchmark-data-db.js";
 import { getFetchBatchConfig } from "../config.js";
+import { toLocalDateStr } from "../../shared/server-constants.js";
 import { detectPublicIdType, extractTickerFromPublicId, extractExchangeFromPublicId } from "../../shared/public-id-utils.js";
 import YahooFinance from "yahoo-finance2";
 
@@ -293,8 +294,8 @@ export async function backfillCurrencyRates(progressCallback) {
   const startDate = new Date();
   startDate.setFullYear(startDate.getFullYear() - 3);
 
-  const startStr = startDate.toISOString().split("T")[0];
-  const endStr = endDate.toISOString().split("T")[0];
+  const startStr = toLocalDateStr(startDate);
+  const endStr = toLocalDateStr(endDate);
 
   progressCallback({
     type: "progress",
@@ -762,8 +763,8 @@ export async function backfillInvestmentPrices(progressCallback) {
   const startDate = new Date();
   startDate.setFullYear(startDate.getFullYear() - 3);
 
-  const startStr = startDate.toISOString().split("T")[0];
-  const endStr = endDate.toISOString().split("T")[0];
+  const startStr = toLocalDateStr(startDate);
+  const endStr = toLocalDateStr(endDate);
 
   // Use the same batch/cooldown settings as "Fetch All" to avoid rate-limiting
   const batchConfig = getFetchBatchConfig();
@@ -1004,8 +1005,8 @@ export async function fetchYahooBenchmarkHistory(yahooTicker, startDate, endDate
   for (const quote of quotes) {
     if (!quote.date || quote.close == null) continue;
 
-    // Convert Date object to ISO-8601 string
-    const dateStr = quote.date.toISOString().split("T")[0];
+    // Convert Date object to ISO-8601 string (using local time to avoid BST date shift)
+    const dateStr = toLocalDateStr(quote.date);
 
     // If Yahoo returns values in GBp (pence), divide by 100 to get pounds
     const value = isGBPence ? quote.close / 100 : quote.close;
@@ -1040,8 +1041,8 @@ export async function backfillBenchmarkValues(progressCallback) {
   const startDate = new Date();
   startDate.setFullYear(startDate.getFullYear() - 3);
 
-  const startStr = startDate.toISOString().split("T")[0];
-  const endStr = endDate.toISOString().split("T")[0];
+  const startStr = toLocalDateStr(startDate);
+  const endStr = toLocalDateStr(endDate);
 
   // Use the same batch/cooldown settings as "Fetch All" to avoid rate-limiting
   const batchConfig = getFetchBatchConfig();
@@ -1187,8 +1188,8 @@ export async function backfillSingleInvestment(inv, progressCallback) {
   const startDate = new Date();
   startDate.setFullYear(startDate.getFullYear() - 3);
 
-  const startStr = startDate.toISOString().split("T")[0];
-  const endStr = endDate.toISOString().split("T")[0];
+  const startStr = toLocalDateStr(startDate);
+  const endStr = toLocalDateStr(endDate);
 
   progressCallback({
     type: "progress",
@@ -1303,8 +1304,8 @@ export async function backfillSingleBenchmark(bm, progressCallback) {
   const startDate = new Date();
   startDate.setFullYear(startDate.getFullYear() - 3);
 
-  const startStr = startDate.toISOString().split("T")[0];
-  const endStr = endDate.toISOString().split("T")[0];
+  const startStr = toLocalDateStr(startDate);
+  const endStr = toLocalDateStr(endDate);
 
   progressCallback({
     type: "progress",
@@ -1378,8 +1379,8 @@ export async function backfillSingleCurrency(currency, progressCallback) {
   const startDate = new Date();
   startDate.setFullYear(startDate.getFullYear() - 3);
 
-  const startStr = startDate.toISOString().split("T")[0];
-  const endStr = endDate.toISOString().split("T")[0];
+  const startStr = toLocalDateStr(startDate);
+  const endStr = toLocalDateStr(endDate);
 
   progressCallback({
     type: "progress",
@@ -1540,7 +1541,7 @@ export async function testBackfillInvestment(investmentId) {
   const startDate = new Date();
   startDate.setMonth(startDate.getMonth() - 3);
 
-  const history = await fetchMorningstarHistory(morningstarId, universe, inv.currency_code, startDate.toISOString().split("T")[0], endDate.toISOString().split("T")[0]);
+  const history = await fetchMorningstarHistory(morningstarId, universe, inv.currency_code, toLocalDateStr(startDate), toLocalDateStr(endDate));
 
   // Return last 10 entries, most recent first
   const rows = history
@@ -1623,7 +1624,7 @@ export async function loadBackfillInvestment(investmentId) {
   const startDate = new Date();
   startDate.setFullYear(startDate.getFullYear() - 3);
 
-  const history = await fetchMorningstarHistory(morningstarId, universe, inv.currency_code, startDate.toISOString().split("T")[0], endDate.toISOString().split("T")[0]);
+  const history = await fetchMorningstarHistory(morningstarId, universe, inv.currency_code, toLocalDateStr(startDate), toLocalDateStr(endDate));
 
   let count = 0;
   for (const entry of history) {
@@ -1655,7 +1656,7 @@ export async function testBackfillCurrency(currencyId) {
   const startDate = new Date();
   startDate.setMonth(startDate.getMonth() - 3);
 
-  const dailyRows = await fetchBoeRateHistory(startDate.toISOString().split("T")[0], endDate.toISOString().split("T")[0]);
+  const dailyRows = await fetchBoeRateHistory(toLocalDateStr(startDate), toLocalDateStr(endDate));
 
   const weeklyRows = filterToWeeklyFridays(dailyRows);
 
@@ -1691,7 +1692,7 @@ export async function loadBackfillCurrency(currencyId) {
   const startDate = new Date();
   startDate.setFullYear(startDate.getFullYear() - 3);
 
-  const dailyRows = await fetchBoeRateHistory(startDate.toISOString().split("T")[0], endDate.toISOString().split("T")[0]);
+  const dailyRows = await fetchBoeRateHistory(toLocalDateStr(startDate), toLocalDateStr(endDate));
 
   const weeklyRows = filterToWeeklyFridays(dailyRows);
 
@@ -1736,7 +1737,7 @@ export async function testBackfillBenchmark(benchmarkId) {
   const startDate = new Date();
   startDate.setMonth(startDate.getMonth() - 3);
 
-  const history = await fetchYahooBenchmarkHistory(yahooTicker, startDate.toISOString().split("T")[0], endDate.toISOString().split("T")[0]);
+  const history = await fetchYahooBenchmarkHistory(yahooTicker, toLocalDateStr(startDate), toLocalDateStr(endDate));
 
   const rows = history
     .slice(-10)
@@ -1779,7 +1780,7 @@ export async function loadBackfillBenchmark(benchmarkId) {
   const startDate = new Date();
   startDate.setFullYear(startDate.getFullYear() - 3);
 
-  const history = await fetchYahooBenchmarkHistory(yahooTicker, startDate.toISOString().split("T")[0], endDate.toISOString().split("T")[0]);
+  const history = await fetchYahooBenchmarkHistory(yahooTicker, toLocalDateStr(startDate), toLocalDateStr(endDate));
 
   let count = 0;
   for (const entry of history) {

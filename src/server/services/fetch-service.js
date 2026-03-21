@@ -8,6 +8,7 @@ import { backfillInvestmentPrices, backfillBenchmarkValues, backfillCurrencyRate
 import { getDatabase } from "../db/connection.js";
 import { checkpointDatabase } from "../db/connection.js";
 import { recordFetchAttempt } from "../db/fetch-history-db.js";
+import { toLocalDateStr } from "../../shared/server-constants.js";
 import { upsertPrice } from "../db/prices-db.js";
 import { upsertBenchmarkData } from "../db/benchmark-data-db.js";
 
@@ -45,7 +46,7 @@ function daysSince(dateStr, now) {
 function nextDay(dateStr) {
   const d = new Date(dateStr + "T12:00:00Z");
   d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().split("T")[0];
+  return toLocalDateStr(d);
 }
 
 /**
@@ -135,7 +136,7 @@ export async function runFullPriceUpdate(options = {}) {
     {
       const db = getDatabase();
       const now = new Date();
-      const todayStr = now.toISOString().split("T")[0];
+      const todayStr = toLocalDateStr(now);
       const allCurrencies = db.query("SELECT id, code FROM currencies WHERE code != 'GBP' ORDER BY code").all();
       let currencyGapDetected = false;
       let oldestGapStart = todayStr;
@@ -240,7 +241,7 @@ export async function runFullPriceUpdate(options = {}) {
           const gap = daysSince(latestPrice.price_date, now);
           if (gap > GAP_THRESHOLD_DAYS) {
             const gapStartDate = nextDay(latestPrice.price_date);
-            const todayStr = now.toISOString().split("T")[0];
+            const todayStr = toLocalDateStr(now);
             console.log("[FetchService] Gap detected for " + investment.description + ": last price " + latestPrice.price_date + ", fetching " + gap + " days of missing data...");
             try {
               // Parse the cached morningstar_id to get secId and universe
@@ -388,7 +389,7 @@ export async function runFullPriceUpdate(options = {}) {
           const gap = daysSince(latestBm.benchmark_date, now);
           if (gap > GAP_THRESHOLD_DAYS) {
             const gapStartDate = nextDay(latestBm.benchmark_date);
-            const todayStr = now.toISOString().split("T")[0];
+            const todayStr = toLocalDateStr(now);
             console.log("[FetchService] Gap detected for " + benchmark.description + ": last value " + latestBm.benchmark_date + ", fetching " + gap + " days of missing data...");
             try {
               const yahooTicker = benchmark.yahoo_ticker;

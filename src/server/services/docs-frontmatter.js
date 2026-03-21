@@ -4,6 +4,8 @@
  * for ensuring default front matter on uploaded files.
  */
 
+import { toLocalDateStr } from "../../shared/server-constants.js";
+
 /**
  * @description Parse YAML front matter from markdown content.
  * Expects front matter delimited by --- on its own line at the start
@@ -45,7 +47,7 @@ export function ensureUnpublishedFrontMatter(content, defaultStyle) {
   var hasFrontMatter = content.trim().startsWith("---");
 
   if (!hasFrontMatter) {
-    var today = new Date().toISOString().split("T")[0];
+    var today = toLocalDateStr(new Date());
     var defaultFrontMatter = "---\ntitle: Untitled\nsummary:\ncreated: " + today + "\npublished: n\nstyle: " + (defaultStyle || "github") + "\n---\n\n";
     return defaultFrontMatter + content;
   }

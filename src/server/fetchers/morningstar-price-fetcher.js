@@ -11,6 +11,7 @@ import { getDatabase } from "../db/connection.js";
 import { getAllInvestments } from "../db/investments-db.js";
 import { upsertPrice } from "../db/prices-db.js";
 import { detectPublicIdType, extractTickerFromPublicId, extractExchangeFromPublicId } from "../../shared/public-id-utils.js";
+import { toLocalDateStr } from "../../shared/server-constants.js";
 import {
   fetchMorningstarHistory,
   lookupMorningstarIdByIsin,
@@ -157,8 +158,8 @@ export async function fetchLatestMorningstarPrice(investment) {
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - 7);
 
-  const startStr = startDate.toISOString().split("T")[0];
-  const endStr = endDate.toISOString().split("T")[0];
+  const startStr = toLocalDateStr(startDate);
+  const endStr = toLocalDateStr(endDate);
 
   let history;
   try {

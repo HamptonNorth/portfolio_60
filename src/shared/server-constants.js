@@ -52,3 +52,17 @@ export function getDocsMediaDir() {
 
 /** @type {number} Multiplier for storing currency rates as integers (e.g. 1.2543 stored as 12543) */
 export const CURRENCY_SCALE_FACTOR = 10000;
+
+/**
+ * @description Convert a Date object to a local-time ISO-8601 date string (YYYY-MM-DD).
+ * Unlike toISOString().split("T")[0], this uses local time components so it
+ * returns the correct date during BST (UTC+1) and other timezone offsets.
+ * @param {Date} date - The date to format
+ * @returns {string} Date string in YYYY-MM-DD format using local time
+ */
+export function toLocalDateStr(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}

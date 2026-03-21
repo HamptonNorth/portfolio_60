@@ -14,6 +14,7 @@ import {
   matchYahooTicker,
   fetchYahooBenchmarkHistory,
 } from "../services/historic-backfill.js";
+import { toLocalDateStr } from "../../shared/server-constants.js";
 
 // ---------------------------------------------------------------------------
 // Yahoo ticker resolution
@@ -93,8 +94,8 @@ export async function fetchLatestYahooBenchmarkValue(benchmark) {
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - 14);
 
-  const startStr = startDate.toISOString().split("T")[0];
-  const endStr = endDate.toISOString().split("T")[0];
+  const startStr = toLocalDateStr(startDate);
+  const endStr = toLocalDateStr(endDate);
 
   let history;
   try {

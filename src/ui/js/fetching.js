@@ -1392,7 +1392,7 @@ function buildCurrentCurrencyRatesSection(rates) {
     html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Currency</th>';
     html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Description</th>';
     html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700 text-right">Rate (per 1 GBP)</th>';
-    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Date</th>';
+    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">As At</th>';
     html += "</tr>";
     html += "</thead>";
     html += "<tbody>";
@@ -1437,7 +1437,7 @@ function buildCurrentPricesSection(prices) {
     html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Investment</th>';
     html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Currency</th>';
     html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700 text-right">Price</th>';
-    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Date</th>';
+    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">As At</th>';
     html += "</tr>";
     html += "</thead>";
     html += "<tbody>";
@@ -1482,7 +1482,7 @@ function buildCurrentBenchmarksSection(benchmarks) {
     html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Benchmark</th>';
     html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Type</th>';
     html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700 text-right">Value</th>';
-    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">Date</th>';
+    html += '<th class="py-2 px-3 text-sm font-semibold text-brand-700">As At</th>';
     html += "</tr>";
     html += "</thead>";
     html += "<tbody>";
