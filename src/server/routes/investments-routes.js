@@ -4,6 +4,7 @@ import { getLatestPrice, getPriceHistory, getPriceCount, upsertPrice } from "../
 import { recordFetchAttempt } from "../db/fetch-history-db.js";
 import { getAllInvestmentTypes } from "../db/investment-types-db.js";
 import { validateInvestment } from "../validation.js";
+import { pushConfigToFetchServer } from "../services/fetch-server-push.js";
 
 /**
  * @description Router instance for investment API routes.
@@ -185,6 +186,7 @@ investmentsRouter.post("/api/investments", async function (request) {
 
   try {
     const investment = createInvestment(body);
+    pushConfigToFetchServer().catch(function () {});
     return new Response(JSON.stringify(investment), {
       status: 201,
       headers: { "Content-Type": "application/json" },
@@ -225,6 +227,7 @@ investmentsRouter.put("/api/investments/:id", async function (request, params) {
     if (!investment) {
       return new Response(JSON.stringify({ error: "Investment not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
     }
+    pushConfigToFetchServer().catch(function () {});
     return new Response(JSON.stringify(investment), {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -244,6 +247,7 @@ investmentsRouter.delete("/api/investments/:id", function (request, params) {
     if (!deleted) {
       return new Response(JSON.stringify({ error: "Investment not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
     }
+    pushConfigToFetchServer().catch(function () {});
     return new Response(JSON.stringify({ message: "Investment deleted" }), {
       status: 200,
       headers: { "Content-Type": "application/json" },

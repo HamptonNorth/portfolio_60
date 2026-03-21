@@ -12,6 +12,8 @@ import { getFetchBatchConfig } from "../config.js";
 import { fetchLatestYahooBenchmarkValue, getYahooFetchableBenchmarks } from "../fetchers/yahoo-benchmark-fetcher.js";
 import { checkpointDatabase, getDatabase } from "../db/connection.js";
 import { backfillInvestmentPrices, backfillBenchmarkValues, backfillCurrencyRates, backfillSingleInvestment, backfillSingleBenchmark, backfillSingleCurrency } from "../services/historic-backfill.js";
+import { syncFromFetchServer, fetchServerStatus } from "../services/fetch-server-sync.js";
+import { getFetchServerConfig } from "../config.js";
 
 /**
  * @description Sleep for a given number of milliseconds.
@@ -1040,6 +1042,32 @@ fetchRouter.get("/api/fetch/scheduler-status", function () {
   } catch (err) {
     return new Response(JSON.stringify({ error: "Failed to get scheduler status", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
+});
+
+// POST /api/fetch/sync — manually trigger sync from fetch server
+fetchRouter.post("/api/fetch/sync", async function () {
+  const config = getFetchServerConfig();
+  if (!config.enabled || !config.url) {
+    return Response.json({ error: "Fetch server is not configured" }, { status: 400 });
+  }
+
+  const result = await syncFromFetchServer();
+  return Response.json(result, { status: result.success ? 200 : 502 });
+});
+
+// GET /api/fetch/server-status — get remote fetch server status
+fetchRouter.get("/api/fetch/server-status", async function () {
+  const config = getFetchServerConfig();
+  if (!config.enabled || !config.url) {
+    return Response.json({ enabled: false }, { status: 200 });
+  }
+
+  const status = await fetchServerStatus();
+  if (!status) {
+    return Response.json({ enabled: true, reachable: false }, { status: 200 });
+  }
+
+  return Response.json({ enabled: true, reachable: true, ...status }, { status: 200 });
 });
 
 /**

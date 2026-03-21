@@ -9,6 +9,7 @@ import {
 } from "../db/benchmarks-db.js";
 import { getBenchmarkDataHistory, getBenchmarkDataCount } from "../db/benchmark-data-db.js";
 import { validateBenchmark } from "../validation.js";
+import { pushConfigToFetchServer } from "../services/fetch-server-push.js";
 
 /**
  * @description Router instance for benchmark API routes.
@@ -151,6 +152,7 @@ benchmarksRouter.post("/api/benchmarks", async function (request) {
 
   try {
     const benchmark = createBenchmark(body);
+    pushConfigToFetchServer().catch(function () {});
     return new Response(JSON.stringify(benchmark), {
       status: 201,
       headers: { "Content-Type": "application/json" },
@@ -213,6 +215,7 @@ benchmarksRouter.put("/api/benchmarks/:id", async function (request, params) {
         { status: 404, headers: { "Content-Type": "application/json" } },
       );
     }
+    pushConfigToFetchServer().catch(function () {});
     return new Response(JSON.stringify(benchmark), {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -242,6 +245,7 @@ benchmarksRouter.delete("/api/benchmarks/:id", function (request, params) {
         { status: status, headers: { "Content-Type": "application/json" } },
       );
     }
+    pushConfigToFetchServer().catch(function () {});
     return new Response(JSON.stringify({ message: "Benchmark deleted" }), {
       status: 200,
       headers: { "Content-Type": "application/json" },

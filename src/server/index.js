@@ -26,6 +26,9 @@ import { handleAnalysisRoute } from "./routes/analysis-routes.js";
 import { initScheduledFetcher, stopScheduledFetcher } from "./services/scheduled-fetcher.js";
 import { processDrawdowns } from "./services/drawdown-processor.js";
 import { databaseExists, closeDatabase } from "./db/connection.js";
+import { getFetchServerConfig } from "./config.js";
+import { pushConfigToFetchServer } from "./services/fetch-server-push.js";
+import { syncFromFetchServer } from "./services/fetch-server-sync.js";
 
 /**
  * @description The port the server listens on.
@@ -441,6 +444,26 @@ if (databaseExists()) {
 
 // Initialise scheduled fetching (after server is ready)
 initScheduledFetcher();
+
+// Fetch server sync: push config and pull latest data on startup
+const fetchServerConfig = getFetchServerConfig();
+if (fetchServerConfig.enabled && fetchServerConfig.url) {
+  // Push config (fire-and-forget — logs warning on failure)
+  pushConfigToFetchServer().catch(function () {});
+
+  // Sync latest data if configured
+  if (fetchServerConfig.syncOnStartup) {
+    syncFromFetchServer().then(function (result) {
+      if (result.success) {
+        console.log("[FetchServer] Startup sync complete — data as of " + result.fetchedAt);
+      } else if (result.error) {
+        console.warn("[FetchServer] Startup sync: " + result.error);
+      }
+    }).catch(function (err) {
+      console.warn("[FetchServer] Startup sync failed:", err.message);
+    });
+  }
+}
 
 // Graceful shutdown: checkpoint WAL and stop the scheduler before exiting
 process.on("SIGINT", function () {

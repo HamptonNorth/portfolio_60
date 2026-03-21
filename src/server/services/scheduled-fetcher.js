@@ -1,8 +1,8 @@
 import { Cron } from "croner";
 import { getSchedulingConfig, getRetryConfig, getFetchDelayProfile, getCronUpdateTestDatabase } from "../config.js";
 import { getLastSuccessfulFetchByType } from "../db/fetch-history-db.js";
-import { closeDatabase, databaseExists, resetDatabasePath } from "../db/connection.js";
-import { testReferenceExists } from "../test-mode.js";
+import { databaseExists } from "../db/connection.js";
+import { testReferenceExists, activateTestMode, deactivateTestMode } from "../test-mode.js";
 import { runFullPriceUpdate, retryFailedItems } from "./fetch-service.js";
 import { writeSchedulerLog, pruneSchedulerLog } from "../db/scheduler-log-db.js";
 import { processDrawdowns } from "./drawdown-processor.js";
@@ -198,28 +198,18 @@ async function executeFetchRun(startedBy) {
 
 /**
  * @description Switch to the test database, run a full price update, then
- * switch back to the live database. Called after the live cron fetch completes
- * when cronUpdateTestDatabase is enabled and a test database exists.
+ * switch back to the live database. Uses activateTestMode/deactivateTestMode
+ * so the server correctly flags test mode during the update — preventing
+ * a logged-in user from unknowingly seeing test data.
  * No retry loop is run for the test database — only the initial fetch.
  * @param {number} startedBy - 0 = manual, 1 = scheduled/cron
  * @param {string} delayProfile - The fetch delay profile to use
  */
 async function updateTestDatabase(startedBy, delayProfile) {
-  const { resolve, join } = await import("node:path");
-  const { DATA_DIR } = await import("../../shared/server-constants.js");
-
-  const testDbPath = resolve(join(DATA_DIR, "data", "test_reference", "portfolio60.db"));
-
   writeSchedulerLog("Switching to test database for cron update");
 
-  // Save current DB_PATH so we can restore it
-  const savedDbPath = process.env.DB_PATH;
-
   try {
-    // Close live database and switch to test
-    closeDatabase();
-    process.env.DB_PATH = testDbPath;
-    resetDatabasePath();
+    activateTestMode();
 
     const testSummary = await runFullPriceUpdate({
       startedBy: startedBy,
@@ -235,14 +225,7 @@ async function updateTestDatabase(startedBy, delayProfile) {
   } catch (err) {
     writeSchedulerLog("Test database fetch failed: " + err.message, "error");
   } finally {
-    // Always switch back to the live database
-    closeDatabase();
-    if (savedDbPath) {
-      process.env.DB_PATH = savedDbPath;
-    } else {
-      delete process.env.DB_PATH;
-    }
-    resetDatabasePath();
+    deactivateTestMode();
     writeSchedulerLog("Switched back to live database");
   }
 }

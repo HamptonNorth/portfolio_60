@@ -61,5 +61,10 @@
       "guide": { "style": "github", "label": "User Guides" },
       "notes": { "style": "modest", "label": "Financial Notes" }
     }
+  },
+  "fetchServer": {
+    "enabled": true,
+    "url": "https://fetch_server_60.redmug.dev",
+    "syncOnStartup": true
   }
 }

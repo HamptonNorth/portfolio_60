@@ -8,6 +8,7 @@ import {
 } from "../db/currencies-db.js";
 import { getRateHistory, getRateCount } from "../db/currency-rates-db.js";
 import { validateCurrency } from "../validation.js";
+import { pushConfigToFetchServer } from "../services/fetch-server-push.js";
 
 /**
  * @description Router instance for currency API routes.
@@ -106,6 +107,7 @@ currenciesRouter.post("/api/currencies", async function (request) {
 
   try {
     const currency = createCurrency(body);
+    pushConfigToFetchServer().catch(function () {});
     return new Response(JSON.stringify(currency), {
       status: 201,
       headers: { "Content-Type": "application/json" },
@@ -158,6 +160,7 @@ currenciesRouter.put("/api/currencies/:id", async function (request, params) {
         { status: 404, headers: { "Content-Type": "application/json" } }
       );
     }
+    pushConfigToFetchServer().catch(function () {});
     return new Response(JSON.stringify(currency), {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -187,6 +190,7 @@ currenciesRouter.delete("/api/currencies/:id", function (request, params) {
         { status: status, headers: { "Content-Type": "application/json" } }
       );
     }
+    pushConfigToFetchServer().catch(function () {});
     return new Response(JSON.stringify({ message: "Currency deleted" }), {
       status: 200,
       headers: { "Content-Type": "application/json" },

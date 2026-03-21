@@ -1777,8 +1777,97 @@ async function retryFailedBenchmarksFromDb() {
 }
 
 // Initialise the page
+// ---------------------------------------------------------------------------
+// Fetch Server sync
+// ---------------------------------------------------------------------------
+
+/**
+ * @description Load and display the fetch server status.
+ * Shows the fetch server section only if it is configured.
+ */
+async function loadFetchServerStatus() {
+  try {
+    const response = await fetch("/api/fetch/server-status");
+    const data = await response.json();
+
+    if (!data.enabled) return;
+
+    // Show the section
+    var section = document.getElementById("fetch-server-section");
+    section.classList.remove("hidden");
+
+    var statusEl = document.getElementById("fetch-server-status");
+
+    if (!data.reachable) {
+      statusEl.textContent = "Server not reachable";
+      statusEl.className = "text-sm text-red-600";
+      return;
+    }
+
+    var parts = [];
+    if (data.lastFetch) {
+      parts.push("Last fetch: " + formatDisplayDate(data.lastFetch.split("T")[0]) + " " + data.lastFetch.split("T")[1].substring(0, 5));
+    }
+    if (data.lastFetchResult) {
+      var r = data.lastFetchResult;
+      parts.push("Prices: " + r.priceSuccess + " OK" + (r.priceFailed > 0 ? ", " + r.priceFailed + " failed" : ""));
+      parts.push("Currency: " + (r.currencySuccess ? "OK" : "failed"));
+    }
+    if (data.nextScheduledFetch) {
+      var nextDate = new Date(data.nextScheduledFetch);
+      parts.push("Next: " + formatDisplayDate(nextDate.toISOString().split("T")[0]) + " " + nextDate.toTimeString().substring(0, 5));
+    }
+    if (data.serverUptime) {
+      parts.push("Uptime: " + data.serverUptime);
+    }
+
+    statusEl.textContent = parts.join("  ·  ");
+    statusEl.className = "text-sm text-brand-500";
+  } catch {
+    // Fetch server not configured or unreachable — leave hidden
+  }
+}
+
+/**
+ * @description Trigger a manual sync from the fetch server.
+ */
+async function syncFromServer() {
+  var btn = document.getElementById("sync-from-server-btn");
+  var resultEl = document.getElementById("fetch-server-sync-result");
+
+  btn.disabled = true;
+  btn.textContent = "Syncing...";
+  resultEl.textContent = "";
+
+  try {
+    var response = await fetch("/api/fetch/sync", { method: "POST" });
+    var data = await response.json();
+
+    if (data.success) {
+      var parts = [];
+      if (data.live) {
+        parts.push("Live: " + data.live.prices + " prices, " + data.live.rates + " rates, " + data.live.benchmarks + " benchmarks");
+      }
+      if (data.test) {
+        parts.push("Test: " + data.test.prices + " prices, " + data.test.rates + " rates, " + data.test.benchmarks + " benchmarks");
+      }
+      resultEl.textContent = parts.join("  ·  ");
+      resultEl.className = "text-sm text-green-600";
+    } else {
+      resultEl.textContent = data.error || "Sync failed";
+      resultEl.className = "text-sm text-red-600";
+    }
+  } catch (err) {
+    resultEl.textContent = "Sync failed: " + err.message;
+    resultEl.className = "text-sm text-red-600";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Sync from Server";
+  }
+}
+
 document.addEventListener("DOMContentLoaded", async function () {
-  await Promise.all([loadLastScrapeTimes(), loadScheduleDisplay(), loadLatestFailures()]);
+  await Promise.all([loadLastScrapeTimes(), loadScheduleDisplay(), loadLatestFailures(), loadFetchServerStatus()]);
 
   document.getElementById("show-current-btn").addEventListener("click", showCurrent);
   document.getElementById("fetch-all-btn").addEventListener("click", fetchAll);
@@ -1787,4 +1876,5 @@ document.addEventListener("DOMContentLoaded", async function () {
   document.getElementById("fetch-benchmarks-btn").addEventListener("click", fetchBenchmarksOnly);
   document.getElementById("retry-failed-prices-btn").addEventListener("click", retryFailedPricesFromDb);
   document.getElementById("retry-failed-benchmarks-btn").addEventListener("click", retryFailedBenchmarksFromDb);
+  document.getElementById("sync-from-server-btn").addEventListener("click", syncFromServer);
 });

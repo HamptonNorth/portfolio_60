@@ -83,27 +83,39 @@ export async function verifyPassphrase(plaintext, hash) {
 }
 
 /**
- * @description Load the passphrase hash from the .env file.
- * Reads the file line by line looking for APP_PASSPHRASE_HASH=<value>.
+ * @description Load a value from the .env file by key name.
+ * Reads the file line by line looking for KEY=value.
  * Returns an empty string if the file doesn't exist or the key is not found.
- * @returns {string} The stored hash, or empty string if not found
+ * @param {string} key - The environment variable name to look for
+ * @returns {string} The value, or empty string if not found
  */
-export function loadHashFromEnv() {
+export function loadEnvValue(key) {
   if (!existsSync(ENV_PATH)) {
     return "";
   }
 
   const content = readFileSync(ENV_PATH, "utf-8");
   const lines = content.split("\n");
+  const prefix = key + "=";
 
   for (const line of lines) {
     const trimmed = line.trim();
-    if (trimmed.startsWith("APP_PASSPHRASE_HASH=")) {
-      return trimmed.substring("APP_PASSPHRASE_HASH=".length);
+    if (trimmed.startsWith(prefix)) {
+      return trimmed.substring(prefix.length);
     }
   }
 
   return "";
+}
+
+/**
+ * @description Load the passphrase hash from the .env file.
+ * Reads the file line by line looking for APP_PASSPHRASE_HASH=<value>.
+ * Returns an empty string if the file doesn't exist or the key is not found.
+ * @returns {string} The stored hash, or empty string if not found
+ */
+export function loadHashFromEnv() {
+  return loadEnvValue("APP_PASSPHRASE_HASH");
 }
 
 /**

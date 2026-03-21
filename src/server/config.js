@@ -31,6 +31,11 @@ const DEFAULTS = {
   reportsOpenInNewTab: true,
   cronUpdateTestDatabase: false,
   fetchDelayProfile: "cron",
+  fetchServer: {
+    enabled: false,
+    url: "",
+    syncOnStartup: true,
+  },
 };
 
 /**
@@ -184,6 +189,14 @@ export function loadConfig() {
   // cronUpdateTestDatabase — whether cron-initiated fetches also update the test database
   config.cronUpdateTestDatabase = typeof rawConfig.cronUpdateTestDatabase === "boolean" ? rawConfig.cronUpdateTestDatabase : DEFAULTS.cronUpdateTestDatabase;
 
+  // fetchServer — optional remote fetch server integration
+  const rawFetchServer = rawConfig.fetchServer || {};
+  config.fetchServer = {
+    enabled: typeof rawFetchServer.enabled === "boolean" ? rawFetchServer.enabled : DEFAULTS.fetchServer.enabled,
+    url: typeof rawFetchServer.url === "string" ? rawFetchServer.url.trim() : DEFAULTS.fetchServer.url,
+    syncOnStartup: typeof rawFetchServer.syncOnStartup === "boolean" ? rawFetchServer.syncOnStartup : DEFAULTS.fetchServer.syncOnStartup,
+  };
+
   configCache = config;
   return config;
 }
@@ -282,6 +295,20 @@ export function getDocsConfig() {
   var rawDocs = config.docs || {};
   var categories = rawDocs.categories || {};
   return { categories: categories };
+}
+
+/**
+ * @description Get the fetch server configuration.
+ * @returns {{ enabled: boolean, url: string, syncOnStartup: boolean }}
+ */
+export function getFetchServerConfig() {
+  const config = loadConfig();
+  const fs = config.fetchServer || DEFAULTS.fetchServer;
+  return {
+    enabled: fs.enabled === true,
+    url: fs.url || "",
+    syncOnStartup: fs.syncOnStartup !== false,
+  };
 }
 
 /**
