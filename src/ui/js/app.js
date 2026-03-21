@@ -1040,6 +1040,47 @@ async function showEditViewsModal() {
  * @description Show the About modal with system information useful for
  * first-line support.
  */
+/**
+ * @description Show the Fetch Server Settings info modal.
+ * Displays instructions for configuring the optional remote fetch server.
+ */
+function showFetchServerInfoModal() {
+  const htmlContent = `
+    <p class="text-base text-brand-700 mb-4">
+      The fetch server is an optional companion service that runs on a separate always-on server
+      to fetch currency rates, investment prices, and benchmark values on a schedule.
+    </p>
+
+    <h4 class="font-semibold text-brand-800 mb-2">1. Enable the fetch server</h4>
+    <p class="text-sm text-brand-600 mb-1">Edit the <code class="bg-brand-100 px-1 rounded">fetchServer</code> section in your settings file:</p>
+    <pre class="bg-brand-50 border border-brand-200 rounded p-3 text-sm font-mono mb-4 overflow-x-auto">nano ~/.config/portfolio_60/user-settings.json</pre>
+    <p class="text-sm text-brand-600 mb-1">Add or update this section:</p>
+    <pre class="bg-brand-50 border border-brand-200 rounded p-3 text-sm font-mono mb-4 overflow-x-auto">"fetchServer": {
+  "enabled": true,
+  "url": "https://your-server-address.example.com",
+  "syncOnStartup": true
+}</pre>
+
+    <h4 class="font-semibold text-brand-800 mb-2">2. Set the shared API key</h4>
+    <p class="text-sm text-brand-600 mb-1">Add the API key to your <code class="bg-brand-100 px-1 rounded">.env</code> file:</p>
+    <pre class="bg-brand-50 border border-brand-200 rounded p-3 text-sm font-mono mb-4 overflow-x-auto">nano ~/.config/portfolio_60/.env
+
+FETCH_SERVER_API_KEY=your-secret-key</pre>
+
+    <h4 class="font-semibold text-brand-800 mb-2">3. Server cron schedule</h4>
+    <p class="text-sm text-brand-600 mb-1">The fetch server has its own cron schedule, configured in <code class="bg-brand-100 px-1 rounded">settings.json</code> on the server:</p>
+    <pre class="bg-brand-50 border border-brand-200 rounded p-3 text-sm font-mono mb-4 overflow-x-auto">"scheduling": {
+  "enabled": true,
+  "cron": "0 6 * * 6"
+}</pre>
+    <p class="text-sm text-brand-500 mb-4">The default is every Saturday at 06:00. This is independent of the workstation's own cron schedule.</p>
+
+    <p class="text-sm text-brand-600">Restart the application after making changes. The Fetching page will show the fetch server status when enabled.</p>
+  `;
+
+  showModalHtml("Fetch Server Settings", htmlContent);
+}
+
 async function showAboutModal() {
   // Remove any existing modal
   const existingModal = document.getElementById("app-modal");

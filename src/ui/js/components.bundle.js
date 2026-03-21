@@ -1697,6 +1697,7 @@ class AppNavbar extends LitElement {
                   <a href="#" @click=${this._editSettings} class="block px-4 py-2 hover:bg-brand-50 transition-colors">Edit User Settings</a>
                   <a href="#" @click=${this._editViews} class="block px-4 py-2 hover:bg-brand-50 transition-colors">Edit Views</a>
                   <a href="#" @click=${this._editReports} class="block px-4 py-2 hover:bg-brand-50 transition-colors">Edit Reports</a>
+                  <a href="#" @click=${this._fetchServerInfo} class="block px-4 py-2 hover:bg-brand-50 transition-colors">Fetch Server Settings</a>
                   <a href="#" @click=${this._about} class="block px-4 py-2 hover:bg-brand-50 transition-colors">About</a>
                   <hr class="my-1 border-brand-200" />
                   <a href="#" @click=${this._signOut} class="block px-4 py-2 hover:bg-brand-50 transition-colors text-red-600">Sign Out</a>
@@ -1732,6 +1733,12 @@ class AppNavbar extends LitElement {
       await fetch("/api/auth/sign-out", { method: "POST" });
     } catch {}
     window.location.href = "/";
+  }
+  _fetchServerInfo(event) {
+    event.preventDefault();
+    if (typeof showFetchServerInfoModal === "function") {
+      showFetchServerInfoModal();
+    }
   }
   _about(event) {
     event.preventDefault();
