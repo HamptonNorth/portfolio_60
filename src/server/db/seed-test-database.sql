@@ -153,41 +153,41 @@ INSERT INTO accounts (user_id, account_type, account_ref, cash_balance, warn_cas
 -- ============================================================================
 
 -- Ben SIPP (account 1): VG Global All Cap, VG LifeStrategy, Rathbone, BG American
-INSERT INTO holdings (account_id, investment_id, quantity, average_cost) VALUES
-    (1,  3,   6250000,  372600),
-    (1,  2,   3500000,  294500),
-    (1,  6,   13750000,   19100),
-    (1,  7,  27500000,  132700);
+INSERT INTO holdings (account_id, investment_id, quantity, average_cost, effective_from)
+SELECT 1,  3,   6250000,  372600, date('now', '-36 months') UNION ALL
+SELECT 1,  2,   3500000,  294500, date('now', '-36 months') UNION ALL
+SELECT 1,  6,   13750000,   19100, date('now', '-36 months') UNION ALL
+SELECT 1,  7,  27500000,  132700, date('now', '-36 months');
 
 -- Ben ISA (account 2): Fidelity Index World, Jupiter Gold & Silver, Polar Capital Tech
-INSERT INTO holdings (account_id, investment_id, quantity, average_cost) VALUES
-    (2,  4,  13750000,  31500),
-    (2,  8,   4550000, 357200),
-    (2, 16,  59000000,  49200);
+INSERT INTO holdings (account_id, investment_id, quantity, average_cost, effective_from)
+SELECT 2,  4,  13750000,  31500, date('now', '-36 months') UNION ALL
+SELECT 2,  8,   4550000, 357200, date('now', '-36 months') UNION ALL
+SELECT 2, 16,  59000000,  49200, date('now', '-36 months');
 
 -- Ben Trading (account 3): Alphabet, NVIDIA, Microsoft
-INSERT INTO holdings (account_id, investment_id, quantity, average_cost) VALUES
-    (3, 19,  1800000,  649870),
-    (3, 17,  1050000,  150990),
-    (3, 18, 1250000, 1045100);
+INSERT INTO holdings (account_id, investment_id, quantity, average_cost, effective_from)
+SELECT 3, 19,  1800000,  649870, date('now', '-36 months') UNION ALL
+SELECT 3, 17,  1050000,  150990, date('now', '-36 months') UNION ALL
+SELECT 3, 18, 1250000, 1045100, date('now', '-36 months');
 
 -- Alexis SIPP (account 4): VG LifeStrategy, L&G Tech, Fidelity Index World
-INSERT INTO holdings (account_id, investment_id, quantity, average_cost) VALUES
-    (4,  2,   4150000,  163500),
-    (4,  5, 132400000,   16480),
-    (4,  4, 114550000,   31100);
+INSERT INTO holdings (account_id, investment_id, quantity, average_cost, effective_from)
+SELECT 4,  2,   4150000,  163500, date('now', '-36 months') UNION ALL
+SELECT 4,  5, 132400000,   16480, date('now', '-36 months') UNION ALL
+SELECT 4,  4, 114550000,   31100, date('now', '-36 months');
 
 -- Alexis Trading (account 5): Polar Capital Tech, Amazon, BG American
-INSERT INTO holdings (account_id, investment_id, quantity, average_cost) VALUES
-    (5, 16, 75650000,  35100),
-    (5, 20,   5150000, 359280),
-    (5,  7,  36000000, 118500);
+INSERT INTO holdings (account_id, investment_id, quantity, average_cost, effective_from)
+SELECT 5, 16, 75650000,  35100, date('now', '-36 months') UNION ALL
+SELECT 5, 20,   5150000, 359280, date('now', '-36 months') UNION ALL
+SELECT 5,  7,  36000000, 118500, date('now', '-36 months');
 
 -- Alexis ISA (account 6): Jupiter Gold & Silver, Rathbone, VG Global All Cap
-INSERT INTO holdings (account_id, investment_id, quantity, average_cost) VALUES
-    (6,  8,   4170000, 363700),
-    (6,  6, 65000000,  19300),
-    (6,  3,   4900000, 352800);
+INSERT INTO holdings (account_id, investment_id, quantity, average_cost, effective_from)
+SELECT 6,  8,   4170000, 363700, date('now', '-36 months') UNION ALL
+SELECT 6,  6, 65000000,  19300, date('now', '-36 months') UNION ALL
+SELECT 6,  3,   4900000, 352800, date('now', '-36 months');
 
 -- ============================================================================
 -- CASH TRANSACTIONS — Opening balance deposits

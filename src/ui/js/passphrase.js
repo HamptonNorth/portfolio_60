@@ -30,20 +30,95 @@ function showTestDbProgress(contentDiv) {
 }
 
 /**
- * @description Show test database creation complete, then redirect after a pause.
- * @param {HTMLElement} contentDiv - The container to show the message in
+ * @description Run the full test database setup via SSE stream.
+ * Connects to /api/test-setup/stream and displays phased progress
+ * as the server backfills prices/rates and seeds historic holdings.
+ * This may take 5-10 minutes on first run.
+ * @param {HTMLElement} contentDiv - The container to show progress in
  * @param {number} dotsInterval - The interval ID from showTestDbProgress
  */
 function showTestDbComplete(contentDiv, dotsInterval) {
   clearInterval(dotsInterval);
+
   contentDiv.innerHTML =
-    '<div class="text-center py-6 space-y-2">' +
-    '<p class="text-base text-success font-medium">Creation of new test database complete.</p>' +
-    '<p class="text-base text-success">Database is ready.</p>' +
+    '<div class="py-6 space-y-4">' +
+    '<div class="text-center">' +
+    '<p class="text-base text-brand-700 font-medium" id="setup-phase">Preparing test database</p>' +
+    '<p class="text-sm text-brand-500 mt-1" id="setup-detail">Fetching 3 years of price and rate history — this will take several minutes</p>' +
+    '<div class="mt-3 flex justify-center gap-1.5" id="setup-spinner">' +
+    '<span class="inline-block w-2.5 h-2.5 bg-brand-500 rounded-full animate-bounce" style="animation-delay: 0ms"></span>' +
+    '<span class="inline-block w-2.5 h-2.5 bg-brand-500 rounded-full animate-bounce" style="animation-delay: 150ms"></span>' +
+    '<span class="inline-block w-2.5 h-2.5 bg-brand-500 rounded-full animate-bounce" style="animation-delay: 300ms"></span>' +
+    '</div>' +
+    '</div>' +
+    '<div id="setup-log" class="mt-4 max-h-48 overflow-y-auto text-xs text-brand-500 font-mono bg-brand-50 rounded-lg p-3 space-y-0.5"></div>' +
     '</div>';
-  setTimeout(function () {
-    window.location.href = "/";
-  }, 2000);
+
+  var phaseEl = document.getElementById("setup-phase");
+  var detailEl = document.getElementById("setup-detail");
+  var logEl = document.getElementById("setup-log");
+  var spinnerEl = document.getElementById("setup-spinner");
+
+  function addLogEntry(text) {
+    var entry = document.createElement("div");
+    entry.textContent = text;
+    logEl.appendChild(entry);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  var source = new EventSource("/api/test-setup/stream");
+
+  source.addEventListener("phase", function (event) {
+    var data = JSON.parse(event.data);
+    phaseEl.textContent = "Step " + data.phase + " of " + data.total + ": " + data.message;
+    addLogEntry("— " + data.message);
+  });
+
+  source.addEventListener("progress", function (event) {
+    var data = JSON.parse(event.data);
+    detailEl.textContent = data.message;
+    addLogEntry("  " + data.message);
+  });
+
+  source.addEventListener("error", function (event) {
+    if (event.data) {
+      var data = JSON.parse(event.data);
+      addLogEntry("  Warning: " + data.message);
+    }
+  });
+
+  source.addEventListener("done", function (event) {
+    source.close();
+    var data = JSON.parse(event.data);
+    spinnerEl.style.display = "none";
+
+    if (data.success) {
+      phaseEl.textContent = "Test database is ready";
+      phaseEl.className = "text-base text-success font-medium";
+      detailEl.textContent = "Redirecting...";
+      addLogEntry("— Setup complete");
+      setTimeout(function () {
+        window.location.href = "/";
+      }, 2000);
+    } else {
+      phaseEl.textContent = "Setup encountered errors";
+      phaseEl.className = "text-base text-error font-medium";
+      detailEl.textContent = data.error || "Some steps may have failed — you can retry from the Fetching page";
+      addLogEntry("— Setup finished with errors: " + (data.error || "unknown"));
+    }
+  });
+
+  // Handle connection errors (e.g. server restart)
+  source.onerror = function () {
+    if (source.readyState === EventSource.CLOSED) {
+      return; // Normal close after done event
+    }
+    source.close();
+    spinnerEl.style.display = "none";
+    phaseEl.textContent = "Connection lost during setup";
+    phaseEl.className = "text-base text-error font-medium";
+    detailEl.textContent = "The server may have restarted — try refreshing the page";
+  };
 }
 
 /**

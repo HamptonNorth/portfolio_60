@@ -23,6 +23,7 @@ import { handleOtherAssetsRoute } from "./routes/other-assets-routes.js";
 import { handleReportsRoute } from "./routes/reports-routes.js";
 import { handlePortfolioDetailRoute } from "./routes/portfolio-detail-routes.js";
 import { handleAnalysisRoute } from "./routes/analysis-routes.js";
+import { handleTestSetupRoute } from "./routes/test-setup-routes.js";
 import { initScheduledFetcher, stopScheduledFetcher } from "./services/scheduled-fetcher.js";
 import { processDrawdowns } from "./services/drawdown-processor.js";
 import { databaseExists, closeDatabase } from "./db/connection.js";
@@ -399,6 +400,17 @@ const server = Bun.serve({
       const fetchResult = await handleFetchRoute(method, path, request);
       if (fetchResult) {
         return fetchResult;
+      }
+    }
+
+    // Test setup stream (SSE — runs fetch + history seed for fresh test databases)
+    if (path.startsWith("/api/test-setup/")) {
+      if (path.endsWith("/stream")) {
+        server.timeout(request, 0);
+      }
+      const testSetupResult = await handleTestSetupRoute(method, path, request);
+      if (testSetupResult) {
+        return testSetupResult;
       }
     }
 
