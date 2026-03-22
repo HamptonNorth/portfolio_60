@@ -44,6 +44,9 @@ logs
 # Finder (MacOS) folder config
 .DS_Store
 
+# Binary build
+portfolio60
+
 # Portfolio 60 specific
 data/
 backups/
