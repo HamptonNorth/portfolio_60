@@ -2,6 +2,14 @@ import { getDatabase } from "./connection.js";
 import { CURRENCY_SCALE_FACTOR } from "../../shared/server-constants.js";
 
 /**
+ * @description Get the current date as ISO-8601 string (YYYY-MM-DD).
+ * @returns {string} Today's date
+ */
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/**
  * @description Scale a decimal value for storage (multiply by CURRENCY_SCALE_FACTOR).
  * @param {number} value - The decimal value (e.g. 150.25)
  * @returns {number} Scaled integer value
@@ -20,7 +28,47 @@ export function unscaleValue(scaledValue) {
 }
 
 /**
+ * @description Close the current active holding row and create a new one with
+ * updated values. If the holding was created today (same effective_from),
+ * updates in place instead (daily granularity — no intra-day SCD2 rows).
+ * Must be called within an existing transaction.
+ * @param {Database} db - The database connection
+ * @param {Object} holding - The current holding row (raw/scaled from DB)
+ * @param {number} newScaledQuantity - New quantity (scaled)
+ * @param {number} newScaledAvgCost - New average cost (scaled)
+ * @param {string} dateToday - Today's date (YYYY-MM-DD)
+ * @returns {number} The holding row's ID (new row if closed/reopened, same row if updated in place)
+ */
+function closeAndReopenHolding(db, holding, newScaledQuantity, newScaledAvgCost, dateToday) {
+  // Check the current row's effective_from
+  const currentRow = db.query("SELECT effective_from FROM holdings WHERE id = ?").get(holding.id);
+
+  if (currentRow && currentRow.effective_from === dateToday) {
+    // Same day — update in place (daily granularity, no intra-day SCD2 rows)
+    db.run(
+      "UPDATE holdings SET quantity = ?, average_cost = ? WHERE id = ?",
+      [newScaledQuantity, newScaledAvgCost, holding.id],
+    );
+    return holding.id;
+  }
+
+  // Different day — close current row and create new one
+  db.run("UPDATE holdings SET effective_to = ? WHERE id = ?", [dateToday, holding.id]);
+
+  const result = db.run(
+    `INSERT INTO holdings (account_id, investment_id, quantity, average_cost, effective_from)
+     VALUES (?, ?, ?, ?, ?)`,
+    [holding.account_id, holding.investment_id, newScaledQuantity, newScaledAvgCost, dateToday],
+  );
+
+  return Number(result.lastInsertRowid);
+}
+
+/**
  * @description Create a buy movement and atomically update the holding and account.
+ *
+ * SCD2: The current holding row is closed and a new row is created with the
+ * updated quantity and average cost. The movement references the old (closed) row.
  *
  * The full Total Consideration is deducted from the account cash balance.
  * The holding quantity is increased by the buy quantity.
@@ -50,7 +98,7 @@ export function createBuyMovement(data) {
   db.exec("BEGIN");
   try {
     // Read the current holding (scaled values direct from DB)
-    const holding = db.query("SELECT id, account_id, quantity, average_cost FROM holdings WHERE id = ?").get(data.holding_id);
+    const holding = db.query("SELECT id, account_id, investment_id, quantity, average_cost FROM holdings WHERE id = ? AND effective_to IS NULL").get(data.holding_id);
 
     if (!holding) {
       throw new Error("Holding not found");
@@ -81,15 +129,16 @@ export function createBuyMovement(data) {
     const scaledNewAvgCost = scaleValue(newAvgCost);
     const scaledBookCost = scaleValue(addedBookCost);
 
-    // Insert the movement record
+    // Insert the movement record (references the old/closing holding row)
     const result = db.run(
       `INSERT INTO holding_movements (holding_id, movement_type, movement_date, quantity, movement_value, book_cost, deductible_costs, revised_avg_cost, notes)
        VALUES (?, 'buy', ?, ?, ?, ?, ?, ?, ?)`,
       [data.holding_id, data.movement_date, scaledQuantity, scaledConsideration, scaledBookCost, scaledDeductible, scaledNewAvgCost, data.notes || null],
     );
 
-    // Update the holding quantity and average cost
-    db.run("UPDATE holdings SET quantity = ?, average_cost = ? WHERE id = ?", [scaledNewQuantity, scaledNewAvgCost, data.holding_id]);
+    // SCD2: close current holding row and create new one
+    const dateToday = today();
+    closeAndReopenHolding(db, holding, scaledNewQuantity, scaledNewAvgCost, dateToday);
 
     // Deduct total consideration from account cash balance
     db.run("UPDATE accounts SET cash_balance = cash_balance - ? WHERE id = ?", [scaledConsideration, holding.account_id]);
@@ -117,6 +166,10 @@ export function createBuyMovement(data) {
 
 /**
  * @description Create a sell movement and atomically update the holding and account.
+ *
+ * SCD2: The current holding row is closed and a new row is created with the
+ * reduced quantity (unless it's a full sale, in which case no new row is created).
+ * The movement references the old (closed) row.
  *
  * The Total Consideration is added to the account cash balance.
  * The holding quantity is reduced by the sell quantity.
@@ -146,7 +199,7 @@ export function createSellMovement(data) {
   db.exec("BEGIN");
   try {
     // Read the current holding (scaled values direct from DB)
-    const holding = db.query("SELECT id, account_id, quantity, average_cost FROM holdings WHERE id = ?").get(data.holding_id);
+    const holding = db.query("SELECT id, account_id, investment_id, quantity, average_cost FROM holdings WHERE id = ? AND effective_to IS NULL").get(data.holding_id);
 
     if (!holding) {
       throw new Error("Holding not found");
@@ -165,15 +218,38 @@ export function createSellMovement(data) {
     // New quantity after sell
     const newScaledQuantity = holding.quantity - scaledQuantity;
 
-    // Insert the movement record
+    // Insert the movement record (references the old/closing holding row)
     const result = db.run(
       `INSERT INTO holding_movements (holding_id, movement_type, movement_date, quantity, movement_value, book_cost, deductible_costs, notes)
        VALUES (?, 'sell', ?, ?, ?, ?, ?, ?)`,
       [data.holding_id, data.movement_date, scaledQuantity, scaledConsideration, scaledBookCost, scaledDeductible, data.notes || null],
     );
 
-    // Reduce the holding quantity (average_cost unchanged on sell)
-    db.run("UPDATE holdings SET quantity = ? WHERE id = ?", [newScaledQuantity, data.holding_id]);
+    // SCD2: update the holding
+    const dateToday = today();
+    const currentRow = db.query("SELECT effective_from FROM holdings WHERE id = ?").get(holding.id);
+
+    if (currentRow && currentRow.effective_from === dateToday) {
+      // Same day — update in place
+      if (newScaledQuantity > 0) {
+        db.run("UPDATE holdings SET quantity = ? WHERE id = ?", [newScaledQuantity, holding.id]);
+      } else {
+        // Full sale on same day — close the row
+        db.run("UPDATE holdings SET quantity = 0, effective_to = ? WHERE id = ?", [dateToday, holding.id]);
+      }
+    } else {
+      // Different day — close current row
+      db.run("UPDATE holdings SET effective_to = ? WHERE id = ?", [dateToday, holding.id]);
+
+      // Only create new row if there's remaining quantity (not a full sale)
+      if (newScaledQuantity > 0) {
+        db.run(
+          `INSERT INTO holdings (account_id, investment_id, quantity, average_cost, effective_from)
+           VALUES (?, ?, ?, ?, ?)`,
+          [holding.account_id, holding.investment_id, newScaledQuantity, holding.average_cost, dateToday],
+        );
+      }
+    }
 
     // Add net proceeds (total consideration minus deductible costs) to account cash balance
     const scaledNetProceeds = scaledConsideration - scaledDeductible;
@@ -203,6 +279,10 @@ export function createSellMovement(data) {
 /**
  * @description Create a stock split adjustment and atomically update the holding.
  *
+ * SCD2: The current holding row is closed and a new row is created with the
+ * new quantity and recalculated average cost (preserving book cost).
+ * The movement references the old (closed) row.
+ *
  * A stock split changes the quantity and average cost of a holding such that
  * the total book cost remains constant. For example, a 1:100 forward split
  * multiplies quantity by 100 and divides avg cost by 100. Reverse splits
@@ -228,7 +308,7 @@ export function createSplitMovement(data) {
   db.exec("BEGIN");
   try {
     // Read the current holding (scaled values direct from DB)
-    const holding = db.query("SELECT id, account_id, quantity, average_cost FROM holdings WHERE id = ?").get(data.holding_id);
+    const holding = db.query("SELECT id, account_id, investment_id, quantity, average_cost FROM holdings WHERE id = ? AND effective_to IS NULL").get(data.holding_id);
 
     if (!holding) {
       throw new Error("Holding not found");
@@ -250,15 +330,16 @@ export function createSplitMovement(data) {
     const scaledNewAvgCost = scaleValue(newAvgCost);
     const scaledBookCost = scaleValue(bookCost);
 
-    // Insert the adjustment movement record
+    // Insert the adjustment movement record (references the old/closing holding row)
     const result = db.run(
       `INSERT INTO holding_movements (holding_id, movement_type, movement_date, quantity, movement_value, book_cost, deductible_costs, revised_avg_cost, notes)
        VALUES (?, 'adjustment', ?, ?, 0, ?, 0, ?, ?)`,
       [data.holding_id, data.movement_date, scaledNewQuantity, scaledBookCost, scaledNewAvgCost, data.notes || null],
     );
 
-    // Update the holding quantity and average cost
-    db.run("UPDATE holdings SET quantity = ?, average_cost = ? WHERE id = ?", [scaledNewQuantity, scaledNewAvgCost, data.holding_id]);
+    // SCD2: close current holding row and create new one
+    const dateToday = today();
+    closeAndReopenHolding(db, holding, scaledNewQuantity, scaledNewAvgCost, dateToday);
 
     db.exec("COMMIT");
 
@@ -290,21 +371,37 @@ export function getMovementById(id) {
 
 /**
  * @description Get holding movements for a holding, ordered newest first.
- * @param {number} holdingId - The holding ID
+ * SCD2-aware: finds all holding rows for the same account+investment pair
+ * and returns movements across all of them, so the full history is visible
+ * regardless of which SCD2 row ID is passed.
+ * @param {number} holdingId - The holding ID (any row in the SCD2 chain)
  * @param {number} [limit=50] - Maximum number of movements to return
  * @returns {Object[]} Array of movement objects with unscaled values
  */
 export function getMovementsByHoldingId(holdingId, limit = 50) {
   const db = getDatabase();
+
+  // Find the account_id and investment_id for this holding
+  const holding = db.query(
+    "SELECT account_id, investment_id FROM holdings WHERE id = ?"
+  ).get(holdingId);
+
+  if (!holding) {
+    return [];
+  }
+
+  // Get movements across all SCD2 rows for this account+investment pair
   const rows = db
     .query(
-      `SELECT id, holding_id, movement_type, movement_date, quantity, movement_value, book_cost, deductible_costs, revised_avg_cost, notes
-       FROM holding_movements
-       WHERE holding_id = ?
-       ORDER BY movement_date DESC, id DESC
+      `SELECT hm.id, hm.holding_id, hm.movement_type, hm.movement_date, hm.quantity,
+              hm.movement_value, hm.book_cost, hm.deductible_costs, hm.revised_avg_cost, hm.notes
+       FROM holding_movements hm
+       JOIN holdings h ON hm.holding_id = h.id
+       WHERE h.account_id = ? AND h.investment_id = ?
+       ORDER BY hm.movement_date DESC, hm.id DESC
        LIMIT ?`,
     )
-    .all(holdingId, limit);
+    .all(holding.account_id, holding.investment_id, limit);
 
   return rows.map(unscaleMovementRow);
 }

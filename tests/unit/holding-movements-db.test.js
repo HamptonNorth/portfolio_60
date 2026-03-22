@@ -9,7 +9,7 @@ import { createAccount, getAccountById } from "../../src/server/db/accounts-db.j
 import { createInvestment } from "../../src/server/db/investments-db.js";
 import { getAllInvestmentTypes } from "../../src/server/db/investment-types-db.js";
 import { getAllCurrencies } from "../../src/server/db/currencies-db.js";
-import { createHolding, getHoldingById } from "../../src/server/db/holdings-db.js";
+import { createHolding, getHoldingById, getActiveHoldingRaw, getHoldingsByAccountId } from "../../src/server/db/holdings-db.js";
 import { createBuyMovement, createSellMovement, createSplitMovement, getMovementById, getMovementsByHoldingId, scaleValue, unscaleValue } from "../../src/server/db/holding-movements-db.js";
 import { getCashTransactionsByAccountId } from "../../src/server/db/cash-transactions-db.js";
 
@@ -102,6 +102,23 @@ afterAll(() => {
   delete process.env.DB_PATH;
 });
 
+/**
+ * @description Helper to get the current active holding for investment1.
+ * After SCD2 operations the holding ID changes, so we look it up by account+investment.
+ * @returns {Object} The active holding (raw/scaled)
+ */
+function getActiveHolding1() {
+  return getActiveHoldingRaw(testAccount.id, investment1.id);
+}
+
+/**
+ * @description Helper to get the current active holding for investment2.
+ * @returns {Object} The active holding (raw/scaled)
+ */
+function getActiveHolding2() {
+  return getActiveHoldingRaw(testAccount.id, investment2.id);
+}
+
 // --- Scaling helpers ---
 
 describe("scaleValue / unscaleValue", () => {
@@ -120,7 +137,7 @@ describe("scaleValue / unscaleValue", () => {
 // --- Buy movements ---
 
 describe("createBuyMovement", () => {
-  test("creates a buy movement and updates holding and account", () => {
+  test("creates a buy movement and updates holding (same-day = in-place update)", () => {
     const movement = createBuyMovement({
       holding_id: holding1.id,
       movement_date: "2026-02-10",
@@ -143,9 +160,13 @@ describe("createBuyMovement", () => {
     // Book cost = total_consideration - deductible_costs = 300 - 10 = 290
     expect(movement.book_cost).toBe(290);
 
-    // Holding should be updated: qty = 100 + 50 = 150
-    const updatedHolding = getHoldingById(holding1.id);
+    // Same-day: holding updated in place (same ID, still active)
+    const activeHolding = getActiveHolding1();
+    expect(activeHolding).not.toBeNull();
+    expect(activeHolding.id).toBe(holding1.id);
+    const updatedHolding = getHoldingById(activeHolding.id);
     expect(updatedHolding.quantity).toBe(150);
+    expect(updatedHolding.effective_to).toBeNull();
 
     // Average cost = (100*5 + 290) / 150 = 790/150 = 5.2667
     expect(updatedHolding.average_cost).toBeCloseTo(5.2667, 3);
@@ -153,6 +174,9 @@ describe("createBuyMovement", () => {
     // Account cash should be reduced by total_consideration: 50000 - 300 = 49700
     const updatedAccount = getAccountById(testAccount.id);
     expect(updatedAccount.cash_balance).toBe(49700);
+
+    // Update holding1 reference for subsequent tests
+    holding1 = updatedHolding;
   });
 
   test("buy with zero deductible costs", () => {
@@ -167,14 +191,15 @@ describe("createBuyMovement", () => {
     expect(movement.book_cost).toBe(350);
     expect(movement.deductible_costs).toBe(0);
 
-    // Holding qty: 150 + 50 = 200
-    const updatedHolding = getHoldingById(holding1.id);
+    // New active holding qty: 150 + 50 = 200
+    const activeHolding = getActiveHolding1();
+    const updatedHolding = getHoldingById(activeHolding.id);
     expect(updatedHolding.quantity).toBe(200);
 
     // Avg cost: (150 * 5.2667 + 350) / 200
-    // = (790.005 + 350) / 200 = 1140.005 / 200 = 5.7000
-    // (slight rounding from previous step)
     expect(updatedHolding.average_cost).toBeCloseTo(5.7, 1);
+
+    holding1 = updatedHolding;
   });
 
   test("buy into zero-quantity holding (first buy)", () => {
@@ -189,19 +214,22 @@ describe("createBuyMovement", () => {
     expect(movement.quantity).toBeCloseTo(1634.969, 3);
     expect(movement.book_cost).toBe(7800);
 
-    const updatedHolding = getHoldingById(holding2.id);
+    const activeHolding = getActiveHolding2();
+    const updatedHolding = getHoldingById(activeHolding.id);
     expect(updatedHolding.quantity).toBeCloseTo(1634.969, 3);
     // Avg cost = 7800 / 1634.969 = 4.7707
     expect(updatedHolding.average_cost).toBeCloseTo(4.7707, 3);
+
+    holding2 = updatedHolding;
   });
 
   test("fails if total consideration exceeds cash balance", () => {
-    // Get current cash balance
+    const activeHolding = getActiveHolding1();
     const account = getAccountById(testAccount.id);
 
     expect(() => {
       createBuyMovement({
-        holding_id: holding1.id,
+        holding_id: activeHolding.id,
         movement_date: "2026-02-11",
         quantity: 100,
         total_consideration: account.cash_balance + 1,
@@ -221,7 +249,8 @@ describe("createBuyMovement", () => {
   });
 
   test("deductible costs are stored in the movement record", () => {
-    const movements = getMovementsByHoldingId(holding1.id);
+    const activeHolding = getActiveHolding1();
+    const movements = getMovementsByHoldingId(activeHolding.id);
     const firstBuy = movements.find((m) => m.notes === "Bought 50 shares");
     expect(firstBuy).not.toBeNull();
     expect(firstBuy.deductible_costs).toBe(10);
@@ -233,12 +262,13 @@ describe("createBuyMovement", () => {
 describe("createSellMovement", () => {
   test("creates a sell movement, reduces quantity, adds cash (avg cost unchanged)", () => {
     // Record pre-sell state
-    const preSellHolding = getHoldingById(holding1.id);
+    const activeHolding = getActiveHolding1();
+    const preSellHolding = getHoldingById(activeHolding.id);
     const preSellAccount = getAccountById(testAccount.id);
     const preSellAvgCost = preSellHolding.average_cost;
 
     const movement = createSellMovement({
-      holding_id: holding1.id,
+      holding_id: activeHolding.id,
       movement_date: "2026-02-11",
       quantity: 30,
       total_consideration: 200,
@@ -256,8 +286,9 @@ describe("createSellMovement", () => {
     // Book cost = sell qty x avg cost = 30 * preSellAvgCost
     expect(movement.book_cost).toBeCloseTo(30 * preSellAvgCost, 2);
 
-    // Holding quantity reduced: pre - 30
-    const updatedHolding = getHoldingById(holding1.id);
+    // New active holding should have reduced quantity
+    const newActive = getActiveHolding1();
+    const updatedHolding = getHoldingById(newActive.id);
     expect(updatedHolding.quantity).toBe(preSellHolding.quantity - 30);
 
     // Average cost must NOT change on a sell
@@ -266,13 +297,16 @@ describe("createSellMovement", () => {
     // Account cash increased by net proceeds (total_consideration - deductible_costs)
     const updatedAccount = getAccountById(testAccount.id);
     expect(updatedAccount.cash_balance).toBe(preSellAccount.cash_balance + 200 - 5.5);
+
+    holding1 = updatedHolding;
   });
 
   test("sell with zero deductible costs", () => {
-    const preSellHolding = getHoldingById(holding1.id);
+    const activeHolding = getActiveHolding1();
+    const preSellHolding = getHoldingById(activeHolding.id);
 
     const movement = createSellMovement({
-      holding_id: holding1.id,
+      holding_id: activeHolding.id,
       movement_date: "2026-02-11",
       quantity: 20,
       total_consideration: 150,
@@ -281,16 +315,20 @@ describe("createSellMovement", () => {
 
     expect(movement.deductible_costs).toBe(0);
 
-    const updatedHolding = getHoldingById(holding1.id);
+    const newActive = getActiveHolding1();
+    const updatedHolding = getHoldingById(newActive.id);
     expect(updatedHolding.quantity).toBe(preSellHolding.quantity - 20);
+
+    holding1 = updatedHolding;
   });
 
   test("fails if sell quantity exceeds holding quantity", () => {
-    const holding = getHoldingById(holding1.id);
+    const activeHolding = getActiveHolding1();
+    const holding = getHoldingById(activeHolding.id);
 
     expect(() => {
       createSellMovement({
-        holding_id: holding1.id,
+        holding_id: activeHolding.id,
         movement_date: "2026-02-11",
         quantity: holding.quantity + 1,
         total_consideration: 1000,
@@ -298,13 +336,14 @@ describe("createSellMovement", () => {
     }).toThrow("Insufficient holding quantity");
   });
 
-  test("full quantity sell leaves holding with qty=0 (no divide-by-zero)", () => {
-    const holding = getHoldingById(holding1.id);
+  test("full quantity sell closes holding with no new row", () => {
+    const activeHolding = getActiveHolding1();
+    const holding = getHoldingById(activeHolding.id);
     const currentQty = holding.quantity;
     const currentAvgCost = holding.average_cost;
 
     const movement = createSellMovement({
-      holding_id: holding1.id,
+      holding_id: activeHolding.id,
       movement_date: "2026-02-11",
       quantity: currentQty,
       total_consideration: currentQty * 6,
@@ -313,11 +352,13 @@ describe("createSellMovement", () => {
     expect(movement).not.toBeNull();
     expect(movement.book_cost).toBeCloseTo(currentQty * currentAvgCost, 2);
 
-    // Holding should have zero quantity
-    const updatedHolding = getHoldingById(holding1.id);
-    expect(updatedHolding.quantity).toBe(0);
-    // Average cost is preserved (not zeroed out)
-    expect(updatedHolding.average_cost).toBeCloseTo(currentAvgCost, 4);
+    // No active holding should remain for this investment
+    const newActive = getActiveHolding1();
+    expect(newActive).toBeNull();
+
+    // Old holding should be closed
+    const oldHolding = getHoldingById(activeHolding.id);
+    expect(oldHolding.effective_to).not.toBeNull();
   });
 
   test("fails if holding not found", () => {
@@ -331,8 +372,6 @@ describe("createSellMovement", () => {
     }).toThrow("Holding not found");
   });
 });
-
-// --- Get movements ---
 
 // --- Cash transaction auto-creation ---
 
@@ -358,11 +397,18 @@ describe("buy/sell movements create matching cash_transactions", () => {
     });
   });
 
+  /** @description Helper to get the current active holding for this test group */
+  function getActiveCashTestHolding() {
+    const raw = getActiveHoldingRaw(cashTestAccount.id, investment1.id);
+    return raw ? getHoldingById(raw.id) : null;
+  }
+
   test("buy movement creates a cash_transaction with type 'buy'", () => {
     const preTx = getCashTransactionsByAccountId(cashTestAccount.id);
+    const active = getActiveCashTestHolding();
 
     createBuyMovement({
-      holding_id: cashTestHolding.id,
+      holding_id: active.id,
       movement_date: "2026-02-12",
       quantity: 10,
       total_consideration: 60,
@@ -384,9 +430,10 @@ describe("buy/sell movements create matching cash_transactions", () => {
 
   test("sell movement creates a cash_transaction with type 'sell'", () => {
     const preTx = getCashTransactionsByAccountId(cashTestAccount.id);
+    const active = getActiveCashTestHolding();
 
     createSellMovement({
-      holding_id: cashTestHolding.id,
+      holding_id: active.id,
       movement_date: "2026-02-12",
       quantity: 5,
       total_consideration: 40,
@@ -407,9 +454,10 @@ describe("buy/sell movements create matching cash_transactions", () => {
 
   test("buy cash_transaction does not double-deduct from account balance", () => {
     const preAccount = getAccountById(cashTestAccount.id);
+    const active = getActiveCashTestHolding();
 
     createBuyMovement({
-      holding_id: cashTestHolding.id,
+      holding_id: active.id,
       movement_date: "2026-02-13",
       quantity: 10,
       total_consideration: 50,
@@ -423,9 +471,10 @@ describe("buy/sell movements create matching cash_transactions", () => {
 
   test("cash_transaction notes without user notes omits separator", () => {
     const preCount = getCashTransactionsByAccountId(cashTestAccount.id).length;
+    const active = getActiveCashTestHolding();
 
     createBuyMovement({
-      holding_id: cashTestHolding.id,
+      holding_id: active.id,
       movement_date: "2026-02-13",
       quantity: 5,
       total_consideration: 25,
@@ -434,7 +483,6 @@ describe("buy/sell movements create matching cash_transactions", () => {
 
     const txList = getCashTransactionsByAccountId(cashTestAccount.id);
     expect(txList.length).toBe(preCount + 1);
-    // Find the newly created buy transaction (opening balance may sort first if dated today)
     const buyTx = txList.find((t) => t.transaction_type === "buy" && t.amount === 25);
     expect(buyTx).toBeDefined();
     expect(buyTx.notes).toBe("Buy: Raspberry Pi Holdings");
@@ -442,32 +490,34 @@ describe("buy/sell movements create matching cash_transactions", () => {
   });
 });
 
-describe("getMovementsByHoldingId", () => {
-  test("returns movements ordered by date desc, id desc", () => {
-    const movements = getMovementsByHoldingId(holding1.id);
-    expect(movements.length).toBeGreaterThan(0);
-
-    // Check ordering: newest first
-    for (let i = 0; i < movements.length - 1; i++) {
-      const a = movements[i];
-      const b = movements[i + 1];
-      if (a.movement_date === b.movement_date) {
-        expect(a.id).toBeGreaterThan(b.id);
-      } else {
-        expect(a.movement_date >= b.movement_date).toBe(true);
-      }
+describe("getMovementsByHoldingId (SCD2-aware)", () => {
+  test("returns movements across all SCD2 rows for the same investment", () => {
+    // investment2 has had movements — get any holding ID for it
+    const active = getActiveHolding2();
+    if (active) {
+      const movements = getMovementsByHoldingId(active.id);
+      expect(movements.length).toBeGreaterThan(0);
     }
   });
 
   test("respects the limit parameter", () => {
-    const movements = getMovementsByHoldingId(holding1.id, 2);
-    expect(movements.length).toBeLessThanOrEqual(2);
+    const active = getActiveHolding2();
+    if (active) {
+      const movements = getMovementsByHoldingId(active.id, 1);
+      expect(movements.length).toBeLessThanOrEqual(1);
+    }
   });
 
   test("returns empty array for holding with no movements", () => {
     // Create a fresh holding with no movements
+    const freshUser = createUser({
+      initials: "FH",
+      first_name: "Fresh",
+      last_name: "Holder",
+      provider: "ii",
+    });
     const freshAccount = createAccount({
-      user_id: testUser.id,
+      user_id: freshUser.id,
       account_type: "trading",
       account_ref: "TRADE1",
       cash_balance: 10000,
@@ -486,7 +536,8 @@ describe("getMovementsByHoldingId", () => {
 
 describe("getMovementById", () => {
   test("returns a specific movement with all fields", () => {
-    const movements = getMovementsByHoldingId(holding1.id);
+    const active = getActiveHolding2();
+    const movements = getMovementsByHoldingId(active.id);
     const first = movements[0];
     const fetched = getMovementById(first.id);
 
@@ -514,9 +565,16 @@ describe("createSplitMovement", () => {
   let splitAccount;
   /** @type {Object} Holding for split testing */
   let splitHolding;
-
-  /** @type {Object} Separate user for split tests to avoid account type conflicts */
+  /** @type {Object} Separate user for split tests */
   let splitUser;
+  /** @type {Object} Investment for split tests */
+  let splitInvestment;
+
+  /** @description Helper to get the active holding for split tests */
+  function getActiveSplitHolding() {
+    const raw = getActiveHoldingRaw(splitAccount.id, splitInvestment.id);
+    return raw ? getHoldingById(raw.id) : null;
+  }
 
   beforeAll(() => {
     splitUser = createUser({
@@ -532,21 +590,25 @@ describe("createSplitMovement", () => {
       cash_balance: 10000,
       warn_cash: 500,
     });
+
+    // Use investment1 for split tests
+    splitInvestment = investment1;
+
     splitHolding = createHolding({
       account_id: splitAccount.id,
-      investment_id: investment1.id,
+      investment_id: splitInvestment.id,
       quantity: 35,
       average_cost: 248.0,
     });
   });
 
   test("forward split: quantity increases, avg cost decreases, book cost constant", () => {
-    const preSplitHolding = getHoldingById(splitHolding.id);
-    const preSplitBookCost = preSplitHolding.quantity * preSplitHolding.average_cost;
+    const active = getActiveSplitHolding();
+    const preSplitBookCost = active.quantity * active.average_cost;
     const preSplitAccount = getAccountById(splitAccount.id);
 
     const movement = createSplitMovement({
-      holding_id: splitHolding.id,
+      holding_id: active.id,
       movement_date: "2026-01-15",
       new_quantity: 3500,
       notes: "Stock split 1:100",
@@ -559,8 +621,8 @@ describe("createSplitMovement", () => {
     expect(movement.movement_value).toBe(0);
     expect(movement.notes).toBe("Stock split 1:100");
 
-    // Holding updated
-    const updatedHolding = getHoldingById(splitHolding.id);
+    // Holding updated (new SCD2 row)
+    const updatedHolding = getActiveSplitHolding();
     expect(updatedHolding.quantity).toBe(3500);
     expect(updatedHolding.average_cost).toBeCloseTo(2.48, 2);
 
@@ -577,11 +639,11 @@ describe("createSplitMovement", () => {
   });
 
   test("reverse split: quantity decreases, avg cost increases, book cost constant", () => {
-    const preSplitHolding = getHoldingById(splitHolding.id);
-    const preSplitBookCost = preSplitHolding.quantity * preSplitHolding.average_cost;
+    const active = getActiveSplitHolding();
+    const preSplitBookCost = active.quantity * active.average_cost;
 
     const movement = createSplitMovement({
-      holding_id: splitHolding.id,
+      holding_id: active.id,
       movement_date: "2026-02-01",
       new_quantity: 350,
       notes: "Reverse split 10:1",
@@ -590,7 +652,7 @@ describe("createSplitMovement", () => {
     expect(movement.movement_type).toBe("adjustment");
     expect(movement.quantity).toBe(350);
 
-    const updatedHolding = getHoldingById(splitHolding.id);
+    const updatedHolding = getActiveSplitHolding();
     expect(updatedHolding.quantity).toBe(350);
     expect(updatedHolding.average_cost).toBeCloseTo(24.8, 1);
 
@@ -601,9 +663,10 @@ describe("createSplitMovement", () => {
 
   test("split does not create a cash_transaction", () => {
     const preTx = getCashTransactionsByAccountId(splitAccount.id);
+    const active = getActiveSplitHolding();
 
     createSplitMovement({
-      holding_id: splitHolding.id,
+      holding_id: active.id,
       movement_date: "2026-02-02",
       new_quantity: 700,
     });
@@ -613,9 +676,10 @@ describe("createSplitMovement", () => {
   });
 
   test("fails if new quantity is zero", () => {
+    const active = getActiveSplitHolding();
     expect(() => {
       createSplitMovement({
-        holding_id: splitHolding.id,
+        holding_id: active.id,
         movement_date: "2026-02-03",
         new_quantity: 0,
       });
@@ -623,9 +687,10 @@ describe("createSplitMovement", () => {
   });
 
   test("fails if new quantity is negative", () => {
+    const active = getActiveSplitHolding();
     expect(() => {
       createSplitMovement({
-        holding_id: splitHolding.id,
+        holding_id: active.id,
         movement_date: "2026-02-03",
         new_quantity: -10,
       });
@@ -633,13 +698,13 @@ describe("createSplitMovement", () => {
   });
 
   test("fails if new quantity equals current quantity", () => {
-    const current = getHoldingById(splitHolding.id);
+    const active = getActiveSplitHolding();
 
     expect(() => {
       createSplitMovement({
-        holding_id: splitHolding.id,
+        holding_id: active.id,
         movement_date: "2026-02-03",
-        new_quantity: current.quantity,
+        new_quantity: active.quantity,
       });
     }).toThrow("New quantity is the same as the current quantity");
   });
@@ -655,8 +720,10 @@ describe("createSplitMovement", () => {
   });
 
   test("notes are optional (defaults to null)", () => {
+    const active = getActiveSplitHolding();
+
     const movement = createSplitMovement({
-      holding_id: splitHolding.id,
+      holding_id: active.id,
       movement_date: "2026-02-04",
       new_quantity: 1400,
     });

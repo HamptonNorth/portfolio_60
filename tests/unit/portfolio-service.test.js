@@ -12,7 +12,7 @@ import { createAccount } from "../../src/server/db/accounts-db.js";
 import { createHolding } from "../../src/server/db/holdings-db.js";
 import { upsertPrice } from "../../src/server/db/prices-db.js";
 import { upsertRate, scaleRate } from "../../src/server/db/currency-rates-db.js";
-import { getPortfolioSummary } from "../../src/server/services/portfolio-service.js";
+import { getPortfolioSummary, getPortfolioSummaryAtDate } from "../../src/server/services/portfolio-service.js";
 
 const testDbPath = getDatabasePath();
 
@@ -324,5 +324,53 @@ describe("Portfolio Service - getPortfolioSummary", function () {
     expect(result.totals.investments).toBe(0);
     expect(result.totals.cash).toBe(0);
     expect(result.totals.grand_total).toBe(0);
+  });
+});
+
+describe("Portfolio Service - getPortfolioSummaryAtDate", function () {
+  // Holdings are created with effective_from = today, so historic queries
+  // must use today's date (or later) to find them. Prices/rates were inserted
+  // for 2026-02-10 which is on or before today.
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  test("returns null for non-existent user", function () {
+    const result = getPortfolioSummaryAtDate(99999, todayStr);
+    expect(result).toBeNull();
+  });
+
+  test("returns correct valuation_date", function () {
+    const result = getPortfolioSummaryAtDate(userId, todayStr);
+    expect(result.valuation_date).toBe(todayStr);
+  });
+
+  test("returns holdings active on today with correct prices (on or before)", function () {
+    const result = getPortfolioSummaryAtDate(userId, todayStr);
+    expect(result).not.toBeNull();
+    expect(result.accounts.length).toBe(2);
+
+    // SIPP should have the GBP holding with price from 2026-02-10 (most recent on or before today)
+    const sipp = result.accounts.find((a) => a.account_type === "sipp");
+    const rpiHolding = sipp.holdings.find((h) => h.description === "Raspberry Pi Holdings");
+    expect(rpiHolding).toBeDefined();
+    expect(rpiHolding.price).toBeCloseTo(1.565, 3);
+    expect(rpiHolding.price_date).toBe("2026-02-10");
+  });
+
+  test("returns empty holdings for date before any holdings existed", function () {
+    const result = getPortfolioSummaryAtDate(userId, "2000-01-01");
+    expect(result).not.toBeNull();
+    const sipp = result.accounts.find((a) => a.account_type === "sipp");
+    expect(sipp.holdings.length).toBe(0);
+    expect(sipp.investments_total).toBe(0);
+  });
+
+  test("handles USD conversion with historic rate", function () {
+    const result = getPortfolioSummaryAtDate(userId, todayStr);
+    const trading = result.accounts.find((a) => a.account_type === "trading");
+    const msftHolding = trading.holdings.find((h) => h.description === "Microsoft Corp");
+
+    expect(msftHolding).toBeDefined();
+    expect(msftHolding.rate).toBeCloseTo(1.369, 4);
+    expect(msftHolding.value_gbp).toBeCloseTo(16962.2, 0);
   });
 });

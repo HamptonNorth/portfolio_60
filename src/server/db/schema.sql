@@ -123,16 +123,18 @@ CREATE TABLE IF NOT EXISTS accounts (
     UNIQUE(user_id, account_type)
 );
 
--- Holdings: investment positions within an account
+-- Holdings: investment positions within an account (SCD2 — temporal history)
 CREATE TABLE IF NOT EXISTS holdings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_id INTEGER NOT NULL,
     investment_id INTEGER NOT NULL,
     quantity INTEGER NOT NULL DEFAULT 0,
     average_cost INTEGER NOT NULL DEFAULT 0,
+    effective_from TEXT NOT NULL,
+    effective_to TEXT,
     FOREIGN KEY (account_id) REFERENCES accounts(id),
     FOREIGN KEY (investment_id) REFERENCES investments(id),
-    UNIQUE(account_id, investment_id)
+    UNIQUE(account_id, investment_id, effective_from)
 );
 
 -- Cash transactions: deposits, withdrawals, drawdowns and adjustments (future UI)

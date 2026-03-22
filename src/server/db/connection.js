@@ -654,6 +654,60 @@ function runMigrations(database) {
   if (oldAutoScrapeCol) {
     database.exec("ALTER TABLE investments RENAME COLUMN auto_scrape TO auto_fetch");
   }
+
+  // Migration 25: Add SCD2 temporal columns to holdings (effective_from, effective_to)
+  // Enables historic portfolio composition tracking — each row represents a holding
+  // state for a date range. The UNIQUE constraint changes from (account_id, investment_id)
+  // to (account_id, investment_id, effective_from).
+  const holdingsCols25 = database.query("PRAGMA table_info(holdings)").all();
+  const hasEffectiveFrom = holdingsCols25.some(function (col) {
+    return col.name === "effective_from";
+  });
+
+  if (!hasEffectiveFrom) {
+    database.exec("PRAGMA foreign_keys = OFF");
+    database.exec("BEGIN TRANSACTION");
+    try {
+      database.exec(`
+        CREATE TABLE holdings_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          account_id INTEGER NOT NULL,
+          investment_id INTEGER NOT NULL,
+          quantity INTEGER NOT NULL DEFAULT 0,
+          average_cost INTEGER NOT NULL DEFAULT 0,
+          effective_from TEXT NOT NULL,
+          effective_to TEXT,
+          FOREIGN KEY (account_id) REFERENCES accounts(id),
+          FOREIGN KEY (investment_id) REFERENCES investments(id),
+          UNIQUE(account_id, investment_id, effective_from)
+        )
+      `);
+
+      // Backfill effective_from from earliest movement date, or today if none
+      database.exec(`
+        INSERT INTO holdings_new (id, account_id, investment_id, quantity, average_cost, effective_from, effective_to)
+        SELECT
+          h.id, h.account_id, h.investment_id, h.quantity, h.average_cost,
+          COALESCE(
+            (SELECT MIN(movement_date) FROM holding_movements WHERE holding_id = h.id),
+            date('now')
+          ),
+          NULL
+        FROM holdings h
+      `);
+
+      database.exec("DROP TABLE holdings");
+      database.exec("ALTER TABLE holdings_new RENAME TO holdings");
+      database.exec("CREATE INDEX IF NOT EXISTS idx_holdings_account ON holdings(account_id)");
+      database.exec("CREATE INDEX IF NOT EXISTS idx_holdings_investment ON holdings(investment_id)");
+      database.exec("COMMIT");
+    } catch (err) {
+      database.exec("ROLLBACK");
+      throw err;
+    } finally {
+      database.exec("PRAGMA foreign_keys = ON");
+    }
+  }
 }
 
 /**

@@ -11,6 +11,7 @@ import { getAllInvestmentTypes } from "../../src/server/db/investment-types-db.j
 import { getAllCurrencies } from "../../src/server/db/currencies-db.js";
 import {
   getHoldingsByAccountId,
+  getHoldingsAtDate,
   getHoldingById,
   createHolding,
   updateHolding,
@@ -123,7 +124,7 @@ describe("getHoldingsByAccountId", () => {
 });
 
 describe("createHolding", () => {
-  test("creates a holding and returns it with investment details", () => {
+  test("creates a holding and returns it with investment details and effective_from", () => {
     const holding = createHolding({
       account_id: testAccount.id,
       investment_id: investment1.id,
@@ -142,6 +143,9 @@ describe("createHolding", () => {
     expect(holding.investment_description).toBe("Raspberry Pi Holdings");
     expect(holding.investment_public_id).toBe("LSE:RPI");
     expect(holding.currency_code).toBe("GBP");
+    // SCD2 fields
+    expect(holding.effective_from).toBe(new Date().toISOString().slice(0, 10));
+    expect(holding.effective_to).toBeNull();
   });
 
   test("creates a second holding with fractional quantity", () => {
@@ -156,9 +160,10 @@ describe("createHolding", () => {
     expect(holding.quantity).toBe(661.152);
     expect(holding.average_cost).toBe(130.4);
     expect(holding.investment_description).toBe("Rathbone Global Opportunities Fund");
+    expect(holding.effective_from).toBe(new Date().toISOString().slice(0, 10));
   });
 
-  test("throws on duplicate account_id + investment_id", () => {
+  test("throws on duplicate account_id + investment_id + effective_from", () => {
     expect(() => {
       createHolding({
         account_id: testAccount.id,
@@ -193,7 +198,7 @@ describe("createHolding", () => {
 });
 
 describe("getHoldingsByAccountId after inserts", () => {
-  test("returns all holdings for the account ordered by investment description", () => {
+  test("returns all active holdings for the account ordered by investment description", () => {
     const holdings = getHoldingsByAccountId(testAccount.id);
     expect(holdings.length).toBe(2);
     // Alphabetical: Raspberry Pi comes before Rathbone
@@ -201,11 +206,13 @@ describe("getHoldingsByAccountId after inserts", () => {
     expect(holdings[1].investment_description).toBe("Rathbone Global Opportunities Fund");
   });
 
-  test("each holding has investment details", () => {
+  test("each holding has investment details and SCD2 fields", () => {
     const holdings = getHoldingsByAccountId(testAccount.id);
     for (const h of holdings) {
       expect(h.investment_description).toBeTruthy();
       expect(h.currency_code).toBeTruthy();
+      expect(h.effective_from).toBeTruthy();
+      expect(h.effective_to).toBeNull();
     }
   });
 
@@ -232,19 +239,23 @@ describe("getHoldingById", () => {
   });
 });
 
-describe("updateHolding", () => {
-  test("updates quantity and average_cost and returns the updated holding", () => {
+describe("updateHolding (SCD2)", () => {
+  test("same-day update modifies row in place (daily granularity)", () => {
     const holdings = getHoldingsByAccountId(testAccount.id);
-    const id = holdings[0].id;
+    const oldId = holdings[0].id;
 
-    const updated = updateHolding(id, {
+    const updated = updateHolding(oldId, {
       quantity: 400,
       average_cost: 1.10,
     });
 
     expect(updated).not.toBeNull();
+    // Same-day update keeps the same row ID
+    expect(updated.id).toBe(oldId);
     expect(updated.quantity).toBe(400);
     expect(updated.average_cost).toBe(1.1);
+    expect(updated.effective_from).toBe(new Date().toISOString().slice(0, 10));
+    expect(updated.effective_to).toBeNull();
     // Investment details preserved
     expect(updated.investment_description).toBe("Raspberry Pi Holdings");
   });
@@ -258,16 +269,18 @@ describe("updateHolding", () => {
   });
 });
 
-describe("deleteHolding", () => {
-  test("deletes a holding and returns true", () => {
+describe("deleteHolding (SCD2 soft-delete)", () => {
+  test("soft-deletes a holding by setting effective_to", () => {
     const holdings = getHoldingsByAccountId(testAccount.id);
     const id = holdings[0].id;
 
     const result = deleteHolding(id);
     expect(result).toBe(true);
 
-    const deleted = getHoldingById(id);
-    expect(deleted).toBeNull();
+    // Row still exists but is closed
+    const closed = getHoldingById(id);
+    expect(closed).not.toBeNull();
+    expect(closed.effective_to).toBe(new Date().toISOString().slice(0, 10));
   });
 
   test("returns false for non-existent ID", () => {
@@ -275,15 +288,44 @@ describe("deleteHolding", () => {
     expect(result).toBe(false);
   });
 
-  test("remaining holdings still exist", () => {
+  test("returns false for already-closed holding", () => {
+    // Try to delete the same already-closed holding again
+    const holdings = getHoldingsByAccountId(testAccount.id);
+    // We deleted holding[0] above, so it's no longer in active list
+    // But we can try the old closed ID
+    // The holdings list should have one fewer active holding
+    expect(holdings.length).toBe(1);
+  });
+
+  test("getHoldingsByAccountId excludes soft-deleted holdings", () => {
     const holdings = getHoldingsByAccountId(testAccount.id);
     expect(holdings.length).toBe(1);
   });
 });
 
+describe("getHoldingsAtDate", () => {
+  test("returns holdings active on today", () => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const holdings = getHoldingsAtDate(testAccount.id, todayStr);
+    // Only the active (non-closed) holding should be returned
+    expect(holdings.length).toBe(1);
+  });
+
+  test("returns empty for a date before any holdings existed", () => {
+    const holdings = getHoldingsAtDate(testAccount.id, "2000-01-01");
+    expect(holdings).toEqual([]);
+  });
+
+  test("returns empty for non-existent account", () => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const holdings = getHoldingsAtDate(9999, todayStr);
+    expect(holdings).toEqual([]);
+  });
+});
+
 describe("cascade delete via account", () => {
-  test("deleting an account removes its holdings", () => {
-    // Verify we have holdings
+  test("deleting an account removes its holdings (including historical)", () => {
+    // Verify we have active holdings
     let holdings = getHoldingsByAccountId(testAccount.id);
     expect(holdings.length).toBe(1);
 

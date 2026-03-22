@@ -1,5 +1,5 @@
 import { Router } from "../router.js";
-import { getPortfolioSummary } from "../services/portfolio-service.js";
+import { getPortfolioSummary, getPortfolioSummaryAtDate } from "../services/portfolio-service.js";
 import { getAllUsers } from "../db/users-db.js";
 
 /**
@@ -34,6 +34,7 @@ portfolioRouter.get("/api/portfolio/summary", function () {
 });
 
 // GET /api/portfolio/summary/:userId — summary for a single user
+// Optional query param: ?date=YYYY-MM-DD for historic valuation
 portfolioRouter.get("/api/portfolio/summary/:userId", function (request, params) {
   try {
     const userId = Number(params.userId);
@@ -44,7 +45,24 @@ portfolioRouter.get("/api/portfolio/summary/:userId", function (request, params)
       );
     }
 
-    const summary = getPortfolioSummary(userId);
+    // Check for optional date query parameter
+    const url = new URL(request.url);
+    const date = url.searchParams.get("date");
+
+    let summary;
+    if (date) {
+      // Validate date format (YYYY-MM-DD)
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return new Response(
+          JSON.stringify({ error: "Invalid date format — use YYYY-MM-DD" }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      summary = getPortfolioSummaryAtDate(userId, date);
+    } else {
+      summary = getPortfolioSummary(userId);
+    }
+
     if (!summary) {
       return new Response(
         JSON.stringify({ error: "User not found" }),

@@ -184,6 +184,37 @@ export function getRatesInRange(currenciesId, fromDate, toDate) {
 }
 
 /**
+ * @description Get the nearest exchange rate for a currency on or before a given date.
+ * Useful for historic portfolio valuations where the exact date may not have a rate
+ * (weekends, bank holidays, etc.).
+ * @param {number} currenciesId - The currency ID
+ * @param {string} rateDate - ISO-8601 date (YYYY-MM-DD) upper bound
+ * @returns {Object|null} Rate record with currency details, or null if none found
+ */
+export function getRateOnOrBefore(currenciesId, rateDate) {
+  const db = getDatabase();
+  const row = db
+    .query(
+      `SELECT
+        cr.id,
+        cr.currencies_id,
+        c.code AS currency_code,
+        c.description AS currency_description,
+        cr.rate_date,
+        cr.rate_time,
+        cr.rate
+      FROM currency_rates cr
+      JOIN currencies c ON c.id = cr.currencies_id
+      WHERE cr.currencies_id = ? AND cr.rate_date <= ?
+      ORDER BY cr.rate_date DESC
+      LIMIT 1`,
+    )
+    .get(currenciesId, rateDate);
+
+  return row || null;
+}
+
+/**
  * @description Convert a raw decimal rate to the integer-scaled value for storage.
  * Multiplies by CURRENCY_SCALE_FACTOR (10000) and rounds to the nearest integer.
  * @param {number} decimalRate - The decimal exchange rate (e.g. 1.2543)
