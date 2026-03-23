@@ -138,6 +138,33 @@ export function generateWeeklyDates(startDate, endDate) {
 }
 
 /**
+ * @description Generate an array of ISO-8601 date strings at 14-day intervals
+ * from startDate to endDate inclusive. Used for longer chart periods (>12 months)
+ * where weekly sampling would produce too many data points.
+ * @param {Date} startDate - The start date
+ * @param {Date} endDate - The end date
+ * @returns {Array<string>} Array of ISO-8601 date strings
+ */
+export function generateFortnightlyDates(startDate, endDate) {
+  var dates = [];
+  var current = new Date(startDate);
+
+  while (current <= endDate) {
+    dates.push(formatISODate(current));
+    current.setDate(current.getDate() + 14);
+  }
+
+  // Ensure the end date is included if not already
+  var lastDate = dates[dates.length - 1];
+  var endStr = formatISODate(endDate);
+  if (lastDate !== endStr) {
+    dates.push(endStr);
+  }
+
+  return dates;
+}
+
+/**
  * @description Format a Date object as ISO-8601 date string (YYYY-MM-DD).
  * @param {Date} date - The date to format
  * @returns {string} ISO-8601 date string

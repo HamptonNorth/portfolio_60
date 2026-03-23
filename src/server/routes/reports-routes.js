@@ -7,6 +7,7 @@ import { generatePortfolioSummaryPdf } from "../reports/pdf-portfolio-summary.js
 import { generatePortfolioDetailPdf } from "../reports/pdf-portfolio-detail.js";
 import { generateCompositePdf } from "../reports/pdf-compositor.js";
 import { generateChartPdf, generateChartGroupPdf } from "../reports/pdf-chart.js";
+import { generatePortfolioValueChartPdf } from "../reports/pdf-portfolio-value-chart.js";
 import { isTestMode } from "../test-mode.js";
 
 /**
@@ -419,6 +420,50 @@ reportsRouter.get("/api/reports/pdf/chart", async function (request) {
   } catch (err) {
     return new Response(
       JSON.stringify({ error: "Failed to generate chart PDF", detail: err.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+});
+
+// GET /api/reports/pdf/portfolio-value-chart — generate a portfolio value chart PDF.
+// Plots account values over time for specified users/account types.
+// Accepts the report ID as a query parameter (e.g. ?id=portfolio_value_chart).
+reportsRouter.get("/api/reports/pdf/portfolio-value-chart", async function (request) {
+  try {
+    const url = new URL(request.url);
+    const reportId = url.searchParams.get("id");
+
+    if (!reportId) {
+      return new Response(
+        JSON.stringify({ error: "Report ID is required (use ?id=...)" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    const reports = loadReportDefinitions();
+    const report = reports.find(function (r) {
+      return r.id === reportId;
+    });
+
+    if (!report) {
+      return new Response(
+        JSON.stringify({ error: "Report not found: " + reportId }),
+        { status: 404, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    const pdfBytes = await generatePortfolioValueChartPdf(report);
+    var filename = (report.id || "portfolio-value-chart").replace(/[^a-z0-9_-]/gi, "-") + ".pdf";
+    return new Response(pdfBytes, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": 'inline; filename="' + filename + '"',
+      },
+    });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Failed to generate portfolio value chart PDF", detail: err.message }),
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }

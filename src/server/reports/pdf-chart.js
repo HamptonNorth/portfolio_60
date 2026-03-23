@@ -151,7 +151,9 @@ function renderLineChart(ctx, params, blockDef) {
     params: params,
   };
 
-  var data = getChartData(chartDef);
+  // Use pre-built chart data if provided (e.g. portfolio value charts),
+  // otherwise fetch investment/benchmark data via getChartData()
+  var data = (blockDef && blockDef._chartData) ? blockDef._chartData : getChartData(chartDef);
 
   if (!data.series || data.series.length === 0) {
     page.drawText(chartDef.title + " \u2014 no data available.", {
@@ -228,14 +230,14 @@ function renderLineChart(ctx, params, blockDef) {
   y -= legendHeight;
 
   // --- Determine Y-axis range ---
-  var yRange = calculateYRange(data.series);
+  var yRange = calculateYRange(data.series, data.valueMode);
   var yMin = yRange.min;
   var yMax = yRange.max;
   var yTicks = yRange.ticks;
 
   // --- Draw grid and axes ---
   drawGrid(page, chartLeft, chartBottom, chartWidth, chartHeight, yMin, yMax, yTicks);
-  drawYAxis(page, chartLeft, chartBottom, chartHeight, yMin, yMax, yTicks, fonts);
+  drawYAxis(page, chartLeft, chartBottom, chartHeight, yMin, yMax, yTicks, fonts, data.valueMode);
   drawXAxis(page, data.sampleDates, chartLeft, chartBottom, chartWidth, data.monthsToShow, fonts);
 
   // --- Plot data lines ---
@@ -524,18 +526,22 @@ function drawLegend(page, series, startX, y, availableWidth, fonts) {
  * @param {Array<Object>} series - Data series with values arrays
  * @returns {Object} Object with min, max, and ticks array
  */
-function calculateYRange(series) {
-  var dataMin = 0;
-  var dataMax = 0;
+function calculateYRange(series, valueMode) {
+  var dataMin = null;
+  var dataMax = null;
 
   for (var s = 0; s < series.length; s++) {
     var vals = series[s].values;
     for (var v = 0; v < vals.length; v++) {
       if (vals[v] === null) continue;
-      if (vals[v] < dataMin) dataMin = vals[v];
-      if (vals[v] > dataMax) dataMax = vals[v];
+      if (dataMin === null || vals[v] < dataMin) dataMin = vals[v];
+      if (dataMax === null || vals[v] > dataMax) dataMax = vals[v];
     }
   }
+
+  // Default to 0-based range if no data
+  if (dataMin === null) dataMin = 0;
+  if (dataMax === null) dataMax = 0;
 
   // Add 10% padding above and below
   var range = dataMax - dataMin;
@@ -552,9 +558,12 @@ function calculateYRange(series) {
   min = Math.floor(min / niceInterval) * niceInterval;
   max = Math.ceil(max / niceInterval) * niceInterval;
 
-  // Ensure 0 is included
-  if (min > 0) min = 0;
-  if (max < 0) max = 0;
+  // For percent mode, ensure 0 is included (all series rebase from 0%)
+  // For value mode, don't force 0 — values may be far above zero
+  if (valueMode !== "value") {
+    if (min > 0) min = 0;
+    if (max < 0) max = 0;
+  }
 
   // Generate tick values
   var ticks = [];
@@ -613,7 +622,30 @@ function drawGrid(page, left, bottom, width, height, yMin, yMax, ticks) {
 }
 
 /**
- * @description Draw Y-axis labels (percentage values) on the left side.
+ * @description Format a GBP value for the Y-axis label.
+ * Uses £Xk for thousands and £X.XM for millions.
+ * @param {number} value - The GBP value
+ * @returns {string} Formatted label like "£150k" or "£1.2M"
+ */
+function formatGBPAxis(value) {
+  var absVal = Math.abs(value);
+  var sign = value < 0 ? "-" : "";
+  if (absVal >= 1000000) {
+    var millions = absVal / 1000000;
+    var mStr = millions === Math.floor(millions) ? millions.toFixed(0) : millions.toFixed(1);
+    return sign + "£" + mStr + "M";
+  }
+  if (absVal >= 1000) {
+    var thousands = absVal / 1000;
+    var kStr = thousands === Math.floor(thousands) ? thousands.toFixed(0) : thousands.toFixed(1);
+    return sign + "£" + kStr + "k";
+  }
+  return sign + "£" + Math.round(absVal);
+}
+
+/**
+ * @description Draw Y-axis labels on the left side.
+ * Shows percentage values by default, or GBP values when valueMode is "value".
  * @param {Object} page - PDFPage instance
  * @param {number} chartLeft - Left edge of chart area
  * @param {number} bottom - Bottom edge of chart area
@@ -621,8 +653,10 @@ function drawGrid(page, left, bottom, width, height, yMin, yMax, ticks) {
  * @param {number} yMin - Y-axis minimum value
  * @param {number} yMax - Y-axis maximum value
  * @param {Array<number>} ticks - Y-axis tick values
+ * @param {Object} fonts - Font objects
+ * @param {string} [valueMode] - "value" for GBP axis, anything else for percent
  */
-function drawYAxis(page, chartLeft, bottom, height, yMin, yMax, ticks, fonts) {
+function drawYAxis(page, chartLeft, bottom, height, yMin, yMax, ticks, fonts, valueMode) {
   var font = fonts.regular;
   var yRange = yMax - yMin;
   if (yRange === 0) return;
@@ -630,7 +664,12 @@ function drawYAxis(page, chartLeft, bottom, height, yMin, yMax, ticks, fonts) {
   for (var i = 0; i < ticks.length; i++) {
     var tickVal = ticks[i];
     var py = bottom + ((tickVal - yMin) / yRange) * height;
-    var label = tickVal.toFixed(tickVal === Math.round(tickVal) ? 0 : 1) + "%";
+    var label;
+    if (valueMode === "value") {
+      label = formatGBPAxis(tickVal);
+    } else {
+      label = tickVal.toFixed(tickVal === Math.round(tickVal) ? 0 : 1) + "%";
+    }
     var textWidth = font.widthOfTextAtSize(label, FONT_SIZE_AXIS);
 
     page.drawText(label, {

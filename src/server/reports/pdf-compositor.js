@@ -5,6 +5,7 @@ import { renderHouseholdAssetsBlock } from "./pdf-household-assets.js";
 import { renderPortfolioSummaryBlock } from "./pdf-portfolio-summary.js";
 import { renderPortfolioDetailBlock } from "./pdf-portfolio-detail.js";
 import { renderChartBlock, renderChartGroupBlock, getChartGroupLayout } from "./pdf-chart.js";
+import { renderPortfolioValueChartBlock } from "./pdf-portfolio-value-chart.js";
 
 /**
  * @description Block type registry mapping type names to their renderer
@@ -44,6 +45,12 @@ const BLOCK_TYPES = {
   chart_group: {
     render: renderChartGroupBlock,
     getLayout: getChartGroupLayout,
+  },
+  portfolio_value_chart: {
+    render: renderPortfolioValueChartBlock,
+    orientation: "landscape",
+    pageHeight: 595.28,
+    usableWidth: 761.89,
   },
 };
 

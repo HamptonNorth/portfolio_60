@@ -241,6 +241,18 @@ describe("Portfolio Routes", function () {
       expect(response.headers.get("Content-Type")).toBe("application/pdf");
     });
   });
+
+  describe("GET /api/reports/pdf/portfolio-value-chart", function () {
+    test("returns 400 without report ID", async function () {
+      const res = await api("/api/reports/pdf/portfolio-value-chart");
+      expect(res.status).toBe(400);
+    });
+
+    test("returns 404 for unknown report ID", async function () {
+      const res = await api("/api/reports/pdf/portfolio-value-chart?id=nonexistent");
+      expect(res.status).toBe(404);
+    });
+  });
 });
 
 // --- parseCompareToDate unit tests (no server needed) ---
