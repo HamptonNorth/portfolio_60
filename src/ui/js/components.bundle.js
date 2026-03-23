@@ -1746,13 +1746,20 @@ class AppNavbar extends LitElement {
       showAboutModal();
     }
   }
-  _buildPdfUrl(endpoint, params) {
-    if (!params || params.length === 0)
-      return endpoint;
-    var isDetail = endpoint.indexOf("portfolio-detail") !== -1;
-    var separator = isDetail ? "|" : ",";
-    var joined = params.join(separator);
-    return endpoint + "?params=" + encodeURIComponent(joined);
+  _buildPdfUrl(endpoint, params, compareTo) {
+    var url = endpoint;
+    var hasQuery = false;
+    if (params && params.length > 0) {
+      var isDetail = endpoint.indexOf("portfolio-detail") !== -1;
+      var separator = isDetail ? "|" : ",";
+      var joined = params.join(separator);
+      url += "?params=" + encodeURIComponent(joined);
+      hasQuery = true;
+    }
+    if (compareTo) {
+      url += (hasQuery ? "&" : "?") + "compareTo=" + encodeURIComponent(compareTo);
+    }
+    return url;
   }
   async firstUpdated() {
     if (typeof highlightActiveNav === "function") {
@@ -1810,7 +1817,7 @@ class AppNavbar extends LitElement {
         } else if (report.pdfEndpoint && report.pdfEndpoint.indexOf("/chart") !== -1) {
           link.href = report.pdfEndpoint + "?id=" + encodeURIComponent(report.id);
         } else if (report.pdfEndpoint) {
-          link.href = this._buildPdfUrl(report.pdfEndpoint, report.params || []);
+          link.href = this._buildPdfUrl(report.pdfEndpoint, report.params || [], report.compareTo);
         } else {
           continue;
         }

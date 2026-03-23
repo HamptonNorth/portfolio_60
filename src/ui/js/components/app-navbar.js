@@ -167,15 +167,25 @@ class AppNavbar extends LitElement {
    * @param {Array<string>} params - The params array from the report definition
    * @returns {string} The full URL with encoded params query parameter
    */
-  _buildPdfUrl(endpoint, params) {
-    if (!params || params.length === 0) return endpoint;
+  _buildPdfUrl(endpoint, params, compareTo) {
+    var url = endpoint;
+    var hasQuery = false;
 
-    // Detail params contain colons and commas (e.g. "BW:ISA:1m,3m,1y,3y")
-    // so use pipe separator for detail, comma for summary
-    var isDetail = endpoint.indexOf("portfolio-detail") !== -1;
-    var separator = isDetail ? "|" : ",";
-    var joined = params.join(separator);
-    return endpoint + "?params=" + encodeURIComponent(joined);
+    if (params && params.length > 0) {
+      // Detail params contain colons and commas (e.g. "BW:ISA:1m,3m,1y,3y")
+      // so use pipe separator for detail, comma for summary
+      var isDetail = endpoint.indexOf("portfolio-detail") !== -1;
+      var separator = isDetail ? "|" : ",";
+      var joined = params.join(separator);
+      url += "?params=" + encodeURIComponent(joined);
+      hasQuery = true;
+    }
+
+    if (compareTo) {
+      url += (hasQuery ? "&" : "?") + "compareTo=" + encodeURIComponent(compareTo);
+    }
+
+    return url;
   }
 
   async firstUpdated() {
@@ -250,7 +260,7 @@ class AppNavbar extends LitElement {
           link.href = report.pdfEndpoint + "?id=" + encodeURIComponent(report.id);
         } else if (report.pdfEndpoint) {
           // Single-block report: link directly to the PDF endpoint
-          link.href = this._buildPdfUrl(report.pdfEndpoint, report.params || []);
+          link.href = this._buildPdfUrl(report.pdfEndpoint, report.params || [], report.compareTo);
         } else {
           continue; // Skip entries with neither blocks nor pdfEndpoint
         }

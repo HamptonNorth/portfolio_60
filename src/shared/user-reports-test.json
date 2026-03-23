@@ -12,6 +12,13 @@
     "params": ["USER2", "USER1", "USER2 + USER1"]
   },
   {
+    "id": "ex2b_portfolio_summary_comparison",
+    "title": "2b: Portfolio Summary (3m comparison)",
+    "pdfEndpoint": "/api/reports/pdf/portfolio-summary",
+    "compareTo": "3m",
+    "params": ["USER2", "USER1", "USER2 + USER1"]
+  },
+  {
     "id": "ex3_portfolio_detail",
     "title": "3: Portfolio Detail",
     "pdfEndpoint": "/api/reports/pdf/portfolio-detail",

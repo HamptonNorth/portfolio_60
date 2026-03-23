@@ -274,12 +274,13 @@ reportsRouter.get("/api/reports/pdf/portfolio-summary", async function (request)
   try {
     const url = new URL(request.url);
     const paramsStr = url.searchParams.get("params");
+    const compareTo = url.searchParams.get("compareTo") || null;
     var params = [];
     if (paramsStr) {
       params = paramsStr.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
     }
 
-    const pdfBytes = await generatePortfolioSummaryPdf(params);
+    const pdfBytes = await generatePortfolioSummaryPdf(params, compareTo);
     return new Response(pdfBytes, {
       status: 200,
       headers: {

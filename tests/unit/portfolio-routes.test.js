@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { existsSync, unlinkSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { parseCompareToDate } from "../../src/server/reports/pdf-portfolio-summary.js";
 
 /**
  * @description Port for portfolio-routes.test.js — unique per test file.
@@ -225,5 +226,60 @@ describe("Portfolio Routes", function () {
       expect(summary.totals.cash_available).toBe(false);
       expect(summary.totals.cash).toBeNull();
     });
+  });
+
+  describe("GET /api/reports/pdf/portfolio-summary", function () {
+    test("returns PDF without compareTo", async function () {
+      const response = await fetch(`${BASE_URL}/api/reports/pdf/portfolio-summary`);
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Content-Type")).toBe("application/pdf");
+    });
+
+    test("returns PDF with compareTo=3m", async function () {
+      const response = await fetch(`${BASE_URL}/api/reports/pdf/portfolio-summary?compareTo=3m`);
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Content-Type")).toBe("application/pdf");
+    });
+  });
+});
+
+// --- parseCompareToDate unit tests (no server needed) ---
+
+describe("parseCompareToDate", function () {
+  test("returns null for null/undefined input", function () {
+    expect(parseCompareToDate(null)).toBeNull();
+    expect(parseCompareToDate(undefined)).toBeNull();
+    expect(parseCompareToDate("")).toBeNull();
+  });
+
+  test("parses months format correctly", function () {
+    const result = parseCompareToDate("3m");
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+    // Should be approximately 3 months ago
+    const d = new Date(result);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+    expect(diffDays).toBeGreaterThan(80);
+    expect(diffDays).toBeLessThan(100);
+  });
+
+  test("parses years format correctly", function () {
+    const result = parseCompareToDate("1y");
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+    const d = new Date(result);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+    expect(diffDays).toBeGreaterThan(355);
+    expect(diffDays).toBeLessThan(375);
+  });
+
+  test("returns null for invalid format", function () {
+    expect(parseCompareToDate("abc")).toBeNull();
+    expect(parseCompareToDate("3")).toBeNull();
+    expect(parseCompareToDate("m3")).toBeNull();
   });
 });
