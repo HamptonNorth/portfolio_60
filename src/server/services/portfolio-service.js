@@ -3,6 +3,7 @@ import { getAccountsByUserId } from "../db/accounts-db.js";
 import { getHoldingsByAccountId, getHoldingsAtDate } from "../db/holdings-db.js";
 import { getLatestPrice, getPriceOnOrBefore } from "../db/prices-db.js";
 import { getLatestRates, getRateOnOrBefore, unscaleRate } from "../db/currency-rates-db.js";
+import { getCashBalanceAtDate } from "../db/cash-transactions-db.js";
 import { CURRENCY_SCALE_FACTOR } from "../../shared/server-constants.js";
 import { getDatabase } from "../db/connection.js";
 
@@ -159,6 +160,7 @@ export function getPortfolioSummaryAtDate(userId, date) {
 
   let totalInvestments = 0;
   let totalCash = 0;
+  let anyCashUnavailable = false;
 
   const accountSummaries = [];
 
@@ -217,17 +219,27 @@ export function getPortfolioSummaryAtDate(userId, date) {
     }
 
     accountInvestmentsTotal = roundToPence(accountInvestmentsTotal);
-    const cashBalance = account.cash_balance;
-    const accountTotal = roundToPence(accountInvestmentsTotal + cashBalance);
+
+    // Look up the historic cash balance from cash_transactions
+    const historicCash = getCashBalanceAtDate(account.id, date);
+    const cashAvailable = historicCash !== null;
+
+    const cashBalance = cashAvailable ? historicCash : null;
+    const accountTotal = cashAvailable ? roundToPence(accountInvestmentsTotal + cashBalance) : null;
 
     totalInvestments += accountInvestmentsTotal;
-    totalCash += cashBalance;
+    if (cashAvailable) {
+      totalCash += cashBalance;
+    } else {
+      anyCashUnavailable = true;
+    }
 
     accountSummaries.push({
       id: account.id,
       account_type: account.account_type,
       account_ref: account.account_ref,
       cash_balance: cashBalance,
+      cash_available: cashAvailable,
       investments_total: accountInvestmentsTotal,
       account_total: accountTotal,
       holdings: holdingSummaries,
@@ -245,8 +257,9 @@ export function getPortfolioSummaryAtDate(userId, date) {
     accounts: accountSummaries,
     totals: {
       investments: roundToPence(totalInvestments),
-      cash: roundToPence(totalCash),
-      grand_total: roundToPence(totalInvestments + totalCash),
+      cash: anyCashUnavailable ? null : roundToPence(totalCash),
+      cash_available: !anyCashUnavailable,
+      grand_total: anyCashUnavailable ? null : roundToPence(totalInvestments + totalCash),
     },
   };
 }

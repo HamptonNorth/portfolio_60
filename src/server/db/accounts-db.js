@@ -66,9 +66,9 @@ export function createAccount(data) {
     if (scaledCash > 0) {
       const today = new Date().toISOString().slice(0, 10);
       db.run(
-        `INSERT INTO cash_transactions (account_id, transaction_type, transaction_date, amount, notes)
-         VALUES (?, 'deposit', ?, ?, 'Opening balance')`,
-        [result.lastInsertRowid, today, scaledCash],
+        `INSERT INTO cash_transactions (account_id, transaction_type, transaction_date, amount, notes, balance_after)
+         VALUES (?, 'deposit', ?, ?, 'Opening balance', ?)`,
+        [result.lastInsertRowid, today, scaledCash, scaledCash],
       );
     }
 

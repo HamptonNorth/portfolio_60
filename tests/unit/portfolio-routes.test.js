@@ -198,4 +198,32 @@ describe("Portfolio Routes", function () {
       expect(summary.totals.grand_total).toBeDefined();
     });
   });
+
+  describe("GET /api/portfolio/summary?date=", function () {
+    test("returns 200 with valid date", async function () {
+      const today = new Date().toISOString().slice(0, 10);
+      const res = await api(`/api/portfolio/summary?date=${today}`);
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.data)).toBe(true);
+      const summary = res.data[0];
+      expect(summary.valuation_date).toBe(today);
+      expect(summary.accounts[0].cash_available).toBeDefined();
+    });
+
+    test("returns 400 for invalid date format", async function () {
+      const res = await api("/api/portfolio/summary?date=not-a-date");
+      expect(res.status).toBe(400);
+      expect(res.data.error).toMatch(/Invalid date/i);
+    });
+
+    test("historic date returns cash_available false when no transactions exist", async function () {
+      const res = await api("/api/portfolio/summary?date=2000-01-01");
+      expect(res.status).toBe(200);
+      const summary = res.data[0];
+      expect(summary.accounts[0].cash_available).toBe(false);
+      expect(summary.accounts[0].cash_balance).toBeNull();
+      expect(summary.totals.cash_available).toBe(false);
+      expect(summary.totals.cash).toBeNull();
+    });
+  });
 });

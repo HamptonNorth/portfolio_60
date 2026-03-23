@@ -189,14 +189,19 @@ function renderUserSummary(summary) {
     const rowClass = i % 2 === 0 ? "bg-white" : "bg-brand-50";
     const cashWarningHtml = acct.cash_warning ? '<span class="text-red-600 font-medium ml-2">** min cash ' + formatGBPWhole(acct.warn_cash) + "</span>" : "";
 
+    // Show N/A for cash and total when historic cash is unavailable
+    const cashNA = acct.cash_available === false;
+    const cashDisplay = cashNA ? '<span class="text-brand-400">N/A</span>' : formatGBPWhole(acct.cash_balance);
+    const totalDisplay = cashNA ? '<span class="text-brand-400">N/A</span>' : formatGBPWhole(acct.account_total);
+
     html += '<tr class="' + rowClass + ' border-b border-brand-100">';
     html += '<td class="py-3 px-3 text-base font-semibold text-brand-700 w-24">' + formatAccountType(acct.account_type) + "</td>";
     html += '<td class="py-3 px-3 text-base text-brand-600">Account ' + escapeHtml(acct.account_ref) + "</td>";
     html += '<td class="py-3 px-3 text-base text-right text-brand-500">Investments</td>';
     html += '<td class="py-3 px-3 text-base text-right font-mono w-32">' + formatGBPWhole(acct.investments_total) + "</td>";
     html += '<td class="py-3 px-3 text-base text-right text-brand-500">Cash</td>';
-    html += '<td class="py-3 px-3 text-base text-right font-mono w-28">' + formatGBPWhole(acct.cash_balance) + "</td>";
-    html += '<td class="py-3 px-3 text-base text-right font-mono w-32 bg-brand-38">' + formatGBPWhole(acct.account_total) + "</td>";
+    html += '<td class="py-3 px-3 text-base text-right font-mono w-28">' + cashDisplay + "</td>";
+    html += '<td class="py-3 px-3 text-base text-right font-mono w-32 bg-brand-38">' + totalDisplay + "</td>";
     html += '<td class="py-3 px-3 text-base">' + cashWarningHtml + "</td>";
     html += '<td class="py-3 px-3 text-right">';
     html += '<button class="bg-brand-100 hover:bg-brand-200 text-brand-700 text-sm font-medium px-3 py-1 rounded transition-colors" ';
@@ -205,14 +210,323 @@ function renderUserSummary(summary) {
     html += "</tr>";
   }
 
-  // Totals row
+  // Totals row — show N/A for cash and grand total when any account lacks historic cash
+  const totalsCashNA = summary.totals.cash_available === false;
+  const totalsCashDisplay = totalsCashNA ? '<span class="text-brand-400">N/A</span>' : formatGBPWhole(summary.totals.cash);
+  const totalsGrandDisplay = totalsCashNA ? '<span class="text-brand-400">N/A</span>' : formatGBPWhole(summary.totals.grand_total);
+
   html += '<tr class="border-t-2 border-brand-300 bg-white">';
   html += '<td class="py-3 px-3" colspan="2"></td>';
   html += '<td class="py-3 px-3 text-base text-right font-semibold text-brand-700">Total</td>';
   html += '<td class="py-3 px-3 text-base text-right font-mono">' + formatGBPWhole(summary.totals.investments) + "</td>";
   html += '<td class="py-3 px-3"></td>';
-  html += '<td class="py-3 px-3 text-base text-right font-mono">' + formatGBPWhole(summary.totals.cash) + "</td>";
-  html += '<td class="py-3 px-3 text-base text-right font-mono bg-brand-38">' + formatGBPWhole(summary.totals.grand_total) + "</td>";
+  html += '<td class="py-3 px-3 text-base text-right font-mono">' + totalsCashDisplay + "</td>";
+  html += '<td class="py-3 px-3 text-base text-right font-mono bg-brand-38">' + totalsGrandDisplay + "</td>";
+  html += '<td colspan="2"></td>';
+  html += "</tr>";
+
+  html += "</tbody></table></div></div>";
+  return html;
+}
+
+// ─── Comparison ─────────────────────────────────────────────────────
+
+/** @type {Array<Object>|null} Cached historic summaries for comparison */
+let comparisonData = null;
+
+/**
+ * @description Calculate the ISO date string N months before today.
+ * @param {number} months - Number of months to go back
+ * @returns {string} ISO date string (YYYY-MM-DD)
+ */
+function getDateMonthsAgo(months) {
+  const d = new Date();
+  d.setMonth(d.getMonth() - months);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * @description Handle changes to the comparison period dropdown.
+ * Shows/hides the date picker and Go button as needed.
+ */
+function onComparePeriodChange() {
+  const value = document.getElementById("compare-period-select").value;
+  const datePicker = document.getElementById("compare-date-picker");
+  const goBtn = document.getElementById("compare-go-btn");
+
+  if (value === "custom") {
+    datePicker.classList.remove("hidden");
+    goBtn.classList.remove("hidden");
+  } else if (value) {
+    datePicker.classList.add("hidden");
+    goBtn.classList.add("hidden");
+    const date = getDateMonthsAgo(Number(value));
+    loadComparison(date);
+  } else {
+    datePicker.classList.add("hidden");
+    goBtn.classList.add("hidden");
+    clearComparison();
+  }
+}
+
+/**
+ * @description Handle the Go button click for custom date comparison.
+ */
+function onCompareGoClick() {
+  const date = document.getElementById("compare-date-picker").value;
+  if (!date) return;
+  loadComparison(date);
+}
+
+/**
+ * @description Add a heading above the current summary block when comparison is active.
+ * This labels the current block as "Portfolio valuation using latest prices".
+ */
+function addCurrentSummaryHeading() {
+  removeCurrentSummaryHeading();
+  const heading = document.createElement("h3");
+  heading.id = "current-summary-heading";
+  heading.className = "text-lg font-semibold text-brand-800 mb-4 mt-2";
+  heading.textContent = "Portfolio valuation using latest prices";
+  const container = document.getElementById("summary-container");
+  container.parentNode.insertBefore(heading, container);
+}
+
+/**
+ * @description Remove the current summary heading (when comparison is cleared).
+ */
+function removeCurrentSummaryHeading() {
+  const existing = document.getElementById("current-summary-heading");
+  if (existing) existing.remove();
+}
+
+/**
+ * @description Clear the comparison and difference displays.
+ */
+function clearComparison() {
+  comparisonData = null;
+  document.getElementById("comparison-container").classList.add("hidden");
+  document.getElementById("comparison-container").innerHTML = "";
+  document.getElementById("difference-controls").classList.add("hidden");
+  document.getElementById("difference-container").classList.add("hidden");
+  document.getElementById("difference-container").innerHTML = "";
+  document.getElementById("compare-clear-btn").classList.add("hidden");
+  document.getElementById("compare-period-select").value = "";
+  document.getElementById("compare-date-picker").classList.add("hidden");
+  document.getElementById("compare-go-btn").classList.add("hidden");
+  removeCurrentSummaryHeading();
+}
+
+/**
+ * @description Fetch historic summary data and render comparison + difference blocks.
+ * @param {string} date - ISO date (YYYY-MM-DD) to compare against
+ */
+async function loadComparison(date) {
+  const userValue = document.getElementById("summary-user-select").value;
+  let url;
+  if (userValue === "all") {
+    url = "/api/portfolio/summary?date=" + date;
+  } else {
+    url = "/api/portfolio/summary/" + userValue + "?date=" + date;
+  }
+
+  const result = await apiRequest(url);
+  if (!result.ok) {
+    document.getElementById("comparison-container").innerHTML = '<p class="text-red-600">Failed to load historic portfolio summary.</p>';
+    document.getElementById("comparison-container").classList.remove("hidden");
+    return;
+  }
+
+  const summaries = Array.isArray(result.data) ? result.data : [result.data];
+  comparisonData = summaries;
+
+  // Render historic summary block (shown first — "what was my portfolio worth then?")
+  const historicDateStr = formatDateUK(date);
+  let html = '<h3 class="text-lg font-semibold text-brand-800 mb-4">Portfolio valuation at ' + escapeHtml(historicDateStr) + '</h3>';
+  for (const summary of summaries) {
+    html += renderUserSummary(summary);
+  }
+  const compContainer = document.getElementById("comparison-container");
+  compContainer.innerHTML = html;
+  compContainer.classList.remove("hidden");
+
+  // Add heading to the current summary block (shown below historic)
+  addCurrentSummaryHeading();
+
+  // Show clear button
+  document.getElementById("compare-clear-btn").classList.remove("hidden");
+
+  // Show and render difference
+  document.getElementById("difference-controls").classList.remove("hidden");
+  renderDifference();
+}
+
+/**
+ * @description Render the difference block comparing current summaryData with comparisonData.
+ * Uses the currently selected difference mode (value or %).
+ */
+function renderDifference() {
+  if (!summaryData || !comparisonData) return;
+
+  const mode = document.getElementById("difference-mode-select").value;
+  const container = document.getElementById("difference-container");
+  let html = "";
+
+  for (const current of summaryData) {
+    const historic = comparisonData.find(function (h) {
+      return h.user.id === current.user.id;
+    });
+
+    html += renderUserDifference(current, historic || null, mode);
+  }
+
+  container.innerHTML = html;
+  container.classList.remove("hidden");
+}
+
+/**
+ * @description Format a difference value for display.
+ * Shows positive values in green with +, negative in red with -, zero in grey.
+ * @param {number} diff - The difference value
+ * @param {string} mode - "value" or "percent"
+ * @returns {string} HTML string with colour styling
+ */
+function formatDiff(diff, mode) {
+  if (diff === null || isNaN(diff) || !isFinite(diff)) return '<span class="text-brand-400">n/a</span>';
+
+  let text;
+  let colourClass;
+
+  if (mode === "percent") {
+    const sign = diff > 0 ? "+" : "";
+    text = sign + diff.toFixed(1) + "%";
+  } else {
+    const sign = diff > 0 ? "+" : "";
+    text = sign + formatGBPWhole(diff);
+  }
+
+  if (diff > 0) {
+    colourClass = "text-green-700";
+  } else if (diff < 0) {
+    colourClass = "text-red-600";
+  } else {
+    colourClass = "text-brand-400";
+  }
+
+  return '<span class="' + colourClass + '">' + text + "</span>";
+}
+
+/**
+ * @description Render the difference table for a single user.
+ * @param {Object} current - Current portfolio summary
+ * @param {Object|null} historic - Historic portfolio summary (may be null if user didn't exist then)
+ * @param {string} mode - "value" or "percent"
+ * @returns {string} HTML string
+ */
+function renderUserDifference(current, historic, mode) {
+  const user = current.user;
+  const currentDate = formatDateUK(current.valuation_date);
+  const historicDate = historic ? formatDateUK(historic.valuation_date) : "n/a";
+
+  let html = '<div class="mb-8">';
+  html += '<h3 class="text-xl font-semibold text-brand-800 mb-3">';
+  html += escapeHtml(user.first_name + " " + user.last_name);
+  html += '<span class="text-brand-400 text-base font-normal ml-3">Change: ' + escapeHtml(historicDate) + " → " + escapeHtml(currentDate) + "</span>";
+  html += "</h3>";
+
+  if (!historic || historic.accounts.length === 0) {
+    html += '<p class="text-brand-500 mb-4">No historic data available for comparison.</p>';
+    html += "</div>";
+    return html;
+  }
+
+  html += '<div class="overflow-x-auto">';
+  html += '<table class="w-full border-collapse">';
+  html += "<tbody>";
+
+  let anyNA = false;
+
+  for (let i = 0; i < current.accounts.length; i++) {
+    const acct = current.accounts[i];
+    const hAcct = historic.accounts.find(function (a) {
+      return a.id === acct.id;
+    });
+
+    // If either side has unavailable cash, show N/A for cash and total diff
+    const cashUnavailable = (acct.cash_available === false) || (hAcct && hAcct.cash_available === false);
+    if (cashUnavailable) anyNA = true;
+
+    const invDiff = hAcct ? acct.investments_total - hAcct.investments_total : null;
+    const cashDiff = (!cashUnavailable && hAcct) ? acct.cash_balance - hAcct.cash_balance : null;
+    const totalDiff = (!cashUnavailable && hAcct) ? acct.account_total - hAcct.account_total : null;
+
+    let invDisplay, cashDisplay, totalDisplay;
+    if (cashUnavailable) {
+      // N/A for cash and total
+      cashDisplay = null;
+      totalDisplay = null;
+    }
+    if (mode === "percent") {
+      invDisplay = hAcct && hAcct.investments_total !== 0 ? (invDiff / hAcct.investments_total) * 100 : null;
+      if (!cashUnavailable) {
+        cashDisplay = hAcct && hAcct.cash_balance !== 0 ? (cashDiff / hAcct.cash_balance) * 100 : null;
+        totalDisplay = hAcct && hAcct.account_total !== 0 ? (totalDiff / hAcct.account_total) * 100 : null;
+      }
+    } else {
+      invDisplay = invDiff;
+      if (!cashUnavailable) {
+        cashDisplay = cashDiff;
+        totalDisplay = totalDiff;
+      }
+    }
+
+    // For N/A display, use a specific string instead of formatDiff
+    const naHtml = '<span class="text-brand-400">N/A</span>';
+
+    const rowClass = i % 2 === 0 ? "bg-white" : "bg-brand-50";
+    html += '<tr class="' + rowClass + ' border-b border-brand-100">';
+    html += '<td class="py-3 px-3 text-base font-semibold text-brand-700 w-24">' + formatAccountType(acct.account_type) + "</td>";
+    html += '<td class="py-3 px-3 text-base text-brand-600">Account ' + escapeHtml(acct.account_ref) + "</td>";
+    html += '<td class="py-3 px-3 text-base text-right text-brand-500">Investments</td>';
+    html += '<td class="py-3 px-3 text-base text-right font-mono w-32">' + formatDiff(invDisplay, mode) + "</td>";
+    html += '<td class="py-3 px-3 text-base text-right text-brand-500">Cash</td>';
+    html += '<td class="py-3 px-3 text-base text-right font-mono w-28">' + (cashUnavailable ? naHtml : formatDiff(cashDisplay, mode)) + "</td>";
+    html += '<td class="py-3 px-3 text-base text-right font-mono w-32 bg-brand-38">' + (cashUnavailable ? naHtml : formatDiff(totalDisplay, mode)) + "</td>";
+    html += '<td colspan="2"></td>';
+    html += "</tr>";
+  }
+
+  // Totals row
+  const hTotals = historic.totals;
+  const totalsNA = anyNA || current.totals.cash_available === false || hTotals.cash_available === false;
+  const invTotalDiff = current.totals.investments - hTotals.investments;
+
+  let invTotalDisplay, cashTotalDisplay, grandTotalDisplay;
+  const naHtml = '<span class="text-brand-400">N/A</span>';
+
+  if (mode === "percent") {
+    invTotalDisplay = hTotals.investments !== 0 ? (invTotalDiff / hTotals.investments) * 100 : null;
+    if (!totalsNA) {
+      const cashTotalDiff = current.totals.cash - hTotals.cash;
+      const grandTotalDiff = current.totals.grand_total - hTotals.grand_total;
+      cashTotalDisplay = hTotals.cash !== 0 ? (cashTotalDiff / hTotals.cash) * 100 : null;
+      grandTotalDisplay = hTotals.grand_total !== 0 ? (grandTotalDiff / hTotals.grand_total) * 100 : null;
+    }
+  } else {
+    invTotalDisplay = invTotalDiff;
+    if (!totalsNA) {
+      cashTotalDisplay = current.totals.cash - hTotals.cash;
+      grandTotalDisplay = current.totals.grand_total - hTotals.grand_total;
+    }
+  }
+
+  html += '<tr class="border-t-2 border-brand-300 bg-white">';
+  html += '<td class="py-3 px-3" colspan="2"></td>';
+  html += '<td class="py-3 px-3 text-base text-right font-semibold text-brand-700">Total</td>';
+  html += '<td class="py-3 px-3 text-base text-right font-mono">' + formatDiff(invTotalDisplay, mode) + "</td>";
+  html += '<td class="py-3 px-3"></td>';
+  html += '<td class="py-3 px-3 text-base text-right font-mono">' + (totalsNA ? naHtml : formatDiff(cashTotalDisplay, mode)) + "</td>";
+  html += '<td class="py-3 px-3 text-base text-right font-mono bg-brand-38">' + (totalsNA ? naHtml : formatDiff(grandTotalDisplay, mode)) + "</td>";
   html += '<td colspan="2"></td>';
   html += "</tr>";
 
@@ -2521,8 +2835,15 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   // Summary user selection
   document.getElementById("summary-user-select").addEventListener("change", function () {
+    clearComparison();
     loadSummary();
   });
+
+  // Comparison controls
+  document.getElementById("compare-period-select").addEventListener("change", onComparePeriodChange);
+  document.getElementById("compare-go-btn").addEventListener("click", onCompareGoClick);
+  document.getElementById("compare-clear-btn").addEventListener("click", clearComparison);
+  document.getElementById("difference-mode-select").addEventListener("change", renderDifference);
 
   // Back to summary button
   document.getElementById("back-to-summary-btn").addEventListener("click", backToSummary);

@@ -373,4 +373,37 @@ describe("Portfolio Service - getPortfolioSummaryAtDate", function () {
     expect(msftHolding.rate).toBeCloseTo(1.369, 4);
     expect(msftHolding.value_gbp).toBeCloseTo(16962.2, 0);
   });
+
+  test("returns cash_available true when transactions exist on or before date", function () {
+    // Accounts were created with opening balance deposits (dated today), so
+    // querying at today should find them
+    const result = getPortfolioSummaryAtDate(userId, todayStr);
+    const sipp = result.accounts.find((a) => a.account_type === "sipp");
+    expect(sipp.cash_available).toBe(true);
+    expect(sipp.cash_balance).toBe(23765);
+    expect(sipp.account_total).not.toBeNull();
+  });
+
+  test("returns cash_available false when no transactions before date", function () {
+    // Query a date well before any transactions were created
+    const result = getPortfolioSummaryAtDate(userId, "2000-01-01");
+    const sipp = result.accounts.find((a) => a.account_type === "sipp");
+    expect(sipp.cash_available).toBe(false);
+    expect(sipp.cash_balance).toBeNull();
+    expect(sipp.account_total).toBeNull();
+  });
+
+  test("totals show cash_available false when any account lacks historic cash", function () {
+    const result = getPortfolioSummaryAtDate(userId, "2000-01-01");
+    expect(result.totals.cash_available).toBe(false);
+    expect(result.totals.cash).toBeNull();
+    expect(result.totals.grand_total).toBeNull();
+  });
+
+  test("totals show cash_available true when all accounts have historic cash", function () {
+    const result = getPortfolioSummaryAtDate(userId, todayStr);
+    expect(result.totals.cash_available).toBe(true);
+    expect(result.totals.cash).not.toBeNull();
+    expect(result.totals.grand_total).not.toBeNull();
+  });
 });

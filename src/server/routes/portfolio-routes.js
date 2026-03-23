@@ -9,13 +9,26 @@ import { getAllUsers } from "../db/users-db.js";
 const portfolioRouter = new Router();
 
 // GET /api/portfolio/summary — summaries for ALL users
-portfolioRouter.get("/api/portfolio/summary", function () {
+// Optional query param: ?date=YYYY-MM-DD for historic valuation
+portfolioRouter.get("/api/portfolio/summary", function (request) {
   try {
+    const url = new URL(request.url);
+    const date = url.searchParams.get("date");
+
+    if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid date format — use YYYY-MM-DD" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
     const users = getAllUsers();
     const summaries = [];
 
     for (const user of users) {
-      const summary = getPortfolioSummary(user.id);
+      const summary = date
+        ? getPortfolioSummaryAtDate(user.id, date)
+        : getPortfolioSummary(user.id);
       if (summary) {
         summaries.push(summary);
       }

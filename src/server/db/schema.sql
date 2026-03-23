@@ -146,6 +146,7 @@ CREATE TABLE IF NOT EXISTS cash_transactions (
     transaction_date TEXT NOT NULL,
     amount INTEGER NOT NULL,
     notes TEXT CHECK(notes IS NULL OR length(notes) <= 255),
+    balance_after INTEGER,
     FOREIGN KEY (account_id) REFERENCES accounts(id),
     FOREIGN KEY (holding_movement_id) REFERENCES holding_movements(id)
 );

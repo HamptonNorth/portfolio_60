@@ -62,6 +62,8 @@ export function createCashTransaction(data) {
 
     db.run(`UPDATE accounts SET cash_balance = cash_balance + ? WHERE id = ?`, [balanceChange, data.account_id]);
 
+    recalculateBalanceAfter(data.account_id);
+
     db.exec("COMMIT");
 
     return getCashTransactionById(result.lastInsertRowid);
@@ -80,7 +82,7 @@ export function getCashTransactionById(id) {
   const db = getDatabase();
   const row = db
     .query(
-      `SELECT id, account_id, holding_movement_id, transaction_type, transaction_date, amount, notes
+      `SELECT id, account_id, holding_movement_id, transaction_type, transaction_date, amount, notes, balance_after
        FROM cash_transactions
        WHERE id = ?`,
     )
@@ -100,7 +102,7 @@ export function getCashTransactionsByAccountId(accountId, limit = 50) {
   const db = getDatabase();
   const rows = db
     .query(
-      `SELECT ct.id, ct.account_id, ct.holding_movement_id, ct.transaction_type, ct.transaction_date, ct.amount, ct.notes,
+      `SELECT ct.id, ct.account_id, ct.holding_movement_id, ct.transaction_type, ct.transaction_date, ct.amount, ct.notes, ct.balance_after,
               hm.quantity AS movement_quantity, hm.movement_value AS movement_total_consideration, hm.deductible_costs AS movement_deductible_costs, hm.revised_avg_cost AS movement_revised_avg_cost
        FROM cash_transactions ct
        LEFT JOIN holding_movements hm ON ct.holding_movement_id = hm.id
@@ -138,6 +140,7 @@ export function deleteCashTransaction(id) {
   try {
     db.run("DELETE FROM cash_transactions WHERE id = ?", [id]);
     db.run("UPDATE accounts SET cash_balance = cash_balance + ? WHERE id = ?", [balanceReversal, row.account_id]);
+    recalculateBalanceAfter(row.account_id);
     db.exec("COMMIT");
     return true;
   } catch (err) {
@@ -193,6 +196,67 @@ export function drawdownExistsForDate(accountId, transactionDate) {
 }
 
 /**
+ * @description Recalculate the balance_after column for all cash transactions
+ * in a given account. Walks backwards from the current account balance,
+ * setting each transaction's balance_after to the running total.
+ *
+ * Must be called inside an existing database transaction (no own BEGIN/COMMIT).
+ *
+ * @param {number} accountId - The account ID to recalculate
+ */
+function recalculateBalanceAfter(accountId) {
+  const db = getDatabase();
+
+  // Get the current account balance
+  const account = db.query("SELECT cash_balance FROM accounts WHERE id = ?").get(accountId);
+  if (!account) return;
+
+  // Get all transactions ordered newest-first
+  const txns = db.query(
+    "SELECT id, transaction_type, amount, notes FROM cash_transactions WHERE account_id = ? ORDER BY transaction_date DESC, id DESC"
+  ).all(accountId);
+
+  if (txns.length === 0) return;
+
+  // Walk backwards from the known current balance
+  let runningBalance = account.cash_balance;
+  for (let i = 0; i < txns.length; i++) {
+    const txn = txns[i];
+    db.run("UPDATE cash_transactions SET balance_after = ? WHERE id = ?", [runningBalance, txn.id]);
+
+    // Subtract this transaction's effect to get the balance before it
+    const isCreditAdj = txn.transaction_type === "adjustment" && txn.notes && txn.notes.startsWith("[Credit]");
+    const addsToBalance = txn.transaction_type === "deposit" || txn.transaction_type === "sell" || isCreditAdj;
+    if (addsToBalance) {
+      runningBalance -= txn.amount;
+    } else {
+      runningBalance += txn.amount;
+    }
+  }
+}
+
+/**
+ * @description Get the cash balance for an account at a specific historic date.
+ * Looks up the most recent balance_after value on or before the given date.
+ *
+ * @param {number} accountId - The account ID
+ * @param {string} date - ISO-8601 date (YYYY-MM-DD)
+ * @returns {number|null} The unscaled cash balance, or null if no transactions exist on or before that date
+ */
+export function getCashBalanceAtDate(accountId, date) {
+  const db = getDatabase();
+  const row = db.query(
+    `SELECT balance_after FROM cash_transactions
+     WHERE account_id = ? AND transaction_date <= ?
+     ORDER BY transaction_date DESC, id DESC
+     LIMIT 1`
+  ).get(accountId, date);
+
+  if (!row) return null;
+  return unscaleCashAmount(row.balance_after);
+}
+
+/**
  * @description Convert a raw database row to an object with unscaled amount.
  * @param {Object} row - The raw database row
  * @returns {Object} Row with amount as a decimal
@@ -207,6 +271,7 @@ function unscaleTransactionRow(row) {
     amount: unscaleCashAmount(row.amount),
     amount_scaled: row.amount,
     notes: row.notes,
+    balance_after: row.balance_after != null ? unscaleCashAmount(row.balance_after) : null,
   };
 
   // Include holding movement details when available (buy/sell transactions)

@@ -6,7 +6,7 @@ import { existsSync, unlinkSync } from "node:fs";
 import { createDatabase, closeDatabase, getDatabasePath } from "../../src/server/db/connection.js";
 import { createUser } from "../../src/server/db/users-db.js";
 import { createAccount, getAccountById } from "../../src/server/db/accounts-db.js";
-import { createCashTransaction, getCashTransactionById, getCashTransactionsByAccountId, deleteCashTransaction, getIsaDepositsForTaxYear, drawdownExistsForDate, scaleCashAmount, unscaleCashAmount } from "../../src/server/db/cash-transactions-db.js";
+import { createCashTransaction, getCashTransactionById, getCashTransactionsByAccountId, deleteCashTransaction, getIsaDepositsForTaxYear, drawdownExistsForDate, getCashBalanceAtDate, scaleCashAmount, unscaleCashAmount } from "../../src/server/db/cash-transactions-db.js";
 
 const testDbPath = getDatabasePath();
 
@@ -466,5 +466,119 @@ describe("drawdownExistsForDate", () => {
   test("returns false for different account", () => {
     const exists = drawdownExistsForDate(isaAccount.id, "2026-02-01");
     expect(exists).toBe(false);
+  });
+});
+
+// --- balance_after on transactions ---
+
+describe("balance_after", () => {
+  test("createCashTransaction sets balance_after on returned row", () => {
+    // ISA account has: opening balance (5000) + deposit 4500 + deposit 3000 + withdrawal 200
+    // Current balance = 5000 + 4500 + 3000 - 200 = 12300
+    const txList = getCashTransactionsByAccountId(isaAccount.id);
+    // All transactions should have a balance_after value
+    for (const tx of txList) {
+      expect(tx.balance_after).not.toBeNull();
+    }
+  });
+
+  test("balance_after reflects running total for newest transaction", () => {
+    // The newest transaction's balance_after should equal the current account balance
+    const txList = getCashTransactionsByAccountId(isaAccount.id);
+    const account = getAccountById(isaAccount.id);
+    expect(txList[0].balance_after).toBe(account.cash_balance);
+  });
+});
+
+// --- getCashBalanceAtDate ---
+
+describe("getCashBalanceAtDate", () => {
+  /** @type {Object} Separate user for balance history tests */
+  let histUser;
+  /** @type {Object} Account for balance history tests */
+  let histAccount;
+
+  beforeAll(() => {
+    histUser = createUser({
+      initials: "HT",
+      first_name: "History",
+      last_name: "Tester",
+      provider: "hl",
+    });
+    histAccount = createAccount({
+      user_id: histUser.id,
+      account_type: "trading",
+      account_ref: "HIST-001",
+      cash_balance: 0,
+      warn_cash: 0,
+    });
+
+    // Create a series of transactions on known dates
+    createCashTransaction({
+      account_id: histAccount.id,
+      transaction_type: "deposit",
+      transaction_date: "2025-06-01",
+      amount: 10000,
+    });
+    createCashTransaction({
+      account_id: histAccount.id,
+      transaction_type: "deposit",
+      transaction_date: "2025-09-01",
+      amount: 5000,
+    });
+    createCashTransaction({
+      account_id: histAccount.id,
+      transaction_type: "withdrawal",
+      transaction_date: "2025-12-01",
+      amount: 3000,
+    });
+    // Final balance: 10000 + 5000 - 3000 = 12000
+  });
+
+  test("returns null before any transactions exist", () => {
+    const balance = getCashBalanceAtDate(histAccount.id, "2025-01-01");
+    expect(balance).toBeNull();
+  });
+
+  test("returns correct balance after first deposit", () => {
+    const balance = getCashBalanceAtDate(histAccount.id, "2025-06-15");
+    expect(balance).toBe(10000);
+  });
+
+  test("returns correct balance between transactions", () => {
+    const balance = getCashBalanceAtDate(histAccount.id, "2025-10-15");
+    expect(balance).toBe(15000);
+  });
+
+  test("returns correct balance after all transactions", () => {
+    const balance = getCashBalanceAtDate(histAccount.id, "2026-01-01");
+    expect(balance).toBe(12000);
+  });
+
+  test("returns null for account with no transactions", () => {
+    const emptyAccount = createAccount({
+      user_id: histUser.id,
+      account_type: "isa",
+      account_ref: "HIST-002",
+      cash_balance: 0,
+      warn_cash: 0,
+    });
+    const balance = getCashBalanceAtDate(emptyAccount.id, "2026-01-01");
+    expect(balance).toBeNull();
+  });
+
+  test("balance_after values are recalculated after delete", () => {
+    // Delete the September deposit (5000) — balance should recalculate
+    const txList = getCashTransactionsByAccountId(histAccount.id);
+    const septTx = txList.find((t) => t.transaction_date === "2025-09-01");
+    deleteCashTransaction(septTx.id);
+
+    // After deleting the 5000 deposit: 10000 - 3000 = 7000
+    const balance = getCashBalanceAtDate(histAccount.id, "2026-01-01");
+    expect(balance).toBe(7000);
+
+    // Balance between June and December should be just the first deposit
+    const midBalance = getCashBalanceAtDate(histAccount.id, "2025-10-15");
+    expect(midBalance).toBe(10000);
   });
 });

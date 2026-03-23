@@ -655,6 +655,50 @@ function runMigrations(database) {
     database.exec("ALTER TABLE investments RENAME COLUMN auto_scrape TO auto_fetch");
   }
 
+  // Migration 26: Add balance_after to cash_transactions (v0.19.0)
+  // Stores the running account balance after each transaction, enabling
+  // historic cash balance lookups via getCashBalanceAtDate().
+  const cashTxCols26 = database.query("PRAGMA table_info(cash_transactions)").all();
+  const hasBalanceAfter = cashTxCols26.some(function (col) {
+    return col.name === "balance_after";
+  });
+
+  if (!hasBalanceAfter) {
+    database.exec("ALTER TABLE cash_transactions ADD COLUMN balance_after INTEGER");
+
+    // Backfill: for each account, walk backwards from the current balance
+    const accountRows = database.query("SELECT id, cash_balance FROM accounts").all();
+    for (const acct of accountRows) {
+      // Get all transactions for this account ordered newest-first
+      const txns = database.query(
+        "SELECT id, transaction_type, amount, notes FROM cash_transactions WHERE account_id = ? ORDER BY transaction_date DESC, id DESC"
+      ).all(acct.id);
+
+      if (txns.length === 0) continue;
+
+      // Start from the known current balance and walk backwards
+      let runningBalance = acct.cash_balance;
+      for (let i = 0; i < txns.length; i++) {
+        const txn = txns[i];
+        // Set this transaction's balance_after to the running balance
+        database.run(
+          "UPDATE cash_transactions SET balance_after = ? WHERE id = ?",
+          [runningBalance, txn.id]
+        );
+
+        // Subtract this transaction's effect to get the balance before it
+        // Deposits, sells, and credit adjustments ADD to balance; everything else SUBTRACTS
+        const isCreditAdj = txn.transaction_type === "adjustment" && txn.notes && txn.notes.startsWith("[Credit]");
+        const addsToBalance = txn.transaction_type === "deposit" || txn.transaction_type === "sell" || isCreditAdj;
+        if (addsToBalance) {
+          runningBalance -= txn.amount;
+        } else {
+          runningBalance += txn.amount;
+        }
+      }
+    }
+  }
+
   // Migration 25: Add SCD2 temporal columns to holdings (effective_from, effective_to)
   // Enables historic portfolio composition tracking — each row represents a holding
   // state for a date range. The UNIQUE constraint changes from (account_id, investment_id)

@@ -24,9 +24,41 @@
 
                 <div id="summary-messages"></div>
 
+                <!-- Compare with controls -->
+                <div id="comparison-controls" class="mb-6 flex items-center gap-4 flex-wrap">
+                    <label class="text-base font-medium text-brand-700">Compare with</label>
+                    <select id="compare-period-select" class="px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white">
+                        <option value="">Select period...</option>
+                        <option value="1">1 month ago</option>
+                        <option value="3">3 months ago</option>
+                        <option value="6">6 months ago</option>
+                        <option value="12">12 months ago</option>
+                        <option value="24">24 months ago</option>
+                        <option value="36">36 months ago</option>
+                        <option value="custom">Choose date...</option>
+                    </select>
+                    <input type="date" id="compare-date-picker" class="hidden px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white" />
+                    <button id="compare-go-btn" class="hidden bg-brand-700 hover:bg-brand-800 text-white font-medium px-5 py-2 rounded-lg transition-colors">Compare</button>
+                    <button id="compare-clear-btn" class="hidden bg-brand-100 hover:bg-brand-200 text-brand-700 font-medium px-4 py-2 rounded-lg transition-colors">Clear</button>
+                </div>
+
+                <!-- Historic comparison summary (shown first when active) -->
+                <div id="comparison-container" class="hidden"></div>
+
+                <!-- Current summary (always shown) -->
                 <div id="summary-container">
                     <p class="text-brand-500">Loading portfolio summary...</p>
                 </div>
+
+                <!-- Difference summary (shown below both when comparison active) -->
+                <div id="difference-controls" class="hidden mt-4 mb-4 flex items-center gap-4">
+                    <h3 class="text-lg font-semibold text-brand-800">Difference</h3>
+                    <select id="difference-mode-select" class="px-3 py-2 border border-brand-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white">
+                        <option value="value">Show value change</option>
+                        <option value="percent">Show % change</option>
+                    </select>
+                </div>
+                <div id="difference-container" class="hidden"></div>
             </div>
 
             <!-- View 3: Holdings Detail (drill-down from summary) -->

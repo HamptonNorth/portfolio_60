@@ -193,13 +193,13 @@ SELECT 6,  3,   4900000, 352800, date('now', '-36 months');
 -- CASH TRANSACTIONS — Opening balance deposits
 -- ============================================================================
 
-INSERT INTO cash_transactions (account_id, transaction_type, transaction_date, amount, notes) VALUES
-    (1, 'adjustment', '2026-03-02', 48500000, 'Opening balance'),
-    (2, 'adjustment', '2026-03-02',  9857500, 'Opening balance'),
-    (3, 'adjustment', '2026-03-02', 17500000, 'Opening balance'),
-    (4, 'adjustment', '2026-03-02', 36540000, 'Opening balance'),
-    (5, 'adjustment', '2026-03-02',  2140000, 'Opening balance'),
-    (6, 'adjustment', '2026-03-02',  7880000, 'Opening balance');
+INSERT INTO cash_transactions (account_id, transaction_type, transaction_date, amount, notes, balance_after) VALUES
+    (1, 'adjustment', '2026-03-02', 48500000, 'Opening balance', 48500000),
+    (2, 'adjustment', '2026-03-02',  9857500, 'Opening balance',  9857500),
+    (3, 'adjustment', '2026-03-02', 17500000, 'Opening balance', 17500000),
+    (4, 'adjustment', '2026-03-02', 36540000, 'Opening balance', 36540000),
+    (5, 'adjustment', '2026-03-02',  2140000, 'Opening balance',  2140000),
+    (6, 'adjustment', '2026-03-02',  7880000, 'Opening balance',  7880000);
 
 -- ============================================================================
 -- OTHER ASSETS
