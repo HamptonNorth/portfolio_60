@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* Comparison block accent colours — used by JS-generated summary blocks.
+   Tailwind v4 cannot detect classes set via string concatenation in JS,
+   so these are defined manually. */
+.border-l-amber-400 { border-left-color: var(--color-amber-400); }
+.border-amber-300 { border-color: var(--color-amber-300); }
+.border-l-slate-400 { border-left-color: var(--color-slate-400); }
+.border-slate-300 { border-color: var(--color-slate-300); }
+.border-l-blue-400 { border-left-color: var(--color-blue-400); }
+.border-blue-300 { border-color: var(--color-blue-300); }
+
 /*
  * Portfolio 60 — custom styles
  * Light theme, financial application colour palette

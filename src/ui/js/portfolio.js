@@ -154,6 +154,8 @@ async function loadSummary() {
 
   let html = "";
   for (const summary of summaries) {
+    // Skip users with no accounts (e.g. Joint Household) — nothing to show
+    if (summary.accounts.length === 0) continue;
     html += renderUserSummary(summary);
   }
   container.innerHTML = html;
@@ -195,14 +197,14 @@ function renderUserSummary(summary) {
     const totalDisplay = cashNA ? '<span class="text-brand-400">N/A</span>' : formatGBPWhole(acct.account_total);
 
     html += '<tr class="' + rowClass + ' border-b border-brand-100">';
-    html += '<td class="py-3 px-3 text-base font-semibold text-brand-700 w-24">' + formatAccountType(acct.account_type) + "</td>";
-    html += '<td class="py-3 px-3 text-base text-brand-600">Account ' + escapeHtml(acct.account_ref) + "</td>";
-    html += '<td class="py-3 px-3 text-base text-right text-brand-500">Investments</td>';
-    html += '<td class="py-3 px-3 text-base text-right font-mono w-32">' + formatGBPWhole(acct.investments_total) + "</td>";
-    html += '<td class="py-3 px-3 text-base text-right text-brand-500">Cash</td>';
-    html += '<td class="py-3 px-3 text-base text-right font-mono w-28">' + cashDisplay + "</td>";
-    html += '<td class="py-3 px-3 text-base text-right font-mono w-32 bg-brand-38">' + totalDisplay + "</td>";
-    html += '<td class="py-3 px-3 text-base">' + cashWarningHtml + "</td>";
+    html += '<td class="py-3 px-3 text-sm font-semibold text-brand-700 w-24">' + formatAccountType(acct.account_type) + "</td>";
+    html += '<td class="py-3 px-3 text-sm text-brand-600">Account ' + escapeHtml(acct.account_ref) + "</td>";
+    html += '<td class="py-3 px-3 text-sm text-right text-brand-500">Investments</td>';
+    html += '<td class="py-3 px-3 text-sm text-right font-mono w-32">' + formatGBPWhole(acct.investments_total) + "</td>";
+    html += '<td class="py-3 px-3 text-sm text-right text-brand-500">Cash</td>';
+    html += '<td class="py-3 px-3 text-sm text-right font-mono w-28">' + cashDisplay + "</td>";
+    html += '<td class="py-3 px-3 text-sm text-right font-mono w-32 bg-brand-38">' + totalDisplay + "</td>";
+    html += '<td class="py-3 px-3 text-sm">' + cashWarningHtml + "</td>";
     html += '<td class="py-3 px-3 text-right">';
     html += '<button class="bg-brand-100 hover:bg-brand-200 text-brand-700 text-sm font-medium px-3 py-1 rounded transition-colors" ';
     html += "onclick=\"showDetail('" + user.id + "', '" + acct.id + "')\">View</button>";
@@ -217,11 +219,11 @@ function renderUserSummary(summary) {
 
   html += '<tr class="border-t-2 border-brand-300 bg-white">';
   html += '<td class="py-3 px-3" colspan="2"></td>';
-  html += '<td class="py-3 px-3 text-base text-right font-semibold text-brand-700">Total</td>';
-  html += '<td class="py-3 px-3 text-base text-right font-mono">' + formatGBPWhole(summary.totals.investments) + "</td>";
+  html += '<td class="py-3 px-3 text-sm text-right font-semibold text-brand-700">Total</td>';
+  html += '<td class="py-3 px-3 text-sm text-right font-mono">' + formatGBPWhole(summary.totals.investments) + "</td>";
   html += '<td class="py-3 px-3"></td>';
-  html += '<td class="py-3 px-3 text-base text-right font-mono">' + totalsCashDisplay + "</td>";
-  html += '<td class="py-3 px-3 text-base text-right font-mono bg-brand-38">' + totalsGrandDisplay + "</td>";
+  html += '<td class="py-3 px-3 text-sm text-right font-mono">' + totalsCashDisplay + "</td>";
+  html += '<td class="py-3 px-3 text-sm text-right font-mono bg-brand-38">' + totalsGrandDisplay + "</td>";
   html += '<td colspan="2"></td>';
   html += "</tr>";
 
@@ -279,25 +281,42 @@ function onCompareGoClick() {
 }
 
 /**
- * @description Add a heading above the current summary block when comparison is active.
- * This labels the current block as "Portfolio valuation using latest prices".
+ * @description Add a styled wrapper and heading around the current summary block
+ * when comparison is active. Uses a blue left border and top/bottom heading stripes
+ * to distinguish it from the historic (amber) and difference (slate) blocks.
  */
 function addCurrentSummaryHeading() {
   removeCurrentSummaryHeading();
-  const heading = document.createElement("h3");
-  heading.id = "current-summary-heading";
-  heading.className = "text-lg font-semibold text-brand-800 mb-4 mt-2";
-  heading.textContent = "Portfolio valuation using latest prices";
   const container = document.getElementById("summary-container");
-  container.parentNode.insertBefore(heading, container);
+
+  // Create wrapper with left border
+  const wrapper = document.createElement("div");
+  wrapper.id = "current-summary-wrapper";
+  wrapper.className = "border-l-4 border-l-blue-400 pl-4 mb-6";
+
+  // Create heading with top/bottom stripes
+  const heading = document.createElement("h3");
+  heading.className = "text-lg font-semibold text-brand-800 mb-4 py-2 border-y-4 border-blue-300";
+  heading.textContent = "Portfolio valuation using latest prices";
+
+  // Wrap the container contents
+  container.parentNode.insertBefore(wrapper, container);
+  wrapper.appendChild(heading);
+  wrapper.appendChild(container);
 }
 
 /**
- * @description Remove the current summary heading (when comparison is cleared).
+ * @description Remove the current summary wrapper and heading (when comparison is cleared).
+ * Restores the summary container to its original position in the DOM.
  */
 function removeCurrentSummaryHeading() {
-  const existing = document.getElementById("current-summary-heading");
-  if (existing) existing.remove();
+  const wrapper = document.getElementById("current-summary-wrapper");
+  if (!wrapper) return;
+
+  const container = document.getElementById("summary-container");
+  // Move summary container back out of the wrapper
+  wrapper.parentNode.insertBefore(container, wrapper);
+  wrapper.remove();
 }
 
 /**
@@ -307,7 +326,6 @@ function clearComparison() {
   comparisonData = null;
   document.getElementById("comparison-container").classList.add("hidden");
   document.getElementById("comparison-container").innerHTML = "";
-  document.getElementById("difference-controls").classList.add("hidden");
   document.getElementById("difference-container").classList.add("hidden");
   document.getElementById("difference-container").innerHTML = "";
   document.getElementById("compare-clear-btn").classList.add("hidden");
@@ -341,11 +359,15 @@ async function loadComparison(date) {
   comparisonData = summaries;
 
   // Render historic summary block (shown first — "what was my portfolio worth then?")
+  // Skip users with no accounts (e.g. Joint Household) — they add no value here
   const historicDateStr = formatDateUK(date);
-  let html = '<h3 class="text-lg font-semibold text-brand-800 mb-4">Portfolio valuation at ' + escapeHtml(historicDateStr) + '</h3>';
+  let html = '<div class="border-l-4 border-l-amber-400 pl-4 mb-6">';
+  html += '<h3 class="text-lg font-semibold text-brand-800 mb-4 py-2 border-y-4 border-amber-300">Portfolio valuation at ' + escapeHtml(historicDateStr) + '</h3>';
   for (const summary of summaries) {
+    if (summary.accounts.length === 0) continue;
     html += renderUserSummary(summary);
   }
+  html += '</div>';
   const compContainer = document.getElementById("comparison-container");
   compContainer.innerHTML = html;
   compContainer.classList.remove("hidden");
@@ -356,30 +378,33 @@ async function loadComparison(date) {
   // Show clear button
   document.getElementById("compare-clear-btn").classList.remove("hidden");
 
-  // Show and render difference
-  document.getElementById("difference-controls").classList.remove("hidden");
+  // Render difference block
   renderDifference();
 }
 
 /**
  * @description Render the difference block comparing current summaryData with comparisonData.
- * Uses the currently selected difference mode (value or %).
+ * Shows both value and percentage change in each row.
  */
 function renderDifference() {
   if (!summaryData || !comparisonData) return;
 
-  const mode = document.getElementById("difference-mode-select").value;
   const container = document.getElementById("difference-container");
-  let html = "";
+  let html = '<div class="border-l-4 border-l-slate-400 pl-4 mb-6">';
+  html += '<h3 class="text-lg font-semibold text-brand-800 mb-4 py-2 border-y-4 border-slate-300">Difference</h3>';
 
   for (const current of summaryData) {
+    // Skip users with no accounts (e.g. Joint Household)
+    if (current.accounts.length === 0) continue;
+
     const historic = comparisonData.find(function (h) {
       return h.user.id === current.user.id;
     });
 
-    html += renderUserDifference(current, historic || null, mode);
+    html += renderUserDifference(current, historic || null);
   }
 
+  html += '</div>';
   container.innerHTML = html;
   container.classList.remove("hidden");
 }
@@ -417,13 +442,41 @@ function formatDiff(diff, mode) {
 }
 
 /**
+ * @description Format both a value difference and its percentage for a single cell.
+ * Shows the value change on the first line and the percentage below in smaller text.
+ * @param {number} valueDiff - The absolute difference
+ * @param {number} baseValue - The historic value (used to calculate %)
+ * @returns {string} HTML string with both value and percentage
+ */
+function formatDiffBoth(valueDiff, baseValue) {
+  if (valueDiff === null || isNaN(valueDiff) || !isFinite(valueDiff)) {
+    return '<span class="text-brand-400">n/a</span>';
+  }
+
+  const valueHtml = formatDiff(valueDiff, "value");
+
+  // Calculate percentage — brackets coloured to match the value
+  let pctHtml;
+  if (baseValue === 0 || baseValue === null) {
+    pctHtml = '<span class="text-brand-400 text-sm">(n/a)</span>';
+  } else {
+    const pct = (valueDiff / baseValue) * 100;
+    const colourClass = pct > 0 ? "text-green-700" : pct < 0 ? "text-red-600" : "text-brand-400";
+    const sign = pct > 0 ? "+" : "";
+    pctHtml = '<span class="text-sm ' + colourClass + '">(' + sign + pct.toFixed(1) + '%)</span>';
+  }
+
+  return '<span class="whitespace-nowrap">' + valueHtml + ' ' + pctHtml + '</span>';
+}
+
+/**
  * @description Render the difference table for a single user.
+ * Shows both value and percentage change in each row.
  * @param {Object} current - Current portfolio summary
  * @param {Object|null} historic - Historic portfolio summary (may be null if user didn't exist then)
- * @param {string} mode - "value" or "percent"
  * @returns {string} HTML string
  */
-function renderUserDifference(current, historic, mode) {
+function renderUserDifference(current, historic) {
   const user = current.user;
   const currentDate = formatDateUK(current.valuation_date);
   const historicDate = historic ? formatDateUK(historic.valuation_date) : "n/a";
@@ -445,6 +498,7 @@ function renderUserDifference(current, historic, mode) {
   html += "<tbody>";
 
   let anyNA = false;
+  const naHtml = '<span class="text-brand-400">N/A</span>';
 
   for (let i = 0; i < current.accounts.length; i++) {
     const acct = current.accounts[i];
@@ -457,42 +511,23 @@ function renderUserDifference(current, historic, mode) {
     if (cashUnavailable) anyNA = true;
 
     const invDiff = hAcct ? acct.investments_total - hAcct.investments_total : null;
+    const invBase = hAcct ? hAcct.investments_total : null;
     const cashDiff = (!cashUnavailable && hAcct) ? acct.cash_balance - hAcct.cash_balance : null;
+    const cashBase = (!cashUnavailable && hAcct) ? hAcct.cash_balance : null;
     const totalDiff = (!cashUnavailable && hAcct) ? acct.account_total - hAcct.account_total : null;
-
-    let invDisplay, cashDisplay, totalDisplay;
-    if (cashUnavailable) {
-      // N/A for cash and total
-      cashDisplay = null;
-      totalDisplay = null;
-    }
-    if (mode === "percent") {
-      invDisplay = hAcct && hAcct.investments_total !== 0 ? (invDiff / hAcct.investments_total) * 100 : null;
-      if (!cashUnavailable) {
-        cashDisplay = hAcct && hAcct.cash_balance !== 0 ? (cashDiff / hAcct.cash_balance) * 100 : null;
-        totalDisplay = hAcct && hAcct.account_total !== 0 ? (totalDiff / hAcct.account_total) * 100 : null;
-      }
-    } else {
-      invDisplay = invDiff;
-      if (!cashUnavailable) {
-        cashDisplay = cashDiff;
-        totalDisplay = totalDiff;
-      }
-    }
-
-    // For N/A display, use a specific string instead of formatDiff
-    const naHtml = '<span class="text-brand-400">N/A</span>';
+    const totalBase = (!cashUnavailable && hAcct) ? hAcct.account_total : null;
 
     const rowClass = i % 2 === 0 ? "bg-white" : "bg-brand-50";
     html += '<tr class="' + rowClass + ' border-b border-brand-100">';
-    html += '<td class="py-3 px-3 text-base font-semibold text-brand-700 w-24">' + formatAccountType(acct.account_type) + "</td>";
-    html += '<td class="py-3 px-3 text-base text-brand-600">Account ' + escapeHtml(acct.account_ref) + "</td>";
-    html += '<td class="py-3 px-3 text-base text-right text-brand-500">Investments</td>';
-    html += '<td class="py-3 px-3 text-base text-right font-mono w-32">' + formatDiff(invDisplay, mode) + "</td>";
-    html += '<td class="py-3 px-3 text-base text-right text-brand-500">Cash</td>';
-    html += '<td class="py-3 px-3 text-base text-right font-mono w-28">' + (cashUnavailable ? naHtml : formatDiff(cashDisplay, mode)) + "</td>";
-    html += '<td class="py-3 px-3 text-base text-right font-mono w-32 bg-brand-38">' + (cashUnavailable ? naHtml : formatDiff(totalDisplay, mode)) + "</td>";
-    html += '<td colspan="2"></td>';
+    html += '<td class="py-3 px-3 text-sm font-semibold text-brand-700 w-24">' + formatAccountType(acct.account_type) + "</td>";
+    html += '<td class="py-3 px-3 text-sm text-brand-600">Account ' + escapeHtml(acct.account_ref) + "</td>";
+    html += '<td class="py-3 px-3 text-sm text-right text-brand-500">Investments</td>';
+    html += '<td class="py-3 px-3 text-sm text-right font-mono w-32">' + formatDiffBoth(invDiff, invBase) + "</td>";
+    html += '<td class="py-3 px-3 text-sm text-right text-brand-500">Cash</td>';
+    html += '<td class="py-3 px-3 text-sm text-right font-mono w-28">' + (cashUnavailable ? naHtml : formatDiffBoth(cashDiff, cashBase)) + "</td>";
+    html += '<td class="py-3 px-3 text-sm text-right font-mono w-32 bg-brand-38">' + (cashUnavailable ? naHtml : formatDiffBoth(totalDiff, totalBase)) + "</td>";
+    html += '<td class="py-3 px-3"></td>';
+    html += '<td class="py-3 px-3 w-16"></td>';
     html += "</tr>";
   }
 
@@ -500,34 +535,28 @@ function renderUserDifference(current, historic, mode) {
   const hTotals = historic.totals;
   const totalsNA = anyNA || current.totals.cash_available === false || hTotals.cash_available === false;
   const invTotalDiff = current.totals.investments - hTotals.investments;
+  const invTotalBase = hTotals.investments;
 
-  let invTotalDisplay, cashTotalDisplay, grandTotalDisplay;
-  const naHtml = '<span class="text-brand-400">N/A</span>';
-
-  if (mode === "percent") {
-    invTotalDisplay = hTotals.investments !== 0 ? (invTotalDiff / hTotals.investments) * 100 : null;
-    if (!totalsNA) {
-      const cashTotalDiff = current.totals.cash - hTotals.cash;
-      const grandTotalDiff = current.totals.grand_total - hTotals.grand_total;
-      cashTotalDisplay = hTotals.cash !== 0 ? (cashTotalDiff / hTotals.cash) * 100 : null;
-      grandTotalDisplay = hTotals.grand_total !== 0 ? (grandTotalDiff / hTotals.grand_total) * 100 : null;
-    }
-  } else {
-    invTotalDisplay = invTotalDiff;
-    if (!totalsNA) {
-      cashTotalDisplay = current.totals.cash - hTotals.cash;
-      grandTotalDisplay = current.totals.grand_total - hTotals.grand_total;
-    }
+  let cashTotalDiff = null;
+  let cashTotalBase = null;
+  let grandTotalDiff = null;
+  let grandTotalBase = null;
+  if (!totalsNA) {
+    cashTotalDiff = current.totals.cash - hTotals.cash;
+    cashTotalBase = hTotals.cash;
+    grandTotalDiff = current.totals.grand_total - hTotals.grand_total;
+    grandTotalBase = hTotals.grand_total;
   }
 
   html += '<tr class="border-t-2 border-brand-300 bg-white">';
   html += '<td class="py-3 px-3" colspan="2"></td>';
-  html += '<td class="py-3 px-3 text-base text-right font-semibold text-brand-700">Total</td>';
-  html += '<td class="py-3 px-3 text-base text-right font-mono">' + formatDiff(invTotalDisplay, mode) + "</td>";
+  html += '<td class="py-3 px-3 text-sm text-right font-semibold text-brand-700">Total</td>';
+  html += '<td class="py-3 px-3 text-sm text-right font-mono">' + formatDiffBoth(invTotalDiff, invTotalBase) + "</td>";
   html += '<td class="py-3 px-3"></td>';
-  html += '<td class="py-3 px-3 text-base text-right font-mono">' + (totalsNA ? naHtml : formatDiff(cashTotalDisplay, mode)) + "</td>";
-  html += '<td class="py-3 px-3 text-base text-right font-mono bg-brand-38">' + (totalsNA ? naHtml : formatDiff(grandTotalDisplay, mode)) + "</td>";
-  html += '<td colspan="2"></td>';
+  html += '<td class="py-3 px-3 text-sm text-right font-mono">' + (totalsNA ? naHtml : formatDiffBoth(cashTotalDiff, cashTotalBase)) + "</td>";
+  html += '<td class="py-3 px-3 text-sm text-right font-mono bg-brand-38">' + (totalsNA ? naHtml : formatDiffBoth(grandTotalDiff, grandTotalBase)) + "</td>";
+  html += '<td class="py-3 px-3"></td>';
+  html += '<td class="py-3 px-3 w-16"></td>';
   html += "</tr>";
 
   html += "</tbody></table></div></div>";
@@ -2843,7 +2872,6 @@ document.addEventListener("DOMContentLoaded", async function () {
   document.getElementById("compare-period-select").addEventListener("change", onComparePeriodChange);
   document.getElementById("compare-go-btn").addEventListener("click", onCompareGoClick);
   document.getElementById("compare-clear-btn").addEventListener("click", clearComparison);
-  document.getElementById("difference-mode-select").addEventListener("change", renderDifference);
 
   // Back to summary button
   document.getElementById("back-to-summary-btn").addEventListener("click", backToSummary);
