@@ -986,6 +986,15 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
     for (var p = 0; p < resolvedParams.length; p++) {
       var entry = resolvedParams[p].trim();
 
+      // "new_page" forces a page break and redraws the page header
+      if (entry === "new_page") {
+        page = pdf.addPage({ size: "a4", orientation: "portrait" });
+        pages.push(page);
+        if (ctx.pageWidths) ctx.pageWidths.push(USABLE_WIDTH);
+        y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_HEIGHT, MARGIN_TOP, fonts);
+        continue;
+      }
+
       if (entry.indexOf("+") !== -1) {
         // Combined section
         var parts = entry.split("+");
