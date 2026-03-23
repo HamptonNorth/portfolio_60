@@ -260,10 +260,11 @@
   {
     "id": "ex8b_portfolio_value_gbp",
     "title": "8b: Portfolio Value (£ GBP)",
-    "subTitle": "12 month account values",
+    "subTitle": "36 month account values",
     "pdfEndpoint": "/api/reports/pdf/portfolio-value-chart",
-    "monthsToShow": "12",
+    "monthsToShow": "36",
     "smooth": true,
+    "showGlobalEvents": true,
     "showPercentOrValue": "value",
     "params": [
       "USER1:isa+sipp+trading",

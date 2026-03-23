@@ -255,7 +255,7 @@ class AppNavbar extends LitElement {
         if (report.blocks && Array.isArray(report.blocks)) {
           // Composite report: link to the compositor endpoint
           link.href = "/api/reports/pdf/composite?id=" + encodeURIComponent(report.id);
-        } else if (report.pdfEndpoint && report.pdfEndpoint.indexOf("/chart") !== -1) {
+        } else if (report.pdfEndpoint && (report.pdfEndpoint.indexOf("/chart") !== -1 || report.pdfEndpoint.indexOf("-chart") !== -1)) {
           // Chart report: server looks up full definition by ID
           link.href = report.pdfEndpoint + "?id=" + encodeURIComponent(report.id);
         } else if (report.pdfEndpoint) {

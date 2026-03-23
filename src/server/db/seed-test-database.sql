@@ -234,4 +234,4 @@ INSERT INTO report_params (param_key, param_value) VALUES
 -- ============================================================================
 INSERT INTO global_events (event_date, description) VALUES
     ('2025-04-01', 'US Tarrifs start'),
-    ('0206-03-01', 'Iran conflict');
+    ('2026-03-01', 'Iran conflict');
