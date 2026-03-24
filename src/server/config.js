@@ -3,6 +3,72 @@ import { resolve, join } from "node:path";
 import { DATA_DIR } from "../shared/server-constants.js";
 
 /**
+ * @description Check whether a value is a plain object (not an array, not null).
+ * Used by deepMerge to decide whether to recurse.
+ * @param {*} val - The value to check
+ * @returns {boolean} True if val is a plain object
+ */
+function isPlainObject(val) {
+  return typeof val === "object" && val !== null && !Array.isArray(val);
+}
+
+/**
+ * @description Deep-merge two plain objects. For each key, if both the base
+ * and override values are plain objects (not arrays, not null), recurse.
+ * Otherwise the override value wins. Keys present only in override are kept.
+ * Arrays are replaced entirely by the override value (not merged element-by-element).
+ * @param {Object} base - The base/default object
+ * @param {Object} override - The user override object
+ * @returns {Object} A new merged object
+ */
+function deepMerge(base, override) {
+  var result = {};
+
+  // Start with all base keys
+  var baseKeys = Object.keys(base);
+  for (var i = 0; i < baseKeys.length; i++) {
+    var key = baseKeys[i];
+    if (key in override) {
+      if (isPlainObject(base[key]) && isPlainObject(override[key])) {
+        result[key] = deepMerge(base[key], override[key]);
+      } else {
+        result[key] = override[key];
+      }
+    } else {
+      result[key] = base[key];
+    }
+  }
+
+  // Carry over any keys only in override
+  var overrideKeys = Object.keys(override);
+  for (var j = 0; j < overrideKeys.length; j++) {
+    var oKey = overrideKeys[j];
+    if (!(oKey in result)) {
+      result[oKey] = override[oKey];
+    }
+  }
+
+  return result;
+}
+
+/**
+ * @description Load the repo-bundled default user-settings.json.
+ * This is the template shipped with the application source code.
+ * New config keys added here automatically appear for existing users
+ * via the deep-merge in loadConfig().
+ * @returns {Object} Parsed JSON from src/shared/user-settings.json, or empty object on failure
+ */
+function getRepoDefaultConfig() {
+  try {
+    var repoPath = resolve("src/shared/user-settings.json");
+    var raw = readFileSync(repoPath, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+/**
  * @description Default configuration values. Used when keys are missing
  * or invalid in the config file.
  * @type {Object}
@@ -111,8 +177,17 @@ export function loadConfig() {
 
   try {
     const configPath = getConfigFilePath();
-    const raw = readFileSync(configPath, "utf-8");
-    rawConfig = JSON.parse(raw);
+    const repoPath = resolve("src/shared/user-settings.json");
+
+    if (configPathOverride || resolve(configPath) === repoPath) {
+      // Test mode (configPathOverride set) or running from source — no merge needed
+      rawConfig = JSON.parse(readFileSync(configPath, "utf-8"));
+    } else {
+      // User has a separate config file — deep-merge repo defaults underneath
+      var repoDefaults = getRepoDefaultConfig();
+      var userConfig = JSON.parse(readFileSync(configPath, "utf-8"));
+      rawConfig = deepMerge(repoDefaults, userConfig);
+    }
   } catch (err) {
     console.warn("Failed to load user-settings.json, using defaults:", err.message);
     rawConfig = {};
@@ -176,11 +251,12 @@ export function loadConfig() {
     items: Array.isArray(rawLists.items) ? rawLists.items : [],
   };
 
-  // docs — documentation subsystem categories
+  // docs — documentation subsystem categories and guide links
   var rawDocs = rawConfig.docs || {};
   config.docs = {
     _readme: rawDocs._readme || "",
     categories: typeof rawDocs.categories === "object" && rawDocs.categories !== null ? rawDocs.categories : {},
+    guides: Array.isArray(rawDocs.guides) ? rawDocs.guides : [],
   };
 
   // reportsOpenInNewTab — boolean flag for opening report pages in a new tab
@@ -310,6 +386,31 @@ export function getFetchServerConfig() {
     url: fs.url || "",
     syncOnStartup: fs.syncOnStartup !== false,
   };
+}
+
+/**
+ * @description Get the full merged configuration as a formatted JSON string.
+ * Used by the Settings editor to show all keys (including new defaults that
+ * may not yet be in the user's file). The editor saves the result back to
+ * the user file, so after one save the user file contains all keys.
+ * @returns {string} Pretty-printed JSON of the merged config
+ */
+export function getMergedConfigRaw() {
+  try {
+    var repoDefaults = getRepoDefaultConfig();
+    var configPath = getConfigFilePath();
+    var repoPath = resolve("src/shared/user-settings.json");
+
+    if (resolve(configPath) === repoPath) {
+      return readFileSync(configPath, "utf-8");
+    }
+
+    var userConfig = JSON.parse(readFileSync(configPath, "utf-8"));
+    var merged = deepMerge(repoDefaults, userConfig);
+    return JSON.stringify(merged, null, 2);
+  } catch {
+    return readFileSync(resolve("src/shared/user-settings.json"), "utf-8");
+  }
 }
 
 /**

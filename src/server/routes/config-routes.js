@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync } from "node:fs";
 import { resolve, dirname, basename, join } from "node:path";
-import { loadConfig, getAllowedProviders, getSchedulingConfig, reloadConfig, getListItems, getConfigFilePath, getWritableConfigPath, getReportsOpenInNewTab } from "../config.js";
+import { loadConfig, getAllowedProviders, getSchedulingConfig, reloadConfig, getListItems, getConfigFilePath, getWritableConfigPath, getReportsOpenInNewTab, getMergedConfigRaw } from "../config.js";
 import { DB_PATH, BACKUP_DIR, APP_NAME, APP_VERSION } from "../../shared/server-constants.js";
 
 /**
@@ -97,14 +97,16 @@ export function handleConfigRoute(method, path) {
     });
   }
 
-  // GET /api/config/raw — return the raw user-settings.json content as a string for editing.
+  // GET /api/config/raw — return the merged user-settings.json content as a string for editing.
+  // The merged result includes repo defaults for any keys missing from the user's file,
+  // so new config additions are always visible in the editor.
   // Creates a timestamped backup before returning so the user can recover if their edits break things.
   if (method === "GET" && path === "/api/config/raw") {
     try {
       const configPath = getConfigFilePath();
       backupJsonFile(configPath);
-      const raw = readFileSync(configPath, "utf-8");
-      return new Response(JSON.stringify({ content: raw, path: configPath }), {
+      const merged = getMergedConfigRaw();
+      return new Response(JSON.stringify({ content: merged, path: configPath }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
