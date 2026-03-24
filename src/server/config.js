@@ -294,7 +294,8 @@ export function getDocsConfig() {
   var config = loadConfig();
   var rawDocs = config.docs || {};
   var categories = rawDocs.categories || {};
-  return { categories: categories };
+  var guides = rawDocs.guides || [];
+  return { categories: categories, guides: guides };
 }
 
 /**

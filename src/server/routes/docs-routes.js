@@ -16,6 +16,24 @@ import { getDatabase } from "../db/connection.js";
 import { initSearchIndex, reindexAllPages, searchPages, getSearchMeta } from "../services/docs-search.js";
 import { spellCheckContent, getCustomDictionary, addCustomWord } from "../services/spellcheck-service.js";
 
+/**
+ * @description Trigger a background reindex of the docs search index.
+ * Called after document mutations (edit, upload, delete) so that search
+ * results stay in sync with the files on disk. Runs asynchronously and
+ * does not block the response.
+ */
+function triggerBackgroundReindex() {
+  try {
+    var db = getDatabase();
+    var docsConfig = getDocsConfig();
+    reindexAllPages(db, docsConfig.categories).catch(function () {
+      // Silently ignore — search will be stale until next reindex
+    });
+  } catch {
+    // Database not available — skip
+  }
+}
+
 /** @type {string[]} Allowed file extensions for markdown uploads */
 var ALLOWED_MARKDOWN_EXTENSIONS = [".md"];
 
@@ -279,6 +297,8 @@ docsRouter.put("/api/docs/raw/:category/:slug", async function (request, params)
   var mdPath = "./" + getDocsDir() + "/" + category + "/" + slug + ".md";
   await Bun.write(mdPath, body.content);
 
+  triggerBackgroundReindex();
+
   return new Response(
     JSON.stringify({
       success: true,
@@ -365,6 +385,8 @@ docsRouter.post("/api/docs/upload/:category", async function (request, params) {
   content = ensureUnpublishedFrontMatter(content, styleConfig.name);
 
   await Bun.write(targetPath, content);
+
+  triggerBackgroundReindex();
 
   return new Response(
     JSON.stringify({
@@ -499,6 +521,8 @@ docsRouter.delete("/api/docs/:category/:slug", async function (request, params) 
   }
 
   await unlink(mdPath);
+
+  triggerBackgroundReindex();
 
   return new Response(
     JSON.stringify({

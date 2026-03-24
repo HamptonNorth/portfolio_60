@@ -27,9 +27,11 @@ import { handleTestSetupRoute } from "./routes/test-setup-routes.js";
 import { initScheduledFetcher, stopScheduledFetcher } from "./services/scheduled-fetcher.js";
 import { processDrawdowns } from "./services/drawdown-processor.js";
 import { databaseExists, closeDatabase } from "./db/connection.js";
-import { getFetchServerConfig } from "./config.js";
+import { getFetchServerConfig, getDocsConfig } from "./config.js";
 import { pushConfigToFetchServer } from "./services/fetch-server-push.js";
 import { syncFromFetchServer } from "./services/fetch-server-sync.js";
+import { reindexAllPages } from "./services/docs-search.js";
+import { getDatabase } from "./db/connection.js";
 
 /**
  * @description The port the server listens on.
@@ -463,6 +465,20 @@ if (databaseExists()) {
 
 // Initialise scheduled fetching (after server is ready)
 initScheduledFetcher();
+
+// Index documentation for search (runs in background, non-blocking)
+if (databaseExists()) {
+  var docsConfig = getDocsConfig();
+  if (docsConfig.categories && Object.keys(docsConfig.categories).length > 0) {
+    reindexAllPages(getDatabase(), docsConfig.categories).then(function (result) {
+      if (result.success) {
+        console.log("[Docs] Search index built: " + result.indexed + " documents in " + result.duration);
+      }
+    }).catch(function (err) {
+      console.warn("[Docs] Search index build failed:", err.message);
+    });
+  }
+}
 
 // Fetch server sync: push config and pull latest data on startup
 const fetchServerConfig = getFetchServerConfig();
