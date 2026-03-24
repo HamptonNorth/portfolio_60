@@ -114,7 +114,7 @@ docsRouter.get("/api/docs/list/:category", async function (request, params) {
     });
   }
 
-  var dirPath = "./" + getDocsDir() + "/" + category;
+  var dirPath = join(getDocsDir(), category);
   var files;
 
   try {
@@ -179,7 +179,7 @@ docsRouter.get("/api/docs/content/:category/:slug", async function (request, par
     });
   }
 
-  var mdPath = "./" + getDocsDir() + "/" + category + "/" + slug + ".md";
+  var mdPath = join(getDocsDir(), category, slug + ".md");
   var mdFile = Bun.file(mdPath);
 
   if (!(await mdFile.exists())) {
@@ -237,7 +237,7 @@ docsRouter.get("/api/docs/raw/:category/:slug", async function (request, params)
     });
   }
 
-  var mdPath = "./" + getDocsDir() + "/" + category + "/" + slug + ".md";
+  var mdPath = join(getDocsDir(), category, slug + ".md");
   var mdFile = Bun.file(mdPath);
 
   if (!(await mdFile.exists())) {
@@ -294,7 +294,7 @@ docsRouter.put("/api/docs/raw/:category/:slug", async function (request, params)
     });
   }
 
-  var mdPath = "./" + getDocsDir() + "/" + category + "/" + slug + ".md";
+  var mdPath = join(getDocsDir(), category, slug + ".md");
   await Bun.write(mdPath, body.content);
 
   triggerBackgroundReindex();
@@ -362,7 +362,7 @@ docsRouter.post("/api/docs/upload/:category", async function (request, params) {
     });
   }
 
-  var targetDir = "./" + getDocsDir() + "/" + category;
+  var targetDir = join(getDocsDir(), category);
   var targetPath = targetDir + "/" + sanitizedName;
 
   await mkdir(targetDir, { recursive: true });

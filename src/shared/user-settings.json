@@ -30,27 +30,16 @@
     "_readme": "Embedded spreadsheet lists displayed under the Lists menu. Each entry has a title (shown in the menu), an iframe (the full embed HTML from Google Sheets or Excel Online 'Publish to Web'), a spreadsheet type ('google' or 'microsoft'), and an optional range. For Google Sheets, range is a cell range e.g. 'A3:F14'. For Microsoft Excel, range is a named range defined in the workbook e.g. 'MyTable'.",
     "items": [
       {
-        "title": "Non-SIPP Pensions",
+        "title": "Gifts within IHT Allowance ",
         "spreadsheet": "google",
-        "iframe": "<iframe src=\"https://docs.google.com/spreadsheets/d/e/2PACX-1vT0tY4WKwEdvPZM61Gt_DoyuUsmysmuA2sAPa-tVmtCie-s2RVB49BQ7ETHRH7wps58_u94e2ICR1PD/pubhtml?gid=2045542612&amp;single=true&amp;widget=true&amp;headers=false\"></iframe>",
+        "iframe": "<iframe src=\"https://docs.google.com/spreadsheets/d/11_wO0Cn2Mn5v9lcnyiMT3pzaIfUz7k0PK7mb5vMoRFA/edit?usp=sharing\"></iframe>",
         "range": "A2:F14"
       },
+
       {
-        "title": "Base Costs",
-        "spreadsheet": "google",
-        "iframe": "<iframe src='https://docs.google.com/spreadsheets/d/e/2PACX-1vSZEUR829SHD4LcQBwsJMDtms5r76oyd6QqDsOrPZe5rdZjM9rzsOk9VKuW_TGsmH667ueufflwrtja/pubhtml?gid=1550914488&amp;single=true&amp;widget=true&amp;headers=false'></iframe>",
-        "range": ""
-      },
-      {
-        "title": "Charity Giving",
-        "spreadsheet": "google",
-        "iframe": "<iframe src=\"https://docs.google.com/spreadsheets/d/e/2PACX-1vRiacahHMJPFlzQzmlyPn37jTNIuywUiCtt393fzTdgIZZR2Xr4rLLu--b5-Vnwi29CKrQneTWduPSb/pubhtml?gid=284599303&amp;single=true&amp;widget=true&amp;headers=false\"></iframe>",
-        "range": ""
-      },
-      {
-        "title": "Test Excel",
+        "title": "Income Tax rates",
         "spreadsheet": "microsoft",
-        "iframe": "<iframe width=\"402\" height=\"346\" frameborder=\"0\" scrolling=\"no\" src=\"https://1drv.ms/x/c/b7bf8885da4911af/IQSWkWXIieaHTZ9Zk7g9sFNvAU4q65xIrWDw01XnX9t0QWU?wdAllowInteractivity=False&wdHideGridlines=True&wdHideHeaders=True&wdDownloadButton=True&wdInConfigurator=True&wdInConfigurator=True\"></iframe>",
+        "iframe": "<iframe  src=\"https://1drv.ms/x/c/b7bf8885da4911af/IQSWkWXIieaHTZ9Zk7g9sFNvAU4q65xIrWDw01XnX9t0QWU\"></iframe>",
         "range": ""
       }
     ]
@@ -62,10 +51,26 @@
       "notes": { "style": "modest", "label": "Financial Notes" }
     },
     "guides": [
-      { "label": "User Guide", "category": "guide", "slug": "user_guide_v0.1.4" },
-      { "label": "Composing Reports & Charts", "category": "guide", "slug": "composing_reports_and_charts_v0.1.4" },
-      { "label": "Technical Reference", "category": "guide", "slug": "technical_reference_v0.1.4" },
-      { "label": "Create Test Database", "category": "guide", "slug": "create_test_database_v0.1.4" }
+      {
+        "label": "User Guide",
+        "category": "guide",
+        "slug": "user_guide_v0.1.4"
+      },
+      {
+        "label": "Composing Reports & Charts",
+        "category": "guide",
+        "slug": "composing_reports_and_charts_v0.1.4"
+      },
+      {
+        "label": "Technical Reference",
+        "category": "guide",
+        "slug": "technical_reference_v0.1.4"
+      },
+      {
+        "label": "Create Test Database",
+        "category": "guide",
+        "slug": "create_test_database_v0.1.4"
+      }
     ]
   },
   "fetchServer": {
