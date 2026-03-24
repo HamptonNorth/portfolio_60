@@ -1352,7 +1352,7 @@ function renderPerformanceChart(canvasId, legendId, series, colours, bmSeries, i
 
   // Build legend with research links and click-to-highlight
   var legendContainer = document.getElementById(legendId);
-  var legendHtml = '<div class="flex flex-wrap gap-4 text-sm">';
+  var legendHtml = '<div class="flex flex-wrap gap-4 text-xs">';
   for (var sl = 0; sl < series.length; sl++) {
     var ser = series[sl];
     var colour = colours[sl % colours.length];
