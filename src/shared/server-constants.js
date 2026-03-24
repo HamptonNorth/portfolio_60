@@ -20,7 +20,8 @@ export const SERVER_PORT = 1420;
 export const DATA_DIR = process.env.PORTFOLIO60_DATA_DIR || ".";
 
 /** @type {string} Path to the SQLite database file */
-export const DB_PATH = process.env.DB_PATH || join(DATA_DIR, "data", "portfolio60.db");
+export const DB_PATH =
+  process.env.DB_PATH || join(DATA_DIR, "data", "portfolio60.db");
 
 /** @type {string} Directory for database backups */
 export const BACKUP_DIR = join(DATA_DIR, "backups");
