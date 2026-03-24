@@ -29,12 +29,12 @@ function handleSpecialPassphrase(passphrase) {
   var mode = classifyPassphrase(passphrase);
   if (!mode) return null;
 
-  // "demo" requires the test DB to already exist
-  if (mode === "demo" && !testReferenceExists()) {
+  // "demo" and "test" (both read-only) require the test DB to already exist
+  if ((mode === "demo" || mode === "test") && !testReferenceExists()) {
     return new Response(
       JSON.stringify({
         error: "Demo database not found",
-        detail: "The demo database has not been created yet. Enter 'test' to create it first.",
+        detail: "The demo database has not been created yet. Enter the developer test passphrase to create it first.",
       }),
       { status: 400, headers: { "Content-Type": "application/json" } },
     );

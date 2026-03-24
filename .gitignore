@@ -52,8 +52,10 @@ data/
 backups/
 src/shared/*-backup-*.json
 docs/*
+!docs/guide/
+docs/guide/*
 !docs/guide/user_prices.md
-!docs/guide/user_*.md
+!docs/guide/*_v[0-9]*.md
 !docs/.gitkeep
 !docs/media/
 docs/media/*
@@ -64,4 +66,3 @@ src/ui/css/output.css
 *.db-shm
 # Remove all PLAN_* markdown files
 PLAN_*
-docs/guide/create_test_database.md

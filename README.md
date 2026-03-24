@@ -1,50 +1,72 @@
-Warning
-
-Portfolio 60  is beta-quality until v1.0. Versions before 1.0 do not strictly follow semantic versioning. The core API should be relatively stable after 0.1.4, but expect breaking changes between minor releases.
+> **Beta** — Portfolio 60 is beta-quality until v1.0. The core functionality is stable from v0.1.4 onwards, but expect breaking changes between minor releases.
 
 # Portfolio 60
 
-A browser-based application for UK families to track investments across multiple people and account types.
+A browser-based application for UK families to track investments across multiple people and account types. All valuations in GBP, with automatic currency conversion for foreign-currency holdings.
 
-## What it does
+## Who is it for?
 
-Portfolio 60 helps you manage a family investment portfolio covering shares, mutual funds, investment trusts, savings accounts and other instruments. All valuations are in GBP, with automatic currency conversion for foreign-currency investments.
+UK families managing their own investments across one or more providers (Interactive Investor, Hargreaves Lansdown, AJ Bell, etc.). The interface is designed for users aged 50–85, with clear layouts, generous text sizes and straightforward navigation.
 
-**Key features:**
+## Key features
 
 - Track investments across multiple family members and account types (Trading, ISA, SIPP)
-- Automatic price fetching from FT Markets, Fidelity and custom web sources
-- Currency exchange rates from the European Central Bank via the Frankfurter API
-- Benchmark tracking (FTSE 100, S&P 500, etc.) for performance comparison
-- Historical data backfill from Morningstar, Yahoo Finance and the Bank of England
+- Automatic price fetching via Morningstar, with currency rates from the Frankfurter/ECB API
+- Benchmark tracking (FTSE 100, S&P 500, etc.) via Yahoo Finance
+- Investment analysis — comparison tables, league tables, risk/return scatter plots, top/bottom performers
 - Portfolio valuation with drill-down to individual holdings per person and account
+- PDF reports — portfolio summaries, detailed valuations, performance charts, household assets
 - Buy/sell transaction recording with automatic cash balance updates
 - SIPP drawdown scheduling and tracking
+- Track other assets (pensions, property, savings) alongside investments
 - Scheduled price fetching on a configurable timetable
 - One-click database backup and restore
-- Built-in documentation system
+- Built-in documentation system and embedded spreadsheet lists
+- Read-only demo mode for trying the application without installation
 
-**Who is it for?**
+## Documentation
 
-UK families managing their own investments across one or more providers. The interface is designed for users aged 50–85, with clear layouts, large text and straightforward navigation. This is a UK-only application due to the complexity of UK tax rules and account types.
+Two guides are included in the application's built-in Docs system (under **Docs > User Guide**) and in the `docs/guide/` directory:
 
-## Getting started
+- **[User Guide](docs/guide/user_guide_v0.1.4.md)** — a friendly walkthrough of every feature, written for non-technical users
+- **[Technical Reference](docs/guide/technical_reference_v0.1.4.md)** — installation, JSON configuration, scheduling, embedding spreadsheets, and advanced settings
 
-1. Install [Bun](https://bun.sh) (the JavaScript runtime)
-2. Clone this repository and install dependencies:
-   ```bash
-   git clone https://github.com/your-repo/portfolio-60.git
-   cd portfolio-60
-   bun install
-   ```
-3. Start the application:
-   ```bash
-   bun run dev
-   ```
-4. Open your browser at **http://localhost:1420**
-5. On first run, you will be asked to set a passphrase to protect your data
+## Try the demo
 
-Your database and settings are stored locally in `~/.config/portfolio_60/`.
+A public demo is available at **[portfolio60.redmug.co.uk](https://portfolio60.redmug.co.uk)**. Enter **demo** as the passphrase to explore the application with pre-loaded sample data. The demo is read-only — you can browse everything but cannot modify data.
+
+## Installation
+
+### Prerequisites
+
+- [Bun](https://bun.sh) v1.1 or later (the JavaScript runtime)
+
+### From source
+
+```bash
+git clone https://github.com/rcollins/portfolio-60.git
+cd portfolio-60
+bun install
+bun run dev
+```
+
+Open your browser at **http://localhost:1420**. On first run, set a passphrase to protect your data.
+
+### Compiled executable
+
+Standalone compiled executables for Linux, macOS and Windows are available from the GitHub Releases page. These bundle the Bun runtime so no separate installation is needed:
+
+```bash
+# Example — Linux
+chmod +x portfolio-60-linux
+./portfolio-60-linux
+```
+
+Packaged installers (`.msi`, `.dmg`, `.deb`) may be made available in future if there is demand.
+
+### Data storage
+
+All data is stored locally on your computer at `~/.config/portfolio_60/`. No cloud services or external accounts are required. The only internet connections made are to fetch prices, exchange rates and benchmark values from public financial data APIs.
 
 ---
 
@@ -54,20 +76,20 @@ Your database and settings are stored locally in `~/.config/portfolio_60/`.
 
 | Layer | Technology |
 |---|---|
-| Runtime & server | Bun with Bun.serve |
-| Frontend | HTML, vanilla JS, Lit web components |
+| Runtime & server | Bun with Bun.serve (port 1420) |
+| Frontend | Server-rendered HTML, vanilla JS, Lit web components |
 | Styling | TailwindCSS v4 |
-| Database | SQLite via bun:sqlite |
-| Web scraping | Playwright (headless Chromium) |
+| Database | SQLite via bun:sqlite (WAL mode) |
 | Testing | Bun test runner (unit), Playwright (e2e) |
+| Price sources | Morningstar API (investments), Yahoo Finance API (benchmarks), Frankfurter API (currency rates) |
 
 ### Architecture
 
-- **Server**: Bun.serve HTTP server with a lightweight custom router. REST-like JSON API consumed by frontend fetch calls. No framework — raw request/response handling.
-- **Frontend**: Server-rendered HTML pages with progressive enhancement via vanilla JavaScript. No SPA framework. Lit web components for reusable UI elements (navbar, footer).
-- **Database**: SQLite with raw SQL (no ORM). Parameterised queries throughout. Financial values stored as integers scaled by 10,000 for precision. WAL mode enabled.
-- **Scraping**: Playwright launches headless Chromium to visit public financial websites and extract prices via CSS selectors. Currency rates fetched via REST API (Frankfurter/ECB). Historical data from Morningstar API, Yahoo Finance and Bank of England CSV downloads.
-- **Security**: Passphrase-protected on startup (bcrypt hash stored in `.env`). Scraper endpoints are unprotected to support future cron-scheduled operation.
+- **Server**: Bun.serve HTTP server with a custom regex router. REST-like JSON API consumed by frontend fetch calls. No framework.
+- **Frontend**: Server-rendered HTML with vanilla JavaScript. Lit web components for shared UI (navbar, footer). No SPA framework.
+- **Database**: SQLite with raw parameterised SQL (no ORM). Financial values stored as integers scaled by 10,000. SCD2 temporal pattern on holdings for historic portfolio tracking.
+- **Fetchers**: API clients for Morningstar, Yahoo Finance and Frankfurter/ECB. SSE streaming for real-time fetch progress in the UI.
+- **Security**: Passphrase-protected (bcrypt hash in `.env`). Fetch endpoints are unprotected to support scheduled background fetching.
 
 ### Project structure
 
@@ -76,26 +98,29 @@ src/
 ├── server/           # Bun.serve backend
 │   ├── routes/       # API route handlers
 │   ├── db/           # SQLite database layer (schema, seeds, queries)
-│   ├── scrapers/     # Playwright price/currency/benchmark scrapers
-│   └── services/     # Scheduled scraping, historic backfill, drawdowns
+│   ├── fetchers/     # API clients (Morningstar, Yahoo, Frankfurter)
+│   ├── services/     # Fetch orchestration, scheduling, analysis, drawdowns
+│   └── reports/      # PDF generation
 ├── ui/               # Frontend served by Bun
 │   ├── pages/        # HTML pages
-│   ├── js/           # Page-specific JavaScript
+│   ├── js/           # Page-specific JavaScript + Lit components
 │   └── css/          # TailwindCSS input/output
 └── shared/           # Constants shared between server and UI
 tests/
 ├── unit/             # Bun test runner
 └── e2e/              # Playwright UI tests
-docs/                 # Built-in user documentation (markdown)
+docs/                 # Built-in user documentation (Markdown)
 ```
 
 ### Commands
 
 ```bash
-bun install           # Install dependencies
-bun run dev           # Start dev server (port 1420)
-bun test              # Run unit tests
-bunx playwright test  # Run e2e tests
+bun install              # Install dependencies
+bun run dev              # Start dev server + Tailwind watcher (port 1420)
+bun run dev:server       # Start server only
+bun run dev:css          # Tailwind watcher only
+bun test                 # Run unit tests
+bunx playwright test     # Run e2e tests
 ```
 
 ### Conventions
@@ -105,6 +130,8 @@ bunx playwright test  # Run e2e tests
 - snake_case for database columns, camelCase for JS, kebab-case for filenames
 - UK English spelling in all user-facing text
 
-### Data storage
+---
 
-All data is stored locally in a SQLite database at `~/.config/portfolio_60/data/`. No cloud services, no external accounts required. Backups are saved to `~/.config/portfolio_60/backups/` as timestamped SQLite copies.
+## Licence
+
+Portfolio 60 is open-source software. See the [LICENSE](LICENSE) file for details.
