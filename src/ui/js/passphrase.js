@@ -214,7 +214,7 @@ function showSetPassphraseForm(contentDiv, messagesDiv) {
           class="w-full px-3 py-2 border border-brand-300 rounded-md text-base
                  focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
           required
-          placeholder="Minimum 8 characters (or 'test' for demo mode)">
+          placeholder="Minimum 8 characters">
       </div>
       <div>
         <label for="confirm-passphrase" class="block text-sm font-medium text-brand-700 mb-1">
@@ -233,6 +233,14 @@ function showSetPassphraseForm(contentDiv, messagesDiv) {
         Set Passphrase
       </button>
     </form>
+    <div class="mt-6 pt-5 border-t border-brand-100 text-center">
+      <p class="text-brand-500 text-sm mb-3">or</p>
+      <button id="demo-btn" type="button"
+        class="bg-brand-50 hover:bg-brand-100 text-brand-600 hover:text-brand-800 font-medium text-base px-5 py-2 rounded-md transition-colors">
+        Explore the application &rarr;
+      </button>
+      <p class="text-brand-400 text-xs mt-1">Browse with sample data, no sign-up needed</p>
+    </div>
   `;
 
   const form = document.getElementById("set-passphrase-form");
@@ -294,6 +302,26 @@ function showSetPassphraseForm(contentDiv, messagesDiv) {
       errorsDiv.textContent = result.error + (result.detail ? " — " + result.detail : "");
     }
   });
+
+  // "Try the demo" button — submits "demo" as the passphrase automatically
+  var demoBtn = document.getElementById("demo-btn");
+  if (demoBtn) {
+    demoBtn.addEventListener("click", async function () {
+      var errorsDiv = document.getElementById("form-errors");
+      if (errorsDiv) errorsDiv.textContent = "";
+
+      var result = await apiRequest("/api/auth/set-passphrase", {
+        method: "POST",
+        body: { passphrase: "demo" },
+      });
+
+      if (result.ok && result.data.success) {
+        window.location.href = "/";
+      } else {
+        if (errorsDiv) errorsDiv.textContent = result.error || "Demo mode is not available.";
+      }
+    });
+  }
 }
 
 /**
@@ -316,7 +344,7 @@ function showVerifyPassphraseForm(contentDiv, messagesDiv) {
           class="w-full px-3 py-2 border border-brand-300 rounded-md text-base
                  focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
           required autofocus
-          placeholder="Enter your passphrase (or 'test' for demo mode)">
+          placeholder="Enter your passphrase">
       </div>
       <div id="form-errors" class="text-error text-sm"></div>
       <button type="submit"
@@ -325,6 +353,14 @@ function showVerifyPassphraseForm(contentDiv, messagesDiv) {
         Unlock
       </button>
     </form>
+    <div class="mt-6 pt-5 border-t border-brand-100 text-center">
+      <p class="text-brand-500 text-sm mb-3">or</p>
+      <button id="demo-btn" type="button"
+        class="bg-brand-50 hover:bg-brand-100 text-brand-600 hover:text-brand-800 font-medium text-base px-5 py-2 rounded-md transition-colors">
+        Explore the application &rarr;
+      </button>
+      <p class="text-brand-400 text-xs mt-1">Browse with sample data, no sign-up needed</p>
+    </div>
   `;
 
   const form = document.getElementById("verify-passphrase-form");
@@ -375,4 +411,24 @@ function showVerifyPassphraseForm(contentDiv, messagesDiv) {
       }
     }
   });
+
+  // "Try the demo" button — submits "demo" as the passphrase automatically
+  var demoBtn = document.getElementById("demo-btn");
+  if (demoBtn) {
+    demoBtn.addEventListener("click", async function () {
+      var errorsDiv = document.getElementById("form-errors");
+      if (errorsDiv) errorsDiv.textContent = "";
+
+      var result = await apiRequest("/api/auth/verify", {
+        method: "POST",
+        body: { passphrase: "demo" },
+      });
+
+      if (result.ok && result.data.success) {
+        window.location.href = "/";
+      } else {
+        if (errorsDiv) errorsDiv.textContent = result.error || "Demo mode is not available.";
+      }
+    });
+  }
 }
