@@ -63,16 +63,28 @@ var PERIOD_DISPLAY = { "1w": "1W", "1m": "1M", "3m": "3M", "6m": "6M", "1y": "1Y
 /** @type {Object|null} Cached league benchmark data */
 var leagueBenchmarkData = null;
 
+/** @type {string} Current holdings filter value */
+var holdingsFilter = "current";
+
+/** @type {Array<Object>} All users loaded from the API */
+var allUsers = [];
+
+/** @type {Array<number>} Currently selected user IDs */
+var selectedUserIds = [];
+
 // ─── Initialisation ──────────────────────────────────────────────
 
-document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener("DOMContentLoaded", async function () {
   setupTabs();
   setupPeriodButtons();
   highlightActivePeriod();
   setupSortButtons();
   setupLeagueLimit();
   setupPrintButton();
+  setupHoldingsFilter();
+  setupUserFilter();
   loadBenchmarks();
+  await loadUsers();
   activateTab("comparison");
 });
 
@@ -147,6 +159,208 @@ function handleBenchmarkChange() {
 function benchmarksParam() {
   if (selectedBenchmarkIds.length === 0) return "";
   return "&benchmarks=" + selectedBenchmarkIds.join(",");
+}
+
+// ─── Investment filters ──────────────────────────────────────────
+
+/**
+ * @description Build the holdings and users query parameter string for API calls.
+ * @returns {string} e.g. "&holdings=current&users=1,2"
+ */
+function filterParams() {
+  var params = "&holdings=" + holdingsFilter;
+  if (selectedUserIds.length > 0 && selectedUserIds.length < allUsers.length) {
+    params += "&users=" + selectedUserIds.join(",");
+  }
+  return params;
+}
+
+/**
+ * @description Clear all cached view data so the next load fetches fresh data.
+ */
+function clearCachedData() {
+  leagueData = null;
+  comparisonData = null;
+  leagueBenchmarkData = null;
+}
+
+/**
+ * @description Fetch all users and populate the user filter dropdown.
+ */
+async function loadUsers() {
+  try {
+    var result = await apiRequest("/api/users");
+    if (!result.ok || !Array.isArray(result.data)) return;
+
+    allUsers = result.data;
+    selectedUserIds = allUsers.map(function (u) { return u.id; });
+
+    renderUserDropdown();
+    updateUserFilterLabel();
+  } catch (err) {
+    // Users are required — but if the API fails, degrade gracefully
+  }
+}
+
+/**
+ * @description Render the user filter dropdown checkboxes.
+ */
+function renderUserDropdown() {
+  var dropdown = document.getElementById("user-filter-dropdown");
+  var html = "";
+
+  // "Select all" option
+  html += '<label class="flex items-center gap-2 px-3 py-1.5 hover:bg-brand-50 cursor-pointer border-b border-brand-100">';
+  html += '<input type="checkbox" id="user-select-all" checked class="rounded" />';
+  html += '<span class="text-sm font-medium text-brand-700">Select all</span>';
+  html += "</label>";
+
+  // Individual user checkboxes
+  for (var i = 0; i < allUsers.length; i++) {
+    var user = allUsers[i];
+    html += '<label class="flex items-center gap-2 px-3 py-1.5 hover:bg-brand-50 cursor-pointer">';
+    html += '<input type="checkbox" class="user-checkbox rounded" value="' + user.id + '" checked />';
+    html += '<span class="text-sm text-brand-700">' + escapeHtml(user.first_name + " " + user.last_name) + "</span>";
+    html += "</label>";
+  }
+
+  dropdown.innerHTML = html;
+
+  // Set up "Select all" handler
+  var selectAll = document.getElementById("user-select-all");
+  selectAll.addEventListener("change", function () {
+    var boxes = dropdown.querySelectorAll(".user-checkbox");
+    for (var j = 0; j < boxes.length; j++) {
+      boxes[j].checked = selectAll.checked;
+    }
+    updateSelectedUserIds();
+  });
+
+  // Set up individual checkbox handlers
+  var boxes = dropdown.querySelectorAll(".user-checkbox");
+  for (var k = 0; k < boxes.length; k++) {
+    boxes[k].addEventListener("change", function () {
+      updateSelectAllState();
+      updateSelectedUserIds();
+    });
+  }
+}
+
+/**
+ * @description Sync the "Select all" checkbox state based on individual checkboxes.
+ */
+function updateSelectAllState() {
+  var boxes = document.querySelectorAll(".user-checkbox");
+  var allChecked = true;
+  for (var i = 0; i < boxes.length; i++) {
+    if (!boxes[i].checked) { allChecked = false; break; }
+  }
+  var selectAll = document.getElementById("user-select-all");
+  if (selectAll) selectAll.checked = allChecked;
+}
+
+/**
+ * @description Read selected user IDs from checkboxes, enforce at least one selected,
+ * update state and reload the current view.
+ */
+function updateSelectedUserIds() {
+  var boxes = document.querySelectorAll(".user-checkbox");
+  var ids = [];
+  for (var i = 0; i < boxes.length; i++) {
+    if (boxes[i].checked) ids.push(parseInt(boxes[i].value, 10));
+  }
+
+  // Enforce at least one user selected
+  if (ids.length === 0) {
+    // Re-check the first user
+    if (boxes.length > 0) {
+      boxes[0].checked = true;
+      ids.push(parseInt(boxes[0].value, 10));
+    }
+    updateSelectAllState();
+  }
+
+  selectedUserIds = ids;
+  updateUserFilterLabel();
+  clearCachedData();
+  loadCurrentView();
+}
+
+/**
+ * @description Update the user filter button label based on the current selection.
+ */
+function updateUserFilterLabel() {
+  var label = document.getElementById("user-filter-label");
+  if (!label) return;
+
+  if (selectedUserIds.length === allUsers.length) {
+    label.textContent = "All users";
+  } else if (selectedUserIds.length <= 2) {
+    // Show user names when 1-2 selected
+    var names = [];
+    for (var i = 0; i < allUsers.length; i++) {
+      for (var j = 0; j < selectedUserIds.length; j++) {
+        if (allUsers[i].id === selectedUserIds[j]) {
+          names.push(allUsers[i].first_name);
+          break;
+        }
+      }
+    }
+    label.textContent = names.join(", ");
+  } else {
+    label.textContent = selectedUserIds.length + " of " + allUsers.length + " users";
+  }
+}
+
+/**
+ * @description Set up the holdings filter dropdown change handler.
+ */
+function setupHoldingsFilter() {
+  var select = document.getElementById("holdings-filter");
+  if (!select) return;
+
+  select.addEventListener("change", function () {
+    holdingsFilter = this.value;
+
+    // Disable/enable user filter when "All investments" is selected
+    var userBtn = document.getElementById("user-filter-btn");
+    var userLabel = document.getElementById("user-filter-label-prefix");
+    if (holdingsFilter === "all") {
+      userBtn.disabled = true;
+      userBtn.classList.add("opacity-50", "cursor-not-allowed");
+      userLabel.classList.add("opacity-50");
+    } else {
+      userBtn.disabled = false;
+      userBtn.classList.remove("opacity-50", "cursor-not-allowed");
+      userLabel.classList.remove("opacity-50");
+    }
+
+    clearCachedData();
+    loadCurrentView();
+  });
+}
+
+/**
+ * @description Set up the user filter dropdown toggle and close-on-outside-click behaviour.
+ */
+function setupUserFilter() {
+  var btn = document.getElementById("user-filter-btn");
+  var dropdown = document.getElementById("user-filter-dropdown");
+  if (!btn || !dropdown) return;
+
+  // Toggle dropdown on button click
+  btn.addEventListener("click", function () {
+    if (btn.disabled) return;
+    dropdown.classList.toggle("hidden");
+  });
+
+  // Close dropdown when clicking outside
+  document.addEventListener("click", function (evt) {
+    var container = document.getElementById("user-filter-container");
+    if (container && !container.contains(evt.target)) {
+      dropdown.classList.add("hidden");
+    }
+  });
 }
 
 // ─── Tabs ────────────────────────────────────────────────────────
@@ -331,7 +545,7 @@ async function loadComparison() {
   var container = document.getElementById("comparison-table-container");
   container.innerHTML = '<p class="text-brand-500">Loading comparison...</p>';
 
-  var url = "/api/analysis/comparison?periods=" + comparisonPeriods.join(",") + benchmarksParam();
+  var url = "/api/analysis/comparison?periods=" + comparisonPeriods.join(",") + benchmarksParam() + filterParams();
   var result = await apiRequest(url);
   if (!result.ok) {
     container.innerHTML = '<p class="text-error">' + escapeHtml(result.error) + "</p>";
@@ -493,7 +707,7 @@ async function loadLeagueTable() {
   var container = document.getElementById("league-table-container");
   container.innerHTML = '<p class="text-brand-500">Loading league table...</p>';
 
-  var result = await apiRequest("/api/analysis/league-table?period=" + activePeriod);
+  var result = await apiRequest("/api/analysis/league-table?period=" + activePeriod + filterParams());
   if (!result.ok) {
     container.innerHTML = '<p class="text-error">' + escapeHtml(result.error) + "</p>";
     return;
@@ -667,7 +881,7 @@ function renderSparkline(inv) {
 async function loadScatter() {
   document.getElementById("period-info").textContent = "Loading...";
 
-  var url = "/api/analysis/risk-return?period=" + activePeriod + benchmarksParam();
+  var url = "/api/analysis/risk-return?period=" + activePeriod + benchmarksParam() + filterParams();
   var result = await apiRequest(url);
   if (!result.ok) {
     document.getElementById("period-info").textContent = result.error;
@@ -891,7 +1105,7 @@ function getBenchmarkLineStyle(index, total) {
 async function loadTopBottom() {
   document.getElementById("period-info").textContent = "Loading...";
 
-  var url = "/api/analysis/top-bottom?period=" + activePeriod + "&count=5" + benchmarksParam();
+  var url = "/api/analysis/top-bottom?period=" + activePeriod + "&count=5" + benchmarksParam() + filterParams();
   var result = await apiRequest(url);
   if (!result.ok) {
     document.getElementById("period-info").textContent = result.error;
@@ -1216,14 +1430,15 @@ function setupPrintButton() {
   document.getElementById("print-pdf-btn").addEventListener("click", function () {
     var url;
     var bm = benchmarksParam();
+    var fp = filterParams();
     if (activeTab === "comparison") {
-      url = "/api/analysis/pdf/comparison?periods=" + comparisonPeriods.join(",") + bm;
+      url = "/api/analysis/pdf/comparison?periods=" + comparisonPeriods.join(",") + bm + fp;
     } else if (activeTab === "league") {
-      url = "/api/analysis/pdf/league-table?period=" + activePeriod + "&sort=" + leagueSort + "&dir=" + leagueSortDir + "&limit=" + leagueLimit + bm;
+      url = "/api/analysis/pdf/league-table?period=" + activePeriod + "&sort=" + leagueSort + "&dir=" + leagueSortDir + "&limit=" + leagueLimit + bm + fp;
     } else if (activeTab === "scatter") {
-      url = "/api/analysis/pdf/risk-return?period=" + activePeriod + bm;
+      url = "/api/analysis/pdf/risk-return?period=" + activePeriod + bm + fp;
     } else {
-      url = "/api/analysis/pdf/top-bottom?period=" + activePeriod + "&count=5" + bm;
+      url = "/api/analysis/pdf/top-bottom?period=" + activePeriod + "&count=5" + bm + fp;
     }
     window.open(url, "_blank");
   });

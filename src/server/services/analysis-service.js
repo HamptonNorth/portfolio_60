@@ -4,11 +4,12 @@
  * data, and top/bottom performer series for the analysis page.
  */
 
-import { getInvestmentsWithPrices } from "../db/investments-db.js";
+import { getInvestmentsWithPrices, getInvestmentsWithPricesByIds } from "../db/investments-db.js";
 import { getAllInvestmentPricesInRange } from "../db/prices-db.js";
 import { getRatesInRange } from "../db/currency-rates-db.js";
 import { getBenchmarkById } from "../db/benchmarks-db.js";
 import { getBenchmarkDataInRange } from "../db/benchmark-data-db.js";
+import { getCurrentHoldingInvestmentIds, getHistoricHoldingInvestmentIds } from "../db/holdings-db.js";
 import { convertPricesToGBP, sampleWeekly, rebaseToZero, generateWeeklyDates, formatISODate } from "./price-utils.js";
 
 /**
@@ -38,6 +39,39 @@ const PERIOD_LABELS = {
   "2y": "2 Years",
   "3y": "3 Years",
 };
+
+/**
+ * @description Resolve the set of investment IDs to include based on the
+ * holdings filter and selected user IDs. Returns null when no filtering
+ * is needed (i.e. "all investments").
+ * @param {string} holdingsFilter - "current", "historic", or "all"
+ * @param {Array<number>} userIds - Array of user IDs to filter by
+ * @returns {Array<number>|null} Array of investment IDs, or null for no filtering
+ */
+export function resolveInvestmentIds(holdingsFilter, userIds) {
+  if (holdingsFilter === "current") {
+    return getCurrentHoldingInvestmentIds(userIds);
+  }
+  if (holdingsFilter === "historic") {
+    return getHistoricHoldingInvestmentIds(userIds);
+  }
+  // "all" — no filtering
+  return null;
+}
+
+/**
+ * @description Get the investments list, optionally filtered by investment IDs.
+ * When investmentIds is null, returns all investments with prices.
+ * When investmentIds is an array, returns only those investments (that also have prices).
+ * @param {Array<number>|null} investmentIds - Array of IDs to filter by, or null for all
+ * @returns {Array<Object>} Array of investment objects
+ */
+function getFilteredInvestments(investmentIds) {
+  if (investmentIds === null) {
+    return getInvestmentsWithPrices();
+  }
+  return getInvestmentsWithPricesByIds(investmentIds);
+}
 
 /**
  * @description Calculate the start and end dates for a given period code.
@@ -195,11 +229,12 @@ function buildSparkline(prices, sampleDates) {
  * @description Build the league table data for all investments with price data.
  * Returns investments ranked by return for the given period.
  * @param {string} periodCode - One of "1w", "1m", "3m", "6m", "1y", "3y"
+ * @param {Array<number>|null} investmentIds - Optional array of investment IDs to filter by
  * @returns {Object} League table data with period info and ranked investments
  */
-export function buildLeagueTable(periodCode) {
+export function buildLeagueTable(periodCode, investmentIds) {
   var range = getDateRange(periodCode);
-  var investments = getInvestmentsWithPrices();
+  var investments = getFilteredInvestments(investmentIds);
   var allPricesMap = getAllInvestmentPricesInRange(range.fromStr, range.toStr);
   var sampleDates = generateWeeklyDates(range.startDate, range.endDate);
 
@@ -246,11 +281,12 @@ export function buildLeagueTable(periodCode) {
  * @description Build risk vs return scatter data for all investments.
  * Each investment gets a return percentage and annualised volatility.
  * @param {string} periodCode - One of "1w", "1m", "3m", "6m", "1y", "3y"
+ * @param {Array<number>|null} investmentIds - Optional array of investment IDs to filter by
  * @returns {Object} Scatter data with period info and investment data points
  */
-export function buildRiskReturnData(periodCode) {
+export function buildRiskReturnData(periodCode, investmentIds) {
   var range = getDateRange(periodCode);
-  var investments = getInvestmentsWithPrices();
+  var investments = getFilteredInvestments(investmentIds);
   var allPricesMap = getAllInvestmentPricesInRange(range.fromStr, range.toStr);
 
   var points = [];
@@ -290,12 +326,13 @@ export function buildRiskReturnData(periodCode) {
  * Series are rebased to 0% at the start of the period (same as performance charts).
  * @param {string} periodCode - One of "1w", "1m", "3m", "6m", "1y", "3y"
  * @param {number} count - Number of top and bottom performers to include (default 5)
+ * @param {Array<number>|null} investmentIds - Optional array of investment IDs to filter by
  * @returns {Object} Top/bottom data with series arrays and sample dates
  */
-export function buildTopBottomPerformers(periodCode, count) {
+export function buildTopBottomPerformers(periodCode, count, investmentIds) {
   count = count || 5;
   var range = getDateRange(periodCode);
-  var investments = getInvestmentsWithPrices();
+  var investments = getFilteredInvestments(investmentIds);
   var allPricesMap = getAllInvestmentPricesInRange(range.fromStr, range.toStr);
   var sampleDates = generateWeeklyDates(range.startDate, range.endDate);
 
@@ -463,9 +500,10 @@ export function buildBenchmarkRebasedSeries(benchmarkIds, periodCode) {
  * plus optional benchmark rows.
  * @param {Array<string>} periodCodes - Array of period codes (e.g. ["3m", "6m", "1y", "3y"])
  * @param {Array<number>} benchmarkIds - Optional array of benchmark IDs
+ * @param {Array<number>|null} investmentIds - Optional array of investment IDs to filter by
  * @returns {Object} Comparison data with periods, investments, and benchmarks
  */
-export function buildComparisonTable(periodCodes, benchmarkIds) {
+export function buildComparisonTable(periodCodes, benchmarkIds, investmentIds) {
   periodCodes = periodCodes || ["3m", "6m", "1y", "3y"];
   benchmarkIds = benchmarkIds || [];
 
@@ -482,7 +520,7 @@ export function buildComparisonTable(periodCodes, benchmarkIds) {
   // Use the widest period for the bulk price query
   var widestCode = periodCodes[periodCodes.length - 1];
   var widestRange = getDateRange(widestCode);
-  var investments = getInvestmentsWithPrices();
+  var investments = getFilteredInvestments(investmentIds);
   var allPricesMap = getAllInvestmentPricesInRange(widestRange.fromStr, widestRange.toStr);
 
   // Pre-compute date ranges for each period

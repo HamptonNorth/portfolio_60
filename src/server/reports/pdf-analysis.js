@@ -189,6 +189,30 @@ function drawTitleBar(page, title, x, y, width, fonts) {
 }
 
 /**
+ * @description Draw a filter subtitle line below the title bar showing which
+ * holdings/user filters are active. Returns the updated Y position.
+ * @param {Object} page - PDFPage instance
+ * @param {string|null} filterText - Human-readable filter description, or null to skip
+ * @param {number} x - Left edge
+ * @param {number} y - Current Y position (just below title bar)
+ * @param {Object} fonts - Roboto font objects from embedRobotoFonts()
+ * @returns {number} Updated Y position below the subtitle
+ */
+function drawFilterSubtitle(page, filterText, x, y, fonts) {
+  if (!filterText) return y;
+
+  page.drawText(filterText, {
+    x: x + 4,
+    y: y - 10,
+    font: fonts.regular,
+    size: FONT_SIZE_SUBTITLE,
+    color: COLOURS.brand600,
+  });
+
+  return y - 16;
+}
+
+/**
  * @description Add clickable research link annotations to an investment name.
  * @param {Object} page - PDFPage instance
  * @param {string} publicId - FT Markets public ID
@@ -610,8 +634,8 @@ function drawChartLegend(page, items, startX, y, availableWidth, maxPerRow, font
  * @param {Array<number>} benchmarkIds - Benchmark IDs
  * @returns {Promise<Uint8Array>} PDF bytes
  */
-export async function generateComparisonPdf(periodCodes, benchmarkIds) {
-  var data = buildComparisonTable(periodCodes, benchmarkIds);
+export async function generateComparisonPdf(periodCodes, benchmarkIds, investmentIds, filterText) {
+  var data = buildComparisonTable(periodCodes, benchmarkIds, investmentIds);
 
   var periodLabels = periodCodes.map(function (code) {
     return PERIOD_LABELS[code] || code;
@@ -625,6 +649,7 @@ export async function generateComparisonPdf(periodCodes, benchmarkIds) {
   var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_PORTRAIT_HEIGHT, MARGIN_TOP, fonts);
 
   y = drawTitleBar(page, title, MARGIN_LEFT, y, PORTRAIT_USABLE_WIDTH, fonts);
+  y = drawFilterSubtitle(page, filterText, MARGIN_LEFT, y, fonts);
   y -= 6;
 
   // Column layout
@@ -774,8 +799,8 @@ export async function generateComparisonPdf(periodCodes, benchmarkIds) {
  * @param {Array<number>} benchmarkIds - Benchmark IDs
  * @returns {Promise<Uint8Array>} PDF bytes
  */
-export async function generateLeagueTablePdf(period, sort, dir, limit, benchmarkIds) {
-  var data = buildLeagueTable(period);
+export async function generateLeagueTablePdf(period, sort, dir, limit, benchmarkIds, investmentIds, filterText) {
+  var data = buildLeagueTable(period, investmentIds);
   var bmData = benchmarkIds.length > 0 ? buildBenchmarkReturnData(benchmarkIds, period) : [];
   var periodLabel = PERIOD_LABELS[period] || period;
   var title = "League Table \u2014 " + periodLabel;
@@ -809,6 +834,7 @@ export async function generateLeagueTablePdf(period, sort, dir, limit, benchmark
   var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_PORTRAIT_HEIGHT, MARGIN_TOP, fonts);
 
   y = drawTitleBar(page, title, MARGIN_LEFT, y, PORTRAIT_USABLE_WIDTH, fonts);
+  y = drawFilterSubtitle(page, filterText, MARGIN_LEFT, y, fonts);
   y -= 6;
 
   // Column layout for portrait
@@ -996,8 +1022,8 @@ export async function generateLeagueTablePdf(period, sort, dir, limit, benchmark
  * @param {Array<number>} benchmarkIds - Benchmark IDs
  * @returns {Promise<Uint8Array>} PDF bytes
  */
-export async function generateTopBottomPdf(period, count, benchmarkIds) {
-  var data = buildTopBottomPerformers(period, count);
+export async function generateTopBottomPdf(period, count, benchmarkIds, investmentIds, filterText) {
+  var data = buildTopBottomPerformers(period, count, investmentIds);
   var bmSeries = [];
   if (benchmarkIds.length > 0) {
     var bmData = buildBenchmarkRebasedSeries(benchmarkIds, period);
@@ -1014,6 +1040,9 @@ export async function generateTopBottomPdf(period, count, benchmarkIds) {
   var page = pdf.addPage({ size: "a4", orientation: "portrait" });
   var pages = [page];
   var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_PORTRAIT_HEIGHT, MARGIN_TOP, fonts);
+
+  // Draw filter subtitle once at the top before the two charts
+  y = drawFilterSubtitle(page, filterText, MARGIN_LEFT, y, fonts);
 
   var pageWidth = PORTRAIT_USABLE_WIDTH;
   var sampleDates = data.sampleDates;
@@ -1152,8 +1181,8 @@ function buildLegendItems(series, bmSeries, colourOffset) {
  * @param {Array<number>} benchmarkIds - Benchmark IDs
  * @returns {Promise<Uint8Array>} PDF bytes
  */
-export async function generateRiskReturnPdf(period, benchmarkIds) {
-  var data = buildRiskReturnData(period);
+export async function generateRiskReturnPdf(period, benchmarkIds, investmentIds, filterText) {
+  var data = buildRiskReturnData(period, investmentIds);
   var bmData = benchmarkIds.length > 0 ? buildBenchmarkReturnData(benchmarkIds, period) : [];
   var periodLabel = PERIOD_LABELS[period] || period;
   var title = "Risk vs Return \u2014 " + periodLabel;
@@ -1165,6 +1194,7 @@ export async function generateRiskReturnPdf(period, benchmarkIds) {
   var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_LANDSCAPE_HEIGHT, MARGIN_TOP, fonts);
 
   y = drawTitleBar(page, title, MARGIN_LEFT, y, USABLE_WIDTH, fonts);
+  y = drawFilterSubtitle(page, filterText, MARGIN_LEFT, y, fonts);
   y -= 8;
 
   var investments = data.investments || [];

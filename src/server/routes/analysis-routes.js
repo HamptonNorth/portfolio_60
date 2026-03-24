@@ -12,6 +12,7 @@ import {
   buildBenchmarkReturnData,
   buildBenchmarkRebasedSeries,
   buildComparisonTable,
+  resolveInvestmentIds,
   PERIOD_WEEKS,
 } from "../services/analysis-service.js";
 import {
@@ -20,6 +21,7 @@ import {
   generateTopBottomPdf,
   generateRiskReturnPdf,
 } from "../reports/pdf-analysis.js";
+import { getAllUsers } from "../db/users-db.js";
 
 const analysisRouter = new Router();
 
@@ -50,12 +52,106 @@ function parseBenchmarkIds(param) {
   return ids;
 }
 
+/**
+ * @description Parse and validate the holdings filter query parameter.
+ * Accepts "current", "historic", or "all". Defaults to "current".
+ * @param {string|null} param - The raw holdings query parameter
+ * @returns {string} Validated holdings filter value
+ */
+function parseHoldingsFilter(param) {
+  if (param === "historic" || param === "all") return param;
+  return "current";
+}
+
+/**
+ * @description Parse a comma-separated list of user IDs from the users query parameter.
+ * Returns an array of valid positive integers. If empty or missing, returns all user IDs.
+ * @param {string|null} param - The raw users query parameter (e.g. "1,2")
+ * @returns {Array<number>} Array of user IDs
+ */
+function parseUserIds(param) {
+  var allUsers = getAllUsers();
+  var allUserIds = allUsers.map(function (u) { return u.id; });
+
+  if (!param) return allUserIds;
+
+  var ids = [];
+  var parts = param.split(",");
+  for (var i = 0; i < parts.length; i++) {
+    var id = parseInt(parts[i], 10);
+    if (id > 0) ids.push(id);
+  }
+
+  return ids.length > 0 ? ids : allUserIds;
+}
+
+/**
+ * @description Resolve investment IDs and user metadata from filter query parameters.
+ * Returns the resolved investment IDs (or null for "all") plus data needed for PDF filter text.
+ * @param {URL} url - The parsed request URL
+ * @returns {Object} Object with investmentIds, holdingsFilter, userIds, allUserIds, and userNames
+ */
+function resolveFilters(url) {
+  var holdingsFilter = parseHoldingsFilter(url.searchParams.get("holdings"));
+  var userIds = parseUserIds(url.searchParams.get("users"));
+  var allUsers = getAllUsers();
+  var allUserIds = allUsers.map(function (u) { return u.id; });
+
+  var investmentIds = resolveInvestmentIds(holdingsFilter, userIds);
+
+  // Build user names lookup for filter text
+  var userNames = [];
+  for (var i = 0; i < allUsers.length; i++) {
+    for (var j = 0; j < userIds.length; j++) {
+      if (allUsers[i].id === userIds[j]) {
+        userNames.push(allUsers[i].first_name + " " + allUsers[i].last_name);
+        break;
+      }
+    }
+  }
+
+  return {
+    investmentIds: investmentIds,
+    holdingsFilter: holdingsFilter,
+    userIds: userIds,
+    allUserIds: allUserIds,
+    userNames: userNames,
+  };
+}
+
+/**
+ * @description Build a human-readable filter description string for PDF subtitles.
+ * @param {Object} filters - The resolved filters from resolveFilters()
+ * @returns {string} Filter description (e.g. "Current holdings \u2014 All users")
+ */
+function buildFilterText(filters) {
+  var holdingsLabels = {
+    current: "Current holdings",
+    historic: "Historic holdings only",
+    all: "All investments",
+  };
+
+  var holdingsLabel = holdingsLabels[filters.holdingsFilter] || "Current holdings";
+
+  // "All investments" doesn't depend on users
+  if (filters.holdingsFilter === "all") {
+    return holdingsLabel;
+  }
+
+  var userLabel = filters.userIds.length === filters.allUserIds.length
+    ? "All users"
+    : filters.userNames.join(", ");
+
+  return holdingsLabel + " \u2014 " + userLabel;
+}
+
 // GET /api/analysis/league-table?period=1y — return ranked investments with sparklines
 analysisRouter.get("/api/analysis/league-table", function (request) {
   try {
     var url = new URL(request.url);
     var period = validatePeriod(url.searchParams.get("period")) || "1y";
-    var data = buildLeagueTable(period);
+    var filters = resolveFilters(url);
+    var data = buildLeagueTable(period, filters.investmentIds);
 
     return new Response(JSON.stringify(data), {
       headers: { "Content-Type": "application/json" },
@@ -74,7 +170,8 @@ analysisRouter.get("/api/analysis/risk-return", function (request) {
     var url = new URL(request.url);
     var period = validatePeriod(url.searchParams.get("period")) || "1y";
     var benchmarkIds = parseBenchmarkIds(url.searchParams.get("benchmarks"));
-    var data = buildRiskReturnData(period);
+    var filters = resolveFilters(url);
+    var data = buildRiskReturnData(period, filters.investmentIds);
 
     // Add benchmark scatter points if requested
     if (benchmarkIds.length > 0) {
@@ -101,8 +198,9 @@ analysisRouter.get("/api/analysis/top-bottom", function (request) {
     if (count < 1) count = 1;
     if (count > 20) count = 20;
     var benchmarkIds = parseBenchmarkIds(url.searchParams.get("benchmarks"));
+    var filters = resolveFilters(url);
 
-    var data = buildTopBottomPerformers(period, count);
+    var data = buildTopBottomPerformers(period, count, filters.investmentIds);
 
     // Add benchmark reference series if requested
     if (benchmarkIds.length > 0) {
@@ -136,8 +234,9 @@ analysisRouter.get("/api/analysis/comparison", function (request) {
       if (validated) periodCodes.push(validated);
     }
     if (periodCodes.length === 0) periodCodes = ["3m", "6m", "1y", "3y"];
+    var filters = resolveFilters(url);
 
-    var data = buildComparisonTable(periodCodes, benchmarkIds);
+    var data = buildComparisonTable(periodCodes, benchmarkIds, filters.investmentIds);
 
     return new Response(JSON.stringify(data), {
       headers: { "Content-Type": "application/json" },
@@ -166,8 +265,10 @@ analysisRouter.get("/api/analysis/pdf/comparison", async function (request) {
       if (validated) periodCodes.push(validated);
     }
     if (periodCodes.length === 0) periodCodes = ["3m", "6m", "1y", "3y"];
+    var filters = resolveFilters(url);
+    var filterText = buildFilterText(filters);
 
-    var pdfBytes = await generateComparisonPdf(periodCodes, benchmarkIds);
+    var pdfBytes = await generateComparisonPdf(periodCodes, benchmarkIds, filters.investmentIds, filterText);
     return new Response(pdfBytes, {
       headers: {
         "Content-Type": "application/pdf",
@@ -191,8 +292,10 @@ analysisRouter.get("/api/analysis/pdf/league-table", async function (request) {
     var dir = url.searchParams.get("dir") || "desc";
     var limit = url.searchParams.get("limit") || "all";
     var benchmarkIds = parseBenchmarkIds(url.searchParams.get("benchmarks"));
+    var filters = resolveFilters(url);
+    var filterText = buildFilterText(filters);
 
-    var pdfBytes = await generateLeagueTablePdf(period, sort, dir, limit, benchmarkIds);
+    var pdfBytes = await generateLeagueTablePdf(period, sort, dir, limit, benchmarkIds, filters.investmentIds, filterText);
     return new Response(pdfBytes, {
       headers: {
         "Content-Type": "application/pdf",
@@ -214,7 +317,10 @@ analysisRouter.get("/api/analysis/pdf/risk-return", async function (request) {
     var period = validatePeriod(url.searchParams.get("period")) || "1y";
     var benchmarkIds = parseBenchmarkIds(url.searchParams.get("benchmarks"));
 
-    var pdfBytes = await generateRiskReturnPdf(period, benchmarkIds);
+    var filters = resolveFilters(url);
+    var filterText = buildFilterText(filters);
+
+    var pdfBytes = await generateRiskReturnPdf(period, benchmarkIds, filters.investmentIds, filterText);
     return new Response(pdfBytes, {
       headers: {
         "Content-Type": "application/pdf",
@@ -239,7 +345,10 @@ analysisRouter.get("/api/analysis/pdf/top-bottom", async function (request) {
     if (count > 20) count = 20;
     var benchmarkIds = parseBenchmarkIds(url.searchParams.get("benchmarks"));
 
-    var pdfBytes = await generateTopBottomPdf(period, count, benchmarkIds);
+    var filters = resolveFilters(url);
+    var filterText = buildFilterText(filters);
+
+    var pdfBytes = await generateTopBottomPdf(period, count, benchmarkIds, filters.investmentIds, filterText);
     return new Response(pdfBytes, {
       headers: {
         "Content-Type": "application/pdf",

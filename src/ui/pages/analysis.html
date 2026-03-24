@@ -15,6 +15,33 @@
                 <button id="print-pdf-btn" class="bg-brand-700 hover:bg-brand-800 text-white font-medium px-5 py-2 rounded-lg transition-colors">Print to PDF</button>
             </div>
 
+            <!-- Filters -->
+            <div id="analysis-filters" class="flex items-center gap-6 mb-4">
+                <!-- Holdings filter -->
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-brand-500">Show:</span>
+                    <select id="holdings-filter" class="text-sm border border-brand-300 rounded px-2 py-1.5 bg-white">
+                        <option value="current" selected>Current holdings only</option>
+                        <option value="historic">Historic holdings only</option>
+                        <option value="all">All investments</option>
+                    </select>
+                </div>
+                <!-- User filter -->
+                <div class="flex items-center gap-2 relative">
+                    <span id="user-filter-label-prefix" class="text-sm text-brand-500">Users:</span>
+                    <div id="user-filter-container" class="relative">
+                        <button id="user-filter-btn" type="button"
+                            class="text-sm border border-brand-300 rounded px-3 py-1.5 bg-white min-w-[160px] text-left flex items-center justify-between">
+                            <span id="user-filter-label">Loading...</span>
+                            <span class="text-brand-400 ml-2">&#9662;</span>
+                        </button>
+                        <div id="user-filter-dropdown" class="hidden absolute top-full left-0 mt-1 bg-white border border-brand-200 rounded-lg shadow-lg z-20 min-w-[220px] py-1">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Tab bar -->
             <div class="flex gap-1 mb-4 border-b border-brand-200">
                 <button class="analysis-tab px-4 py-2 text-base font-medium rounded-t-lg transition-colors" data-tab="comparison">Comparison</button>

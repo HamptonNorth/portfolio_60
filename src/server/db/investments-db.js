@@ -223,6 +223,33 @@ export function getInvestmentsWithPrices() {
 }
 
 /**
+ * @description Get investments that have at least one price record, filtered
+ * to a specific set of investment IDs. Used by the analysis service when
+ * holdings or user filters are active.
+ * @param {Array<number>} investmentIds - Array of investment IDs to include
+ * @returns {Object[]} Array of investment objects with currency details
+ */
+export function getInvestmentsWithPricesByIds(investmentIds) {
+  if (!investmentIds || investmentIds.length === 0) return [];
+
+  const db = getDatabase();
+  const placeholders = investmentIds.map(() => "?").join(", ");
+  return db
+    .query(
+      `SELECT DISTINCT i.id, i.description, i.public_id, i.morningstar_id,
+              i.currencies_id, c.code AS currency_code,
+              it.short_description AS type_short
+       FROM investments i
+       JOIN currencies c ON i.currencies_id = c.id
+       JOIN investment_types it ON i.investment_type_id = it.id
+       JOIN prices p ON p.investment_id = i.id
+       WHERE i.id IN (${placeholders})
+       ORDER BY i.description`,
+    )
+    .all(...investmentIds);
+}
+
+/**
  * @description Get all manually-priced investments (auto_fetch = 0) with their
  * latest price date and how the last price was obtained.
  * Used by the home page alert table to show investments that need manual price updates.
