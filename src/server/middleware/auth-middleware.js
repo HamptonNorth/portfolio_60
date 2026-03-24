@@ -1,4 +1,13 @@
 import { getAuthStatus } from "../auth.js";
+import { isDemoMode } from "../test-mode.js";
+
+/**
+ * @description Paths exempt from the demo mode write block.
+ * Auth routes must remain writable so users can sign in/out.
+ * Fetch routes handle demo mode internally (simulated responses).
+ * @type {string[]}
+ */
+const DEMO_WRITE_EXEMPT = ["/api/auth/", "/api/fetch/"];
 
 /**
  * @description List of URL path prefixes that do NOT require authentication.
@@ -28,6 +37,32 @@ export function requiresAuth(path) {
     }
   }
   return true;
+}
+
+/**
+ * @description Check whether a write request should be blocked in demo mode.
+ * In demo mode, all non-GET requests are blocked except for auth routes.
+ * Returns a 403 Response if blocked, or null if allowed.
+ * @param {string} method - The HTTP method (GET, POST, etc.)
+ * @param {string} path - The URL pathname of the request
+ * @returns {Response|null} A 403 Response if blocked, or null if allowed
+ */
+export function checkDemoBlock(method, path) {
+  if (!isDemoMode()) return null;
+  if (method === "GET") return null;
+
+  // Allow auth routes through (sign-in, sign-out)
+  for (var i = 0; i < DEMO_WRITE_EXEMPT.length; i++) {
+    if (path.startsWith(DEMO_WRITE_EXEMPT[i])) return null;
+  }
+
+  return new Response(
+    JSON.stringify({
+      error: "Read-only demonstration",
+      detail: "Data cannot be modified in demo mode.",
+    }),
+    { status: 403, headers: { "Content-Type": "application/json" } },
+  );
 }
 
 /**

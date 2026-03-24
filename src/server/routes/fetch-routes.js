@@ -14,6 +14,8 @@ import { checkpointDatabase, getDatabase } from "../db/connection.js";
 import { backfillInvestmentPrices, backfillBenchmarkValues, backfillCurrencyRates, backfillSingleInvestment, backfillSingleBenchmark, backfillSingleCurrency } from "../services/historic-backfill.js";
 import { syncFromFetchServer, fetchServerStatus } from "../services/fetch-server-sync.js";
 import { getFetchServerConfig } from "../config.js";
+import { isDemoMode } from "../test-mode.js";
+import { CURRENCY_SCALE_FACTOR } from "../../shared/server-constants.js";
 
 /**
  * @description Sleep for a given number of milliseconds.
@@ -38,6 +40,21 @@ const fetchRouter = new Router();
 // Query parameter: testMode=true to skip database writes (returns JSON without updating tables)
 fetchRouter.post("/api/fetch/currency-rates", async function (request) {
   try {
+    // Demo mode — return latest rates from DB without fetching or writing
+    if (isDemoMode()) {
+      var latestRates = getLatestRates();
+      var demoRates = latestRates.map(function (r) {
+        return { code: r.currency_code, description: r.currency_description, rate: r.rate / CURRENCY_SCALE_FACTOR, date: r.rate_date };
+      });
+      return new Response(JSON.stringify({
+        success: true,
+        message: "Currency rates (demo)",
+        rates: demoRates,
+        date: demoRates.length > 0 ? demoRates[0].date : null,
+        demoMode: true,
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+
     const url = new URL(request.url);
     const testMode = url.searchParams.get("testMode") === "true";
 
@@ -249,6 +266,11 @@ fetchRouter.get("/api/fetch/benchmarks/list", async function () {
 // Query parameter: ids=1,2,3 — optional, fetch only these investment IDs (for batched fetching)
 // Query parameter: skipCurrencyRates=true — skip the currency rate fetch step
 fetchRouter.get("/api/fetch/prices/stream", async function (request) {
+  // Demo mode — simulate the stream using existing DB prices
+  if (isDemoMode()) {
+    return buildDemoPriceStream(request);
+  }
+
   try {
     const stream = new ReadableStream({
       async start(controller) {
@@ -605,6 +627,11 @@ fetchRouter.post("/api/fetch/prices/:id", async function (request, params) {
 // Sends events: "init" (benchmark list), "benchmark" (each result), "done" (summary)
 // Query parameter: ids=1,2,3 — optional, fetch only these benchmark IDs (for batched fetching)
 fetchRouter.get("/api/fetch/benchmarks/stream", async function (request) {
+  // Demo mode — simulate the stream using existing DB benchmark values
+  if (isDemoMode()) {
+    return buildDemoBenchmarkStream(request);
+  }
+
   try {
     const stream = new ReadableStream({
       async start(controller) {
@@ -1077,6 +1104,296 @@ fetchRouter.get("/api/fetch/server-status", async function () {
  * @param {Request} request - The full Request object
  * @returns {Promise<Response|null>} Response if matched, null otherwise
  */
+// ─── Demo mode simulated streams ─────────────────────────────────
+
+/**
+ * @description Build a simulated SSE price stream for demo mode.
+ * Reads existing prices from the database and emits them with short delays
+ * to make the UI look realistic. No external API calls or DB writes.
+ * @param {Request} request - The incoming HTTP request
+ * @returns {Response} SSE stream response
+ */
+function buildDemoPriceStream(request) {
+  var stream = new ReadableStream({
+    async start(controller) {
+      var encoder = new TextEncoder();
+      var eventId = 0;
+
+      function sendEvent(eventName, data) {
+        try {
+          controller.enqueue(encoder.encode("id: " + (++eventId) + "\n"));
+          controller.enqueue(encoder.encode("event: " + eventName + "\n"));
+          controller.enqueue(encoder.encode("data: " + JSON.stringify(data) + "\n\n"));
+        } catch { /* connection lost */ }
+      }
+
+      try {
+        var url = new URL(request.url);
+        var idsParam = url.searchParams.get("ids");
+        var skipCurrencyRates = url.searchParams.get("skipCurrencyRates") === "true";
+
+        // Get currency rates result for init event
+        var currencyRatesResult = null;
+        if (!skipCurrencyRates) {
+          var latestRates = getLatestRates();
+          currencyRatesResult = {
+            success: true,
+            message: "Currency rates (demo)",
+            rates: latestRates.map(function (r) {
+              return { code: r.currency_code, description: r.currency_description, rate: r.rate / CURRENCY_SCALE_FACTOR, date: r.rate_date };
+            }),
+          };
+        }
+
+        var investments = getMorningstarFetchableInvestments();
+        if (idsParam) {
+          var requestedIds = new Set(idsParam.split(",").map(Number));
+          investments = investments.filter(function (inv) { return requestedIds.has(inv.id); });
+        }
+
+        sendEvent("init", {
+          investments: investments.map(function (inv) {
+            return {
+              investmentId: inv.id,
+              description: inv.description,
+              currency: inv.currency_code,
+              morningstarResolvable: inv.morningstarResolvable,
+            };
+          }),
+          currencyRatesResult: currencyRatesResult,
+          total: investments.length,
+          method: "demo",
+        });
+
+        var successCount = 0;
+        var failedIds = [];
+
+        for (var i = 0; i < investments.length; i++) {
+          var inv = investments[i];
+
+          // Short random delay (500–2000ms) to look realistic
+          if (i > 0) {
+            await sleep(Math.floor(Math.random() * 1501) + 500);
+          }
+
+          // Manually priced investments
+          if (!inv.morningstarResolvable) {
+            sendEvent("price", {
+              success: false,
+              investmentId: inv.id,
+              description: inv.description,
+              rawPrice: "",
+              parsedPrice: null,
+              isMinorUnit: false,
+              priceMinorUnit: null,
+              currency: inv.currency_code,
+              error: "No Morningstar ID — manually priced",
+              errorCode: "MANUALLY_PRICED",
+              fallbackUsed: false,
+              priceDate: null,
+              attemptNumber: 1,
+              maxAttempts: 1,
+            });
+            failedIds.push(inv.id);
+            continue;
+          }
+
+          // Read latest price from DB
+          var latest = getLatestPrice(inv.id);
+          if (latest) {
+            sendEvent("price", {
+              success: true,
+              investmentId: inv.id,
+              description: inv.description,
+              rawPrice: latest.price.toFixed(2),
+              parsedPrice: latest.price,
+              isMinorUnit: false,
+              priceMinorUnit: null,
+              currency: inv.currency_code,
+              error: null,
+              errorCode: null,
+              fallbackUsed: false,
+              priceDate: latest.price_date,
+              attemptNumber: 1,
+              maxAttempts: 1,
+            });
+            successCount++;
+          } else {
+            sendEvent("price", {
+              success: false,
+              investmentId: inv.id,
+              description: inv.description,
+              rawPrice: "",
+              parsedPrice: null,
+              isMinorUnit: false,
+              priceMinorUnit: null,
+              currency: inv.currency_code,
+              error: "No price data available",
+              errorCode: "API_ERROR",
+              fallbackUsed: false,
+              priceDate: null,
+              attemptNumber: 1,
+              maxAttempts: 1,
+            });
+            failedIds.push(inv.id);
+          }
+        }
+
+        sendEvent("done", {
+          success: true,
+          message: "Demo fetch complete",
+          total: investments.length,
+          successCount: successCount,
+          failCount: failedIds.length,
+          failedIds: failedIds,
+        });
+      } catch (err) {
+        sendEvent("error", { error: "Demo stream error: " + err.message });
+      }
+
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
+  });
+}
+
+/**
+ * @description Build a simulated SSE benchmark stream for demo mode.
+ * Reads existing benchmark values from the database and emits them with
+ * short delays. No external API calls or DB writes.
+ * @param {Request} request - The incoming HTTP request
+ * @returns {Response} SSE stream response
+ */
+function buildDemoBenchmarkStream(request) {
+  var stream = new ReadableStream({
+    async start(controller) {
+      var encoder = new TextEncoder();
+      var eventId = 0;
+
+      function sendEvent(eventName, data) {
+        try {
+          controller.enqueue(encoder.encode("id: " + (++eventId) + "\n"));
+          controller.enqueue(encoder.encode("event: " + eventName + "\n"));
+          controller.enqueue(encoder.encode("data: " + JSON.stringify(data) + "\n\n"));
+        } catch { /* connection lost */ }
+      }
+
+      try {
+        var url = new URL(request.url);
+        var idsParam = url.searchParams.get("ids");
+
+        var benchmarks = getYahooFetchableBenchmarks();
+        if (idsParam) {
+          var requestedIds = new Set(idsParam.split(",").map(Number));
+          benchmarks = benchmarks.filter(function (bm) { return requestedIds.has(bm.id); });
+        }
+
+        sendEvent("init", {
+          benchmarks: benchmarks.map(function (bm) {
+            return {
+              benchmarkId: bm.id,
+              description: bm.description,
+              benchmarkType: bm.benchmark_type,
+              currency: bm.currency_code,
+              yahooResolvable: bm.yahooResolvable,
+            };
+          }),
+          total: benchmarks.length,
+          method: "demo",
+        });
+
+        var successCount = 0;
+        var failedIds = [];
+
+        for (var i = 0; i < benchmarks.length; i++) {
+          var bm = benchmarks[i];
+
+          // Short random delay (500–2000ms) to look realistic
+          if (i > 0) {
+            await sleep(Math.floor(Math.random() * 1501) + 500);
+          }
+
+          // Benchmarks without Yahoo ticker
+          if (!bm.yahooResolvable) {
+            sendEvent("benchmark", {
+              success: false,
+              benchmarkId: bm.id,
+              description: bm.description,
+              benchmarkType: bm.benchmark_type,
+              rawValue: "",
+              parsedValue: null,
+              currency: bm.currency_code || "",
+              error: "No Yahoo Finance ticker — requires web scraping",
+              errorCode: "NO_YAHOO_TICKER",
+              valueDate: null,
+              attemptNumber: 1,
+              maxAttempts: 1,
+            });
+            failedIds.push(bm.id);
+            continue;
+          }
+
+          // Read latest value from DB
+          var latest = getLatestBenchmarkData(bm.id);
+          if (latest) {
+            sendEvent("benchmark", {
+              success: true,
+              benchmarkId: bm.id,
+              description: bm.description,
+              benchmarkType: bm.benchmark_type,
+              rawValue: latest.value.toFixed(2),
+              parsedValue: latest.value,
+              currency: bm.currency_code || "",
+              error: null,
+              errorCode: null,
+              valueDate: latest.benchmark_date,
+              attemptNumber: 1,
+              maxAttempts: 1,
+            });
+            successCount++;
+          } else {
+            sendEvent("benchmark", {
+              success: false,
+              benchmarkId: bm.id,
+              description: bm.description,
+              benchmarkType: bm.benchmark_type,
+              rawValue: "",
+              parsedValue: null,
+              currency: bm.currency_code || "",
+              error: "No benchmark data available",
+              errorCode: "API_ERROR",
+              valueDate: null,
+              attemptNumber: 1,
+              maxAttempts: 1,
+            });
+            failedIds.push(bm.id);
+          }
+        }
+
+        sendEvent("done", {
+          success: true,
+          message: "Demo fetch complete",
+          total: benchmarks.length,
+          successCount: successCount,
+          failCount: failedIds.length,
+          failedIds: failedIds,
+        });
+      } catch (err) {
+        sendEvent("error", { error: "Demo stream error: " + err.message });
+      }
+
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
+  });
+}
+
 export async function handleFetchRoute(method, path, request) {
   return await fetchRouter.match(method, path, request);
 }

@@ -1,6 +1,6 @@
 import { SERVER_PORT, getDocsMediaDir } from "../shared/server-constants.js";
 import { resolve, join } from "node:path";
-import { checkAuth } from "./middleware/auth-middleware.js";
+import { checkAuth, checkDemoBlock } from "./middleware/auth-middleware.js";
 import { handleAuthRoute } from "./routes/auth-routes.js";
 import { handleDbRoute } from "./routes/db-routes.js";
 import { handleUsersRoute } from "./routes/users-routes.js";
@@ -130,6 +130,13 @@ const server = Bun.serve({
     const authResponse = checkAuth(path);
     if (authResponse) {
       return authResponse;
+    }
+
+    // --- Demo mode write block ---
+    // In demo mode, block all non-GET requests (except auth routes).
+    const demoResponse = checkDemoBlock(method, path);
+    if (demoResponse) {
+      return demoResponse;
     }
 
     // --- Static file routes ---

@@ -278,8 +278,9 @@ class AppNavbar extends LitElement {
   }
 
   /**
-   * @description Check whether the current session is in test mode.
+   * @description Check whether the current session is in test or demo mode.
    * If so, update the navbar title and add a visual indicator.
+   * Demo mode also shows a read-only banner below the navbar.
    */
   async _checkTestMode() {
     try {
@@ -288,17 +289,40 @@ class AppNavbar extends LitElement {
       const data = await response.json();
       if (!data.testMode) return;
 
-      document.documentElement.dataset.dbMode = "test";
-
-      const titleSpan = this.querySelector("#nav-app-title");
-      if (titleSpan) {
-        titleSpan.textContent = "Portfolio 60 - Test";
-      }
-
       const nav = this.querySelector("nav");
-      if (nav) {
-        nav.classList.remove("bg-brand-800");
-        nav.classList.add("bg-emerald-900");
+
+      if (data.demoMode) {
+        // Demo mode — amber styling with read-only indicator
+        document.documentElement.dataset.dbMode = "demo";
+
+        const titleSpan = this.querySelector("#nav-app-title");
+        if (titleSpan) {
+          titleSpan.textContent = "Portfolio 60 - Demo";
+        }
+
+        if (nav) {
+          nav.classList.remove("bg-brand-800");
+          nav.classList.add("bg-amber-800");
+        }
+
+        // Add a read-only banner below the navbar
+        const banner = document.createElement("div");
+        banner.className = "bg-amber-100 text-amber-800 text-center text-sm py-1.5 font-medium border-b border-amber-200";
+        banner.textContent = "Read-only demonstration \u2014 data cannot be modified";
+        this.appendChild(banner);
+      } else {
+        // Write-enabled test mode — green styling
+        document.documentElement.dataset.dbMode = "test";
+
+        const titleSpan = this.querySelector("#nav-app-title");
+        if (titleSpan) {
+          titleSpan.textContent = "Portfolio 60 - Test";
+        }
+
+        if (nav) {
+          nav.classList.remove("bg-brand-800");
+          nav.classList.add("bg-emerald-900");
+        }
       }
     } catch {
       // Ignore fetch errors — navbar stays in normal mode

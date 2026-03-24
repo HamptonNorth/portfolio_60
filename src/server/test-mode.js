@@ -16,6 +16,14 @@ import { setConfigPath, reloadConfig } from "./config.js";
 let testModeActive = false;
 
 /**
+ * @description In-memory flag tracking whether the current session is in demo
+ * (read-only) mode. When true, all write operations are blocked and fetch
+ * requests return simulated data from the existing database.
+ * @type {boolean}
+ */
+let demoModeActive = false;
+
+/**
  * @description Whether the test database was freshly created in this session.
  * When true, the UI should prompt the user to run Fetch All to populate prices.
  * @type {boolean}
@@ -140,6 +148,7 @@ export function activateTestMode() {
  */
 export function deactivateTestMode() {
   testModeActive = false;
+  demoModeActive = false;
 
   // Close the test database connection
   closeDatabase();
@@ -162,4 +171,22 @@ export function deactivateTestMode() {
  */
 export function isTestMode() {
   return testModeActive;
+}
+
+/**
+ * @description Check whether the current session is in demo (read-only) mode.
+ * Demo mode uses the test database but blocks all write operations.
+ * @returns {boolean} True if demo mode is active
+ */
+export function isDemoMode() {
+  return demoModeActive;
+}
+
+/**
+ * @description Set the demo mode flag. Called during passphrase handling
+ * to enable or disable read-only demo mode.
+ * @param {boolean} value - True to enable demo mode, false to disable
+ */
+export function setDemoMode(value) {
+  demoModeActive = !!value;
 }

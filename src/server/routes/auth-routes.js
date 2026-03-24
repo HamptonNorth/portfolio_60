@@ -1,14 +1,81 @@
 import { isFirstRun, getAuthStatus, setAuthStatus, hashPassphrase, verifyPassphrase, loadHashFromEnv, saveHashToEnv, checkLockout, recordFailedAttempt, resetFailedAttempts } from "../auth.js";
 import { databaseExists, createDatabase } from "../db/connection.js";
-import { isTestMode, activateTestMode, deactivateTestMode, isTestDatabaseFresh } from "../test-mode.js";
+import { isTestMode, isDemoMode, activateTestMode, deactivateTestMode, isTestDatabaseFresh, setDemoMode, testReferenceExists } from "../test-mode.js";
 
 /**
- * @description Check if a passphrase value is the test mode trigger.
+ * @description Classify a passphrase as a special mode trigger.
+ * Returns "demo" for read-only demo mode, "test" for read-only test mode
+ * (creates DB if needed), "test-write" for write-enabled test mode,
+ * or null for a normal passphrase.
  * @param {string} passphrase - The passphrase to check
- * @returns {boolean} True if the passphrase is "test" (case-insensitive)
+ * @returns {string|null} Mode string or null
  */
-function isTestPassphrase(passphrase) {
-  return typeof passphrase === "string" && passphrase.toLowerCase() === "test";
+function classifyPassphrase(passphrase) {
+  if (typeof passphrase !== "string") return null;
+  var lower = passphrase.toLowerCase();
+  if (lower === "demo") return "demo";
+  if (lower === "test") return "test";
+  if (passphrase === "test$rnc") return "test-write";
+  return null;
+}
+
+/**
+ * @description Handle activation of a special mode (demo, test, or test-write).
+ * Returns a Response if activation succeeds or fails, or null if not a special passphrase.
+ * @param {string} passphrase - The raw passphrase value
+ * @returns {Response|null} Response if handled, null if not a special passphrase
+ */
+function handleSpecialPassphrase(passphrase) {
+  var mode = classifyPassphrase(passphrase);
+  if (!mode) return null;
+
+  // "demo" requires the test DB to already exist
+  if (mode === "demo" && !testReferenceExists()) {
+    return new Response(
+      JSON.stringify({
+        error: "Demo database not found",
+        detail: "The demo database has not been created yet. Enter 'test' to create it first.",
+      }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  // Activate test mode (creates DB if needed for "test" and "test-write")
+  if (!activateTestMode()) {
+    return new Response(
+      JSON.stringify({
+        error: "Test mode failed",
+        detail: "Could not create or activate the test database.",
+      }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  // Set demo (read-only) flag for "demo" and "test" modes
+  var isReadOnly = mode === "demo" || mode === "test";
+  setDemoMode(isReadOnly);
+
+  setAuthStatus(true);
+  var fresh = isTestDatabaseFresh();
+  var message;
+  if (fresh) {
+    message = "Test mode activated. New database created — run Fetch All to populate prices.";
+  } else if (isReadOnly) {
+    message = "Demo mode activated — read-only";
+  } else {
+    message = "Test mode activated (write-enabled)";
+  }
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      testMode: true,
+      demoMode: isReadOnly,
+      freshDatabase: fresh,
+      message: message,
+    }),
+    { status: 200, headers: { "Content-Type": "application/json" } },
+  );
 }
 
 /**
@@ -35,11 +102,12 @@ export async function handleAuthRoute(method, path, request) {
     );
   }
 
-  // GET /api/auth/test-mode — returns whether the current session is in test mode
+  // GET /api/auth/test-mode — returns whether the current session is in test or demo mode
   if (method === "GET" && path === "/api/auth/test-mode") {
     return new Response(
       JSON.stringify({
         testMode: isTestMode(),
+        demoMode: isDemoMode(),
       }),
       {
         status: 200,
@@ -73,25 +141,9 @@ export async function handleAuthRoute(method, path, request) {
 
     const passphrase = body.passphrase;
 
-    // Test mode bypass — enter test mode without setting a hash
-    if (isTestPassphrase(passphrase)) {
-      if (!activateTestMode()) {
-        return new Response(
-          JSON.stringify({
-            error: "Test mode failed",
-            detail: "Could not create or activate the test database.",
-          }),
-          { status: 500, headers: { "Content-Type": "application/json" } },
-        );
-      }
-
-      setAuthStatus(true);
-      const fresh = isTestDatabaseFresh();
-      const message = fresh
-        ? "Test mode activated. New database created — run Fetch All to populate prices."
-        : "Test mode activated";
-      return new Response(JSON.stringify({ success: true, testMode: true, freshDatabase: fresh, message: message }), { status: 200, headers: { "Content-Type": "application/json" } });
-    }
+    // Special mode bypass — demo, test, or test-write without setting a hash
+    var specialResponse = handleSpecialPassphrase(passphrase);
+    if (specialResponse) return specialResponse;
 
     if (!passphrase || typeof passphrase !== "string" || passphrase.length < 8) {
       return new Response(
@@ -179,25 +231,9 @@ export async function handleAuthRoute(method, path, request) {
       return new Response(JSON.stringify({ error: "Validation failed", detail: "Passphrase is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
     }
 
-    // Test mode bypass — enter test mode without verifying hash
-    if (isTestPassphrase(passphrase)) {
-      if (!activateTestMode()) {
-        return new Response(
-          JSON.stringify({
-            error: "Test mode failed",
-            detail: "Could not create or activate the test database.",
-          }),
-          { status: 500, headers: { "Content-Type": "application/json" } },
-        );
-      }
-
-      setAuthStatus(true);
-      const fresh = isTestDatabaseFresh();
-      const message = fresh
-        ? "Test mode activated. New database created — run Fetch All to populate prices."
-        : "Test mode activated";
-      return new Response(JSON.stringify({ success: true, testMode: true, freshDatabase: fresh, message: message }), { status: 200, headers: { "Content-Type": "application/json" } });
-    }
+    // Special mode bypass — demo, test, or test-write without verifying hash
+    var specialResponse = handleSpecialPassphrase(passphrase);
+    if (specialResponse) return specialResponse;
 
     const storedHash = loadHashFromEnv();
     if (!storedHash) {

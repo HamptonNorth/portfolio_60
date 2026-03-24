@@ -1838,15 +1838,31 @@ class AppNavbar extends LitElement {
       const data = await response.json();
       if (!data.testMode)
         return;
-      document.documentElement.dataset.dbMode = "test";
-      const titleSpan = this.querySelector("#nav-app-title");
-      if (titleSpan) {
-        titleSpan.textContent = "Portfolio 60 - Test";
-      }
       const nav = this.querySelector("nav");
-      if (nav) {
-        nav.classList.remove("bg-brand-800");
-        nav.classList.add("bg-emerald-900");
+      if (data.demoMode) {
+        document.documentElement.dataset.dbMode = "demo";
+        const titleSpan = this.querySelector("#nav-app-title");
+        if (titleSpan) {
+          titleSpan.textContent = "Portfolio 60 - Demo";
+        }
+        if (nav) {
+          nav.classList.remove("bg-brand-800");
+          nav.classList.add("bg-amber-800");
+        }
+        const banner = document.createElement("div");
+        banner.className = "bg-amber-100 text-amber-800 text-center text-sm py-1.5 font-medium border-b border-amber-200";
+        banner.textContent = "Read-only demonstration — data cannot be modified";
+        this.appendChild(banner);
+      } else {
+        document.documentElement.dataset.dbMode = "test";
+        const titleSpan = this.querySelector("#nav-app-title");
+        if (titleSpan) {
+          titleSpan.textContent = "Portfolio 60 - Test";
+        }
+        if (nav) {
+          nav.classList.remove("bg-brand-800");
+          nav.classList.add("bg-emerald-900");
+        }
       }
     } catch {}
   }
@@ -1942,7 +1958,39 @@ customElements.define("app-navbar", AppNavbar);
 
 // app-identity.js
 var APP_NAME = "Portfolio 60";
-var APP_VERSION = "0.1.2";
+// package.json
+var package_default = {
+  name: "portfolio-60",
+  version: "0.1.4",
+  description: "UK Family Investment Portfolio Tracker",
+  type: "module",
+  private: true,
+  scripts: {
+    dev: 'concurrently "bun run dev:css" "bun run dev:server"',
+    "dev:server": "fuser -k 1420/tcp 2>/dev/null; PORTFOLIO60_DATA_DIR=$HOME/.config/portfolio_60 bun --hot run src/server/index.js",
+    "dev:css": "bunx @tailwindcss/cli -i ./src/ui/css/input.css -o ./src/ui/css/output.css --watch",
+    "build:css": "bunx @tailwindcss/cli -i ./src/ui/css/input.css -o ./src/ui/css/output.css --minify",
+    test: "bun test",
+    "test:e2e": "bunx playwright test"
+  },
+  dependencies: {
+    "@libpdf/core": "^0.3.3",
+    "@tailwindcss/cli": "^4.1.18",
+    "adm-zip": "^0.5.16",
+    archiver: "^7.0.1",
+    concurrently: "^9.2.1",
+    croner: "^10.0.1",
+    "cspell-lib": "^9.6.4",
+    lit: "^3.3.2",
+    marked: "^17.0.2",
+    tailwindcss: "^4.1.18",
+    "yahoo-finance2": "^3.13.0"
+  },
+  devDependencies: {
+    "@playwright/test": "^1.58.1",
+    playwright: "^1.58.1"
+  }
+};
 
 // src/ui/js/components/app-footer.js
 class AppFooter extends LitElement {
@@ -1952,7 +2000,7 @@ class AppFooter extends LitElement {
   render() {
     return html`
       <footer class="text-brand-400 text-sm py-4 border-t border-brand-100 flex justify-between px-6 max-w-7xl mx-auto w-full">
-        <span>${APP_NAME} v${APP_VERSION}</span>
+        <span>${APP_NAME} v${package_default.version}</span>
         <span id="build-time"></span>
       </footer>
     `;

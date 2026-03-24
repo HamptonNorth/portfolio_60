@@ -2,7 +2,7 @@ import { Cron } from "croner";
 import { getSchedulingConfig, getRetryConfig, getFetchDelayProfile, getCronUpdateTestDatabase } from "../config.js";
 import { getLastSuccessfulFetchByType } from "../db/fetch-history-db.js";
 import { databaseExists } from "../db/connection.js";
-import { testReferenceExists, activateTestMode, deactivateTestMode } from "../test-mode.js";
+import { testReferenceExists, activateTestMode, deactivateTestMode, isDemoMode } from "../test-mode.js";
 import { runFullPriceUpdate, retryFailedItems } from "./fetch-service.js";
 import { writeSchedulerLog, pruneSchedulerLog } from "../db/scheduler-log-db.js";
 import { processDrawdowns } from "./drawdown-processor.js";
@@ -242,6 +242,12 @@ async function updateTestDatabase(startedBy, delayProfile) {
  * @returns {{ stop: Function, getNextRun: Function, isRunning: Function }}
  */
 export function initScheduledFetcher() {
+  // Skip scheduled fetching entirely in demo mode — no writes allowed
+  if (isDemoMode()) {
+    console.log("[Scheduler] Demo mode — scheduled fetching disabled");
+    return { stop: function () {}, getNextRun: function () { return null; } };
+  }
+
   const schedulingConfig = getSchedulingConfig();
 
   // Prune log entries older than 30 days on every startup
