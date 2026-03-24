@@ -75,6 +75,7 @@ docsRouter.get("/api/docs/config", function () {
   return new Response(
     JSON.stringify({
       categories: docsConfig.categories,
+      guides: docsConfig.guides || [],
       styles: STYLE_REGISTRY,
     }),
     {

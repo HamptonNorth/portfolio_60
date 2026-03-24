@@ -56,11 +56,17 @@
     ]
   },
   "docs": {
-    "_readme": "Documentation subsystem categories. Each key under 'categories' is a folder name under docs/. The 'style' sets the default markdown CSS (github or modest), and 'label' is the display name in the Docs menu.",
+    "_readme": "Documentation subsystem categories. Each key under 'categories' is a folder name under docs/. The 'style' sets the default markdown CSS (github or modest), and 'label' is the display name in the Docs menu. The 'guides' array adds direct links to specific documents at the top of the Docs dropdown.",
     "categories": {
       "guide": { "style": "github", "label": "User Guides" },
       "notes": { "style": "modest", "label": "Financial Notes" }
-    }
+    },
+    "guides": [
+      { "label": "User Guide", "category": "guide", "slug": "user_guide_v0.1.4" },
+      { "label": "Composing Reports & Charts", "category": "guide", "slug": "composing_reports_and_charts_v0.1.4" },
+      { "label": "Technical Reference", "category": "guide", "slug": "technical_reference_v0.1.4" },
+      { "label": "Create Test Database", "category": "guide", "slug": "create_test_database_v0.1.4" }
+    ]
   },
   "fetchServer": {
     "enabled": true,

@@ -1925,14 +1925,26 @@ class AppNavbar extends LitElement {
       }
       docsItem.style.display = "";
       dropdown.innerHTML = "";
+      const guides = data.guides || [];
       categoryNames.forEach(function(name) {
         const cat = categories[name];
-        const link = document.createElement("a");
-        link.href = "/pages/docs-list.html?category=" + encodeURIComponent(name);
-        link.className = "block px-4 py-2 hover:bg-brand-50 transition-colors";
-        link.setAttribute("data-nav", "docs-" + name);
-        link.textContent = cat.label || name;
-        dropdown.appendChild(link);
+        const heading = document.createElement("a");
+        heading.href = "/pages/docs-list.html?category=" + encodeURIComponent(name);
+        heading.className = "block px-4 py-2 hover:bg-brand-50 transition-colors font-medium";
+        heading.setAttribute("data-nav", "docs-" + name);
+        heading.textContent = cat.label || name;
+        dropdown.appendChild(heading);
+        var categoryGuides = guides.filter(function(g) {
+          return g.category === name;
+        });
+        categoryGuides.forEach(function(guide) {
+          const link = document.createElement("a");
+          link.href = "/pages/docs-page.html?category=" + encodeURIComponent(guide.category) + "&slug=" + encodeURIComponent(guide.slug);
+          link.className = "block pl-8 pr-4 py-1.5 hover:bg-brand-50 transition-colors text-sm text-brand-600";
+          link.setAttribute("data-nav", "docs-guide-" + guide.slug);
+          link.textContent = guide.label;
+          dropdown.appendChild(link);
+        });
       });
       const hr = document.createElement("hr");
       hr.className = "my-1 border-brand-200";
