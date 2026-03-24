@@ -1,6 +1,8 @@
 import { isFirstRun, getAuthStatus, setAuthStatus, hashPassphrase, verifyPassphrase, loadHashFromEnv, saveHashToEnv, checkLockout, recordFailedAttempt, resetFailedAttempts } from "../auth.js";
-import { databaseExists, createDatabase } from "../db/connection.js";
+import { databaseExists, createDatabase, getDatabase } from "../db/connection.js";
 import { isTestMode, isDemoMode, activateTestMode, deactivateTestMode, isTestDatabaseFresh, setDemoMode, testReferenceExists } from "../test-mode.js";
+import { getDocsConfig } from "../config.js";
+import { reindexAllPages } from "../services/docs-search.js";
 
 /**
  * @description Classify a passphrase as a special mode trigger.
@@ -54,6 +56,12 @@ function handleSpecialPassphrase(passphrase) {
   // Set demo (read-only) flag for "demo" and "test" modes
   var isReadOnly = mode === "demo" || mode === "test";
   setDemoMode(isReadOnly);
+
+  // Reindex docs search for the new database/docs directory (fire-and-forget)
+  var docsConfig = getDocsConfig();
+  if (docsConfig.categories && Object.keys(docsConfig.categories).length > 0) {
+    reindexAllPages(getDatabase(), docsConfig.categories).catch(function () {});
+  }
 
   setAuthStatus(true);
   var fresh = isTestDatabaseFresh();
@@ -253,6 +261,11 @@ export async function handleAuthRoute(method, path, request) {
       // If switching from test mode back to live, deactivate test mode first
       if (isTestMode()) {
         deactivateTestMode();
+        // Reindex docs search for the live database/docs directory
+        var liveDocsConfig = getDocsConfig();
+        if (liveDocsConfig.categories && Object.keys(liveDocsConfig.categories).length > 0) {
+          reindexAllPages(getDatabase(), liveDocsConfig.categories).catch(function () {});
+        }
       }
       setAuthStatus(true);
       return new Response(JSON.stringify({ success: true, message: "Passphrase verified" }), { status: 200, headers: { "Content-Type": "application/json" } });

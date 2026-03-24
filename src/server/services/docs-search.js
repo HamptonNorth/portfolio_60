@@ -6,7 +6,7 @@
  */
 
 import { readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { getDocsDir } from "../../shared/server-constants.js";
 import { parseFrontMatter } from "./docs-frontmatter.js";
 
@@ -226,7 +226,7 @@ export async function reindexAllPages(db, categories) {
 
     for (var i = 0; i < categoryNames.length; i++) {
       var category = categoryNames[i];
-      var dirPath = "./" + getDocsDir() + "/" + category;
+      var dirPath = resolve(getDocsDir(), category);
 
       try {
         var files = await readdir(dirPath);

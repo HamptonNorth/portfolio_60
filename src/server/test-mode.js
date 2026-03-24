@@ -1,5 +1,5 @@
 import { resolve, join } from "node:path";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, mkdirSync, readdirSync, copyFileSync } from "node:fs";
 import { DATA_DIR } from "../shared/server-constants.js";
 import {
   closeDatabase,
@@ -95,6 +95,43 @@ function createTestDatabase() {
 }
 
 /**
+ * @description Copy guide markdown files from the repo docs directory into
+ * the test reference docs directory. This ensures that user guides are
+ * available for search and viewing in demo/test mode even though the test
+ * docs directory starts empty. Only copies files that don't already exist
+ * in the target (preserves any test-specific docs).
+ */
+function syncRepoGuidesToTestDocs(testDocsDir) {
+  try {
+    var repoDocsDir = resolve("docs");
+    if (!existsSync(repoDocsDir)) return;
+
+    var categories = readdirSync(repoDocsDir, { withFileTypes: true });
+    for (var i = 0; i < categories.length; i++) {
+      if (!categories[i].isDirectory()) continue;
+
+      var categoryName = categories[i].name;
+      var srcDir = join(repoDocsDir, categoryName);
+      var destDir = join(testDocsDir, categoryName);
+
+      mkdirSync(destDir, { recursive: true });
+
+      var files = readdirSync(srcDir);
+      for (var j = 0; j < files.length; j++) {
+        if (!files[j].endsWith(".md")) continue;
+        var srcFile = join(srcDir, files[j]);
+        var destFile = join(destDir, files[j]);
+        if (!existsSync(destFile)) {
+          copyFileSync(srcFile, destFile);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[Test Mode] Failed to sync repo guides to test docs:", err.message);
+  }
+}
+
+/**
  * @description Activate test mode. If no test database exists, creates and
  * seeds one from scratch. Switches the database, docs, and config paths to
  * point at the test reference data. Closes the current database connection
@@ -130,8 +167,10 @@ export function activateTestMode() {
   process.env.DB_PATH = resolve(TEST_REF_DIR, "portfolio60.db");
   resetDatabasePath();
 
-  // Point docs at test reference
-  process.env.DOCS_DIR = resolve(TEST_REF_DIR, "docs");
+  // Point docs at test reference, copying repo guide files if needed
+  var testDocsDir = resolve(TEST_REF_DIR, "docs");
+  process.env.DOCS_DIR = testDocsDir;
+  syncRepoGuidesToTestDocs(testDocsDir);
 
   // Load test reference config
   const testConfigPath = resolve(TEST_REF_DIR, "user-settings.json");
