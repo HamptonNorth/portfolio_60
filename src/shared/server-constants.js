@@ -9,6 +9,9 @@ import { APP_NAME, APP_VERSION } from "../../app-identity.js";
 export { APP_NAME, APP_VERSION };
 
 /** @type {number} Port the Bun HTTP server listens on */
+// for deployment to nuc2023 (dem version)
+// export const SERVER_PORT = 1451;
+// for local development
 export const SERVER_PORT = 1420;
 
 /**

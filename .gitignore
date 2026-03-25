@@ -66,3 +66,4 @@ src/ui/css/output.css
 *.db-shm
 # Remove all PLAN_* markdown files
 PLAN_*
+deploy_to_nuc2023.md
