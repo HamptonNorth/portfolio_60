@@ -289,6 +289,22 @@ The navigation bar changes to a green colour and shows **Portfolio 60 - Test** t
 
 ---
 
+## Passphrase Management
+
+The application passphrase is stored as an argon2id hash in the `.env` file located in the data directory (typically `~/.config/portfolio_60/.env`). The hash is saved under the key `APP_PASSPHRASE_HASH`.
+
+### Resetting the passphrase
+
+To reset the passphrase, delete or clear the `APP_PASSPHRASE_HASH` line from the `.env` file. On next startup, `isFirstRun()` will return `true` and the application will present the set-passphrase screen.
+
+This operation is safe — it affects only the authentication gate. The database, configuration, documents and backups are not modified.
+
+### Lockout protection
+
+The verify endpoint has brute-force protection: after 5 consecutive failed attempts, authentication is locked out for 4 hours. The lockout counter resets on a successful authentication or a server restart.
+
+---
+
 ## Data Storage
 
 All application data is stored locally on your computer:

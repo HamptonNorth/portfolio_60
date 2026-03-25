@@ -52,6 +52,21 @@ On the very first run, you will be asked to **set** a passphrase. Choose somethi
 
 On subsequent runs, you simply enter the passphrase you chose and press Enter.
 
+### Resetting your passphrase
+
+If you forget your passphrase or simply want to change it, you can reset it. This does **not** delete or alter your portfolio data in any way — it only removes the stored passphrase so the application treats you as a first-time user and asks you to choose a new one.
+
+To reset your passphrase:
+
+1. Close Portfolio 60 if it is running
+2. Open your data folder — this is typically `~/.config/portfolio_60/` on Linux or macOS, or `%APPDATA%\portfolio_60\` on Windows
+3. Open the file called `.env` in a plain text editor (e.g. Notepad, TextEdit or nano)
+4. Find the line that starts with `APP_PASSPHRASE_HASH=` and delete it entirely
+5. Save the file and close the editor
+6. Start Portfolio 60 — you will be asked to set a new passphrase
+
+Your database, settings, documents, backups and all other data are completely unaffected by this process.
+
 ### Trying the demo first
 
 If you would like to explore the application before entering your own data, type **demo** or **test** as the passphrase. This opens a pre-loaded set of sample data so you can browse around and see what the application does. Nothing you do in demo mode affects any real data, and no changes are saved. See the [Demo Mode](#demo-mode) section for more details.
