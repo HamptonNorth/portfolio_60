@@ -26,24 +26,6 @@
     "batchSize": 10,
     "cooldownSeconds": 25
   },
-  "lists": {
-    "_readme": "Embedded spreadsheet lists displayed under the Lists menu. Each entry has a title (shown in the menu), an iframe (the full embed HTML from Google Sheets or Excel Online 'Publish to Web'), a spreadsheet type ('google' or 'microsoft'), and an optional range. For Google Sheets, range is a cell range e.g. 'A3:F14'. For Microsoft Excel, range is a named range defined in the workbook e.g. 'MyTable'.",
-    "items": [
-      {
-        "title": "Gifts within IHT Allowance ",
-        "spreadsheet": "google",
-        "iframe": "<iframe src=\"https://docs.google.com/spreadsheets/d/11_wO0Cn2Mn5v9lcnyiMT3pzaIfUz7k0PK7mb5vMoRFA/edit?usp=sharing\"></iframe>",
-        "range": "A2:F14"
-      },
-
-      {
-        "title": "Income Tax rates",
-        "spreadsheet": "microsoft",
-        "iframe": "<iframe  src=\"https://1drv.ms/x/c/b7bf8885da4911af/IQSWkWXIieaHTZ9Zk7g9sFNvAU4q65xIrWDw01XnX9t0QWU\"></iframe>",
-        "range": ""
-      }
-    ]
-  },
   "docs": {
     "_readme": "Documentation subsystem categories. Each key under 'categories' is a folder name under docs/. The 'style' sets the default markdown CSS (github or modest), and 'label' is the display name in the Docs menu. The 'guides' array adds direct links to specific documents at the top of the Docs dropdown.",
     "categories": {

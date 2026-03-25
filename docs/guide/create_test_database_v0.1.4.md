@@ -18,7 +18,7 @@ This guide explains how the test/demo database works in Portfolio 60. The test d
 
 The test database is created **automatically** the first time you enter the developer test passphrase (`test****`). There is no manual setup required — the application handles everything.
 
-### What happens when you type "test$rnc"
+### What happens when you enter the developer test passphrase
 
 1. The application creates a fresh database in the `data/test_reference/` directory
 2. It applies the schema and populates it with sample reference data (users, accounts, investments, holdings, benchmarks, currencies, other assets and global events)
@@ -31,7 +31,7 @@ The first-time setup takes **5–10 minutes** because of the volume of historic 
 
 Once the backfill completes, you are prompted to run **Fetch All** to collect today's prices. After that, the test database is fully functional with realistic, up-to-date valuations.
 
-The `demo` and `test` passphrases (read-only modes) **do not** create the database — if the test database does not yet exist, they will show an error directing you to create it first using `test$rnc`.
+The `demo` and `test` passphrases (read-only modes) **do not** create the database — if the test database does not yet exist, they will show an error directing you to create it first using the developer test passphrase.
 
 ---
 
@@ -43,10 +43,10 @@ Three special passphrases provide access to the test database:
 |---|---|---|---|
 | **demo** | No — shows an error if the database does not exist | Read-only | Amber |
 | **test** | No — shows an error if the database does not exist | Read-only | Amber |
-| **test$rnc** | Yes — creates and backfills automatically | Full read/write | Green |
+| developer test passphrase | Yes — creates and backfills automatically | Full read/write | Green |
 
 - **demo** and **test** both open the test database in read-only (demonstration) mode. You can browse all views, run reports and try the simulated Fetch All, but you cannot add, edit or delete any data.
-- **test$rnc** opens the test database with full write access — you can make changes, run real fetches against external APIs, and modify the data freely. This is the developer/testing passphrase.
+- The **developer test passphrase** opens the test database with full write access — you can make changes, run real fetches against external APIs, and modify the data freely.
 
 ### How to tell which mode you are in
 
@@ -85,7 +85,7 @@ The investments include a realistic mix: UK mutual funds identified by ISIN, Lon
 To start fresh with a clean test database:
 
 1. Delete the `data/test_reference/` directory from your data folder
-2. Enter **test$rnc** as your passphrase
+2. Enter the developer test passphrase
 3. The database will be recreated and backfilled from scratch
 
 This is useful after significant application updates that change the database schema, or if you simply want to reset the sample data to its original state.
@@ -94,7 +94,7 @@ This is useful after significant application updates that change the database sc
 
 If you are running a public demo (for example, via a Cloudflare tunnel), the test database prices will become stale unless updated. You can either:
 
-- Enter **test$rnc** mode periodically and run **Fetch All** to get fresh prices
+- Enter write-enabled test mode periodically and run **Fetch All** to get fresh prices
 - Copy an up-to-date test database from your development machine to the server
 
 ---

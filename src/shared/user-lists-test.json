@@ -1,0 +1,18 @@
+{
+  "_readme": "Test/demo mode lists. These are shown instead of the live lists when in test or demo mode.",
+  "items": [
+    {
+      "title": "Gifts within IHT Allowance ",
+      "spreadsheet": "google",
+      "iframe": "<iframe src=\"https://docs.google.com/spreadsheets/d/11_wO0Cn2Mn5v9lcnyiMT3pzaIfUz7k0PK7mb5vMoRFA/edit?usp=sharing\"></iframe>",
+      "range": "A2:F14"
+    },
+
+    {
+      "title": "Income Tax rates",
+      "spreadsheet": "microsoft",
+      "iframe": "<iframe  src=\"https://1drv.ms/x/c/b7bf8885da4911af/IQSWkWXIieaHTZ9Zk7g9sFNvAU4q65xIrWDw01XnX9t0QWU\"></iframe>",
+      "range": ""
+    }
+  ]
+}

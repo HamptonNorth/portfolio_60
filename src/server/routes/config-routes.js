@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync } from "node:fs";
 import { resolve, dirname, basename, join } from "node:path";
 import { loadConfig, getAllowedProviders, getSchedulingConfig, reloadConfig, getListItems, getConfigFilePath, getWritableConfigPath, getReportsOpenInNewTab, getMergedConfigRaw } from "../config.js";
+import { isTestMode } from "../test-mode.js";
 import { DB_PATH, BACKUP_DIR, APP_NAME, APP_VERSION } from "../../shared/server-constants.js";
 
 /**
@@ -176,9 +177,10 @@ export function handleConfigRoute(method, path) {
     }
   }
 
-  // GET /api/config/lists — return the embedded spreadsheet list items
+  // GET /api/config/lists — return the embedded spreadsheet list items.
+  // Uses user-lists-test.json in test/demo mode, user-lists.json otherwise.
   if (method === "GET" && path === "/api/config/lists") {
-    const items = getListItems();
+    const items = getListItems(isTestMode());
     return new Response(JSON.stringify({ items: items }), {
       status: 200,
       headers: { "Content-Type": "application/json" },

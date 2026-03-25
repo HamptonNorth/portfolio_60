@@ -281,11 +281,11 @@ When enabled, Portfolio 60 pushes its fetch configuration to the fetch server on
 
 For development and testing purposes, a write-enabled test mode is available. This is separate from the read-only demo mode described in the User Guide.
 
-To enter write-enabled test mode, type `test$rnc` as the passphrase. This opens the test database with full read/write access — you can add, edit and delete data, run real fetches against external APIs, and make any changes you wish.
+To enter write-enabled test mode, type the developer test passphrase (shown in the source code — see `auth-routes.js`). This opens the test database with full read/write access — you can add, edit and delete data, run real fetches against external APIs, and make any changes you wish.
 
 The navigation bar changes to a green colour and shows **Portfolio 60 - Test** to distinguish it from both normal mode and demo mode.
 
-**Note:** The standard `test` and `demo` passphrases open the test database in read-only (demo) mode. Only `test$rnc` provides write access.
+**Note:** The standard `test` and `demo` passphrases open the test database in read-only (demo) mode. Only the developer test passphrase provides write access.
 
 ---
 

@@ -244,13 +244,6 @@ export function loadConfig() {
     cooldownSeconds: typeof rawFetchBatch.cooldownSeconds === "number" && Number.isInteger(rawFetchBatch.cooldownSeconds) && rawFetchBatch.cooldownSeconds >= 0 && rawFetchBatch.cooldownSeconds <= 600 ? rawFetchBatch.cooldownSeconds : DEFAULTS.fetchBatch.cooldownSeconds,
   };
 
-  // lists — embedded spreadsheet lists for the Lists menu
-  const rawLists = rawConfig.lists || {};
-  config.lists = {
-    _readme: rawLists._readme || "",
-    items: Array.isArray(rawLists.items) ? rawLists.items : [],
-  };
-
   // docs — documentation subsystem categories and guide links
   var rawDocs = rawConfig.docs || {};
   config.docs = {
@@ -352,13 +345,29 @@ export function getCronUpdateTestDatabase() {
 }
 
 /**
- * @description Get the list items for embedded spreadsheet lists.
- * Returns an array of { title, spreadsheet, iframe } objects.
- * @returns {Array<{title: string, spreadsheet: string, iframe: string}>}
+ * @description File paths for the live and test list definition files.
+ * Follows the same pattern as user-reports.json / user-reports-test.json.
+ * @type {string}
  */
-export function getListItems() {
-  const config = loadConfig();
-  return config.lists ? config.lists.items : [];
+const listsFilePath = resolve("src/shared/user-lists.json");
+const listsTestFilePath = resolve("src/shared/user-lists-test.json");
+
+/**
+ * @description Get the list items for embedded spreadsheet lists.
+ * Reads from user-lists.json (live) or user-lists-test.json (test/demo mode).
+ * Re-reads the JSON file on every call so hand-edits take effect without restart.
+ * @param {boolean} [testMode=false] - Whether to use the test lists file
+ * @returns {Array<{title: string, spreadsheet: string, iframe: string, range?: string}>}
+ */
+export function getListItems(testMode) {
+  try {
+    const filePath = testMode ? listsTestFilePath : listsFilePath;
+    const raw = readFileSync(filePath, "utf-8");
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed.items) ? parsed.items : [];
+  } catch {
+    return [];
+  }
 }
 
 /**
