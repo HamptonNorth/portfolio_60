@@ -1963,6 +1963,14 @@ class AppNavbar extends LitElement {
         modal.open();
       });
       dropdown.appendChild(searchBtn);
+      const courseHr = document.createElement("hr");
+      courseHr.className = "my-1 border-brand-200";
+      dropdown.appendChild(courseHr);
+      const courseLink = document.createElement("a");
+      courseLink.href = "/pages/portfolio60-course.html";
+      courseLink.className = "block px-4 py-2 hover:bg-brand-50 transition-colors font-medium";
+      courseLink.textContent = "How Portfolio 60 Works";
+      dropdown.appendChild(courseLink);
     } catch {}
   }
 }

@@ -1,0 +1,3125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How Portfolio 60 Works — An Interactive Course</title>
+<!-- System fonts only — matches Portfolio 60's approach -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 24 24'%3E%3Cpath fill='%23d01212' d='M3.903 4.008L4.086 4h10.828A2.08 2.08 0 0 1 17 6.077V7h1.5c1.917 0 3.5 1.477 3.5 3.333v2.334C22 14.523 20.417 16 18.5 16h-1.663a5.33 5.33 0 0 1-5.17 4H7.333C4.389 20 2 17.625 2 14.692V6.074a2.08 2.08 0 0 1 1.903-2.066M17 14h1.5c.843 0 1.5-.613 1.5-1.333v-2.334C20 9.613 19.343 9 18.5 9H17z'/%3E%3C/svg%3E">
+<style>
+/* ============================================
+   DESIGN SYSTEM — CSS Custom Properties
+   ============================================ */
+:root {
+  /* Backgrounds — Portfolio 60 brand palette */
+  --color-bg:             #f7f9fc;       /* brand-25 */
+  --color-bg-warm:        #f0f4f8;       /* brand-50 */
+  --color-bg-code:        #1E1E2E;       /* dark code blocks (unchanged) */
+  --color-text:           #102a43;       /* brand-900 */
+  --color-text-secondary: #486581;       /* brand-600 */
+  --color-text-muted:     #829ab1;       /* brand-400 */
+  --color-border:         #bcccdc;       /* brand-200 */
+  --color-border-light:   #d9e2ec;       /* brand-100 */
+  --color-surface:        #FFFFFF;
+  --color-surface-warm:   #f3f7fb;       /* brand-38 */
+
+  /* Accent — brand-700/800 */
+  --color-accent:         #334e68;       /* brand-700 */
+  --color-accent-hover:   #243b53;       /* brand-800 */
+  --color-accent-light:   #d9e2ec;       /* brand-100 */
+  --color-accent-muted:   #627d98;       /* brand-500 */
+
+  /* Semantic — Portfolio 60 status colours */
+  --color-success:        #2d6a4f;
+  --color-success-light:  #e8f5ee;
+  --color-error:          #c1121f;
+  --color-error-light:    #fde8e8;
+  --color-info:           #486581;       /* brand-600 */
+  --color-info-light:     #d9e2ec;       /* brand-100 */
+
+  /* Actor colors — brand shades + status colours for variety */
+  --color-actor-1:        #334e68;       /* brand-700 */
+  --color-actor-2:        #627d98;       /* brand-500 */
+  --color-actor-3:        #486581;       /* brand-600 */
+  --color-actor-4:        #e09f3e;       /* warning/amber */
+  --color-actor-5:        #2d6a4f;       /* success/green */
+
+  /* Fonts — system fonts matching Portfolio 60 */
+  --font-display:  ui-sans-serif, system-ui, sans-serif;
+  --font-body:     ui-sans-serif, system-ui, sans-serif;
+  --font-mono:     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+
+  /* Type scale */
+  --text-xs:   0.75rem;
+  --text-sm:   0.875rem;
+  --text-base: 1rem;
+  --text-lg:   1.125rem;
+  --text-xl:   1.25rem;
+  --text-2xl:  1.5rem;
+  --text-3xl:  1.875rem;
+  --text-4xl:  2.25rem;
+  --text-5xl:  3rem;
+  --text-6xl:  3.75rem;
+
+  /* Line heights */
+  --leading-tight:  1.15;
+  --leading-snug:   1.3;
+  --leading-normal: 1.6;
+  --leading-loose:  1.8;
+
+  /* Spacing */
+  --space-1:  0.25rem;
+  --space-2:  0.5rem;
+  --space-3:  0.75rem;
+  --space-4:  1rem;
+  --space-5:  1.25rem;
+  --space-6:  1.5rem;
+  --space-8:  2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
+  --space-24: 6rem;
+
+  --content-width:      800px;
+  --content-width-wide: 1000px;
+  --nav-height:         60px;          /* matches Portfolio 60 py-4 navbar */
+  --radius-sm:  4px;        /* rounded-sm */
+  --radius-md:  6px;        /* rounded-md */
+  --radius-lg:  8px;        /* rounded-lg */
+  --radius-full: 9999px;
+
+  /* Shadows — Portfolio 60 standard */
+  --shadow-sm:  0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md:  0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg:  0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl:  0 16px 48px rgb(0 0 0 / 0.12);
+
+  /* Animation */
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --duration-fast:   150ms;
+  --duration-normal: 300ms;
+  --duration-slow:   500ms;
+  --stagger-delay:   120ms;
+}
+
+/* ============================================
+   RESET & BASE
+   ============================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  scroll-snap-type: y proximity;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: var(--radius-full); }
+
+/* Code blocks — no horizontal scroll ever */
+pre, code {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: hidden;
+}
+.translation-code::-webkit-scrollbar, pre::-webkit-scrollbar { display: none; }
+
+/* ============================================
+   NAVIGATION
+   ============================================ */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: #243b53;              /* brand-800, matching Portfolio 60 navbar */
+  box-shadow: var(--shadow-md);
+  height: var(--nav-height);
+}
+.progress-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: #bcccdc;              /* brand-200 — visible on dark navbar */
+  width: 0%;
+  transition: width 100ms linear;
+}
+.nav-inner {
+  max-width: 80rem;                 /* max-w-7xl */
+  margin: 0 auto;
+  padding: 0 1.5rem;               /* px-6 */
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nav-title {
+  font-family: var(--font-display);
+  font-weight: 600;                /* font-semibold */
+  font-size: var(--text-xl);       /* text-xl, matching Portfolio 60 */
+  color: #ffffff;
+  letter-spacing: 0.025em;         /* tracking-wide */
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;                     /* gap-2 */
+}
+.nav-title svg {
+  width: 32px;
+  height: 32px;                    /* h-8 w-8 */
+  flex-shrink: 0;
+}
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;                     /* gap-6 */
+}
+.nav-link {
+  color: #ffffff;
+  text-decoration: none;
+  font-size: var(--text-base);
+  transition: color var(--duration-fast);
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: var(--font-body);
+  padding: 0;
+}
+.nav-link:hover {
+  color: #bcccdc;                  /* hover:text-brand-200 */
+}
+.nav-dots {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+.nav-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #627d98;          /* brand-500 on dark bg */
+  background: transparent;
+  cursor: pointer;
+  transition: all var(--duration-fast);
+  position: relative;
+  padding: 0;
+}
+.nav-dot:hover { border-color: #bcccdc; }
+.nav-dot.current {
+  border-color: #ffffff;
+  background: #ffffff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+.nav-dot.visited {
+  border-color: #bcccdc;
+  background: #bcccdc;
+}
+.nav-dot-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #102a43;              /* brand-900 */
+  color: #d9e2ec;                   /* brand-100 */
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast);
+}
+.nav-dot:hover .nav-dot-tooltip { opacity: 1; }
+
+/* ============================================
+   MODULE LAYOUT
+   ============================================ */
+.module {
+  min-height: 100dvh;
+  min-height: 100vh;
+  scroll-snap-align: start;
+  padding: var(--space-16) var(--space-6);
+  padding-top: calc(var(--nav-height) + var(--space-12));
+}
+.module-content {
+  max-width: var(--content-width);
+  margin: 0 auto;
+}
+.module-header { margin-bottom: var(--space-12); }
+.module-number {
+  font-family: var(--font-display);
+  font-size: var(--text-6xl);
+  font-weight: 800;
+  color: var(--color-accent);
+  opacity: 0.15;
+  line-height: var(--leading-tight);
+}
+.module-title {
+  font-family: var(--font-display);
+  font-size: var(--text-4xl);
+  font-weight: 700;
+  line-height: var(--leading-tight);
+  margin-top: var(--space-2);
+  color: var(--color-text);
+}
+.module-subtitle {
+  font-size: var(--text-lg);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-3);
+  line-height: var(--leading-normal);
+}
+.module-body { display: flex; flex-direction: column; gap: var(--space-16); }
+
+/* Screen sections within modules */
+.screen { display: flex; flex-direction: column; gap: var(--space-6); }
+.screen-heading {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  line-height: var(--leading-snug);
+  color: var(--color-text);
+}
+.screen p {
+  max-width: 65ch;
+  line-height: var(--leading-normal);
+}
+
+/* ============================================
+   SCROLL ANIMATIONS
+   ============================================ */
+.animate-in {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity var(--duration-slow) var(--ease-out),
+              transform var(--duration-slow) var(--ease-out);
+}
+.animate-in.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.stagger-children > .animate-in {
+  transition-delay: calc(var(--stagger-index, 0) * var(--stagger-delay));
+}
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================
+   CODE TRANSLATION BLOCKS
+   ============================================ */
+.translation-block {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  margin: var(--space-4) 0;
+}
+.translation-code {
+  background: var(--color-bg-code);
+  color: #CDD6F4;
+  padding: var(--space-6);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  position: relative;
+  overflow-x: hidden;
+}
+.translation-code pre, .translation-code code {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: hidden;
+}
+.translation-english {
+  background: var(--color-surface-warm);
+  padding: var(--space-6);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  border-left: 3px solid var(--color-accent);
+}
+.translation-label {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-3);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.5;
+  font-family: var(--font-mono);
+}
+.translation-english .translation-label {
+  color: var(--color-text-muted);
+  position: relative;
+  top: auto;
+  right: auto;
+  display: block;
+  margin-bottom: var(--space-3);
+}
+.translation-lines { display: flex; flex-direction: column; gap: var(--space-2); }
+.tl { color: var(--color-text-secondary); margin: 0; }
+
+/* Syntax highlighting — Catppuccin */
+.code-keyword  { color: #CBA6F7; }
+.code-string   { color: #A6E3A1; }
+.code-function { color: #89B4FA; }
+.code-comment  { color: #6C7086; }
+.code-number   { color: #FAB387; }
+.code-property { color: #F9E2AF; }
+.code-operator { color: #94E2D5; }
+.code-tag      { color: #F38BA8; }
+.code-attr     { color: #F9E2AF; }
+.code-value    { color: #A6E3A1; }
+
+/* ============================================
+   QUIZ COMPONENTS
+   ============================================ */
+.quiz-container {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  box-shadow: var(--shadow-md);
+}
+.quiz-question-block { margin-bottom: var(--space-8); }
+.quiz-question-block:last-of-type { margin-bottom: var(--space-6); }
+.quiz-question {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  margin-bottom: var(--space-4);
+  line-height: var(--leading-snug);
+}
+.quiz-options { display: flex; flex-direction: column; gap: var(--space-2); }
+.quiz-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  cursor: pointer;
+  width: 100%;
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  text-align: left;
+  transition: border-color var(--duration-fast), background var(--duration-fast);
+}
+.quiz-option:hover { border-color: var(--color-accent-muted); }
+.quiz-option.selected { border-color: var(--color-accent); background: var(--color-accent-light); }
+.quiz-option.correct { border-color: var(--color-success); background: var(--color-success-light); }
+.quiz-option.incorrect { border-color: var(--color-error); background: var(--color-error-light); }
+.quiz-option-radio {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  flex-shrink: 0;
+  transition: all var(--duration-fast);
+}
+.quiz-option.selected .quiz-option-radio {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  box-shadow: inset 0 0 0 3px white;
+}
+.quiz-option.correct .quiz-option-radio {
+  border-color: var(--color-success);
+  background: var(--color-success);
+  box-shadow: inset 0 0 0 3px white;
+}
+.quiz-option.incorrect .quiz-option-radio {
+  border-color: var(--color-error);
+  background: var(--color-error);
+  box-shadow: inset 0 0 0 3px white;
+}
+.quiz-feedback {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height var(--duration-normal), opacity var(--duration-normal), padding var(--duration-normal);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+.quiz-feedback.show {
+  max-height: 200px;
+  opacity: 1;
+  padding: var(--space-3);
+  margin-top: var(--space-2);
+  border-radius: var(--radius-sm);
+}
+.quiz-feedback.success { background: var(--color-success-light); color: #1a6b3a; }
+.quiz-feedback.error { background: var(--color-error-light); color: #a62e2e; }
+.quiz-feedback.warning { background: var(--color-accent-light); color: var(--color-accent); }
+.quiz-check-btn, .quiz-reset-btn {
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+  border: none;
+}
+.quiz-check-btn {
+  background: #334e68;              /* brand-700 */
+  color: white;
+  margin-right: var(--space-2);
+  border-radius: var(--radius-lg);
+}
+.quiz-check-btn:hover { background: #243b53; }  /* brand-800 */
+.quiz-reset-btn {
+  background: #d9e2ec;             /* brand-100 */
+  color: #334e68;                  /* brand-700 */
+  border: none;
+  border-radius: var(--radius-lg);
+}
+.quiz-reset-btn:hover { background: #bcccdc; }  /* brand-200 */
+
+/* ============================================
+   CALLOUT BOXES
+   ============================================ */
+.callout {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  border-radius: var(--radius-md);
+  margin: var(--space-4) 0;
+}
+.callout-accent {
+  background: var(--color-accent-light);
+  border-left: 4px solid var(--color-accent);
+}
+.callout-info {
+  background: var(--color-info-light);
+  border-left: 4px solid var(--color-info);
+}
+.callout-warning {
+  background: var(--color-error-light);
+  border-left: 4px solid var(--color-error);
+}
+.callout-icon { font-size: 1.5rem; flex-shrink: 0; }
+.callout-content { flex: 1; }
+.callout-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  display: block;
+  margin-bottom: var(--space-2);
+}
+.callout-content p { font-size: var(--text-sm); color: var(--color-text-secondary); margin: 0; }
+
+/* ============================================
+   PATTERN / FEATURE CARDS
+   ============================================ */
+.pattern-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-4);
+}
+.pattern-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--duration-normal) var(--ease-out), box-shadow var(--duration-normal);
+}
+.pattern-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+.pattern-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  margin-bottom: var(--space-3);
+  color: white;
+}
+.pattern-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  margin-bottom: var(--space-2);
+}
+.pattern-desc {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: var(--leading-normal);
+  margin: 0;
+}
+
+/* ============================================
+   FLOW DIAGRAMS
+   ============================================ */
+.flow-steps {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.flow-step {
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+  min-width: 120px;
+  flex: 1;
+}
+.flow-step-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: white;
+  font-weight: 700;
+  font-family: var(--font-display);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--space-2);
+  font-size: var(--text-sm);
+}
+.flow-step p { font-size: var(--text-sm); margin: 0; color: var(--color-text-secondary); }
+.flow-arrow {
+  font-size: var(--text-2xl);
+  color: var(--color-accent);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* ============================================
+   STEP CARDS
+   ============================================ */
+.step-cards { display: flex; flex-direction: column; gap: var(--space-3); }
+.step-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--color-accent);
+  box-shadow: var(--shadow-sm);
+}
+.step-num {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: white;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  flex-shrink: 0;
+}
+.step-body strong { display: block; }
+.step-body p { margin: var(--space-1) 0 0; color: var(--color-text-secondary); font-size: var(--text-sm); }
+
+/* ============================================
+   ICON ROWS
+   ============================================ */
+.icon-rows { display: flex; flex-direction: column; gap: var(--space-4); }
+.icon-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+.icon-row p { margin: 0; color: var(--color-text-secondary); font-size: var(--text-sm); }
+.icon-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  color: white;
+}
+
+/* ============================================
+   FILE TREE
+   ============================================ */
+.file-tree {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sm);
+}
+.ft-folder, .ft-file {
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--color-border-light);
+  margin-left: var(--space-4);
+}
+.ft-folder > .ft-name { color: var(--color-accent); font-weight: 600; }
+.ft-file > .ft-name { color: var(--color-text); }
+.ft-desc {
+  color: var(--color-text-secondary);
+  font-family: var(--font-body);
+  margin-left: var(--space-2);
+  font-size: var(--text-xs);
+}
+.ft-children { margin-left: var(--space-4); }
+
+/* ============================================
+   GROUP CHAT
+   ============================================ */
+.chat-window {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  max-width: 600px;
+  margin: var(--space-4) auto;
+}
+.chat-header {
+  background: #243b53;             /* brand-800, matches navbar */
+  color: #ffffff;
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+.chat-messages {
+  padding: var(--space-4);
+  min-height: 200px;
+  max-height: 500px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.chat-message {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+.chat-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: var(--text-xs);
+  color: white;
+  flex-shrink: 0;
+  font-family: var(--font-display);
+}
+.chat-bubble {
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  max-width: 80%;
+}
+.chat-sender {
+  font-weight: 600;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: block;
+  margin-bottom: var(--space-1);
+}
+.chat-bubble p { font-size: var(--text-sm); margin: 0; }
+.chat-typing {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding: 0 var(--space-4);
+}
+.chat-typing-dots {
+  display: flex;
+  gap: 4px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+}
+.typing-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+  animation: typingBounce 1.4s infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-6px); }
+}
+.chat-controls {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border-light);
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.chat-controls button {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+}
+.chat-controls button:hover { border-color: var(--color-accent); color: var(--color-accent); }
+.chat-progress {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+/* ============================================
+   DATA FLOW ANIMATION
+   ============================================ */
+.flow-animation {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  box-shadow: var(--shadow-md);
+  text-align: center;
+}
+.flow-actors {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: var(--space-8);
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+.flow-actor {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 2px solid var(--color-border);
+  transition: all var(--duration-normal) var(--ease-out);
+  min-width: 100px;
+}
+.flow-actor.active {
+  box-shadow: 0 0 0 3px #334e68, 0 0 20px rgba(51, 78, 104, 0.2);
+  transform: scale(1.05);
+}
+.flow-actor-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  color: white;
+}
+.flow-actor span {
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary);
+}
+.flow-step-label {
+  padding: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.flow-controls {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: center;
+  align-items: center;
+  margin-top: var(--space-4);
+}
+.flow-controls button {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+}
+.flow-controls button:hover { border-color: var(--color-accent); color: var(--color-accent); }
+
+/* ============================================
+   GLOSSARY TOOLTIPS
+   ============================================ */
+.term {
+  border-bottom: 1.5px dashed var(--color-accent-muted);
+  cursor: pointer;
+  position: relative;
+}
+.term:hover, .term.active {
+  border-bottom-color: var(--color-accent);
+  color: var(--color-accent);
+}
+.term-tooltip {
+  position: fixed;
+  background: #102a43;              /* brand-900 */
+  color: #d9e2ec;                   /* brand-100 */
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-family: var(--font-body);
+  line-height: var(--leading-normal);
+  width: max(200px, min(320px, 80vw));
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--duration-fast);
+  z-index: 10000;
+}
+.term-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: #102a43;
+}
+.term-tooltip.visible { opacity: 1; }
+.term-tooltip.flip::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+  border-bottom-color: #102a43;
+}
+
+/* ============================================
+   SCENARIO BLOCKS
+   ============================================ */
+.scenario-block {
+  margin-bottom: var(--space-6);
+}
+.scenario-context {
+  background: var(--color-bg-warm);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-4);
+  border-left: 3px solid var(--color-actor-4);
+}
+.scenario-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-actor-4);
+  font-weight: 600;
+  display: block;
+  margin-bottom: var(--space-2);
+}
+
+/* ============================================
+   BADGE ITEMS
+   ============================================ */
+.badge-list { display: flex; flex-direction: column; gap: var(--space-2); }
+.badge-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--duration-fast);
+}
+.badge-item:hover { border-color: var(--color-accent-muted); }
+.badge-code {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  background: var(--color-bg-code);
+  color: #CBA6F7;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+/* ============================================
+   HERO / WELCOME MODULE
+   ============================================ */
+.hero-module {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 100dvh;
+  min-height: 100vh;
+}
+.hero-badge {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: #334e68;                  /* brand-700 */
+  background: #d9e2ec;            /* brand-100 */
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  margin-bottom: var(--space-6);
+}
+.hero-title {
+  font-family: var(--font-display);
+  font-size: var(--text-5xl);
+  font-weight: 800;
+  line-height: var(--leading-tight);
+  max-width: 700px;
+  margin-bottom: var(--space-6);
+}
+.hero-desc {
+  font-size: var(--text-lg);
+  color: var(--color-text-secondary);
+  max-width: 550px;
+  line-height: var(--leading-normal);
+  margin-bottom: var(--space-10);
+}
+.hero-scroll-hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  animation: float 3s ease-in-out infinite;
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 768px) {
+  :root {
+    --text-4xl: 1.875rem;
+    --text-5xl: 2.25rem;
+    --text-6xl: 3rem;
+  }
+  .translation-block { grid-template-columns: 1fr; }
+  .translation-english { border-left: none; border-top: 3px solid var(--color-accent); }
+  .pattern-cards { grid-template-columns: 1fr 1fr; }
+  .flow-steps { flex-direction: column; }
+  .flow-arrow { transform: rotate(90deg); }
+}
+@media (max-width: 480px) {
+  :root {
+    --text-4xl: 1.5rem;
+    --text-5xl: 1.875rem;
+    --text-6xl: 2.25rem;
+  }
+  .module { padding: var(--space-8) var(--space-4); }
+  .pattern-cards { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ==========================================
+     NAVIGATION
+     ========================================== -->
+<nav class="nav" role="navigation">
+  <div class="progress-bar" id="progress-bar" role="progressbar" aria-valuenow="0"></div>
+  <div class="nav-inner">
+    <span class="nav-title">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="#d01212" d="M3.903 4.008L4.086 4h10.828A2.08 2.08 0 0 1 17 6.077V7h1.5c1.917 0 3.5 1.477 3.5 3.333v2.334C22 14.523 20.417 16 18.5 16h-1.663a5.33 5.33 0 0 1-5.17 4H7.333C4.389 20 2 17.625 2 14.692V6.074a2.08 2.08 0 0 1 1.903-2.066M17 14h1.5c.843 0 1.5-.613 1.5-1.333v-2.334C20 9.613 19.343 9 18.5 9H17z"/></svg>
+      How Portfolio 60 Works
+    </span>
+    <div style="display:flex; align-items:center; gap:1.5rem;">
+      <div class="nav-dots">
+        <button class="nav-dot current" data-target="hero" aria-label="Welcome"><span class="nav-dot-tooltip">Welcome</span></button>
+        <button class="nav-dot" data-target="module-1" aria-label="Module 1"><span class="nav-dot-tooltip">The Big Picture</span></button>
+        <button class="nav-dot" data-target="module-2" aria-label="Module 2"><span class="nav-dot-tooltip">Meet the Cast</span></button>
+        <button class="nav-dot" data-target="module-3" aria-label="Module 3"><span class="nav-dot-tooltip">The Database</span></button>
+        <button class="nav-dot" data-target="module-4" aria-label="Module 4"><span class="nav-dot-tooltip">Fetching Prices</span></button>
+        <button class="nav-dot" data-target="module-5" aria-label="Module 5"><span class="nav-dot-tooltip">Valuation</span></button>
+        <button class="nav-dot" data-target="module-6" aria-label="Module 6"><span class="nav-dot-tooltip">The Frontend</span></button>
+        <button class="nav-dot" data-target="module-7" aria-label="Module 7"><span class="nav-dot-tooltip">When Things Break</span></button>
+      </div>
+      <a href="#about-modal" class="nav-link">About</a>
+      <a href="/" class="nav-link">Portfolio 60</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ==========================================
+     HERO / WELCOME
+     ========================================== -->
+<section class="module hero-module" id="hero" style="background: var(--color-bg);">
+  <div class="hero-badge animate-in">INTERACTIVE COURSE</div>
+  <h1 class="hero-title animate-in">How Portfolio 60 Works Under the Hood</h1>
+  <p class="hero-desc animate-in">A UK family investment tracker that converts currencies, fetches live prices, and values your portfolio — all from a single SQLite database and a Bun server. Here's how every piece fits together.</p>
+  <div class="hero-scroll-hint animate-in">Scroll down to begin</div>
+</section>
+
+<!-- ==========================================
+     MODULE 1 — THE BIG PICTURE
+     ========================================== -->
+<section class="module" id="module-1" style="background: var(--color-bg-warm);">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">01</span>
+      <h1 class="module-title">What Portfolio 60 Does — And What Happens When You Use It</h1>
+      <p class="module-subtitle">Start with the product, then trace a real user action into the code.</p>
+    </header>
+    <div class="module-body" id="m1-body">
+
+      <!-- Screen 1: What it does -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A Family Investment Dashboard — In Your Browser</h2>
+        <p>Portfolio 60 is a web application that tracks investments for a UK family. It shows how much each person's <span class="term" data-definition="An ISA (Individual Savings Account), SIPP (Self-Invested Personal Pension), and Trading account are the three main UK investment account types. Each has different tax rules.">Trading, ISA, and SIPP accounts</span> are worth — all converted to British pounds.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-1)">
+            <div class="pattern-icon" style="background: var(--color-actor-1)">👥</div>
+            <h4 class="pattern-title">Multiple People</h4>
+            <p class="pattern-desc">Tracks investments for each family member separately, with their own accounts.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">💷</div>
+            <h4 class="pattern-title">GBP Valuations</h4>
+            <p class="pattern-desc">Everything shown in pounds. US and European investments get converted using live exchange rates.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">📈</div>
+            <h4 class="pattern-title">Live Prices</h4>
+            <p class="pattern-desc">Fetches real prices from Morningstar, Yahoo Finance, and the European Central Bank — automatically.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-5)">
+            <div class="pattern-icon" style="background: var(--color-actor-5)">🔒</div>
+            <h4 class="pattern-title">Self-Hosted</h4>
+            <p class="pattern-desc">Runs on your own machine. No cloud accounts, no subscriptions. Your financial data stays yours.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 2: The user action trace -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">What Happens When You Open the App?</h2>
+        <p>Imagine you type the address into your browser and hit Enter. Here's the journey your request takes — from your browser all the way to the database and back.</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <strong>Your browser sends a request</strong>
+              <p>You type <code>http://localhost:1420</code>. Your browser sends an <span class="term" data-definition="An HTTP request is a message your browser sends to a server asking for something — like loading a page or fetching data. It includes a method (GET = 'give me this', POST = 'here's some data') and a URL (the address).">HTTP request</span> to the server.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <strong>The server catches it</strong>
+              <p>A <span class="term" data-definition="Bun is a fast JavaScript runtime — like Node.js but newer and faster. It can run JavaScript code, serve websites, and talk to databases, all without needing a separate web server like Apache or Nginx.">Bun</span> server is listening on port 1420. It receives the request and looks at the URL path to decide what to do.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <strong>The bouncer checks your ID</strong>
+              <p>An <span class="term" data-definition="Authentication middleware is code that runs before your actual request is handled. It checks whether you're allowed in — like a bouncer at the door checking your name is on the list.">auth middleware</span> checks: have you entered the passphrase yet? If not, you get redirected to the passphrase page.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">4</div>
+            <div class="step-body">
+              <strong>The right handler picks up</strong>
+              <p>A <span class="term" data-definition="A router is like a telephone switchboard operator. It looks at the address of your request (the URL) and connects you to the right piece of code that knows how to handle it.">router</span> matches your URL to the correct route handler. For the home page, it serves the HTML file directly.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">5</div>
+            <div class="step-body">
+              <strong>The page loads and fetches data</strong>
+              <p>Your browser renders the HTML, then JavaScript on the page calls the <span class="term" data-definition="An API (Application Programming Interface) is a set of URLs that your frontend code can call to get data from the server. Think of it like a menu at a restaurant — each item (URL) gets you a specific dish (piece of data).">API</span> to get your portfolio summary, account details, and latest prices.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 3: Code translation — the server entry point -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The Server's Front Door</h2>
+        <p>This is the actual code that starts the server and handles every single request. It's the first thing that runs.</p>
+
+        <div class="translation-block">
+          <div class="translation-code">
+            <span class="translation-label">CODE</span>
+            <pre><code><span class="code-keyword">const</span> server = <span class="code-function">Bun.serve</span>({
+  <span class="code-property">port</span>: port,
+  <span class="code-property">hostname</span>: hostname,
+  <span class="code-property">idleTimeout</span>: <span class="code-number">0</span>,
+
+  <span class="code-keyword">async</span> <span class="code-function">fetch</span>(request) {
+    <span class="code-keyword">const</span> url = <span class="code-keyword">new</span> <span class="code-function">URL</span>(request.url);
+    <span class="code-keyword">const</span> path = url.pathname;
+
+    <span class="code-keyword">const</span> authResponse = <span class="code-function">checkAuth</span>(path);
+    <span class="code-keyword">if</span> (authResponse) <span class="code-keyword">return</span> authResponse;
+  }</span>
+});</code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Start a web server using Bun (a fast JavaScript engine)...</p>
+              <p class="tl">Listen on the configured port (1420 by default) and network address...</p>
+              <p class="tl">Never auto-disconnect slow connections — some features stream data in real time...</p>
+              <p class="tl">Every time a request arrives, this function runs...</p>
+              <p class="tl">Figure out what URL the browser is asking for...</p>
+              <p class="tl">Extract just the path part (e.g., "/api/portfolio/summary")...</p>
+              <p class="tl">Ask the bouncer: "Is this person allowed in?"...</p>
+              <p class="tl">If the bouncer says no, send them to the passphrase page immediately.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Every Web App Has a Front Door</strong>
+            <p>This pattern — a single entry point that receives every request and decides where it goes — is how virtually all web servers work. Whether it's a tiny portfolio tracker or Netflix, there's always one function that catches every incoming request first.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 4: The request flow diagram -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The Full Request Journey</h2>
+        <p>Here's the complete path every request takes, from your browser to the database and back.</p>
+
+        <div class="flow-steps stagger-children">
+          <div class="flow-step animate-in">
+            <div class="flow-step-num">1</div>
+            <p><strong>Browser</strong><br>Sends request</p>
+          </div>
+          <div class="flow-arrow animate-in">→</div>
+          <div class="flow-step animate-in">
+            <div class="flow-step-num">2</div>
+            <p><strong>Auth Gate</strong><br>Checks passphrase</p>
+          </div>
+          <div class="flow-arrow animate-in">→</div>
+          <div class="flow-step animate-in">
+            <div class="flow-step-num">3</div>
+            <p><strong>Router</strong><br>Matches URL</p>
+          </div>
+          <div class="flow-arrow animate-in">→</div>
+          <div class="flow-step animate-in">
+            <div class="flow-step-num">4</div>
+            <p><strong>Service</strong><br>Business logic</p>
+          </div>
+          <div class="flow-arrow animate-in">→</div>
+          <div class="flow-step animate-in">
+            <div class="flow-step-num">5</div>
+            <p><strong>Database</strong><br>Reads/writes data</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 5: Quiz -->
+      <section class="screen animate-in" id="m1-quiz">
+        <h2 class="screen-heading">Check Your Understanding</h2>
+
+        <div class="quiz-container">
+          <div class="quiz-question-block" data-question="m1q1" data-correct="option-b"
+               data-correct-text="<strong>Exactly!</strong> The auth middleware checks first. If you haven't entered the passphrase, you never reach the router or any route handler — you get sent straight to the passphrase page."
+               data-incorrect-text="<strong>Not quite.</strong> The auth middleware runs before the router even looks at the URL. If you're not authenticated, the request stops there — you get redirected to the passphrase page.">
+            <h3 class="quiz-question">You've just deployed Portfolio 60 and open it in your browser for the first time. You see the passphrase page instead of the home page. Why?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="option-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The home page HTML file is missing from the server</span>
+              </button>
+              <button class="quiz-option" data-value="option-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The auth middleware intercepted the request before it reached the home page</span>
+              </button>
+              <button class="quiz-option" data-value="option-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The database doesn't exist yet, so the server can't load anything</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block" data-question="m1q2" data-correct="option-c"
+               data-correct-text="<strong>Exactly!</strong> Fetch routes are deliberately unprotected so that the scheduled cron job can fetch prices automatically without anyone being logged in. This is a common pattern — background tasks need to work independently of user sessions."
+               data-incorrect-text="<strong>Not quite.</strong> The fetch routes are intentionally left unprotected. The app fetches prices on a schedule (like a cron job) even when nobody is logged in — so those routes can't require a passphrase.">
+            <h3 class="quiz-question">A scheduled task needs to fetch the latest investment prices at 6pm every day — even when nobody is using the app. How does it get past the authentication gate?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="option-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The server stores a permanent session token for scheduled tasks</span>
+              </button>
+              <button class="quiz-option" data-value="option-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The scheduled task logs in with the passphrase before fetching</span>
+              </button>
+              <button class="quiz-option" data-value="option-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Fetch routes are on the "unprotected" list — they skip authentication entirely</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div style="display: flex; gap: var(--space-2); margin-top: var(--space-4);">
+            <button class="quiz-check-btn" onclick="checkQuiz('m1-quiz')">Check Answers</button>
+            <button class="quiz-reset-btn" onclick="resetQuiz('m1-quiz')">Try Again</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+
+<!-- ==========================================
+     MODULE 2 — MEET THE CAST
+     ========================================== -->
+<section class="module" id="module-2" style="background: var(--color-bg);">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">02</span>
+      <h1 class="module-title">Meet the Cast — The Components That Run the Show</h1>
+      <p class="module-subtitle">Know which pieces exist so you can tell AI "put this logic in X, not Y."</p>
+    </header>
+    <div class="module-body" id="m2-body">
+
+      <!-- Screen 1: The cast metaphor -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A Post Office With Specialist Departments</h2>
+        <p>Think of Portfolio 60 like a post office. Mail arrives at the front desk (the <span class="term" data-definition="The server entry point is the single piece of code that receives every incoming request — like the front desk of a post office that accepts all parcels before sorting them to the right department.">server entry point</span>), gets sorted to the right department, and each department has specialists who know exactly how to handle their type of mail.</p>
+        <p>The codebase is organised into clear layers. Each layer has one job and talks only to its neighbours.</p>
+
+        <div class="icon-rows stagger-children">
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-1)">🚪</div>
+            <div>
+              <strong>Routes</strong>
+              <p>The front desk. Receives HTTP requests, checks what's being asked, and passes work to the right service. Lives in <code>src/server/routes/</code>.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-2)">🧠</div>
+            <div>
+              <strong>Services</strong>
+              <p>The specialists. Business logic lives here — calculating portfolio values, orchestrating price fetches, generating reports. Lives in <code>src/server/services/</code>.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-3)">🗄️</div>
+            <div>
+              <strong>Database Layer</strong>
+              <p>The filing cabinet. Raw SQL queries that read and write data. One file per table. Lives in <code>src/server/db/</code>.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-4)">🌐</div>
+            <div>
+              <strong>Fetchers</strong>
+              <p>The couriers. Go out to external APIs (Morningstar, Yahoo, ECB) to collect prices and exchange rates. Lives in <code>src/server/fetchers/</code>.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-5)">🖥️</div>
+            <div>
+              <strong>Frontend (UI)</strong>
+              <p>What you see. HTML pages, JavaScript, and web components that display data and handle user interaction. Lives in <code>src/ui/</code>.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 2: The file tree -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Where Everything Lives</h2>
+        <p>Here's the project's folder structure. Each folder maps to one of the actors above.</p>
+
+        <div class="file-tree">
+          <div class="ft-folder open" style="margin-left: 0; border-left: none;">
+            <span class="ft-name">src/</span>
+            <span class="ft-desc">All source code</span>
+            <div class="ft-children">
+              <div class="ft-folder open">
+                <span class="ft-name">server/</span>
+                <span class="ft-desc">Everything that runs on the server</span>
+                <div class="ft-children">
+                  <div class="ft-file">
+                    <span class="ft-name">index.js</span>
+                    <span class="ft-desc">The front door — starts the server, handles every request</span>
+                  </div>
+                  <div class="ft-file">
+                    <span class="ft-name">router.js</span>
+                    <span class="ft-desc">Custom URL matcher — maps paths to handlers</span>
+                  </div>
+                  <div class="ft-folder">
+                    <span class="ft-name">routes/</span>
+                    <span class="ft-desc">One file per resource (users, accounts, holdings, fetch...)</span>
+                  </div>
+                  <div class="ft-folder">
+                    <span class="ft-name">services/</span>
+                    <span class="ft-desc">Business logic — valuation, scheduling, analysis</span>
+                  </div>
+                  <div class="ft-folder">
+                    <span class="ft-name">db/</span>
+                    <span class="ft-desc">Database queries — one file per table</span>
+                  </div>
+                  <div class="ft-folder">
+                    <span class="ft-name">fetchers/</span>
+                    <span class="ft-desc">External API clients — Morningstar, Yahoo, ECB</span>
+                  </div>
+                  <div class="ft-folder">
+                    <span class="ft-name">middleware/</span>
+                    <span class="ft-desc">Code that runs before route handlers (auth checks)</span>
+                  </div>
+                </div>
+              </div>
+              <div class="ft-folder open">
+                <span class="ft-name">ui/</span>
+                <span class="ft-desc">Everything the browser sees</span>
+                <div class="ft-children">
+                  <div class="ft-file">
+                    <span class="ft-name">index.html</span>
+                    <span class="ft-desc">The home page</span>
+                  </div>
+                  <div class="ft-folder">
+                    <span class="ft-name">pages/</span>
+                    <span class="ft-desc">HTML pages (portfolio, accounts, reports...)</span>
+                  </div>
+                  <div class="ft-folder">
+                    <span class="ft-name">js/</span>
+                    <span class="ft-desc">Page-specific JavaScript and web components</span>
+                  </div>
+                  <div class="ft-folder">
+                    <span class="ft-name">css/</span>
+                    <span class="ft-desc">Stylesheets (compiled from Tailwind CSS)</span>
+                  </div>
+                </div>
+              </div>
+              <div class="ft-folder">
+                <span class="ft-name">shared/</span>
+                <span class="ft-desc">Constants and utilities shared between server and UI</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 3: The Router — code translation -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The Switchboard Operator — The Custom Router</h2>
+        <p>Portfolio 60 doesn't use a <span class="term" data-definition="A framework is a pre-built structure that gives you tools and conventions for building an app. Express, Next.js, and Django are frameworks. Portfolio 60 chose not to use one for routing — it built its own lightweight version instead.">framework</span> for routing. It has a tiny, hand-built router — just 116 lines of code — that matches incoming URLs to the right handler.</p>
+
+        <div class="translation-block">
+          <div class="translation-code">
+            <span class="translation-label">CODE</span>
+            <pre><code><span class="code-function">add</span>(method, path, handler) {
+  <span class="code-keyword">const</span> paramNames = [];
+  <span class="code-keyword">const</span> patternString = path.<span class="code-function">replace</span>(
+    <span class="code-string">/:([a-zA-Z_]+)/g</span>,
+    <span class="code-keyword">function</span>(match, paramName) {
+      paramNames.<span class="code-function">push</span>(paramName);
+      <span class="code-keyword">return</span> <span class="code-string">"([^/]+)"</span>;
+    }
+  );
+  <span class="code-keyword">const</span> pattern = <span class="code-keyword">new</span> <span class="code-function">RegExp</span>(<span class="code-string">"^"</span> + patternString + <span class="code-string">"$"</span>);
+  <span class="code-keyword">this</span>.routes.<span class="code-function">push</span>({ method, pattern, paramNames, handler });
+}</code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Register a new route — tell the router "when you see this URL pattern, use this handler"...</p>
+              <p class="tl">Prepare a list to hold the names of any variable parts in the URL...</p>
+              <p class="tl">Scan the path for placeholders like <code>:id</code> or <code>:userId</code>...</p>
+              <p class="tl">When you find one, remember its name...</p>
+              <p class="tl">...and replace it with a pattern that matches any text (the actual ID value will go here)...</p>
+              <p class="tl">Turn the whole thing into a <span class="term" data-definition="A regular expression (regex) is a pattern-matching tool. It's like a template with wildcards — you describe the shape of text you're looking for, and the computer finds matches. For example, the pattern '[0-9]+' matches any number.">regular expression</span> — a precise pattern the computer can match against incoming URLs...</p>
+              <p class="tl">Store this route (method + pattern + handler) in the list of all known routes.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">URLs Are Just Patterns</strong>
+            <p>When you see <code>/api/users/42/accounts/7</code>, the router sees a pattern: <code>/api/users/:userId/accounts/:accountId</code>. The <code>42</code> and <code>7</code> are captured as variables the handler can use. This "parameterised routing" pattern is used by every web framework — Express, Django, Rails — Portfolio 60 just built its own tiny version.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 4: Group Chat — how layers talk -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">How the Layers Talk to Each Other</h2>
+        <p>Watch how a real request flows through the system. When you ask for your portfolio summary, here's the conversation between the components.</p>
+
+        <div class="chat-window" id="m2-chat">
+          <div class="chat-header">Portfolio Summary Request</div>
+          <div class="chat-messages" id="m2-chat-messages">
+            <div class="chat-message" data-msg="0" data-sender="browser" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-1)">B</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-1)">Browser</span>
+                <p>GET /api/portfolio/summary — show me everything!</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="1" data-sender="auth" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-text-muted)">🔒</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-text-muted)">Auth Middleware</span>
+                <p>Passphrase verified. You're in. Passing you through.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="2" data-sender="router" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-4)">R</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-4)">Router</span>
+                <p>Matched! Sending this to the portfolio route handler.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="3" data-sender="route" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-1)">PH</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-1)">Portfolio Route</span>
+                <p>Got it. Hey Portfolio Service — build me a full summary please.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="4" data-sender="service" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-2)">PS</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-2)">Portfolio Service</span>
+                <p>On it. I need users, accounts, holdings, prices, and currency rates from the DB.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="5" data-sender="db" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-3)">DB</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-3)">Database Layer</span>
+                <p>Here you go — 2 users, 6 accounts, 19 holdings, latest prices and rates.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="6" data-sender="service" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-2)">PS</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-2)">Portfolio Service</span>
+                <p>Calculated all valuations, converted USD/EUR to GBP. Summary ready!</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="7" data-sender="browser" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-1)">B</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-1)">Browser</span>
+                <p>Got the JSON. Rendering the portfolio page now. 💰</p>
+              </div>
+            </div>
+          </div>
+          <div class="chat-typing" id="m2-chat-typing" style="display:none">
+            <div class="chat-avatar" id="m2-typing-avatar" style="background: var(--color-text-muted)">?</div>
+            <div class="chat-typing-dots">
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+            </div>
+          </div>
+          <div class="chat-controls">
+            <button onclick="playChatNext('m2')">Next Message</button>
+            <button onclick="playChatAll('m2')">Play All</button>
+            <button onclick="resetChat('m2')">Replay</button>
+            <span class="chat-progress" id="m2-chat-progress">0 / 8 messages</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 5: Quiz -->
+      <section class="screen animate-in" id="m2-quiz">
+        <h2 class="screen-heading">Check Your Understanding</h2>
+
+        <div class="quiz-container">
+          <div class="quiz-question-block" data-question="m2q1" data-correct="option-b"
+               data-correct-text="<strong>Exactly!</strong> The services layer contains business logic. The route handles the HTTP request/response, but the calculation logic belongs in the service — that separation keeps things clean and testable."
+               data-incorrect-text="<strong>Not quite.</strong> Routes handle HTTP mechanics (reading the request, sending the response). The actual calculation logic belongs in the services layer — that's where business logic lives. You'd tell the AI: 'Add a new function in the portfolio service.'">
+            <h3 class="quiz-question">You want to add a new feature: show the total gain/loss as a percentage. Where would you tell an AI coding tool to put this calculation?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="option-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>In the route handler (<code>portfolio-routes.js</code>)</span>
+              </button>
+              <button class="quiz-option" data-value="option-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>In the service layer (<code>portfolio-service.js</code>)</span>
+              </button>
+              <button class="quiz-option" data-value="option-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>In the database layer (<code>prices-db.js</code>)</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block" data-question="m2q2" data-correct="option-a"
+               data-correct-text="<strong>Exactly!</strong> Fetchers are the couriers — they go out to external services and bring data back. A new price source means a new fetcher. You'd create a file like <code>london-stock-exchange-fetcher.js</code> in the fetchers directory."
+               data-incorrect-text="<strong>Not quite.</strong> The fetchers directory is where external API clients live. Each fetcher knows how to talk to one external service. A new price source = a new fetcher file in <code>src/server/fetchers/</code>.">
+            <h3 class="quiz-question">You want to add a new price source — the London Stock Exchange direct feed. Which layer would this new code belong to?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="option-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Fetchers (<code>src/server/fetchers/</code>)</span>
+              </button>
+              <button class="quiz-option" data-value="option-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Services (<code>src/server/services/</code>)</span>
+              </button>
+              <button class="quiz-option" data-value="option-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Routes (<code>src/server/routes/</code>)</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div style="display: flex; gap: var(--space-2); margin-top: var(--space-4);">
+            <button class="quiz-check-btn" onclick="checkQuiz('m2-quiz')">Check Answers</button>
+            <button class="quiz-reset-btn" onclick="resetQuiz('m2-quiz')">Try Again</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+
+<!-- ==========================================
+     MODULE 3 — THE DATABASE
+     ========================================== -->
+<section class="module" id="module-3" style="background: var(--color-bg-warm);">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">03</span>
+      <h1 class="module-title">The Vault — How Portfolio 60 Stores Your Data</h1>
+      <p class="module-subtitle">Understand the database so you can debug "where did my data go?" problems.</p>
+    </header>
+    <div class="module-body" id="m3-body">
+
+      <!-- Screen 1: SQLite metaphor -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A Library With a Single Librarian</h2>
+        <p>Most web apps use big database servers like <span class="term" data-definition="PostgreSQL and MySQL are database servers — separate programs that run alongside your app and handle data storage. They're powerful but require installation, configuration, and maintenance. SQLite skips all of that by storing everything in a single file.">PostgreSQL or MySQL</span>. Portfolio 60 uses <span class="term" data-definition="SQLite is a database that lives in a single file on your hard drive. No separate server to install or configure. It's the most widely used database in the world — it's in every smartphone, every browser, and most desktop apps.">SQLite</span> — a database that's just a single file on your hard drive.</p>
+        <p>Think of it like a private library with one librarian. There's no network, no queue, no separate building. The librarian sits right inside the app and answers queries instantly.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">📄</div>
+            <h4 class="pattern-title">Single File</h4>
+            <p class="pattern-desc">The entire database is one file: <code>portfolio60.db</code>. Back it up by copying the file. Restore by replacing it.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">🔗</div>
+            <h4 class="pattern-title">Singleton Connection</h4>
+            <p class="pattern-desc">The app opens the database once and reuses that connection for every query. No connection pools needed.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-5)">
+            <div class="pattern-icon" style="background: var(--color-actor-5)">🔒</div>
+            <h4 class="pattern-title">WAL Mode</h4>
+            <p class="pattern-desc">Write-Ahead Logging lets reads and writes happen at the same time without blocking each other.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 2: Code translation — singleton -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Opening the Database — Once and Only Once</h2>
+        <p>The <span class="term" data-definition="A singleton is a design pattern where you ensure only one instance of something exists. Like having exactly one key to a safe — no matter how many people ask for the key, they all get the same one.">singleton pattern</span> ensures the database is opened once and shared everywhere.</p>
+
+        <div class="translation-block">
+          <div class="translation-code">
+            <span class="translation-label">CODE</span>
+            <pre><code><span class="code-keyword">let</span> db = <span class="code-keyword">null</span>;
+
+<span class="code-keyword">export function</span> <span class="code-function">getDatabase</span>() {
+  <span class="code-keyword">if</span> (db) {
+    <span class="code-keyword">return</span> db;
+  }
+
+  db = <span class="code-keyword">new</span> <span class="code-function">Database</span>(dbPath);
+  db.<span class="code-function">exec</span>(<span class="code-string">"PRAGMA journal_mode = WAL"</span>);
+  db.<span class="code-function">exec</span>(<span class="code-string">"PRAGMA foreign_keys = ON"</span>);
+  db.<span class="code-function">exec</span>(<span class="code-string">"PRAGMA busy_timeout = 5000"</span>);
+
+  <span class="code-keyword">return</span> db;
+}</code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Start with no database connection...</p>
+              <p class="tl">Every part of the app calls this function when it needs the database...</p>
+              <p class="tl">If we already opened the database, just hand it back — don't open it again...</p>
+              <p class="tl">First time only: open the database file...</p>
+              <p class="tl">Turn on WAL mode so reads and writes don't block each other...</p>
+              <p class="tl">Enforce <span class="term" data-definition="A foreign key is a reference from one table to another — like a link. When 'foreign keys = ON', the database refuses to create a holding for an account that doesn't exist. It keeps your data consistent.">foreign keys</span> — the database will refuse invalid references...</p>
+              <p class="tl">If the database is busy, wait up to 5 seconds instead of failing immediately...</p>
+              <p class="tl">Return the now-ready database connection.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 3: Scaled integers -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The Money Trick — Why Everything Is Multiplied by 10,000</h2>
+        <p>Computers are bad at decimal maths. Try <code>0.1 + 0.2</code> in JavaScript and you get <code>0.30000000000000004</code>. That's a disaster when tracking real money.</p>
+        <p>Portfolio 60's solution: <strong>never store decimals</strong>. Instead, multiply every number by 10,000 and store it as a whole number. When it's time to display, divide by 10,000.</p>
+
+        <div class="translation-block">
+          <div class="translation-code">
+            <span class="translation-label">CODE</span>
+            <pre><code><span class="code-keyword">export const</span> <span class="code-property">CURRENCY_SCALE_FACTOR</span> = <span class="code-number">10000</span>;
+
+<span class="code-comment">// Storing a price:</span>
+<span class="code-keyword">const</span> scaledPrice = <span class="code-function">Math.round</span>(
+  priceMinorUnit * CURRENCY_SCALE_FACTOR
+);
+
+<span class="code-comment">// Reading a price:</span>
+<span class="code-property">price</span>: row.price / CURRENCY_SCALE_FACTOR</code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">The magic number: multiply by 10,000 to store, divide by 10,000 to display...</p>
+              <p class="tl">When saving a price to the database...</p>
+              <p class="tl">Multiply by 10,000 and round to the nearest whole number. So £123.4567 becomes 1,234,567...</p>
+              <p class="tl">When reading a price back out...</p>
+              <p class="tl">Divide by 10,000 to get back to the real number. 1,234,567 becomes £123.4567 again.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Integers Are Exact, Decimals Are Not</strong>
+            <p>This "scaled integer" pattern is used by banks, payment processors, and financial systems worldwide. Stripe stores amounts in pennies. Portfolio 60 goes four decimal places further to handle exchange rates precisely. When you see financial code storing money as whole numbers, this is why.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 4: SCD2 -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Time Travel — How Holdings Remember Their History</h2>
+        <p>When you sell half your shares, the app doesn't just overwrite the old number. It closes the old record with an end date and opens a new one. This means you can ask "what did my portfolio look like last March?" and get the exact answer.</p>
+        <p>This technique has a name: <span class="term" data-definition="Slowly Changing Dimension Type 2 (SCD2) is a data warehousing technique. Instead of overwriting old data, you close the old record with an end date and create a new one. It lets you query the state of your data at any point in history.">SCD2</span> — Slowly Changing Dimension Type 2. It's the same technique used in data warehouses at large companies.</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in">
+            <div class="step-num" style="background: var(--color-actor-5)">✓</div>
+            <div class="step-body">
+              <strong>Current holdings: <code>effective_to IS NULL</code></strong>
+              <p>If a holding has no end date, it's still active. That's what you own right now.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num" style="background: var(--color-actor-3)">📅</div>
+            <div class="step-body">
+              <strong>Historic holdings: date falls within the range</strong>
+              <p><code>effective_from &lt;= date AND (effective_to IS NULL OR effective_to &gt; date)</code> — finds what you held on any past date.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num" style="background: var(--color-actor-1)">🔐</div>
+            <div class="step-body">
+              <strong>Unique constraint prevents duplicates</strong>
+              <p><code>UNIQUE(account_id, investment_id, effective_from)</code> — you can't accidentally create two overlapping records.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 5: Quiz -->
+      <section class="screen animate-in" id="m3-quiz">
+        <h2 class="screen-heading">Check Your Understanding</h2>
+        <div class="quiz-container">
+          <div class="quiz-question-block" data-question="m3q1" data-correct="option-c"
+               data-correct-text="<strong>Exactly!</strong> Floating-point arithmetic produces tiny rounding errors (0.1 + 0.2 = 0.30000000000000004). By storing everything as integers multiplied by 10,000, the app avoids these errors entirely. It divides by 10,000 only when displaying to the user."
+               data-incorrect-text="<strong>Not quite.</strong> The scale factor exists because computers can't store decimal numbers exactly. By multiplying by 10,000 and storing whole numbers, the app avoids rounding errors that would compound over thousands of price calculations.">
+            <h3 class="quiz-question">A user reports that their portfolio total is off by a fraction of a penny. You look at the database and see prices stored as integers like 1234567. Why does the app store prices this way instead of as normal decimal numbers?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="option-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Integers take up less storage space in SQLite</span>
+              </button>
+              <button class="quiz-option" data-value="option-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>SQLite doesn't support decimal numbers at all</span>
+              </button>
+              <button class="quiz-option" data-value="option-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Computers can't store decimals exactly — integers avoid rounding errors in financial calculations</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block" data-question="m3q2" data-correct="option-b"
+               data-correct-text="<strong>Exactly!</strong> SCD2 means old records are never deleted — they get an end date and a new record is created. To find holdings at a past date, you query for records where that date falls between effective_from and effective_to."
+               data-incorrect-text="<strong>Not quite.</strong> SCD2 keeps all historical records. When a holding changes, the old record gets an end date (effective_to) and a new record is created. You'd query for records where June 2024 falls within their effective date range.">
+            <h3 class="quiz-question">You sold half your shares in June 2024. Now in March 2025, you want to see what your portfolio looked like before the sale. How does the app know?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="option-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It looks at the git history to find old database values</span>
+              </button>
+              <button class="quiz-option" data-value="option-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The old holding record is still there with an end date — it queries holdings where the date falls in range</span>
+              </button>
+              <button class="quiz-option" data-value="option-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It reconstructs from a daily backup file</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div style="display: flex; gap: var(--space-2); margin-top: var(--space-4);">
+            <button class="quiz-check-btn" onclick="checkQuiz('m3-quiz')">Check Answers</button>
+            <button class="quiz-reset-btn" onclick="resetQuiz('m3-quiz')">Try Again</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+
+<!-- ==========================================
+     MODULE 4 — FETCHING PRICES
+     ========================================== -->
+<section class="module" id="module-4" style="background: var(--color-bg);">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">04</span>
+      <h1 class="module-title">Talking to the Outside World — Fetching Prices and Rates</h1>
+      <p class="module-subtitle">Know what's external so you can evaluate costs, rate limits, and failure modes.</p>
+    </header>
+    <div class="module-body" id="m4-body">
+
+      <!-- Screen 1: The three couriers -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Three News Wires, One Newsroom</h2>
+        <p>Portfolio 60 gets its data from three external <span class="term" data-definition="An API (Application Programming Interface) is a way for one program to talk to another over the internet. You send a request to a specific URL, and the other program sends back data — usually in JSON format. It's like ordering from a menu: you ask for a specific item, and you get it back.">APIs</span> — like a newsroom that subscribes to three different news wires, each specialising in a different type of information.</p>
+
+        <div class="icon-rows stagger-children">
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-1)">⭐</div>
+            <div>
+              <strong>Morningstar</strong>
+              <p>Investment prices — mutual funds, shares, and investment trusts. The main price source.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-4)">💱</div>
+            <div>
+              <strong>Frankfurter (ECB)</strong>
+              <p>Currency exchange rates — how many USD or EUR per £1 GBP. Free, no API key needed. Data from the European Central Bank.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-3)">📊</div>
+            <div>
+              <strong>Yahoo Finance</strong>
+              <p>Benchmark indices — FTSE 100, S&P 500, Nasdaq. Used for comparing your portfolio's performance against the market.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 2: The fetch order matters -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Order Matters — Rates First, Then Prices</h2>
+        <p>When the app fetches new data, it always gets currency rates <em>before</em> investment prices. Why? Because a US share price in dollars is meaningless until you know today's USD-to-GBP rate. The rates and prices need to be from the same moment in time.</p>
+
+        <div class="flow-steps stagger-children">
+          <div class="flow-step animate-in">
+            <div class="flow-step-num">1</div>
+            <p><strong>Currency Rates</strong><br>ECB via Frankfurter</p>
+          </div>
+          <div class="flow-arrow animate-in">→</div>
+          <div class="flow-step animate-in">
+            <div class="flow-step-num">2</div>
+            <p><strong>Investment Prices</strong><br>Morningstar API</p>
+          </div>
+          <div class="flow-arrow animate-in">→</div>
+          <div class="flow-step animate-in">
+            <div class="flow-step-num">3</div>
+            <p><strong>Benchmarks</strong><br>Yahoo Finance</p>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">📌</div>
+          <div class="callout-content">
+            <strong class="callout-title">Contemporaneous Data</strong>
+            <p>In finance, data that's captured at the same time is called "contemporaneous." If your USD exchange rate is from Tuesday but your US share price is from Wednesday, your valuation is subtly wrong. Fetching rates first ensures they're as close in time as possible.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 3: Code translation — currency fetcher -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">How Currency Rates Are Fetched</h2>
+        <p>This is the actual code that calls the European Central Bank's API to get today's exchange rates.</p>
+
+        <div class="translation-block">
+          <div class="translation-code">
+            <span class="translation-label">CODE</span>
+            <pre><code><span class="code-keyword">const</span> <span class="code-property">FRANKFURTER_API_URL</span> =
+  <span class="code-string">"https://api.frankfurter.dev/v1/latest"</span>;
+
+<span class="code-keyword">const</span> symbols = nonGbpCurrencies
+  .<span class="code-function">map</span>(<span class="code-keyword">function</span>(c) { <span class="code-keyword">return</span> c.code; })
+  .<span class="code-function">join</span>(<span class="code-string">","</span>);
+
+<span class="code-keyword">const</span> url = FRANKFURTER_API_URL
+  + <span class="code-string">"?base=GBP&symbols="</span> + symbols;</code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">The address of the Frankfurter API — a free service powered by European Central Bank data...</p>
+              <p class="tl">Get all the non-GBP currencies from the database (USD, EUR, etc.)...</p>
+              <p class="tl">Pull out just the currency codes and join them with commas: "USD,EUR"...</p>
+              <p class="tl">Build the full URL: "how many USD and EUR per £1 GBP?"</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 4: Data flow animation -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Watch a Price Fetch in Action</h2>
+        <p>Click through each step to see how the scheduled fetcher collects and stores data.</p>
+
+        <div class="flow-animation" id="m4-flow">
+          <div class="flow-actors">
+            <div class="flow-actor" id="m4-flow-scheduler">
+              <div class="flow-actor-icon" style="background: var(--color-actor-5)">⏰</div>
+              <span>Scheduler</span>
+            </div>
+            <div class="flow-actor" id="m4-flow-fetch-service">
+              <div class="flow-actor-icon" style="background: var(--color-actor-2)">🧠</div>
+              <span>Fetch Service</span>
+            </div>
+            <div class="flow-actor" id="m4-flow-apis">
+              <div class="flow-actor-icon" style="background: var(--color-actor-4)">🌐</div>
+              <span>External APIs</span>
+            </div>
+            <div class="flow-actor" id="m4-flow-database">
+              <div class="flow-actor-icon" style="background: var(--color-actor-3)">🗄️</div>
+              <span>Database</span>
+            </div>
+          </div>
+          <div class="flow-step-label" id="m4-flow-label">Click "Next Step" to begin</div>
+          <div class="flow-controls">
+            <button onclick="flowNext('m4')">Next Step</button>
+            <button onclick="flowReset('m4')">Restart</button>
+            <span class="flow-progress" id="m4-flow-progress">Step 0 / 6</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 5: Scheduled fetching & backfill -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">It Happens Automatically — Scheduled Fetching</h2>
+        <p>You don't have to click "fetch" every day. A <span class="term" data-definition="A cron job is a scheduled task that runs automatically at set times — like an alarm clock for code. The name comes from the Unix 'cron' utility. Portfolio 60 uses a library called Croner to schedule price fetches.">cron job</span> inside the app triggers a full price update on a schedule. If it fails, it retries automatically.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-5)">
+            <div class="pattern-icon" style="background: var(--color-actor-5)">⏰</div>
+            <h4 class="pattern-title">Scheduled Runs</h4>
+            <p class="pattern-desc">A cron expression sets the fetch time (e.g., every weekday at 6pm). Runs even when nobody is logged in.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-1)">
+            <div class="pattern-icon" style="background: var(--color-actor-1)">🔄</div>
+            <h4 class="pattern-title">Auto-Retry</h4>
+            <p class="pattern-desc">If a fetch fails (API timeout, network blip), the scheduler retries with a configurable delay and max attempts.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">📚</div>
+            <h4 class="pattern-title">Historic Backfill</h4>
+            <p class="pattern-desc">First time? The app fetches 36 months of history — prices, rates, and benchmarks — so you have data from day one.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 6: Quiz -->
+      <section class="screen animate-in" id="m4-quiz">
+        <h2 class="screen-heading">Check Your Understanding</h2>
+        <div class="quiz-container">
+          <div class="quiz-question-block" data-question="m4q1" data-correct="option-a"
+               data-correct-text="<strong>Exactly!</strong> Without the exchange rate, you can't convert the US share price to GBP. The rates must come first so that when prices arrive, they can be correctly valued in pounds."
+               data-incorrect-text="<strong>Not quite.</strong> Currency rates are fetched first because investment prices in foreign currencies need to be converted to GBP. You can't value a US share in pounds without knowing today's USD/GBP rate.">
+            <h3 class="quiz-question">You add a new US-listed share to the portfolio. The price fetch runs but the currency rate fetch failed earlier. What happens to the valuation?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="option-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The USD price can't be converted to GBP — the valuation will use a stale exchange rate</span>
+              </button>
+              <button class="quiz-option" data-value="option-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The price fetch will also fail because it depends on the rate fetch</span>
+              </button>
+              <button class="quiz-option" data-value="option-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The share will simply be shown in USD instead of GBP</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block" data-question="m4q2" data-correct="option-b"
+               data-correct-text="<strong>Exactly!</strong> The app detects an empty prices table and triggers a 36-month backfill automatically before fetching the latest prices. This means you have historical data from day one — no manual setup needed."
+               data-incorrect-text="<strong>Not quite.</strong> Portfolio 60 has an auto-backfill feature. When it detects an empty prices table, it fetches 36 months of historical prices, rates, and benchmarks before getting the latest data. The user doesn't need to do anything.">
+            <h3 class="quiz-question">You've just set up Portfolio 60 for the first time and added your investments. The prices table is completely empty. What happens when the first fetch runs?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="option-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It fetches only today's prices — you start with just one day of data</span>
+              </button>
+              <button class="quiz-option" data-value="option-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It detects the empty table and backfills 36 months of historical data first</span>
+              </button>
+              <button class="quiz-option" data-value="option-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It shows an error telling you to manually import historical data</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div style="display: flex; gap: var(--space-2); margin-top: var(--space-4);">
+            <button class="quiz-check-btn" onclick="checkQuiz('m4-quiz')">Check Answers</button>
+            <button class="quiz-reset-btn" onclick="resetQuiz('m4-quiz')">Try Again</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+
+<!-- ==========================================
+     MODULE 5 — VALUATION
+     ========================================== -->
+<section class="module" id="module-5" style="background: var(--color-bg-warm);">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">05</span>
+      <h1 class="module-title">From Raw Numbers to Your Portfolio — The Valuation Engine</h1>
+      <p class="module-subtitle">Learn the patterns (scaling, conversion, temporal queries) so you can request them from AI.</p>
+    </header>
+    <div class="module-body" id="m5-body">
+
+      <!-- Screen 1: The recipe metaphor -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The Recipe — How Raw Numbers Become Your Portfolio Value</h2>
+        <p>Imagine a currency exchange desk at an airport. You hand over your foreign currency, they check today's rate, multiply, and give you pounds. Portfolio 60 does this at scale — for every holding, in every account, for every person.</p>
+        <p>The valuation recipe has three ingredients:</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <strong>Holdings: What you own</strong>
+              <p>Quantity of each investment in each account (e.g., 150 shares of a US tech fund).</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <strong>Prices: What each thing is worth</strong>
+              <p>The latest price per unit from Morningstar (e.g., $45.23 per share).</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <strong>Rates: The exchange rate to GBP</strong>
+              <p>How many units of foreign currency per £1 (e.g., 1 GBP = 1.27 USD).</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 2: The formula -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The Maths — One Line Per Holding</h2>
+        <p>For each holding, the calculation is simple. For a GBP investment, it's just price times quantity. For foreign currency, there's one extra step — divide by the exchange rate.</p>
+
+        <div class="translation-block">
+          <div class="translation-code">
+            <span class="translation-label">CODE</span>
+            <pre><code><span class="code-keyword">const</span> valueLocal = price * holding.quantity;
+
+<span class="code-keyword">const</span> valueGBP =
+  holding.currency_code === <span class="code-string">"GBP"</span>
+    ? valueLocal
+    : valueLocal / ratesMap[holding.currency_code];</code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Multiply the price by how many units you hold — this gives the value in the investment's own currency...</p>
+              <p class="tl">Now convert to GBP...</p>
+              <p class="tl">If it's already in GBP, the value is ready — no conversion needed...</p>
+              <p class="tl">If it's in a foreign currency (USD, EUR), divide by the exchange rate. Since the rate is "units per GBP", dividing converts foreign currency back to pounds.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why Divide, Not Multiply?</strong>
+            <p>The exchange rate is stored as "how many foreign units per 1 GBP" (e.g., 1.27 USD per GBP). So to convert $100 to pounds: $100 ÷ 1.27 = £78.74. If the rate were stored the other way ("GBP per 1 USD"), you'd multiply instead. The direction of the rate determines the operation.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 3: The hierarchy -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Rolling It Up — From Holdings to the Household Total</h2>
+        <p>The service builds a hierarchy: holdings roll up into accounts, accounts into users, users into the household total. Think of it like a spreadsheet with subtotals.</p>
+
+        <div class="flow-steps stagger-children">
+          <div class="flow-step animate-in">
+            <div class="flow-step-num" style="font-size: var(--text-xs)">💼</div>
+            <p><strong>Holdings</strong><br>Price × Qty → GBP</p>
+          </div>
+          <div class="flow-arrow animate-in">→</div>
+          <div class="flow-step animate-in">
+            <div class="flow-step-num" style="font-size: var(--text-xs)">🏦</div>
+            <p><strong>Account</strong><br>Sum holdings + cash</p>
+          </div>
+          <div class="flow-arrow animate-in">→</div>
+          <div class="flow-step animate-in">
+            <div class="flow-step-num" style="font-size: var(--text-xs)">👤</div>
+            <p><strong>Person</strong><br>Sum all accounts</p>
+          </div>
+          <div class="flow-arrow animate-in">→</div>
+          <div class="flow-step animate-in">
+            <div class="flow-step-num" style="font-size: var(--text-xs)">🏠</div>
+            <p><strong>Household</strong><br>Sum all people</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 4: Historic valuation -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Time Travel Valuations</h2>
+        <p>Remember SCD2 from Module 3? This is where it pays off. You can ask "what was my portfolio worth on 15 June 2024?" and the service will:</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <strong>Find the holdings at that date</strong>
+              <p>Query SCD2 records where 15 June falls within the effective date range.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <strong>Find the prices on or before that date</strong>
+              <p>Get the most recent price for each investment that's not after 15 June.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <strong>Find the exchange rates at that date</strong>
+              <p>Use the currency rate from 15 June (or the nearest earlier date) for conversion.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">4</div>
+            <div class="step-body">
+              <strong>Calculate with the same formula</strong>
+              <p>Same multiplication and conversion — just using historical data instead of current data.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 5: Quiz -->
+      <section class="screen animate-in" id="m5-quiz">
+        <h2 class="screen-heading">Check Your Understanding</h2>
+        <div class="quiz-container">
+          <div class="quiz-question-block" data-question="m5q1" data-correct="option-c"
+               data-correct-text="<strong>Exactly!</strong> You divide the USD value by the exchange rate. $6,784.50 ÷ 1.27 = £5,342.91. The rate means '1.27 dollars per pound', so dividing converts dollars to pounds."
+               data-incorrect-text="<strong>Not quite.</strong> Since the rate is 'USD per 1 GBP', you divide: $6,784.50 ÷ 1.27 = £5,342.91. Multiplying would give you more dollars, not pounds.">
+            <h3 class="quiz-question">You hold 150 shares of a US fund at $45.23 per share. The USD/GBP rate is 1.27. What's the GBP value?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="option-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>$45.23 × 150 × 1.27 = £8,616.32</span>
+              </button>
+              <button class="quiz-option" data-value="option-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>$45.23 × 150 = £6,784.50 (no conversion needed)</span>
+              </button>
+              <button class="quiz-option" data-value="option-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>$45.23 × 150 ÷ 1.27 = £5,342.91</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block" data-question="m5q2" data-correct="option-b"
+               data-correct-text="<strong>Exactly!</strong> The service uses the SCD2 holdings (what you held at that date), the prices from that date, and the exchange rates from that date — then applies the same formula. This is how time-travel valuation works."
+               data-incorrect-text="<strong>Not quite.</strong> Portfolio 60 doesn't store daily snapshots. It reconstructs past valuations on-the-fly by querying SCD2 holdings at that date, prices from that date, and rates from that date — then running the same valuation formula.">
+            <h3 class="quiz-question">A user wants to see their portfolio value from 6 months ago. How does the app calculate this?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="option-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It looks up a pre-calculated daily snapshot stored in a history table</span>
+              </button>
+              <button class="quiz-option" data-value="option-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It queries holdings, prices, and rates at that date and runs the same valuation formula</span>
+              </button>
+              <button class="quiz-option" data-value="option-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It takes today's value and applies the market's 6-month percentage change</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div style="display: flex; gap: var(--space-2); margin-top: var(--space-4);">
+            <button class="quiz-check-btn" onclick="checkQuiz('m5-quiz')">Check Answers</button>
+            <button class="quiz-reset-btn" onclick="resetQuiz('m5-quiz')">Try Again</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+
+<!-- ==========================================
+     MODULE 6 — THE FRONTEND
+     ========================================== -->
+<section class="module" id="module-6" style="background: var(--color-bg);">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">06</span>
+      <h1 class="module-title">What You See — The Frontend That Ties It All Together</h1>
+      <p class="module-subtitle">Understand how HTML, JavaScript, and web components create the user interface.</p>
+    </header>
+    <div class="module-body" id="m6-body">
+
+      <!-- Screen 1: No framework -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">No Framework — And That's the Point</h2>
+        <p>Most modern web apps use a <span class="term" data-definition="A frontend framework (like React, Vue, or Angular) is a pre-built toolkit for building user interfaces. They handle things like updating the page when data changes. Portfolio 60 chose not to use one — it uses plain HTML and JavaScript instead.">frontend framework</span> like React or Vue. Portfolio 60 deliberately doesn't. It uses plain <span class="term" data-definition="HTML (HyperText Markup Language) is the language that defines the structure of a web page — headings, paragraphs, buttons, tables. It's what the browser reads to know what to display.">HTML</span> served from the server, with vanilla <span class="term" data-definition="Vanilla JavaScript means plain JavaScript without any framework or library. 'Vanilla' in tech means 'the basic version, with nothing added.' Like vanilla ice cream — no toppings.">JavaScript</span> adding interactivity.</p>
+        <p>Think of it like building furniture from solid wood instead of buying flat-pack. It takes a bit more initial effort, but there are no mysterious framework bugs, no build pipeline to debug, and the code is readable by anyone who knows basic JavaScript.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">📄</div>
+            <h4 class="pattern-title">Server-Rendered HTML</h4>
+            <p class="pattern-desc">Each page is a real HTML file served from the server. No client-side routing, no virtual DOM.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">⚡</div>
+            <h4 class="pattern-title">Vanilla JavaScript</h4>
+            <p class="pattern-desc">Page-specific JS files fetch data from the API and update the DOM directly. No React, no Vue, no build step.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">🧩</div>
+            <h4 class="pattern-title">Lit Web Components</h4>
+            <p class="pattern-desc">Reusable pieces (navbar, footer) are built as web components using Lit — a thin library for custom HTML elements.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-1)">
+            <div class="pattern-icon" style="background: var(--color-actor-1)">🎨</div>
+            <h4 class="pattern-title">Tailwind CSS</h4>
+            <p class="pattern-desc">Styling uses utility classes — small pre-built CSS snippets you combine directly in the HTML.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 2: How pages work -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">How a Page Loads Data</h2>
+        <p>Each page follows the same pattern: the HTML loads, then JavaScript calls the <span class="term" data-definition="A REST API is a way of organising your backend URLs so they follow predictable patterns. GET /api/users gets all users. GET /api/users/42 gets user 42. POST /api/users creates a new one. It's a naming convention that makes APIs predictable.">API</span> to fetch data, then renders it into the page.</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <strong>Browser loads the HTML page</strong>
+              <p>The server sends a static HTML file — empty table, loading spinner visible.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <strong>JavaScript runs on page load</strong>
+              <p>A page-specific JS file (e.g., <code>portfolio.js</code>) calls <code>apiRequest('/api/portfolio/summary')</code>.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <strong>The server returns JSON data</strong>
+              <p>The API handler queries the database through the service layer and returns a <span class="term" data-definition="JSON (JavaScript Object Notation) is a text format for structured data. It looks like: {&quot;name&quot;: &quot;Ben&quot;, &quot;balance&quot;: 5000}. It's the most common way for servers to send data to browsers — easy for both humans and computers to read.">JSON</span> response.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">4</div>
+            <div class="step-body">
+              <strong>JavaScript renders the data</strong>
+              <p>The JS loops over the data, creates HTML elements, and inserts them into the page. The spinner disappears.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 3: Web components -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Custom Building Blocks — Web Components</h2>
+        <p>The navbar and footer appear on every page. Instead of copying HTML, they're built as <span class="term" data-definition="A web component is a custom HTML element you define yourself. Instead of writing a complex chunk of HTML every time, you create a tag like &lt;app-navbar&gt; and the browser knows how to render it. It's like creating your own Lego brick that you can reuse anywhere.">web components</span> — custom HTML tags like <code>&lt;app-navbar&gt;</code> that the browser knows how to render.</p>
+
+        <div class="translation-block">
+          <div class="translation-code">
+            <span class="translation-label">CODE</span>
+            <pre><code><span class="code-keyword">class</span> <span class="code-function">AppNavbar</span> <span class="code-keyword">extends</span> <span class="code-function">LitElement</span> {
+  <span class="code-function">createRenderRoot</span>() {
+    <span class="code-keyword">return this</span>;
+  }
+  <span class="code-function">render</span>() {
+    <span class="code-keyword">return</span> <span class="code-function">html</span><span class="code-string">`
+      &lt;nav class="bg-brand-800 text-white"&gt;
+        &lt;h1&gt;Portfolio 60&lt;/h1&gt;
+        &lt;ul&gt;...menu items...&lt;/ul&gt;
+      &lt;/nav&gt;
+    `</span>;
+  }
+}</code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Define a new custom HTML element called AppNavbar, built using Lit (a tiny web component library)...</p>
+              <p class="tl">Use "light DOM" — render directly into the page so Tailwind CSS classes work normally...</p>
+              <p class="tl">(Without this, styles would be isolated inside a shadow boundary and Tailwind wouldn't reach them)...</p>
+              <p class="tl">The render method returns the HTML that this component displays...</p>
+              <p class="tl">A navigation bar with the app title and menu items, styled with Tailwind utility classes.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Light DOM vs Shadow DOM</strong>
+            <p>Web components normally use "Shadow DOM" which isolates their styles completely — great for reusable libraries, but it means external CSS (like Tailwind) can't reach inside. Portfolio 60 uses "light DOM" instead, so the component's HTML is just normal HTML on the page and Tailwind classes work as expected. This is a pragmatic trade-off — less isolation, but simpler styling.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 4: Quiz -->
+      <section class="screen animate-in" id="m6-quiz">
+        <h2 class="screen-heading">Check Your Understanding</h2>
+        <div class="quiz-container">
+          <div class="quiz-question-block" data-question="m6q1" data-correct="option-a"
+               data-correct-text="<strong>Exactly!</strong> The page JS calls the API, gets back JSON, and renders it into the DOM. If the API returns different data (e.g., updated prices), the same code will render the new values. You'd look at the portfolio page's JavaScript file to trace the data flow."
+               data-incorrect-text="<strong>Not quite.</strong> Portfolio pages work by: load HTML → JavaScript calls API → JSON comes back → JS renders data into the page. The data comes from the API, not from the HTML file itself.">
+            <h3 class="quiz-question">The portfolio page shows stale data — yesterday's prices instead of today's. Where would you look first to debug this?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="option-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The API response — check if <code>/api/portfolio/summary</code> is returning old data</span>
+              </button>
+              <button class="quiz-option" data-value="option-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The HTML template — the prices might be hardcoded in the HTML</span>
+              </button>
+              <button class="quiz-option" data-value="option-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The CSS file — a styling issue might be hiding the updated values</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block" data-question="m6q2" data-correct="option-c"
+               data-correct-text="<strong>Exactly!</strong> Web components with Lit use 'light DOM' rendering in this project — that means they render into the normal page so Tailwind CSS classes work. If a new component used Shadow DOM by default, Tailwind classes wouldn't apply and it'd look unstyled."
+               data-incorrect-text="<strong>Not quite.</strong> The key is light DOM vs shadow DOM. Portfolio 60's web components use <code>createRenderRoot() { return this; }</code> to render in light DOM, allowing Tailwind to style them. A new component needs the same pattern or Tailwind won't work.">
+            <h3 class="quiz-question">You ask an AI tool to create a new Lit web component for the app. It looks correct but none of the Tailwind styles are applying. What's the most likely cause?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="option-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Tailwind needs to be rebuilt with the new component's file path included</span>
+              </button>
+              <button class="quiz-option" data-value="option-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The component needs to import Tailwind CSS separately</span>
+              </button>
+              <button class="quiz-option" data-value="option-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The component is using Shadow DOM — it needs <code>createRenderRoot() { return this; }</code> for light DOM</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div style="display: flex; gap: var(--space-2); margin-top: var(--space-4);">
+            <button class="quiz-check-btn" onclick="checkQuiz('m6-quiz')">Check Answers</button>
+            <button class="quiz-reset-btn" onclick="resetQuiz('m6-quiz')">Try Again</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+
+<!-- ==========================================
+     MODULE 7 — WHEN THINGS BREAK
+     ========================================== -->
+<section class="module" id="module-7" style="background: var(--color-bg-warm);">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">07</span>
+      <h1 class="module-title">When Things Break — Debugging, Testing, and the Full Picture</h1>
+      <p class="module-subtitle">Build debugging intuition so you can escape AI bug loops.</p>
+    </header>
+    <div class="module-body" id="m7-body">
+
+      <!-- Screen 1: Debugging mindset -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Debugging Is Detective Work</h2>
+        <p>When something goes wrong, the key skill isn't knowing the answer — it's knowing <em>where to look</em>. Think of it like a detective following a trail of evidence. Each layer of the app gives you clues, and the error message is the first clue.</p>
+        <p>Portfolio 60's layered architecture makes this easier. If the symptom is "wrong number on screen," you can trace backwards through the layers to find where the data went wrong.</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in">
+            <div class="step-num" style="background: var(--color-actor-5)">🖥️</div>
+            <div class="step-body">
+              <strong>Wrong on the page?</strong>
+              <p>Check the browser's Network tab — is the API returning bad data, or is the JS rendering it wrong?</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num" style="background: var(--color-actor-2)">🧠</div>
+            <div class="step-body">
+              <strong>Bad API response?</strong>
+              <p>Check the service layer — is the calculation wrong, or is the database returning unexpected values?</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num" style="background: var(--color-actor-3)">🗄️</div>
+            <div class="step-body">
+              <strong>Database looks wrong?</strong>
+              <p>Check the fetcher — did the external API return bad data, or was it stored incorrectly (scaling issue)?</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num" style="background: var(--color-actor-4)">🌐</div>
+            <div class="step-body">
+              <strong>External API issue?</strong>
+              <p>Check the fetcher logs — did the API time out, return an error, or change its response format?</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 2: Auth security -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Security — The Bouncer's Playbook</h2>
+        <p>Portfolio 60 protects financial data with a passphrase system. But security isn't just about having a password — it's about thinking about all the ways someone could get in without one.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-1)">
+            <div class="pattern-icon" style="background: var(--color-actor-1)">🔐</div>
+            <h4 class="pattern-title">Hashed Passphrase</h4>
+            <p class="pattern-desc">The passphrase is never stored in plain text. It's hashed with <span class="term" data-definition="Argon2 is a password hashing algorithm — it turns your password into an unreadable string that can't be reversed. Even if someone steals the hash, they can't figure out your password. It's considered the gold standard for password storage.">Argon2</span>, so even if someone reads the database, they can't find the passphrase.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">🚫</div>
+            <h4 class="pattern-title">Brute-Force Protection</h4>
+            <p class="pattern-desc">After 5 wrong attempts, the account locks for 4 hours. This stops attackers from guessing the passphrase by trying thousands of combinations.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-5)">
+            <div class="pattern-icon" style="background: var(--color-actor-5)">🛡️</div>
+            <h4 class="pattern-title">Path Traversal Prevention</h4>
+            <p class="pattern-desc">The file server strips <code>..</code> from paths and verifies files are inside the allowed directory. This stops attackers from reading files outside the app.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 3: Testing -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Testing — The Safety Net</h2>
+        <p>Tests are like a checklist a pilot runs before every flight. They catch problems <em>before</em> they reach users. Portfolio 60 has two types.</p>
+
+        <div class="translation-block">
+          <div class="translation-code">
+            <span class="translation-label">CODE</span>
+            <pre><code><span class="code-comment">// Each test file gets its own database</span>
+<span class="code-property">process.env.DB_PATH</span> =
+  <span class="code-string">"data/portfolio_60_test/test.db"</span>;
+
+<span class="code-comment">// Each test file gets its own port</span>
+<span class="code-property">process.env.PORT</span> = <span class="code-string">"1441"</span>;
+
+<span class="code-function">describe</span>(<span class="code-string">"Holdings DB"</span>, () => {
+  <span class="code-function">test</span>(<span class="code-string">"creates a holding"</span>, () => {
+    <span class="code-keyword">const</span> h = <span class="code-function">createHolding</span>({...});
+    <span class="code-function">expect</span>(h.id).<span class="code-function">toBeDefined</span>();
+  });
+});</code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Give this test its own separate database file — don't touch the real data...</p>
+              <p class="tl">Give this test its own network port — don't clash with the running app or other tests...</p>
+              <p class="tl">Group related tests together under a name...</p>
+              <p class="tl">Define a single test case: "when I create a holding, it should come back with an ID"...</p>
+              <p class="tl">Call the function and check the result. If the ID is missing, the test fails and we know something broke.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Test Isolation Is Everything</strong>
+            <p>Each test file gets its own database and its own port number. This means tests can run in parallel without interfering with each other — and they never touch your real data. This "isolation" principle is why Portfolio 60 can run dozens of tests in seconds with confidence that a pass means the code actually works.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 4: The big picture — architecture diagram -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The Full Picture — Everything Connected</h2>
+        <p>Now you've seen every piece. Here's how it all fits together — from the browser at the top to the external APIs at the bottom.</p>
+
+        <div class="flow-animation" id="m7-arch" style="text-align: left;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); max-width: 700px; margin: 0 auto;">
+            <div style="grid-column: 1 / -1; text-align: center; padding: var(--space-4); background: var(--color-accent-light); border-radius: var(--radius-md);">
+              <strong style="color: var(--color-accent);">Browser</strong>
+              <p style="font-size: var(--text-sm); color: var(--color-text-secondary); margin: var(--space-1) 0 0;">HTML pages + vanilla JS + Lit web components + Tailwind CSS</p>
+            </div>
+            <div style="grid-column: 1 / -1; text-align: center; color: var(--color-accent); font-size: var(--text-xl);">↕ HTTP requests / JSON responses</div>
+            <div style="padding: var(--space-4); background: rgba(217,79,48,0.08); border-radius: var(--radius-md); border-left: 3px solid var(--color-actor-1);">
+              <strong style="color: var(--color-actor-1);">Auth Middleware</strong>
+              <p style="font-size: var(--text-sm); color: var(--color-text-secondary); margin: var(--space-1) 0 0;">Passphrase gate + demo mode block</p>
+            </div>
+            <div style="padding: var(--space-4); background: rgba(217,79,48,0.08); border-radius: var(--radius-md); border-left: 3px solid var(--color-actor-1);">
+              <strong style="color: var(--color-actor-1);">Router</strong>
+              <p style="font-size: var(--text-sm); color: var(--color-text-secondary); margin: var(--space-1) 0 0;">URL pattern matching → handler dispatch</p>
+            </div>
+            <div style="grid-column: 1 / -1; padding: var(--space-4); background: rgba(42,123,155,0.08); border-radius: var(--radius-md); border-left: 3px solid var(--color-actor-2);">
+              <strong style="color: var(--color-actor-2);">Services</strong>
+              <p style="font-size: var(--text-sm); color: var(--color-text-secondary); margin: var(--space-1) 0 0;">Portfolio valuation · Fetch orchestration · Scheduled fetcher · Analysis · Reports</p>
+            </div>
+            <div style="padding: var(--space-4); background: rgba(123,109,170,0.08); border-radius: var(--radius-md); border-left: 3px solid var(--color-actor-3);">
+              <strong style="color: var(--color-actor-3);">Database (SQLite)</strong>
+              <p style="font-size: var(--text-sm); color: var(--color-text-secondary); margin: var(--space-1) 0 0;">Singleton connection · WAL mode · Scaled integers · SCD2 holdings</p>
+            </div>
+            <div style="padding: var(--space-4); background: rgba(212,168,67,0.08); border-radius: var(--radius-md); border-left: 3px solid var(--color-actor-4);">
+              <strong style="color: var(--color-actor-4);">Fetchers</strong>
+              <p style="font-size: var(--text-sm); color: var(--color-text-secondary); margin: var(--space-1) 0 0;">Morningstar · Frankfurter (ECB) · Yahoo Finance</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 5: Chat — debugging scenario -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Debugging in Action</h2>
+        <p>A user reports: "My portfolio total looks way too high." Watch how you'd trace through the layers to find the bug.</p>
+
+        <div class="chat-window" id="m7-chat">
+          <div class="chat-header">Debugging: Inflated Portfolio Total</div>
+          <div class="chat-messages" id="m7-chat-messages">
+            <div class="chat-message" data-msg="0" data-sender="ui" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-5)">UI</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-5)">Frontend</span>
+                <p>The portfolio total shows £2.4 million. That can't be right!</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="1" data-sender="ui" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-5)">UI</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-5)">Frontend</span>
+                <p>Let me check the API response... /api/portfolio/summary returns a huge number for one holding.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="2" data-sender="service" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-2)">SV</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-2)">Service Layer</span>
+                <p>The valuation formula is fine. But the price for "Vanguard FTSE" looks way too high: 1,847,200.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="3" data-sender="db" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-3)">DB</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-3)">Database</span>
+                <p>That's the scaled value! 1,847,200 ÷ 10,000 = £184.72. But the DB layer forgot to unscale it.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="4" data-sender="db" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-3)">DB</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-3)">Database</span>
+                <p>Found it! A new query was added that returns the raw scaled price instead of dividing by CURRENCY_SCALE_FACTOR. One-line fix.</p>
+              </div>
+            </div>
+          </div>
+          <div class="chat-typing" id="m7-chat-typing" style="display:none">
+            <div class="chat-avatar" id="m7-typing-avatar" style="background: var(--color-text-muted)">?</div>
+            <div class="chat-typing-dots">
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+            </div>
+          </div>
+          <div class="chat-controls">
+            <button onclick="playChatNext('m7')">Next Message</button>
+            <button onclick="playChatAll('m7')">Play All</button>
+            <button onclick="resetChat('m7')">Replay</button>
+            <span class="chat-progress" id="m7-chat-progress">0 / 5 messages</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 6: Quiz -->
+      <section class="screen animate-in" id="m7-quiz">
+        <h2 class="screen-heading">Final Check</h2>
+        <div class="quiz-container">
+          <div class="quiz-question-block" data-question="m7q1" data-correct="option-b"
+               data-correct-text="<strong>Exactly!</strong> The fetch routes are deliberately unprotected — they skip the auth middleware. This means anyone who can reach the server's network can trigger a fetch. For a self-hosted app on a private network, this is fine. On the public internet, it would need additional protection."
+               data-incorrect-text="<strong>Not quite.</strong> Fetch routes are unprotected by design — the scheduled fetcher needs them to work without a passphrase. But this means anyone on the network can trigger a fetch. On a home network that's fine, but it's a real consideration for public-facing deployments.">
+            <h3 class="quiz-question">You want to make Portfolio 60 accessible over the internet. What security concern should you raise?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="option-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The SQLite database file could be downloaded directly by anyone</span>
+              </button>
+              <button class="quiz-option" data-value="option-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The fetch and backfill API routes are unprotected — anyone could trigger price fetches</span>
+              </button>
+              <button class="quiz-option" data-value="option-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The passphrase is sent in plain text over the network</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block" data-question="m7q2" data-correct="option-a"
+               data-correct-text="<strong>Exactly!</strong> A portfolio total that's 10,000× too large is the classic symptom of a missing division by CURRENCY_SCALE_FACTOR. The data was stored scaled (multiplied by 10,000) but returned to the service without being unscaled. This is a common bug pattern in this codebase."
+               data-incorrect-text="<strong>Not quite.</strong> When a value is exactly 10,000× too large, it means the scaled integer wasn't divided by CURRENCY_SCALE_FACTOR (10,000) before being used in calculations. Check the DB layer — a query is likely returning the raw scaled value.">
+            <h3 class="quiz-question">After adding a new investment type, the portfolio total jumps to £2.4 million (it should be around £240). All other investments look correct. What's the most likely bug?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="option-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The new DB query returns the raw scaled price without dividing by 10,000</span>
+              </button>
+              <button class="quiz-option" data-value="option-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The exchange rate is being applied backwards (multiplying instead of dividing)</span>
+              </button>
+              <button class="quiz-option" data-value="option-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The holding quantity was entered incorrectly as 10,000× too many shares</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div style="display: flex; gap: var(--space-2); margin-top: var(--space-4);">
+            <button class="quiz-check-btn" onclick="checkQuiz('m7-quiz')">Check Answers</button>
+            <button class="quiz-reset-btn" onclick="resetQuiz('m7-quiz')">Try Again</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 7: Conclusion -->
+      <section class="screen animate-in" style="text-align: center; padding: var(--space-16) 0;">
+        <h2 class="screen-heading" style="font-size: var(--text-3xl);">You've Seen Behind the Curtain</h2>
+        <p style="max-width: 550px; margin: var(--space-4) auto; font-size: var(--text-lg); color: var(--color-text-secondary);">You now know how a real web application works — from the browser to the database and back. Every concept here applies to thousands of other apps. Use this knowledge to steer AI tools better, debug smarter, and build with confidence.</p>
+        <div style="margin-top: var(--space-8);">
+          <div class="pattern-cards" style="max-width: 600px; margin: 0 auto;">
+            <div class="pattern-card" style="border-top: 3px solid var(--color-actor-2);">
+              <h4 class="pattern-title">You learned</h4>
+              <p class="pattern-desc">Request flow, layered architecture, scaled integers, SCD2 temporal data, API fetching, currency conversion, web components, and test isolation.</p>
+            </div>
+            <div class="pattern-card" style="border-top: 3px solid var(--color-actor-5);">
+              <h4 class="pattern-title">You can now</h4>
+              <p class="pattern-desc">Read server code, trace data flows, spot scaling bugs, understand database patterns, and direct AI coding tools with precise architectural vocabulary.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+
+<!-- ==========================================
+     ABOUT MODAL (CSS-only, :target based)
+     ========================================== -->
+<style>
+  .about-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(16, 42, 67, 0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--duration-normal);
+  }
+  .about-overlay:target {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .about-panel {
+    background: #ffffff;
+    border: 1px solid #bcccdc;
+    border-radius: 8px;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+    padding: 2rem;
+    max-width: 480px;
+    width: 90%;
+    position: relative;
+    transform: translateY(10px);
+    transition: transform var(--duration-normal) var(--ease-out);
+  }
+  .about-overlay:target .about-panel {
+    transform: translateY(0);
+  }
+  .about-close {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    cursor: pointer;
+    color: #829ab1;
+    line-height: 1;
+    text-decoration: none;
+  }
+  .about-close:hover { color: #102a43; }
+  .about-panel h2 {
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #102a43;
+    margin-bottom: 1rem;
+  }
+  .about-panel p {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: #486581;
+    margin-bottom: 0.75rem;
+  }
+  .about-panel p:last-child { margin-bottom: 0; }
+  .about-panel a { color: #334e68; text-decoration: underline; }
+  .about-panel a:hover { color: #102a43; }
+</style>
+<div id="about-modal" class="about-overlay">
+  <div class="about-panel">
+    <a href="#" class="about-close" aria-label="Close">&times;</a>
+    <h2>About This Course</h2>
+    <p>
+      This interactive course was generated from the Portfolio 60 codebase using
+      <a href="https://github.com/zarazhangrui/codebase-to-course" target="_blank" rel="noopener">Codebase to Course</a>
+      by Zara Zhang, powered by
+      <a href="https://claude.ai" target="_blank" rel="noopener">Claude AI</a>
+      from Anthropic.
+    </p>
+    <p>
+      It teaches how the code works through scroll-based modules, animated visualisations, embedded quizzes, and plain-English translations of real code from the project.
+    </p>
+  </div>
+</div>
+
+<!-- ==========================================
+     JAVASCRIPT
+     ========================================== -->
+<script>
+(function() {
+  'use strict';
+
+  /* --- Scroll progress bar --- */
+  var progressBar = document.getElementById('progress-bar');
+  function updateProgressBar() {
+    var scrollTop = window.scrollY;
+    var scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+    var progress = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
+    progressBar.style.width = progress + '%';
+  }
+  window.addEventListener('scroll', function() {
+    requestAnimationFrame(updateProgressBar);
+  }, { passive: true });
+
+  /* --- Nav dot tracking --- */
+  var modules = document.querySelectorAll('.module');
+  var navDots = document.querySelectorAll('.nav-dot');
+  var visited = new Set();
+
+  function updateNavDots() {
+    var scrollY = window.scrollY + window.innerHeight * 0.3;
+    var currentIdx = 0;
+    modules.forEach(function(mod, i) {
+      if (scrollY >= mod.offsetTop) currentIdx = i;
+    });
+    visited.add(currentIdx);
+    navDots.forEach(function(dot, i) {
+      dot.classList.remove('current');
+      if (i === currentIdx) {
+        dot.classList.add('current');
+      } else if (visited.has(i)) {
+        dot.classList.add('visited');
+      }
+    });
+  }
+  window.addEventListener('scroll', function() {
+    requestAnimationFrame(updateNavDots);
+  }, { passive: true });
+
+  /* --- Nav dot click navigation --- */
+  navDots.forEach(function(dot) {
+    dot.addEventListener('click', function() {
+      var target = document.getElementById(dot.dataset.target);
+      if (target) target.scrollIntoView({ behavior: 'smooth' });
+    });
+  });
+
+  /* --- Keyboard navigation --- */
+  var moduleIds = Array.from(modules).map(function(m) { return m.id; });
+  function getCurrentModuleIndex() {
+    var scrollY = window.scrollY + window.innerHeight * 0.3;
+    var idx = 0;
+    modules.forEach(function(mod, i) {
+      if (scrollY >= mod.offsetTop) idx = i;
+    });
+    return idx;
+  }
+  document.addEventListener('keydown', function(e) {
+    if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+    var idx = getCurrentModuleIndex();
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      if (idx < modules.length - 1) modules[idx + 1].scrollIntoView({ behavior: 'smooth' });
+    }
+    if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      if (idx > 0) modules[idx - 1].scrollIntoView({ behavior: 'smooth' });
+    }
+  });
+
+  /* --- Scroll-triggered reveals --- */
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { rootMargin: '0px 0px -10% 0px', threshold: 0.1 });
+  document.querySelectorAll('.animate-in').forEach(function(el) {
+    observer.observe(el);
+  });
+
+  /* --- Stagger children setup --- */
+  document.querySelectorAll('.stagger-children').forEach(function(parent) {
+    Array.from(parent.children).forEach(function(child, i) {
+      child.style.setProperty('--stagger-index', i);
+    });
+  });
+
+  /* --- Glossary tooltips (position:fixed, appended to body) --- */
+  var activeTooltip = null;
+  function positionTooltip(term, tip) {
+    var rect = term.getBoundingClientRect();
+    document.body.appendChild(tip);
+    var tipWidth = tip.offsetWidth || 300;
+    var left = rect.left + rect.width / 2 - tipWidth / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - tipWidth - 8));
+    tip.style.left = left + 'px';
+    var tipHeight = tip.offsetHeight;
+    if (rect.top - tipHeight - 8 < 0) {
+      tip.style.top = (rect.bottom + 8) + 'px';
+      tip.classList.add('flip');
+    } else {
+      tip.style.top = (rect.top - tipHeight - 8) + 'px';
+      tip.classList.remove('flip');
+    }
+  }
+
+  document.querySelectorAll('.term').forEach(function(term) {
+    var tip = document.createElement('span');
+    tip.className = 'term-tooltip';
+    tip.textContent = term.dataset.definition;
+    term.addEventListener('mouseenter', function() {
+      if (activeTooltip && activeTooltip !== tip) {
+        activeTooltip.classList.remove('visible');
+        if (activeTooltip.parentNode) activeTooltip.remove();
+      }
+      positionTooltip(term, tip);
+      requestAnimationFrame(function() { tip.classList.add('visible'); });
+      activeTooltip = tip;
+    });
+    term.addEventListener('mouseleave', function() {
+      tip.classList.remove('visible');
+      setTimeout(function() { if (!tip.classList.contains('visible') && tip.parentNode) tip.remove(); }, 150);
+      activeTooltip = null;
+    });
+    term.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (activeTooltip && activeTooltip !== tip) {
+        activeTooltip.classList.remove('visible');
+        if (activeTooltip.parentNode) activeTooltip.remove();
+      }
+      if (tip.classList.contains('visible')) {
+        tip.classList.remove('visible');
+        if (tip.parentNode) tip.remove();
+        activeTooltip = null;
+      } else {
+        positionTooltip(term, tip);
+        requestAnimationFrame(function() { tip.classList.add('visible'); });
+        activeTooltip = tip;
+      }
+    });
+  });
+  document.addEventListener('click', function() {
+    if (activeTooltip) {
+      activeTooltip.classList.remove('visible');
+      if (activeTooltip.parentNode) activeTooltip.remove();
+      activeTooltip = null;
+    }
+  });
+
+  /* --- Chat animation system --- */
+  var chatStates = {};
+  var chatActors = {
+    'browser':  { initials: 'B',  color: 'var(--color-actor-1)' },
+    'auth':     { initials: '🔒', color: 'var(--color-text-muted)' },
+    'router':   { initials: 'R',  color: 'var(--color-actor-4)' },
+    'route':    { initials: 'PH', color: 'var(--color-actor-1)' },
+    'service':  { initials: 'PS', color: 'var(--color-actor-2)' },
+    'db':       { initials: 'DB', color: 'var(--color-actor-3)' },
+    'fetcher':  { initials: 'F',  color: 'var(--color-actor-4)' },
+    'scheduler':{ initials: 'SC', color: 'var(--color-actor-5)' },
+    'api':      { initials: 'API',color: 'var(--color-actor-4)' },
+    'ui':       { initials: 'UI', color: 'var(--color-actor-5)' },
+  };
+
+  function getChatState(chatId) {
+    if (!chatStates[chatId]) {
+      var msgs = document.querySelectorAll('#' + chatId + '-chat-messages .chat-message');
+      chatStates[chatId] = { index: 0, messages: msgs, playing: false };
+    }
+    return chatStates[chatId];
+  }
+
+  window.playChatNext = function(chatId) {
+    var state = getChatState(chatId);
+    if (state.index >= state.messages.length) return;
+    var msg = state.messages[state.index];
+    var sender = msg.dataset.sender;
+    var typing = document.getElementById(chatId + '-chat-typing');
+    var avatar = document.getElementById(chatId + '-typing-avatar');
+    var actor = chatActors[sender] || { initials: '?', color: 'var(--color-text-muted)' };
+    avatar.textContent = actor.initials;
+    avatar.style.background = actor.color;
+    typing.style.display = 'flex';
+    setTimeout(function() {
+      typing.style.display = 'none';
+      msg.style.display = 'flex';
+      msg.style.animation = 'fadeSlideUp 0.3s var(--ease-out)';
+      state.index++;
+      var progress = document.getElementById(chatId + '-chat-progress');
+      if (progress) progress.textContent = state.index + ' / ' + state.messages.length + ' messages';
+      var container = document.getElementById(chatId + '-chat-messages');
+      container.scrollTop = container.scrollHeight;
+    }, 800);
+  };
+
+  window.playChatAll = function(chatId) {
+    var state = getChatState(chatId);
+    if (state.playing) return;
+    state.playing = true;
+    var interval = setInterval(function() {
+      if (state.index >= state.messages.length) { clearInterval(interval); state.playing = false; return; }
+      playChatNext(chatId);
+    }, 1200);
+  };
+
+  window.resetChat = function(chatId) {
+    var state = getChatState(chatId);
+    state.index = 0;
+    state.playing = false;
+    state.messages.forEach(function(msg) { msg.style.display = 'none'; msg.style.animation = ''; });
+    var progress = document.getElementById(chatId + '-chat-progress');
+    if (progress) progress.textContent = '0 / ' + state.messages.length + ' messages';
+    var typing = document.getElementById(chatId + '-chat-typing');
+    if (typing) typing.style.display = 'none';
+  };
+
+  /* --- Data flow animation system --- */
+  var flowConfigs = {
+    'm4': {
+      steps: [
+        { highlight: 'm4-flow-scheduler', label: 'The cron scheduler fires — it\'s 6pm, time to fetch prices.' },
+        { highlight: 'm4-flow-fetch-service', label: 'The fetch service wakes up. Step 1: get currency rates from the ECB.' },
+        { highlight: 'm4-flow-apis', label: 'The Frankfurter API responds with today\'s USD and EUR rates vs GBP.' },
+        { highlight: 'm4-flow-database', label: 'Rates are scaled by 10,000 and stored in the currency_rates table.' },
+        { highlight: 'm4-flow-apis', label: 'Step 2: Morningstar responds with the latest price for each investment.' },
+        { highlight: 'm4-flow-database', label: 'Each price is scaled and stored. The portfolio service can now calculate up-to-date valuations.' },
+      ]
+    }
+  };
+  var flowStates = {};
+
+  function getFlowState(flowId) {
+    if (!flowStates[flowId]) flowStates[flowId] = { step: 0 };
+    return flowStates[flowId];
+  }
+
+  window.flowNext = function(flowId) {
+    var config = flowConfigs[flowId];
+    var state = getFlowState(flowId);
+    if (!config || state.step >= config.steps.length) return;
+    var step = config.steps[state.step];
+    // Remove previous highlights
+    var animation = document.getElementById(flowId + '-flow') || document.querySelector('#' + flowId + '-flow');
+    if (animation) animation.querySelectorAll('.flow-actor').forEach(function(a) { a.classList.remove('active'); });
+    // Highlight current
+    var actor = document.getElementById(step.highlight);
+    if (actor) actor.classList.add('active');
+    // Update label
+    var label = document.getElementById(flowId + '-flow-label');
+    if (label) label.textContent = step.label;
+    state.step++;
+    var progress = document.getElementById(flowId + '-flow-progress');
+    if (progress) progress.textContent = 'Step ' + state.step + ' / ' + config.steps.length;
+  };
+
+  window.flowReset = function(flowId) {
+    var config = flowConfigs[flowId];
+    var state = getFlowState(flowId);
+    state.step = 0;
+    var animation = document.getElementById(flowId + '-flow');
+    if (animation) animation.querySelectorAll('.flow-actor').forEach(function(a) { a.classList.remove('active'); });
+    var label = document.getElementById(flowId + '-flow-label');
+    if (label) label.textContent = 'Click "Next Step" to begin';
+    var progress = document.getElementById(flowId + '-flow-progress');
+    if (progress) progress.textContent = 'Step 0 / ' + (config ? config.steps.length : 0);
+  };
+
+  /* --- Quiz system --- */
+  window.selectOption = function(btn) {
+    var block = btn.closest('.quiz-question-block');
+    block.querySelectorAll('.quiz-option').forEach(function(o) {
+      o.classList.remove('selected');
+    });
+    btn.classList.add('selected');
+  };
+
+  window.checkQuiz = function(sectionId) {
+    var container = document.querySelector('#' + sectionId + ' .quiz-container');
+    if (!container) return;
+    var questions = container.querySelectorAll('.quiz-question-block');
+    questions.forEach(function(q) {
+      var selected = q.querySelector('.quiz-option.selected');
+      var feedback = q.querySelector('.quiz-feedback');
+      var correctValue = q.dataset.correct;
+      if (!selected) {
+        feedback.textContent = 'Pick an answer first!';
+        feedback.className = 'quiz-feedback show warning';
+        return;
+      }
+      if (selected.dataset.value === correctValue) {
+        selected.classList.add('correct');
+        feedback.innerHTML = q.dataset.correctText || '<strong>Exactly!</strong>';
+        feedback.className = 'quiz-feedback show success';
+      } else {
+        selected.classList.add('incorrect');
+        var correctBtn = q.querySelector('[data-value="' + correctValue + '"]');
+        if (correctBtn) correctBtn.classList.add('correct');
+        feedback.innerHTML = q.dataset.incorrectText || '<strong>Not quite.</strong>';
+        feedback.className = 'quiz-feedback show error';
+      }
+      q.querySelectorAll('.quiz-option').forEach(function(o) { o.disabled = true; });
+    });
+  };
+
+  window.resetQuiz = function(sectionId) {
+    var container = document.querySelector('#' + sectionId + ' .quiz-container');
+    if (!container) return;
+    container.querySelectorAll('.quiz-option').forEach(function(o) {
+      o.classList.remove('selected', 'correct', 'incorrect');
+      o.disabled = false;
+    });
+    container.querySelectorAll('.quiz-feedback').forEach(function(f) {
+      f.className = 'quiz-feedback';
+    });
+  };
+
+})();
+</script>
+
+</body>
+</html>
