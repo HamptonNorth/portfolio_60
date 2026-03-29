@@ -87,6 +87,73 @@ export async function fetchServerStatus() {
 }
 
 /**
+ * @description Fetch the log entries from the remote fetch server.
+ * Returns the most recent 80 fetch log rows, or null on failure.
+ * @returns {Promise<Array|null>} Array of log row objects, or null on failure
+ */
+export async function fetchServerLog() {
+  const fetchServerConfig = getFetchServerConfig();
+
+  if (!fetchServerConfig.enabled || !fetchServerConfig.url) {
+    return null;
+  }
+
+  const apiKey = loadEnvValue("FETCH_SERVER_API_KEY");
+  if (!apiKey) return null;
+
+  const url = fetchServerConfig.url.replace(/\/$/, "") + "/api/fetch-log";
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { "X-API-Key": apiKey },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @description Trigger a manual Fetch All on the remote fetch server.
+ * The fetch runs asynchronously on the server; poll /api/status or /api/fetch-log for results.
+ * @returns {Promise<{success: boolean, message?: string, error?: string}>}
+ */
+export async function triggerServerFetchAll() {
+  const fetchServerConfig = getFetchServerConfig();
+
+  if (!fetchServerConfig.enabled || !fetchServerConfig.url) {
+    return { success: false, error: "Fetch server is not configured" };
+  }
+
+  const apiKey = loadEnvValue("FETCH_SERVER_API_KEY");
+  if (!apiKey) {
+    return { success: false, error: "No API key configured" };
+  }
+
+  const url = fetchServerConfig.url.replace(/\/$/, "") + "/api/fetch";
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "X-API-Key": apiKey },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    const data = await response.json();
+    if (response.ok) {
+      return { success: true, message: data.message || "Fetch started" };
+    }
+    return { success: false, error: data.error || "Request failed" };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
  * @description Upsert the fetched data into a database.
  * Maps natural keys (morningstar_id, currency code, yahoo_ticker) to local
  * integer IDs and writes prices, rates, and benchmark values.

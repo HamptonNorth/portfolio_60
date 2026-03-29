@@ -12,7 +12,7 @@ import { getFetchBatchConfig } from "../config.js";
 import { fetchLatestYahooBenchmarkValue, getYahooFetchableBenchmarks } from "../fetchers/yahoo-benchmark-fetcher.js";
 import { checkpointDatabase, getDatabase } from "../db/connection.js";
 import { backfillInvestmentPrices, backfillBenchmarkValues, backfillCurrencyRates, backfillSingleInvestment, backfillSingleBenchmark, backfillSingleCurrency } from "../services/historic-backfill.js";
-import { syncFromFetchServer, fetchServerStatus } from "../services/fetch-server-sync.js";
+import { syncFromFetchServer, fetchServerStatus, fetchServerLog, triggerServerFetchAll } from "../services/fetch-server-sync.js";
 import { getFetchServerConfig } from "../config.js";
 import { isDemoMode } from "../test-mode.js";
 import { CURRENCY_SCALE_FACTOR } from "../../shared/server-constants.js";
@@ -1095,6 +1095,32 @@ fetchRouter.get("/api/fetch/server-status", async function () {
   }
 
   return Response.json({ enabled: true, reachable: true, ...status }, { status: 200 });
+});
+
+// GET /api/fetch/server-log — proxy fetch log from remote fetch server
+fetchRouter.get("/api/fetch/server-log", async function () {
+  const config = getFetchServerConfig();
+  if (!config.enabled || !config.url) {
+    return Response.json({ enabled: false }, { status: 200 });
+  }
+
+  const log = await fetchServerLog();
+  if (!log) {
+    return Response.json({ enabled: true, reachable: false }, { status: 200 });
+  }
+
+  return Response.json({ enabled: true, reachable: true, entries: log }, { status: 200 });
+});
+
+// POST /api/fetch/server-rerun — trigger a Fetch All on the remote fetch server
+fetchRouter.post("/api/fetch/server-rerun", async function () {
+  const config = getFetchServerConfig();
+  if (!config.enabled || !config.url) {
+    return Response.json({ error: "Fetch server is not configured" }, { status: 400 });
+  }
+
+  const result = await triggerServerFetchAll();
+  return Response.json(result, { status: result.success ? 202 : 502 });
 });
 
 /**

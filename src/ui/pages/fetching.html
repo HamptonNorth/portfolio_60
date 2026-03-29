@@ -64,6 +64,21 @@
                 </div>
             </div>
 
+            <!-- Fetch Server Log (hidden when not configured) -->
+            <div id="fetch-server-log-section" class="hidden bg-white rounded-lg shadow-md p-4 mb-6">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-base font-semibold text-brand-700">Fetch Server Log</h3>
+                    <div class="flex items-center gap-3">
+                        <span id="rerun-fetch-result" class="text-sm"></span>
+                        <button id="rerun-fetch-btn" class="px-3 py-1.5 bg-brand-700 hover:bg-brand-800 text-white rounded-md text-sm transition-colors">Rerun Fetch All</button>
+                        <button id="refresh-server-log-btn" class="text-sm text-brand-600 hover:text-brand-800 underline">Refresh</button>
+                    </div>
+                </div>
+                <div id="fetch-server-log-container" class="overflow-y-auto border border-brand-200 rounded-md" style="max-height: 24rem;">
+                    <p class="text-sm text-brand-500 p-3">Loading...</p>
+                </div>
+            </div>
+
             <!-- Single Fetch All Button -->
             <section class="mb-8">
                 <div class="bg-white rounded-lg shadow-md p-6">

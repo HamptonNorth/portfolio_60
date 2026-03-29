@@ -1866,8 +1866,105 @@ async function syncFromServer() {
   }
 }
 
+/**
+ * @description Load and display the fetch server log.
+ * Fetches the last 80 entries from the remote server via the proxy endpoint.
+ * Shows the last 20 entries visible by default with the panel scrolled to the bottom.
+ * Only shown when fetch server is enabled and reachable.
+ */
+async function loadFetchServerLog() {
+  try {
+    var response = await fetch("/api/fetch/server-log");
+    var data = await response.json();
+
+    if (!data.enabled) return;
+
+    var section = document.getElementById("fetch-server-log-section");
+    var container = document.getElementById("fetch-server-log-container");
+
+    if (!data.reachable || !data.entries || data.entries.length === 0) {
+      section.classList.remove("hidden");
+      container.innerHTML = '<p class="text-sm text-brand-500 p-3">No log entries available.</p>';
+      return;
+    }
+
+    section.classList.remove("hidden");
+
+    // Build the log table — entries arrive newest-first, display newest at bottom
+    var entries = data.entries.slice().reverse();
+    var html = '<table class="w-full text-xs">';
+    html += '<thead class="sticky top-0 bg-brand-50"><tr class="text-left">';
+    html += '<th class="py-1.5 px-3 font-medium text-brand-700">Date/Time</th>';
+    html += '<th class="py-1.5 px-3 font-medium text-brand-700">Type</th>';
+    html += '<th class="py-1.5 px-3 font-medium text-brand-700 text-right">OK</th>';
+    html += '<th class="py-1.5 px-3 font-medium text-brand-700 text-right">Failed</th>';
+    html += '<th class="py-1.5 px-3 font-medium text-brand-700">Error</th>';
+    html += '</tr></thead><tbody>';
+
+    for (var i = 0; i < entries.length; i++) {
+      var entry = entries[i];
+      var dt = entry.fetch_datetime || "";
+      var displayDate = dt.length >= 16 ? dt.substring(0, 10) + " " + dt.substring(11, 16) : dt;
+      var hasFailed = entry.items_failed > 0;
+      var hasError = entry.error_message && entry.error_message.length > 0;
+      var rowClass = (hasFailed || hasError) ? "bg-red-50" : "";
+
+      html += '<tr class="border-t border-brand-100 ' + rowClass + '">';
+      html += '<td class="py-1.5 px-3 text-brand-600 whitespace-nowrap">' + escapeHtml(displayDate) + '</td>';
+      html += '<td class="py-1.5 px-3 text-brand-600">' + escapeHtml(entry.fetch_type || "") + '</td>';
+      html += '<td class="py-1.5 px-3 text-right text-green-700">' + (entry.items_success || 0) + '</td>';
+      html += '<td class="py-1.5 px-3 text-right' + (hasFailed ? ' text-red-600 font-medium' : ' text-brand-500') + '">' + (entry.items_failed || 0) + '</td>';
+      html += '<td class="py-1.5 px-3 text-red-600 truncate max-w-xs" title="' + escapeHtml(entry.error_message || "") + '">' + escapeHtml(entry.error_message || "") + '</td>';
+      html += '</tr>';
+    }
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+
+    // Scroll to the bottom so the most recent entries are visible
+    container.scrollTop = container.scrollHeight;
+  } catch {
+    // Fetch server log not available — leave hidden
+  }
+}
+
+/**
+ * @description Trigger a Fetch All on the remote fetch server.
+ * The fetch runs asynchronously; the user can refresh the log to see results.
+ */
+async function rerunServerFetchAll() {
+  var btn = document.getElementById("rerun-fetch-btn");
+  var resultEl = document.getElementById("rerun-fetch-result");
+
+  btn.disabled = true;
+  btn.textContent = "Starting...";
+  resultEl.textContent = "";
+
+  try {
+    var response = await fetch("/api/fetch/server-rerun", { method: "POST" });
+    var data = await response.json();
+
+    if (data.success) {
+      resultEl.textContent = data.message || "Fetch started — refresh log to see results";
+      resultEl.className = "text-sm text-green-600";
+    } else {
+      resultEl.textContent = data.error || "Failed to trigger fetch";
+      resultEl.className = "text-sm text-red-600";
+    }
+  } catch (err) {
+    resultEl.textContent = "Failed: " + err.message;
+    resultEl.className = "text-sm text-red-600";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Rerun Fetch All";
+  }
+}
+
 document.addEventListener("DOMContentLoaded", async function () {
   await Promise.all([loadLastScrapeTimes(), loadScheduleDisplay(), loadLatestFailures(), loadFetchServerStatus()]);
+
+  // Load the fetch server log after status (so section visibility is already set)
+  loadFetchServerLog();
 
   document.getElementById("show-current-btn").addEventListener("click", showCurrent);
   document.getElementById("fetch-all-btn").addEventListener("click", fetchAll);
@@ -1877,4 +1974,14 @@ document.addEventListener("DOMContentLoaded", async function () {
   document.getElementById("retry-failed-prices-btn").addEventListener("click", retryFailedPricesFromDb);
   document.getElementById("retry-failed-benchmarks-btn").addEventListener("click", retryFailedBenchmarksFromDb);
   document.getElementById("sync-from-server-btn").addEventListener("click", syncFromServer);
+
+  var refreshLogBtn = document.getElementById("refresh-server-log-btn");
+  if (refreshLogBtn) {
+    refreshLogBtn.addEventListener("click", loadFetchServerLog);
+  }
+
+  var rerunBtn = document.getElementById("rerun-fetch-btn");
+  if (rerunBtn) {
+    rerunBtn.addEventListener("click", rerunServerFetchAll);
+  }
 });
