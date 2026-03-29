@@ -1890,8 +1890,8 @@ async function loadFetchServerLog() {
 
     section.classList.remove("hidden");
 
-    // Build the log table — entries arrive newest-first, display newest at bottom
-    var entries = data.entries.slice().reverse();
+    // Build the log table — entries arrive newest-first, display newest first
+    var entries = data.entries;
     var html = '<table class="w-full text-xs">';
     html += '<thead class="sticky top-0 bg-brand-50"><tr class="text-left">';
     html += '<th class="py-1.5 px-3 font-medium text-brand-700">Date/Time</th>';
@@ -1920,9 +1920,6 @@ async function loadFetchServerLog() {
 
     html += '</tbody></table>';
     container.innerHTML = html;
-
-    // Scroll to the bottom so the most recent entries are visible
-    container.scrollTop = container.scrollHeight;
   } catch {
     // Fetch server log not available — leave hidden
   }
@@ -1947,6 +1944,7 @@ async function rerunServerFetchAll() {
     if (data.success) {
       resultEl.textContent = data.message || "Fetch started — refresh log to see results";
       resultEl.className = "text-sm text-green-600";
+      setTimeout(function () { resultEl.textContent = ""; }, 5000);
     } else {
       resultEl.textContent = data.error || "Failed to trigger fetch";
       resultEl.className = "text-sm text-red-600";
@@ -1963,9 +1961,6 @@ async function rerunServerFetchAll() {
 document.addEventListener("DOMContentLoaded", async function () {
   await Promise.all([loadLastScrapeTimes(), loadScheduleDisplay(), loadLatestFailures(), loadFetchServerStatus()]);
 
-  // Load the fetch server log after status (so section visibility is already set)
-  loadFetchServerLog();
-
   document.getElementById("show-current-btn").addEventListener("click", showCurrent);
   document.getElementById("fetch-all-btn").addEventListener("click", fetchAll);
   document.getElementById("fetch-currencies-btn").addEventListener("click", fetchCurrenciesOnly);
@@ -1974,6 +1969,20 @@ document.addEventListener("DOMContentLoaded", async function () {
   document.getElementById("retry-failed-prices-btn").addEventListener("click", retryFailedPricesFromDb);
   document.getElementById("retry-failed-benchmarks-btn").addEventListener("click", retryFailedBenchmarksFromDb);
   document.getElementById("sync-from-server-btn").addEventListener("click", syncFromServer);
+
+  var showLogBtn = document.getElementById("show-server-log-btn");
+  if (showLogBtn) {
+    showLogBtn.addEventListener("click", function () {
+      var logSection = document.getElementById("fetch-server-log-section");
+      if (logSection && logSection.classList.contains("hidden")) {
+        loadFetchServerLog();
+        showLogBtn.textContent = "Hide Fetch Server Log";
+      } else if (logSection) {
+        logSection.classList.add("hidden");
+        showLogBtn.textContent = "Show Fetch Server Log";
+      }
+    });
+  }
 
   var refreshLogBtn = document.getElementById("refresh-server-log-btn");
   if (refreshLogBtn) {
