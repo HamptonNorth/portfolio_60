@@ -9,14 +9,23 @@
     "id": "ex2_portfolio_summary",
     "title": "2: Portfolio Summary",
     "pdfEndpoint": "/api/reports/pdf/portfolio-summary",
-    "params": ["USER2", "USER1", "USER2 + USER1"]
+    "params": [
+      "USER2",
+      "USER1",
+      "USER2 + USER1"
+    ]
   },
   {
     "id": "ex2b_portfolio_summary_comparison",
     "title": "2b: Portfolio Summary (3m comparison)",
     "pdfEndpoint": "/api/reports/pdf/portfolio-summary",
     "compareTo": "3m",
-    "params": ["USER2", "USER1", "new_page", "USER2 + USER1"]
+    "params": [
+      "USER2",
+      "USER1",
+      "new_page",
+      "USER2 + USER1"
+    ]
   },
   {
     "id": "ex3_portfolio_detail",
@@ -49,7 +58,11 @@
     "pdfEndpoint": "/api/reports/pdf/chart",
     "monthsToShow": "12",
     "smooth": true,
-    "params": ["inv:GB00B41YBW71", "inv:GB00B4PQW151", "bm:FTSE 100"]
+    "params": [
+      "inv:GB00B41YBW71",
+      "inv:GB00B4PQW151",
+      "bm:FTSE 100"
+    ]
   },
   {
     "id": "ex4b_chart_with_events",
@@ -80,14 +93,22 @@
         "subTitle": "36 month performance",
         "monthsToShow": "36",
         "smooth": true,
-        "params": ["inv:GB00B41YBW71", "inv:GB00B4PQW151", "bm:FTSE 100"]
+        "params": [
+          "inv:GB00B41YBW71",
+          "inv:GB00B4PQW151",
+          "bm:FTSE 100"
+        ]
       },
       {
         "title": "Key Funds",
         "subTitle": "12 month performance",
         "monthsToShow": "12",
         "smooth": true,
-        "params": ["inv:GB00B41YBW71", "inv:GB00B4PQW151", "bm:FTSE 100"]
+        "params": [
+          "inv:GB00B41YBW71",
+          "inv:GB00B4PQW151",
+          "bm:FTSE 100"
+        ]
       }
     ]
   },
@@ -156,7 +177,11 @@
     "blocks": [
       {
         "type": "portfolio_summary",
-        "params": ["USER2", "USER1", "USER2 + USER1"]
+        "params": [
+          "USER2",
+          "USER1",
+          "USER2 + USER1"
+        ]
       },
       {
         "type": "chart",
@@ -164,7 +189,11 @@
         "subTitle": "12 month trend",
         "monthsToShow": "12",
         "smooth": true,
-        "params": ["inv:GB00B41YBW71", "inv:GB00B4PQW151", "bm:FTSE 100"]
+        "params": [
+          "inv:GB00B41YBW71",
+          "inv:GB00B4PQW151",
+          "bm:FTSE 100"
+        ]
       }
     ]
   },
@@ -172,10 +201,16 @@
     "id": "ex7_weekly_report",
     "title": "7: Weekly Report (6 pages)",
     "blocks": [
-      { "type": "household_assets" },
+      {
+        "type": "household_assets"
+      },
       {
         "type": "portfolio_summary",
-        "params": ["USER2", "USER1", "USER2 + USER1"]
+        "params": [
+          "USER2",
+          "USER1",
+          "USER2 + USER1"
+        ]
       },
       {
         "type": "portfolio_detail",

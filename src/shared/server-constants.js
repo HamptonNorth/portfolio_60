@@ -12,7 +12,9 @@ export { APP_NAME, APP_VERSION };
 // for deployment to nuc2023 (dem version)
 // export const SERVER_PORT = 1451;
 // for local development
-export const SERVER_PORT = 1420;
+// export const SERVER_PORT = 1420;
+// set in start up
+export const SERVER_PORT = parseInt(process.env.PORT, 10) || 1420;
 
 /**
  * @description Base directory for writable data files (database, backups, docs, .env, config).

@@ -65,17 +65,12 @@ function getReportTypeLabel(report) {
  * @description Load report definitions and tokens from the server, then render.
  */
 async function loadReports() {
-  var result = await apiRequest("/api/reports/raw");
+  var result = await apiRequest("/api/reports/definitions");
   if (!result.ok) {
     showError("page-messages", result.error || "Failed to load reports", result.detail || "");
     return;
   }
-  try {
-    reportDefinitions = JSON.parse(result.data.content);
-  } catch {
-    showError("page-messages", "Failed to parse report definitions");
-    return;
-  }
+  reportDefinitions = result.data || [];
 
   // Load tokens (non-blocking — used for hints in modals)
   try {

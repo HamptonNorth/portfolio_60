@@ -281,19 +281,38 @@ reportsRouter.get("/api/reports", function () {
 });
 
 // GET /api/reports/raw — return raw user-reports.json content for editing.
-// Creates a timestamped backup before returning.
+// Creates a timestamped backup before returning. Used by the JSON text editor.
 // Must be registered before /api/reports/:id so "raw" is not matched as an :id param
 reportsRouter.get("/api/reports/raw", function () {
   try {
-    backupJsonFile(reportsFilePath);
-    const raw = readFileSync(reportsFilePath, "utf-8");
-    return new Response(JSON.stringify({ content: raw, path: reportsFilePath }), {
+    var filePath = isTestMode() ? reportsTestFilePath : reportsFilePath;
+    backupJsonFile(filePath);
+    const raw = readFileSync(filePath, "utf-8");
+    return new Response(JSON.stringify({ content: raw, path: filePath }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
     return new Response(
       JSON.stringify({ error: "Failed to read reports file", detail: err.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+});
+
+// GET /api/reports/definitions — return raw report definitions array (no token
+// substitution, no backup). Used by the Manage Reports page for CRUD operations.
+// Must be registered before /api/reports/:id so "definitions" is not matched as :id
+reportsRouter.get("/api/reports/definitions", function () {
+  try {
+    var reports = readRawReports();
+    return new Response(JSON.stringify(reports), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Failed to load report definitions", detail: err.message }),
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }
@@ -616,7 +635,8 @@ reportsRouter.put("/api/reports/raw", async function (request) {
       );
     }
 
-    writeFileSync(reportsFilePath, content, "utf-8");
+    var filePath = isTestMode() ? reportsTestFilePath : reportsFilePath;
+    writeFileSync(filePath, content, "utf-8");
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
