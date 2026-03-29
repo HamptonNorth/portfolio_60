@@ -272,6 +272,17 @@ class AppNavbar extends LitElement {
         link.setAttribute("title", report.title);
         dropdown.appendChild(link);
       }
+
+      // Manage Reports link at the bottom
+      const manageHr = document.createElement("hr");
+      manageHr.className = "my-1 border-brand-200";
+      dropdown.appendChild(manageHr);
+
+      const manageLink = document.createElement("a");
+      manageLink.href = "/pages/reports-manager.html";
+      manageLink.className = "block px-4 py-2 hover:bg-brand-50 transition-colors text-brand-600";
+      manageLink.textContent = "Manage Reports";
+      dropdown.appendChild(manageLink);
     } catch (err) {
       // Silently ignore — reports menu items are optional
     }

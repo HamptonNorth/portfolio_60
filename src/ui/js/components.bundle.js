@@ -1828,6 +1828,14 @@ class AppNavbar extends LitElement {
         link.setAttribute("title", report.title);
         dropdown.appendChild(link);
       }
+      const manageHr = document.createElement("hr");
+      manageHr.className = "my-1 border-brand-200";
+      dropdown.appendChild(manageHr);
+      const manageLink = document.createElement("a");
+      manageLink.href = "/pages/reports-manager.html";
+      manageLink.className = "block px-4 py-2 hover:bg-brand-50 transition-colors text-brand-600";
+      manageLink.textContent = "Manage Reports";
+      dropdown.appendChild(manageLink);
     } catch (err) {}
   }
   async _checkTestMode() {
@@ -1892,21 +1900,57 @@ class AppNavbar extends LitElement {
       }
       const data = await response.json();
       const items = data.items || [];
+      const documents = data.documents || [];
       const listItem = this.querySelector("#nav-lists-item");
       const dropdown = this.querySelector("#nav-lists-dropdown");
-      if (items.length === 0 || !listItem || !dropdown) {
+      if (!listItem || !dropdown) {
         return;
       }
       listItem.style.display = "";
       dropdown.innerHTML = "";
-      items.forEach(function(item, index) {
-        const link = document.createElement("a");
-        link.href = "/pages/list-viewer.html?index=" + index;
-        link.className = "block px-4 py-2 hover:bg-brand-50 transition-colors";
-        link.setAttribute("data-nav", "list-viewer-" + index);
-        link.textContent = item.title;
-        dropdown.appendChild(link);
-      });
+      if (items.length > 0) {
+        const heading = document.createElement("span");
+        heading.className = "block px-4 py-2 font-medium text-brand-800 select-none";
+        heading.textContent = "Spreadsheets";
+        dropdown.appendChild(heading);
+        items.forEach(function(item, index) {
+          const link = document.createElement("a");
+          link.href = "/pages/list-viewer.html?index=" + index;
+          link.className = "block pl-8 pr-4 py-1.5 hover:bg-brand-50 transition-colors text-sm text-brand-600";
+          link.setAttribute("data-nav", "list-viewer-" + index);
+          link.textContent = item.title;
+          dropdown.appendChild(link);
+        });
+      }
+      if (documents.length > 0) {
+        if (items.length > 0) {
+          const hr = document.createElement("hr");
+          hr.className = "my-1 border-brand-200";
+          dropdown.appendChild(hr);
+        }
+        const docHeading = document.createElement("span");
+        docHeading.className = "block px-4 py-2 font-medium text-brand-800 select-none";
+        docHeading.textContent = "Documents (PDF)";
+        dropdown.appendChild(docHeading);
+        documents.forEach(function(doc) {
+          const link = document.createElement("a");
+          link.href = "/docs/lists/" + encodeURIComponent(doc.filename);
+          link.target = "_blank";
+          link.rel = "noopener";
+          link.className = "block pl-8 pr-4 py-1.5 hover:bg-brand-50 transition-colors text-sm text-brand-600";
+          link.setAttribute("data-nav", "list-doc-" + doc.filename);
+          link.textContent = doc.title;
+          dropdown.appendChild(link);
+        });
+      }
+      const manageHr = document.createElement("hr");
+      manageHr.className = "my-1 border-brand-200";
+      dropdown.appendChild(manageHr);
+      const manageLink = document.createElement("a");
+      manageLink.href = "/pages/lists-manager.html";
+      manageLink.className = "block px-4 py-2 hover:bg-brand-50 transition-colors text-brand-600";
+      manageLink.textContent = "Manage Lists";
+      dropdown.appendChild(manageLink);
     } catch {}
   }
   async _loadDocs() {
@@ -1981,7 +2025,7 @@ var APP_NAME = "Portfolio 60";
 // package.json
 var package_default = {
   name: "portfolio-60",
-  version: "0.1.4",
+  version: "0.1.5",
   description: "UK Family Investment Portfolio Tracker",
   type: "module",
   private: true,

@@ -1,7 +1,7 @@
 import { Router } from "../router.js";
 import { readFileSync, writeFileSync, existsSync, copyFileSync } from "node:fs";
 import { resolve, dirname, basename, join } from "node:path";
-import { getReportParams } from "../db/report-params-db.js";
+import { getReportParams, getAllReportParams } from "../db/report-params-db.js";
 import { generateHouseholdAssetsPdf } from "../reports/pdf-household-assets.js";
 import { generatePortfolioSummaryPdf } from "../reports/pdf-portfolio-summary.js";
 import { generatePortfolioDetailPdf } from "../reports/pdf-portfolio-detail.js";
@@ -106,6 +106,59 @@ function backupJsonFile(filePath) {
   const backupName = base + "-backup-" + timestamp + ".json";
   const backupPath = join(dir, backupName);
   copyFileSync(filePath, backupPath);
+}
+
+/**
+ * @description Read the raw report definitions array from the JSON file
+ * (without token substitution). Uses the test file when in test mode.
+ * @returns {Array} Array of report definition objects
+ */
+function readRawReports() {
+  var filePath = isTestMode() ? reportsTestFilePath : reportsFilePath;
+  var raw = readFileSync(filePath, "utf-8");
+  return JSON.parse(raw);
+}
+
+/**
+ * @description Write the report definitions array back to the JSON file
+ * with a timestamped backup. Uses the test file when in test mode.
+ * @param {Array} reports - The full array of report definitions
+ */
+function writeReports(reports) {
+  var filePath = isTestMode() ? reportsTestFilePath : reportsFilePath;
+  backupJsonFile(filePath);
+  writeFileSync(filePath, JSON.stringify(reports, null, 2) + "\n", "utf-8");
+}
+
+/**
+ * @description Validate a report definition object has the minimum required fields.
+ * Returns an error string if invalid, or null if valid.
+ * @param {Object} report - The report definition to validate
+ * @returns {string|null} Error message if invalid, null if valid
+ */
+function validateReportDefinition(report) {
+  if (!report || typeof report !== "object") {
+    return "Report definition must be an object";
+  }
+  if (!report.id || typeof report.id !== "string" || report.id.trim().length === 0) {
+    return "Report ID is required";
+  }
+  if (!report.title || typeof report.title !== "string" || report.title.trim().length === 0) {
+    return "Report title is required";
+  }
+  // Composite reports need at least one block
+  if (report.blocks) {
+    if (!Array.isArray(report.blocks) || report.blocks.length === 0) {
+      return "Composite reports must have at least one block";
+    }
+  }
+  // Chart groups need 1-4 charts
+  if (report.charts) {
+    if (!Array.isArray(report.charts) || report.charts.length === 0 || report.charts.length > 4) {
+      return "Chart groups must have between 1 and 4 charts";
+    }
+  }
+  return null;
 }
 
 // ─── Views endpoints (HTML composite reports) ───────────────────────────────
@@ -572,6 +625,197 @@ reportsRouter.put("/api/reports/raw", async function (request) {
   } catch (err) {
     return new Response(
       JSON.stringify({ error: "Failed to save reports", detail: err.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+});
+
+// ─── Report Definition CRUD ──────────────────────────────────────────────────
+
+// GET /api/reports/tokens — return the report_params token map for the UI
+reportsRouter.get("/api/reports/tokens", function () {
+  try {
+    var params = getAllReportParams();
+    return new Response(JSON.stringify(params), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Failed to load tokens", detail: err.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+});
+
+// POST /api/reports/definition — add a new report definition
+reportsRouter.post("/api/reports/definition", async function (request) {
+  try {
+    var body = await request.json();
+    var error = validateReportDefinition(body);
+    if (error) {
+      return new Response(JSON.stringify({ error: error }), {
+        status: 400, headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    var reports = readRawReports();
+
+    // Check for duplicate ID
+    var duplicate = reports.find(function (r) { return r.id === body.id; });
+    if (duplicate) {
+      return new Response(JSON.stringify({ error: "A report with ID '" + body.id + "' already exists" }), {
+        status: 409, headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    reports.push(body);
+    writeReports(reports);
+
+    return new Response(JSON.stringify({ success: true, index: reports.length - 1 }), {
+      status: 201, headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Failed to add report", detail: err.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+});
+
+// PUT /api/reports/definition/:index — update a report definition at index
+reportsRouter.put("/api/reports/definition/:index", async function (request, params) {
+  try {
+    var index = parseInt(params.index, 10);
+    var reports = readRawReports();
+
+    if (isNaN(index) || index < 0 || index >= reports.length) {
+      return new Response(JSON.stringify({ error: "Report not found" }), {
+        status: 404, headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    var body = await request.json();
+    var error = validateReportDefinition(body);
+    if (error) {
+      return new Response(JSON.stringify({ error: error }), {
+        status: 400, headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Check for duplicate ID (excluding the current index)
+    var duplicate = reports.find(function (r, i) { return i !== index && r.id === body.id; });
+    if (duplicate) {
+      return new Response(JSON.stringify({ error: "A report with ID '" + body.id + "' already exists" }), {
+        status: 409, headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    reports[index] = body;
+    writeReports(reports);
+
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200, headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Failed to update report", detail: err.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+});
+
+// DELETE /api/reports/definition/:index — delete a report definition
+reportsRouter.delete("/api/reports/definition/:index", async function (request, params) {
+  try {
+    var index = parseInt(params.index, 10);
+    var reports = readRawReports();
+
+    if (isNaN(index) || index < 0 || index >= reports.length) {
+      return new Response(JSON.stringify({ error: "Report not found" }), {
+        status: 404, headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    reports.splice(index, 1);
+    writeReports(reports);
+
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200, headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Failed to delete report", detail: err.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+});
+
+// PUT /api/reports/reorder — reorder reports by moving an item from one index to another
+reportsRouter.put("/api/reports/reorder", async function (request) {
+  try {
+    var body = await request.json();
+    var fromIndex = body.from;
+    var toIndex = body.to;
+
+    var reports = readRawReports();
+
+    if (typeof fromIndex !== "number" || typeof toIndex !== "number" ||
+        fromIndex < 0 || fromIndex >= reports.length ||
+        toIndex < 0 || toIndex >= reports.length) {
+      return new Response(JSON.stringify({ error: "Invalid indices" }), {
+        status: 400, headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    var item = reports.splice(fromIndex, 1)[0];
+    reports.splice(toIndex, 0, item);
+    writeReports(reports);
+
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200, headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Failed to reorder reports", detail: err.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+});
+
+// POST /api/reports/duplicate/:index — duplicate a report definition
+reportsRouter.post("/api/reports/duplicate/:index", async function (request, params) {
+  try {
+    var index = parseInt(params.index, 10);
+    var reports = readRawReports();
+
+    if (isNaN(index) || index < 0 || index >= reports.length) {
+      return new Response(JSON.stringify({ error: "Report not found" }), {
+        status: 404, headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    var original = reports[index];
+    var copy = JSON.parse(JSON.stringify(original));
+    copy.id = original.id + "_copy";
+    copy.title = original.title + " (Copy)";
+
+    // Ensure unique ID
+    var counter = 1;
+    while (reports.find(function (r) { return r.id === copy.id; })) {
+      counter++;
+      copy.id = original.id + "_copy" + counter;
+    }
+
+    reports.splice(index + 1, 0, copy);
+    writeReports(reports);
+
+    return new Response(JSON.stringify({ success: true, index: index + 1 }), {
+      status: 201, headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Failed to duplicate report", detail: err.message }),
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }

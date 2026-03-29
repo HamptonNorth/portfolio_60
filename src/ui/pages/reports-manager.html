@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en-GB">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Portfolio 60 — Manage Reports</title>
+        <link rel="stylesheet" href="/css/output.css" />
+        <link rel="icon" type="image/svg+xml" href="/images/favicon.svg" />
+    </head>
+    <body class="bg-brand-25 text-brand-900 min-h-screen flex flex-col">
+        <app-navbar></app-navbar>
+        <main class="max-w-5xl mx-auto px-6 py-8 flex-1 w-full" id="main-content">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-semibold text-brand-800">Manage Reports</h2>
+                <div class="relative" id="add-report-wrapper">
+                    <button id="btn-add-report" class="px-4 py-2 bg-brand-600 text-white rounded-md hover:bg-brand-700 transition-colors text-sm">
+                        Add Report &#9662;
+                    </button>
+                    <div id="add-report-menu" class="hidden absolute right-0 top-full mt-1 bg-white border border-brand-200 rounded-md shadow-lg py-1 min-w-56 z-50">
+                        <button class="block w-full text-left px-4 py-2 hover:bg-brand-50 text-sm" data-type="household_assets">Household Assets</button>
+                        <button class="block w-full text-left px-4 py-2 hover:bg-brand-50 text-sm" data-type="portfolio_summary">Portfolio Summary</button>
+                        <button class="block w-full text-left px-4 py-2 hover:bg-brand-50 text-sm" data-type="portfolio_detail">Portfolio Detail</button>
+                        <button class="block w-full text-left px-4 py-2 hover:bg-brand-50 text-sm" data-type="chart">Performance Chart</button>
+                        <button class="block w-full text-left px-4 py-2 hover:bg-brand-50 text-sm" data-type="chart_group">Chart Group (1–4)</button>
+                        <button class="block w-full text-left px-4 py-2 hover:bg-brand-50 text-sm" data-type="portfolio_value_chart">Portfolio Value Chart</button>
+                        <hr class="my-1 border-brand-200" />
+                        <button class="block w-full text-left px-4 py-2 hover:bg-brand-50 text-sm" data-type="composite">Composite Report</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="page-messages"></div>
+
+            <!-- Reports table -->
+            <section class="bg-white rounded-lg border border-brand-200 p-6 mb-6">
+                <div id="reports-list"></div>
+            </section>
+
+            <!-- Footer links -->
+            <div class="flex justify-between items-center text-sm text-brand-500">
+                <button id="btn-edit-json" class="hover:text-brand-700 underline">Edit as JSON (advanced)</button>
+            </div>
+        </main>
+        <app-footer></app-footer>
+        <script src="/js/app.js"></script>
+        <script src="/js/components.bundle.js"></script>
+        <script src="/js/reports-manager.js"></script>
+    </body>
+</html>

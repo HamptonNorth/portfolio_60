@@ -7,7 +7,6 @@
       "iframe": "<iframe src=\"https://docs.google.com/spreadsheets/d/11_wO0Cn2Mn5v9lcnyiMT3pzaIfUz7k0PK7mb5vMoRFA/edit?usp=sharing\"></iframe>",
       "range": "A2:F14"
     },
-
     {
       "title": "Income Tax rates",
       "spreadsheet": "microsoft",
@@ -15,5 +14,10 @@
       "range": ""
     }
   ],
-  "documents": []
+  "documents": [
+    {
+      "title": "IHT Rates as at 2026",
+      "filename": "iht400-rates-and-tables-2026.pdf"
+    }
+  ]
 }
