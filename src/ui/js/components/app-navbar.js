@@ -357,8 +357,9 @@ class AppNavbar extends LitElement {
   }
 
   /**
-   * @description Fetch list items from the config API and populate the Lists dropdown.
-   * Shows the Lists menu item only if there are items configured.
+   * @description Fetch list items and documents from the config API and populate
+   * the Lists dropdown with two sections: Spreadsheets and Documents.
+   * Always shows the menu (so users can access Manage Lists even when empty).
    */
   async _loadLists() {
     try {
@@ -368,24 +369,69 @@ class AppNavbar extends LitElement {
       }
       const data = await response.json();
       const items = data.items || [];
+      const documents = data.documents || [];
       const listItem = this.querySelector("#nav-lists-item");
       const dropdown = this.querySelector("#nav-lists-dropdown");
 
-      if (items.length === 0 || !listItem || !dropdown) {
+      if (!listItem || !dropdown) {
         return;
       }
 
       listItem.style.display = "";
       dropdown.innerHTML = "";
 
-      items.forEach(function (item, index) {
-        const link = document.createElement("a");
-        link.href = "/pages/list-viewer.html?index=" + index;
-        link.className = "block px-4 py-2 hover:bg-brand-50 transition-colors";
-        link.setAttribute("data-nav", "list-viewer-" + index);
-        link.textContent = item.title;
-        dropdown.appendChild(link);
-      });
+      // Spreadsheets section
+      if (items.length > 0) {
+        const heading = document.createElement("span");
+        heading.className = "block px-4 py-2 font-medium text-brand-800 select-none";
+        heading.textContent = "Spreadsheets";
+        dropdown.appendChild(heading);
+
+        items.forEach(function (item, index) {
+          const link = document.createElement("a");
+          link.href = "/pages/list-viewer.html?index=" + index;
+          link.className = "block pl-8 pr-4 py-1.5 hover:bg-brand-50 transition-colors text-sm text-brand-600";
+          link.setAttribute("data-nav", "list-viewer-" + index);
+          link.textContent = item.title;
+          dropdown.appendChild(link);
+        });
+      }
+
+      // Documents section
+      if (documents.length > 0) {
+        if (items.length > 0) {
+          const hr = document.createElement("hr");
+          hr.className = "my-1 border-brand-200";
+          dropdown.appendChild(hr);
+        }
+
+        const docHeading = document.createElement("span");
+        docHeading.className = "block px-4 py-2 font-medium text-brand-800 select-none";
+        docHeading.textContent = "Documents (PDF)";
+        dropdown.appendChild(docHeading);
+
+        documents.forEach(function (doc) {
+          const link = document.createElement("a");
+          link.href = "/docs/lists/" + encodeURIComponent(doc.filename);
+          link.target = "_blank";
+          link.rel = "noopener";
+          link.className = "block pl-8 pr-4 py-1.5 hover:bg-brand-50 transition-colors text-sm text-brand-600";
+          link.setAttribute("data-nav", "list-doc-" + doc.filename);
+          link.textContent = doc.title;
+          dropdown.appendChild(link);
+        });
+      }
+
+      // Manage Lists link at the bottom
+      const manageHr = document.createElement("hr");
+      manageHr.className = "my-1 border-brand-200";
+      dropdown.appendChild(manageHr);
+
+      const manageLink = document.createElement("a");
+      manageLink.href = "/pages/lists-manager.html";
+      manageLink.className = "block px-4 py-2 hover:bg-brand-50 transition-colors text-brand-600";
+      manageLink.textContent = "Manage Lists";
+      dropdown.appendChild(manageLink);
     } catch {
       // Lists menu stays hidden if fetch fails
     }

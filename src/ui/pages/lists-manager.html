@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en-GB">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Portfolio 60 — Manage Lists</title>
+        <link rel="stylesheet" href="/css/output.css" />
+        <link rel="icon" type="image/svg+xml" href="/images/favicon.svg" />
+    </head>
+    <body class="bg-brand-25 text-brand-900 min-h-screen flex flex-col">
+        <app-navbar></app-navbar>
+        <main class="max-w-5xl mx-auto px-6 py-8 flex-1 w-full" id="main-content">
+            <h2 class="text-2xl font-semibold text-brand-800 mb-6">Manage Lists</h2>
+
+            <div id="page-messages"></div>
+
+            <!-- Spreadsheets Section -->
+            <section class="bg-white rounded-lg border border-brand-200 p-6 mb-8">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-brand-800">Spreadsheets</h3>
+                    <button id="btn-add-spreadsheet" class="px-4 py-2 bg-brand-600 text-white rounded-md hover:bg-brand-700 transition-colors text-sm">
+                        Add Spreadsheet
+                    </button>
+                </div>
+                <div id="spreadsheets-list"></div>
+            </section>
+
+            <!-- Documents Section -->
+            <section class="bg-white rounded-lg border border-brand-200 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-brand-800">Documents (PDF)</h3>
+                    <button id="btn-add-document" class="px-4 py-2 bg-brand-600 text-white rounded-md hover:bg-brand-700 transition-colors text-sm">
+                        Add Document
+                    </button>
+                </div>
+                <div id="documents-list"></div>
+            </section>
+        </main>
+        <app-footer></app-footer>
+        <script src="/js/app.js"></script>
+        <script src="/js/components.bundle.js"></script>
+        <script src="/js/lists-manager.js"></script>
+    </body>
+</html>

@@ -1,6 +1,6 @@
-import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync } from "node:fs";
-import { resolve, dirname, basename, join } from "node:path";
-import { loadConfig, getAllowedProviders, getSchedulingConfig, reloadConfig, getListItems, getConfigFilePath, getWritableConfigPath, getReportsOpenInNewTab, getMergedConfigRaw } from "../config.js";
+import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync, unlinkSync, readdirSync } from "node:fs";
+import { resolve, dirname, basename, join, extname } from "node:path";
+import { loadConfig, getAllowedProviders, getSchedulingConfig, reloadConfig, getListItems, getListDocuments, saveListItems, saveListDocuments, getListsDir, getConfigFilePath, getWritableConfigPath, getReportsOpenInNewTab, getMergedConfigRaw } from "../config.js";
 import { isTestMode } from "../test-mode.js";
 import { DB_PATH, BACKUP_DIR, APP_NAME, APP_VERSION } from "../../shared/server-constants.js";
 
@@ -177,11 +177,12 @@ export function handleConfigRoute(method, path) {
     }
   }
 
-  // GET /api/config/lists — return the embedded spreadsheet list items.
+  // GET /api/config/lists — return spreadsheet items and PDF documents.
   // Uses user-lists-test.json in test/demo mode, user-lists.json otherwise.
   if (method === "GET" && path === "/api/config/lists") {
     const items = getListItems(isTestMode());
-    return new Response(JSON.stringify({ items: items }), {
+    const documents = getListDocuments(isTestMode());
+    return new Response(JSON.stringify({ items: items, documents: documents }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
@@ -277,7 +278,250 @@ function convertMarkdownToHtml(markdown) {
  * @param {Request} request - The full Request object
  * @returns {Promise<Response|null>} Response if matched, null otherwise
  */
+/** @type {number} Maximum PDF upload size in bytes (20 MB) */
+const MAX_PDF_SIZE = 20 * 1024 * 1024;
+
+/**
+ * @description Build an iframe HTML string from a share link URL.
+ * Escapes the URL for safe embedding in an HTML attribute.
+ * @param {string} shareLink - The spreadsheet share URL
+ * @returns {string} An iframe HTML tag with the URL as the src attribute
+ */
+function wrapShareLinkAsIframe(shareLink) {
+  const escaped = shareLink.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+  return '<iframe src="' + escaped + '"></iframe>';
+}
+
+/**
+ * @description Generate a unique filename by appending (1), (2), etc. if
+ * a file with the same name already exists in the target directory.
+ * @param {string} dir - Directory to check for existing files
+ * @param {string} filename - The desired filename
+ * @returns {{ filename: string, isDuplicate: boolean }} The unique filename and whether it was modified
+ */
+function getUniqueFilename(dir, filename) {
+  const ext = extname(filename);
+  const base = basename(filename, ext);
+  let candidate = filename;
+  let counter = 0;
+
+  while (existsSync(join(dir, candidate))) {
+    counter++;
+    candidate = base + " (" + counter + ")" + ext;
+  }
+
+  return { filename: candidate, isDuplicate: counter > 0 };
+}
+
 export async function handleConfigRouteAsync(method, path, request) {
+
+  // --- Spreadsheet CRUD ---
+
+  // POST /api/config/lists/spreadsheet — add a new spreadsheet entry
+  if (method === "POST" && path === "/api/config/lists/spreadsheet") {
+    try {
+      const body = await request.json();
+      const title = (body.title || "").trim();
+      const spreadsheet = (body.spreadsheet || "").trim().toLowerCase();
+      const shareLink = (body.shareLink || "").trim();
+      const range = (body.range || "").trim();
+
+      if (!title) {
+        return new Response(JSON.stringify({ error: "Title is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+      if (spreadsheet !== "google" && spreadsheet !== "microsoft") {
+        return new Response(JSON.stringify({ error: "Spreadsheet type must be 'google' or 'microsoft'" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+      if (!shareLink) {
+        return new Response(JSON.stringify({ error: "Share link is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+
+      const iframe = wrapShareLinkAsIframe(shareLink);
+      const testMode = isTestMode();
+      const items = getListItems(testMode);
+      items.push({ title: title, spreadsheet: spreadsheet, iframe: iframe, range: range });
+      saveListItems(testMode, items);
+
+      return new Response(JSON.stringify({ success: true, index: items.length - 1 }), { status: 201, headers: { "Content-Type": "application/json" } });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: "Failed to add spreadsheet", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+    }
+  }
+
+  // PUT /api/config/lists/spreadsheet/:index — edit a spreadsheet entry
+  var spreadsheetPutMatch = path.match(/^\/api\/config\/lists\/spreadsheet\/(\d+)$/);
+  if (method === "PUT" && spreadsheetPutMatch) {
+    try {
+      const index = parseInt(spreadsheetPutMatch[1], 10);
+      const testMode = isTestMode();
+      const items = getListItems(testMode);
+
+      if (index < 0 || index >= items.length) {
+        return new Response(JSON.stringify({ error: "Spreadsheet not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
+      }
+
+      const body = await request.json();
+      const title = (body.title || "").trim();
+      const spreadsheet = (body.spreadsheet || "").trim().toLowerCase();
+      const shareLink = (body.shareLink || "").trim();
+      const range = (body.range || "").trim();
+
+      if (!title) {
+        return new Response(JSON.stringify({ error: "Title is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+      if (spreadsheet !== "google" && spreadsheet !== "microsoft") {
+        return new Response(JSON.stringify({ error: "Spreadsheet type must be 'google' or 'microsoft'" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+      if (!shareLink) {
+        return new Response(JSON.stringify({ error: "Share link is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+
+      const iframe = wrapShareLinkAsIframe(shareLink);
+      items[index] = { title: title, spreadsheet: spreadsheet, iframe: iframe, range: range };
+      saveListItems(testMode, items);
+
+      return new Response(JSON.stringify({ success: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: "Failed to update spreadsheet", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+    }
+  }
+
+  // DELETE /api/config/lists/spreadsheet/:index — delete a spreadsheet entry
+  var spreadsheetDeleteMatch = path.match(/^\/api\/config\/lists\/spreadsheet\/(\d+)$/);
+  if (method === "DELETE" && spreadsheetDeleteMatch) {
+    try {
+      const index = parseInt(spreadsheetDeleteMatch[1], 10);
+      const testMode = isTestMode();
+      const items = getListItems(testMode);
+
+      if (index < 0 || index >= items.length) {
+        return new Response(JSON.stringify({ error: "Spreadsheet not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
+      }
+
+      items.splice(index, 1);
+      saveListItems(testMode, items);
+
+      return new Response(JSON.stringify({ success: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: "Failed to delete spreadsheet", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+    }
+  }
+
+  // --- Document (PDF) CRUD ---
+
+  // POST /api/config/lists/document — upload a PDF document
+  if (method === "POST" && path === "/api/config/lists/document") {
+    try {
+      var formData;
+      try {
+        formData = await request.formData();
+      } catch {
+        return new Response(JSON.stringify({ error: "Invalid form data" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+
+      const title = (formData.get("title") || "").trim();
+      const file = formData.get("file");
+
+      if (!title) {
+        return new Response(JSON.stringify({ error: "Title is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+      if (!file || !(file instanceof File)) {
+        return new Response(JSON.stringify({ error: "A PDF file is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+      if (extname(file.name).toLowerCase() !== ".pdf") {
+        return new Response(JSON.stringify({ error: "Only PDF files are allowed" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+      if (file.size > MAX_PDF_SIZE) {
+        return new Response(JSON.stringify({ error: "File too large. Maximum size is 20 MB" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+
+      const listsDir = getListsDir();
+      mkdirSync(listsDir, { recursive: true });
+
+      // Sanitise the original filename: lowercase, replace spaces with dashes, strip unsafe chars
+      var sanitised = file.name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9\-_.]/g, "");
+      if (!sanitised || sanitised === ".pdf") {
+        sanitised = "document.pdf";
+      }
+
+      const unique = getUniqueFilename(listsDir, sanitised);
+      const targetPath = join(listsDir, unique.filename);
+      const buffer = await file.arrayBuffer();
+      await Bun.write(targetPath, buffer);
+
+      const testMode = isTestMode();
+      const documents = getListDocuments(testMode);
+      documents.push({ title: title, filename: unique.filename });
+      saveListDocuments(testMode, documents);
+
+      return new Response(JSON.stringify({
+        success: true,
+        index: documents.length - 1,
+        filename: unique.filename,
+        isDuplicate: unique.isDuplicate,
+      }), { status: 201, headers: { "Content-Type": "application/json" } });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: "Failed to upload document", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+    }
+  }
+
+  // PUT /api/config/lists/document/:index — edit a document title
+  var documentPutMatch = path.match(/^\/api\/config\/lists\/document\/(\d+)$/);
+  if (method === "PUT" && documentPutMatch) {
+    try {
+      const index = parseInt(documentPutMatch[1], 10);
+      const testMode = isTestMode();
+      const documents = getListDocuments(testMode);
+
+      if (index < 0 || index >= documents.length) {
+        return new Response(JSON.stringify({ error: "Document not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
+      }
+
+      const body = await request.json();
+      const title = (body.title || "").trim();
+
+      if (!title) {
+        return new Response(JSON.stringify({ error: "Title is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+
+      documents[index].title = title;
+      saveListDocuments(testMode, documents);
+
+      return new Response(JSON.stringify({ success: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: "Failed to update document", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+    }
+  }
+
+  // DELETE /api/config/lists/document/:index — delete a document entry and its file
+  var documentDeleteMatch = path.match(/^\/api\/config\/lists\/document\/(\d+)$/);
+  if (method === "DELETE" && documentDeleteMatch) {
+    try {
+      const index = parseInt(documentDeleteMatch[1], 10);
+      const testMode = isTestMode();
+      const documents = getListDocuments(testMode);
+
+      if (index < 0 || index >= documents.length) {
+        return new Response(JSON.stringify({ error: "Document not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
+      }
+
+      // Remove the PDF file from disk (if it exists)
+      const listsDir = getListsDir();
+      const filePath = join(listsDir, documents[index].filename);
+      const safeFilePath = resolve(filePath);
+      if (safeFilePath.startsWith(resolve(listsDir)) && existsSync(safeFilePath)) {
+        unlinkSync(safeFilePath);
+      }
+
+      documents.splice(index, 1);
+      saveListDocuments(testMode, documents);
+
+      return new Response(JSON.stringify({ success: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: "Failed to delete document", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+    }
+  }
+
   // PUT /api/config/raw — save edited user-settings.json content
   if (method === "PUT" && path === "/api/config/raw") {
     try {

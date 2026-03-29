@@ -27,7 +27,7 @@ import { handleTestSetupRoute } from "./routes/test-setup-routes.js";
 import { initScheduledFetcher, stopScheduledFetcher } from "./services/scheduled-fetcher.js";
 import { processDrawdowns } from "./services/drawdown-processor.js";
 import { databaseExists, closeDatabase } from "./db/connection.js";
-import { getFetchServerConfig, getDocsConfig } from "./config.js";
+import { getFetchServerConfig, getDocsConfig, getListsDir } from "./config.js";
 import { pushConfigToFetchServer } from "./services/fetch-server-push.js";
 import { syncFromFetchServer } from "./services/fetch-server-sync.js";
 import { reindexAllPages } from "./services/docs-search.js";
@@ -183,6 +183,24 @@ const server = Bun.serve({
       }
       return new Response(mediaFile, {
         headers: { "Content-Type": getMimeType(fullMediaPath) },
+      });
+    }
+
+    // Lists PDF files — served from docs/lists/ on disk
+    if (path.startsWith("/docs/lists/")) {
+      var safeListPath = path.replace(/\.\./g, "");
+      var listFilePath = safeListPath.replace(/^\/docs\/lists\//, "");
+      var listsRoot = resolve(getListsDir());
+      var fullListPath = join(listsRoot, listFilePath);
+      if (!fullListPath.startsWith(listsRoot)) {
+        return new Response("Forbidden", { status: 403 });
+      }
+      var listFile = Bun.file(fullListPath);
+      if (!(await listFile.exists())) {
+        return new Response("Not found", { status: 404 });
+      }
+      return new Response(listFile, {
+        headers: { "Content-Type": "application/pdf" },
       });
     }
 

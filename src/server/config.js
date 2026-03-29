@@ -1,5 +1,5 @@
-import { readFileSync, existsSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { readFileSync, writeFileSync, copyFileSync, existsSync } from "node:fs";
+import { resolve, join, dirname, basename } from "node:path";
 import { DATA_DIR } from "../shared/server-constants.js";
 
 /**
@@ -368,6 +368,94 @@ export function getListItems(testMode) {
   } catch {
     return [];
   }
+}
+
+/**
+ * @description Get the document (PDF) entries from the lists config.
+ * Reads from user-lists.json (live) or user-lists-test.json (test/demo mode).
+ * Re-reads the JSON file on every call so hand-edits take effect without restart.
+ * @param {boolean} [testMode=false] - Whether to use the test lists file
+ * @returns {Array<{title: string, filename: string}>}
+ */
+export function getListDocuments(testMode) {
+  try {
+    const filePath = testMode ? listsTestFilePath : listsFilePath;
+    const raw = readFileSync(filePath, "utf-8");
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed.documents) ? parsed.documents : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * @description Create a timestamped backup of a lists JSON file before overwriting.
+ * @param {string} filePath - Absolute path to the file to back up
+ */
+function backupListsFile(filePath) {
+  if (!existsSync(filePath)) return;
+  const dir = dirname(filePath);
+  const base = basename(filePath, ".json");
+  const now = new Date();
+  const pad = function (n) { return String(n).padStart(2, "0"); };
+  const timestamp = now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate()) + "-" + pad(now.getHours()) + "-" + pad(now.getMinutes());
+  const backupName = base + "-backup-" + timestamp + ".json";
+  const backupPath = join(dir, backupName);
+  copyFileSync(filePath, backupPath);
+}
+
+/**
+ * @description Read the full lists JSON file (items + documents).
+ * @param {boolean} testMode - Whether to use the test lists file
+ * @returns {{ _readme: string, items: Array, documents: Array }}
+ */
+function readListsFile(testMode) {
+  const filePath = testMode ? listsTestFilePath : listsFilePath;
+  const raw = readFileSync(filePath, "utf-8");
+  return JSON.parse(raw);
+}
+
+/**
+ * @description Write the full lists JSON file back to disk with a backup.
+ * @param {boolean} testMode - Whether to use the test lists file
+ * @param {Object} data - The full JSON object to write
+ */
+function writeListsFile(testMode, data) {
+  const filePath = testMode ? listsTestFilePath : listsFilePath;
+  backupListsFile(filePath);
+  writeFileSync(filePath, JSON.stringify(data, null, 2) + "\n", "utf-8");
+}
+
+/**
+ * @description Save the spreadsheet items array to the lists config file.
+ * Preserves the _readme field and documents array. Creates a backup first.
+ * @param {boolean} testMode - Whether to use the test lists file
+ * @param {Array<{title: string, spreadsheet: string, iframe: string, range?: string}>} items
+ */
+export function saveListItems(testMode, items) {
+  const data = readListsFile(testMode);
+  data.items = items;
+  writeListsFile(testMode, data);
+}
+
+/**
+ * @description Save the documents array to the lists config file.
+ * Preserves the _readme field and items array. Creates a backup first.
+ * @param {boolean} testMode - Whether to use the test lists file
+ * @param {Array<{title: string, filename: string}>} documents
+ */
+export function saveListDocuments(testMode, documents) {
+  const data = readListsFile(testMode);
+  data.documents = documents;
+  writeListsFile(testMode, data);
+}
+
+/**
+ * @description Get the file path for the lists directory where PDFs are stored.
+ * @returns {string} Absolute path to the docs/lists/ directory
+ */
+export function getListsDir() {
+  return resolve("docs/lists");
 }
 
 /**
