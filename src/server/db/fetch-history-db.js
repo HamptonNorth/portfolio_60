@@ -300,6 +300,10 @@ export function getLatestFailures() {
            WHERE h2.fetch_type = h.fetch_type AND h2.reference_id = h.reference_id
            ORDER BY h2.fetch_datetime DESC LIMIT 1
          )
+         AND CASE h.fetch_type
+               WHEN 'investment' THEN i.id IS NOT NULL
+               WHEN 'benchmark' THEN b.id IS NOT NULL
+             END
        ORDER BY h.fetch_type, h.reference_id`,
     )
     .all();

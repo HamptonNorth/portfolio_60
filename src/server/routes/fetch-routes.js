@@ -559,7 +559,34 @@ fetchRouter.post("/api/fetch/prices/retry", async function (request) {
         }
         const result = await fetchLatestMorningstarPrice(investment);
         results.push(result);
-        if (result.success) successCount++;
+        if (result.success) {
+          successCount++;
+          try {
+            recordFetchAttempt({
+              fetchType: "investment",
+              referenceId: investment.id,
+              attemptNumber: 1,
+              maxAttempts: 1,
+              success: true,
+            });
+          } catch (historyErr) {
+            console.warn("[FetchRetry] Failed to record history for investment " + investment.id + ": " + historyErr.message);
+          }
+        } else if (result.errorCode !== "MANUALLY_PRICED") {
+          try {
+            recordFetchAttempt({
+              fetchType: "investment",
+              referenceId: investment.id,
+              attemptNumber: 1,
+              maxAttempts: 1,
+              success: false,
+              errorCode: result.errorCode,
+              errorMessage: result.error,
+            });
+          } catch (historyErr) {
+            console.warn("[FetchRetry] Failed to record history for investment " + investment.id + ": " + historyErr.message);
+          }
+        }
       } catch (err) {
         results.push({ success: false, investmentId: id, error: err.message });
       }
@@ -904,7 +931,34 @@ fetchRouter.post("/api/fetch/benchmarks/retry", async function (request) {
       try {
         const result = await fetchLatestYahooBenchmarkValue({ id: id });
         results.push(result);
-        if (result.success) successCount++;
+        if (result.success) {
+          successCount++;
+          try {
+            recordFetchAttempt({
+              fetchType: "benchmark",
+              referenceId: id,
+              attemptNumber: 1,
+              maxAttempts: 1,
+              success: true,
+            });
+          } catch (historyErr) {
+            console.warn("[FetchRetry] Failed to record history for benchmark " + id + ": " + historyErr.message);
+          }
+        } else {
+          try {
+            recordFetchAttempt({
+              fetchType: "benchmark",
+              referenceId: id,
+              attemptNumber: 1,
+              maxAttempts: 1,
+              success: false,
+              errorCode: result.errorCode,
+              errorMessage: result.error,
+            });
+          } catch (historyErr) {
+            console.warn("[FetchRetry] Failed to record history for benchmark " + id + ": " + historyErr.message);
+          }
+        }
       } catch (err) {
         results.push({ success: false, benchmarkId: id, error: err.message });
       }
