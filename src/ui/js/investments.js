@@ -846,16 +846,13 @@ function buildSpinner(label) {
  * @returns {string} HTML string
  */
 function buildFetchResultHtml(fetchResult) {
-  if (fetchResult.ok && fetchResult.data.price) {
-    const price = fetchResult.data.price;
-    if (price.success) {
-      return '<div class="bg-green-50 border border-green-200 rounded p-3 text-sm">' + "<p><strong>Investment:</strong> " + escapeHtml(price.description) + "</p>" + "<p><strong>Currency:</strong> " + escapeHtml(price.currency) + "</p>" + "<p><strong>Raw price:</strong> " + escapeHtml(price.rawPrice) + "</p>" + "<p><strong>Parsed (minor unit):</strong> " + escapeHtml(String(price.priceMinorUnit)) + "</p>" + "</div>";
-    } else {
-      return '<div class="bg-red-50 border border-red-200 rounded p-3 text-sm">' + "<p><strong>Investment:</strong> " + escapeHtml(price.description) + "</p>" + "<p><strong>Error:</strong> " + escapeHtml(price.error) + "</p>" + "</div>";
-    }
-  } else if (fetchResult.data && fetchResult.data.price) {
-    const price = fetchResult.data.price;
-    return '<div class="bg-red-50 border border-red-200 rounded p-3 text-sm">' + "<p><strong>Investment:</strong> " + escapeHtml(price.description) + "</p>" + "<p><strong>Error:</strong> " + escapeHtml(price.error) + "</p>" + "</div>";
+  // The success response from /api/fetch/prices/:id?testMode=true spreads the
+  // price result flat (no "price" wrapper), so fetchResult.data IS the price object.
+  const price = fetchResult.data;
+  if (fetchResult.ok && price && price.success) {
+    return '<div class="bg-green-50 border border-green-200 rounded p-3 text-sm">' + "<p><strong>Investment:</strong> " + escapeHtml(price.description) + "</p>" + "<p><strong>Currency:</strong> " + escapeHtml(price.currency) + "</p>" + "<p><strong>Raw price:</strong> " + escapeHtml(price.rawPrice) + "</p>" + "<p><strong>Parsed (minor unit):</strong> " + escapeHtml(String(price.priceMinorUnit)) + "</p>" + "</div>";
+  } else if (price && (price.error || price.description)) {
+    return '<div class="bg-red-50 border border-red-200 rounded p-3 text-sm">' + (price.description ? "<p><strong>Investment:</strong> " + escapeHtml(price.description) + "</p>" : "") + "<p><strong>Error:</strong> " + escapeHtml(price.error || price.detail || "Fetch failed") + "</p>" + "</div>";
   } else {
     let html = '<div class="bg-red-50 border border-red-200 rounded p-3 text-sm">';
     html += "<p>" + escapeHtml(fetchResult.error || "Unknown error") + "</p>";
@@ -874,7 +871,12 @@ function buildFetchResultHtml(fetchResult) {
  */
 function buildHistoryResultHtml(historyResult) {
   if (historyResult.ok && historyResult.data.success) {
-    return '<p class="text-sm text-brand-600 mb-1">' + escapeHtml(historyResult.data.description) + " (" + escapeHtml(historyResult.data.currency) + ")</p>" + buildHistoricPreviewTable(historyResult.data.rows, "Price");
+    const rows = historyResult.data.rows || [];
+    let warning = "";
+    if (rows.length > 0 && rows.length < 10) {
+      warning = '<div class="bg-amber-50 border border-amber-200 rounded p-2 mb-2 text-sm text-amber-700">Only ' + rows.length + " price" + (rows.length === 1 ? "" : "s") + " available.</div>";
+    }
+    return '<p class="text-sm text-brand-600 mb-1">' + escapeHtml(historyResult.data.description) + " (" + escapeHtml(historyResult.data.currency) + ")</p>" + warning + buildHistoricPreviewTable(rows, "Price");
   } else if (historyResult.data && historyResult.data.error) {
     return '<div class="bg-amber-50 border border-amber-200 rounded p-3 text-sm">' + "<p>" + escapeHtml(historyResult.data.error) + "</p>" + "</div>";
   } else {
