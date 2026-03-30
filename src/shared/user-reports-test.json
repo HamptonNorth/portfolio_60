@@ -306,5 +306,17 @@
       "USER2:isa+sipp+trading",
       "USER1+USER2:isa+sipp+trading"
     ]
+  },
+  {
+    "id": "test_perf_1",
+    "title": "Test SSON and new Smithson fund",
+    "pdfEndpoint": "/api/reports/pdf/chart",
+    "subTitle": "",
+    "monthsToShow": "24",
+    "smooth": true,
+    "showGlobalEvents": false,
+    "params": [
+      "LSE:SSON, Inv:GB00BLBNK482, bm: FTSE 100"
+    ]
   }
 ]

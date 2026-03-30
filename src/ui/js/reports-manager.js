@@ -366,6 +366,44 @@ function collectDynamicList(fieldId) {
   return values;
 }
 
+/**
+ * @description Validate and normalise data series entries. Each entry must have
+ * an inv: or bm: prefix (case-insensitive). The prefix is normalised to lowercase.
+ * Returns an object with the normalised values and any validation errors.
+ * @param {Array<string>} entries - Raw data series entries from the form
+ * @returns {{ values: Array<string>, errors: Array<string> }} Normalised values and any errors
+ */
+function validateDataSeries(entries) {
+  var values = [];
+  var errors = [];
+
+  for (var i = 0; i < entries.length; i++) {
+    var entry = entries[i];
+    var colonIdx = entry.indexOf(":");
+    if (colonIdx === -1) {
+      errors.push('"' + entry + '" — must be prefixed with inv: or bm:');
+      continue;
+    }
+
+    var prefix = entry.substring(0, colonIdx).trim().toLowerCase();
+    var identifier = entry.substring(colonIdx + 1).trim();
+
+    if (prefix !== "inv" && prefix !== "bm") {
+      errors.push('"' + entry + '" — prefix must be inv: or bm: (got "' + prefix + ':")');
+      continue;
+    }
+
+    if (!identifier) {
+      errors.push('"' + entry + '" — identifier after ' + prefix + ': is empty');
+      continue;
+    }
+
+    values.push(prefix + ":" + identifier);
+  }
+
+  return { values: values, errors: errors };
+}
+
 // ─── Report modal builder ────────────────────────────────────────────────────
 
 /**
@@ -991,7 +1029,12 @@ async function saveReport(type, editIndex) {
     report.monthsToShow = chartFields.monthsToShow;
     report.smooth = chartFields.smooth;
     report.showGlobalEvents = chartFields.showGlobalEvents;
-    report.params = chartFields.params;
+    var chartValidation = validateDataSeries(chartFields.params);
+    if (chartValidation.errors.length > 0) {
+      showError("rpt-modal-messages", "Invalid data series: " + chartValidation.errors.join("; "));
+      return;
+    }
+    report.params = chartValidation.values;
   } else if (type === "chart_group") {
     report.pdfEndpoint = "/api/reports/pdf/chart-group";
     report.showGlobalEvents = getChecked("rpt-globalevents");
@@ -1003,6 +1046,15 @@ async function saveReport(type, editIndex) {
     if (report.charts.length > 4) {
       showError("rpt-modal-messages", "Maximum of 4 charts allowed");
       return;
+    }
+    // Validate data series in each chart panel
+    for (var ci = 0; ci < report.charts.length; ci++) {
+      var panelValidation = validateDataSeries(report.charts[ci].params);
+      if (panelValidation.errors.length > 0) {
+        showError("rpt-modal-messages", "Chart " + (ci + 1) + " — invalid data series: " + panelValidation.errors.join("; "));
+        return;
+      }
+      report.charts[ci].params = panelValidation.values;
     }
   } else if (type === "portfolio_value_chart") {
     report.pdfEndpoint = "/api/reports/pdf/portfolio-value-chart";
@@ -1017,6 +1069,28 @@ async function saveReport(type, editIndex) {
     if (report.blocks.length === 0) {
       showError("rpt-modal-messages", "At least one block is required");
       return;
+    }
+    // Validate data series in chart-type composite blocks
+    for (var bi = 0; bi < report.blocks.length; bi++) {
+      var blk = report.blocks[bi];
+      if (blk.type === "chart" && blk.params) {
+        var blkValidation = validateDataSeries(blk.params);
+        if (blkValidation.errors.length > 0) {
+          showError("rpt-modal-messages", "Block " + (bi + 1) + " — invalid data series: " + blkValidation.errors.join("; "));
+          return;
+        }
+        blk.params = blkValidation.values;
+      }
+      if (blk.type === "chart_group" && blk.charts) {
+        for (var bci = 0; bci < blk.charts.length; bci++) {
+          var blkPanelValidation = validateDataSeries(blk.charts[bci].params || []);
+          if (blkPanelValidation.errors.length > 0) {
+            showError("rpt-modal-messages", "Block " + (bi + 1) + ", Chart " + (bci + 1) + " — invalid data series: " + blkPanelValidation.errors.join("; "));
+            return;
+          }
+          blk.charts[bci].params = blkPanelValidation.values;
+        }
+      }
     }
   }
 
