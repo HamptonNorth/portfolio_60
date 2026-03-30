@@ -20,6 +20,8 @@ export function getAllInvestments() {
         i.investment_url,
         i.selector,
         i.auto_fetch,
+        i.notes,
+        i.replaced,
         c.code AS currency_code,
         c.description AS currency_description,
         it.short_description AS type_short,
@@ -52,6 +54,8 @@ export function getInvestmentById(id) {
         i.investment_url,
         i.selector,
         i.auto_fetch,
+        i.notes,
+        i.replaced,
         c.code AS currency_code,
         c.description AS currency_description,
         it.short_description AS type_short,
@@ -285,6 +289,7 @@ export function getManuallyPricedInvestments() {
           AND fh2.success = 1
         )
       WHERE i.auto_fetch = 0
+        AND i.replaced = 0
       ORDER BY i.description`,
     )
     .all();
@@ -301,4 +306,40 @@ export function getManuallyPricedInvestments() {
       how_priced: row.how_priced !== null ? row.how_priced : null,
     };
   });
+}
+
+/**
+ * @description Update the notes field on an investment.
+ * Used to record replacement audit trail on both old and new investments.
+ * @param {number} id - The investment ID
+ * @param {string|null} notes - The note text (max 255 chars), or null to clear
+ * @returns {Object|null} Updated investment or null if not found
+ */
+export function updateInvestmentNotes(id, notes) {
+  const db = getDatabase();
+  const result = db.run("UPDATE investments SET notes = ? WHERE id = ?", [notes, id]);
+
+  if (result.changes === 0) {
+    return null;
+  }
+
+  return getInvestmentById(id);
+}
+
+/**
+ * @description Mark an investment as replaced by a corporate action.
+ * Sets the replaced flag to 1, which excludes it from the manually-priced
+ * warning on the home page.
+ * @param {number} id - The investment ID
+ * @returns {Object|null} Updated investment or null if not found
+ */
+export function markInvestmentReplaced(id) {
+  const db = getDatabase();
+  const result = db.run("UPDATE investments SET replaced = 1 WHERE id = ?", [id]);
+
+  if (result.changes === 0) {
+    return null;
+  }
+
+  return getInvestmentById(id);
 }

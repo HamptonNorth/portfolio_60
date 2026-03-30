@@ -1421,6 +1421,11 @@ let splitQuantityListener = null;
  */
 let lastCostFieldEdited = null;
 
+// ─── Replacement state ────────────────────────────────────────────────
+
+/** @type {boolean} Whether the user has confirmed the replacement via the Proceed button */
+let replaceConfirmed = false;
+
 /**
  * @description Auto-calculate Book Cost Value from Quantity and Average Cost,
  * or Average Cost from Quantity and Book Cost Value, depending on which
@@ -1466,6 +1471,13 @@ function onSplitCheckChanged() {
   const quantityInput = document.getElementById("holding-quantity");
 
   if (isChecked) {
+    // Uncheck Replace if it was checked (mutually exclusive)
+    const replaceCheck = document.getElementById("holding-replace-check");
+    if (replaceCheck.checked) {
+      replaceCheck.checked = false;
+      resetReplaceState();
+    }
+
     // Store original values
     splitOriginalQuantity = Number(quantityInput.value) || 0;
     const avgCost = Number(avgCostInput.value) || 0;
@@ -1522,7 +1534,8 @@ function onSplitCheckChanged() {
 }
 
 /**
- * @description Reset the stock split UI state. Called when opening the holding form.
+ * @description Reset the stock split and replacement UI state.
+ * Called when opening the holding form.
  */
 function resetSplitState() {
   splitOriginalQuantity = null;
@@ -1543,6 +1556,169 @@ function resetSplitState() {
   avgCostInput.classList.remove("bg-brand-100", "text-brand-400");
   bookCostInput.disabled = false;
   bookCostInput.classList.remove("bg-brand-100", "text-brand-400");
+
+  // Also reset replacement state
+  resetReplaceState();
+}
+
+// ─── Replacement UI functions ─────────────────────────────────────────
+
+/**
+ * @description Handle the Replace checkbox being toggled on or off.
+ * When checked: shows the info panel with Proceed/Cancel.
+ * Mutually exclusive with Stock split — checking one unchecks the other.
+ */
+function onReplaceCheckChanged() {
+  const isChecked = document.getElementById("holding-replace-check").checked;
+
+  if (isChecked) {
+    // Uncheck stock split if it was checked (mutually exclusive)
+    const splitCheck = document.getElementById("holding-split-check");
+    if (splitCheck.checked) {
+      splitCheck.checked = false;
+      onSplitCheckChanged(); // Reset split state
+    }
+
+    // Show info panel
+    document.getElementById("holding-replace-info").classList.remove("hidden");
+  } else {
+    resetReplaceState();
+  }
+}
+
+/**
+ * @description Handle the user clicking Proceed on the replacement info panel.
+ * Shows the replacement input fields and disables the original holding form fields.
+ */
+async function onReplaceProceed() {
+  replaceConfirmed = true;
+
+  // Hide info panel, show input fields
+  document.getElementById("holding-replace-info").classList.add("hidden");
+  document.getElementById("holding-replace-details").classList.remove("hidden");
+
+  // Disable original form fields (quantity, avg cost, book cost)
+  const quantityInput = document.getElementById("holding-quantity");
+  const avgCostInput = document.getElementById("holding-avg-cost");
+  const bookCostInput = document.getElementById("holding-book-cost");
+  quantityInput.disabled = true;
+  quantityInput.classList.add("bg-brand-100", "text-brand-400");
+  avgCostInput.disabled = true;
+  avgCostInput.classList.add("bg-brand-100", "text-brand-400");
+  bookCostInput.disabled = true;
+  bookCostInput.classList.add("bg-brand-100", "text-brand-400");
+
+  // Pre-fill execution date with today
+  document.getElementById("replace-date").value = getTodayISO();
+
+  // Load investments for the replacement search (excluding the current investment)
+  await loadAvailableInvestments();
+
+  // Focus the replacement investment search
+  setTimeout(function () {
+    document.getElementById("replace-investment-search").focus();
+  }, 50);
+}
+
+/**
+ * @description Handle the user clicking Cancel on the replacement info panel,
+ * or unchecking the Replace checkbox. Resets all replacement state.
+ */
+function onReplaceCancel() {
+  document.getElementById("holding-replace-check").checked = false;
+  resetReplaceState();
+}
+
+/**
+ * @description Reset all replacement UI state. Called when opening the holding form
+ * and when cancelling a replacement.
+ */
+function resetReplaceState() {
+  replaceConfirmed = false;
+
+  // Hide panels
+  document.getElementById("holding-replace-info").classList.add("hidden");
+  document.getElementById("holding-replace-details").classList.add("hidden");
+
+  // Uncheck the checkbox
+  document.getElementById("holding-replace-check").checked = false;
+
+  // Clear fields
+  document.getElementById("replace-investment-id").value = "";
+  document.getElementById("replace-investment-search").value = "";
+  document.getElementById("replace-investment-list").classList.add("hidden");
+  document.getElementById("replace-quantity").value = "";
+  document.getElementById("replace-price").value = "";
+  document.getElementById("replace-date").value = "";
+  document.getElementById("replace-notes").value = "";
+
+  // Re-enable original form fields
+  const quantityInput = document.getElementById("holding-quantity");
+  const avgCostInput = document.getElementById("holding-avg-cost");
+  const bookCostInput = document.getElementById("holding-book-cost");
+  quantityInput.disabled = false;
+  quantityInput.classList.remove("bg-brand-100", "text-brand-400");
+  avgCostInput.disabled = false;
+  avgCostInput.classList.remove("bg-brand-100", "text-brand-400");
+  bookCostInput.disabled = false;
+  bookCostInput.classList.remove("bg-brand-100", "text-brand-400");
+}
+
+/**
+ * @description Filter and display the replacement investment search dropdown.
+ * Reuses the same matching logic as the main investment search.
+ * @param {string} searchText - The text typed by the user
+ */
+function filterReplaceInvestmentList(searchText) {
+  const listEl = document.getElementById("replace-investment-list");
+  const query = searchText.trim().toLowerCase();
+
+  if (query.length === 0) {
+    listEl.classList.add("hidden");
+    return;
+  }
+
+  // Exclude the current holding's investment from the replacement list
+  const currentInvId = Number(document.getElementById("holding-investment").value);
+  const matches = availableInvestments.filter(function (inv) {
+    if (inv.id === currentInvId) return false;
+    const desc = inv.description.toLowerCase();
+    const pubId = (inv.public_id || "").toLowerCase();
+    return desc.includes(query) || pubId.includes(query);
+  });
+
+  if (matches.length === 0) {
+    listEl.innerHTML = '<div class="px-3 py-2 text-brand-400 text-sm">No matching investments</div>';
+    listEl.classList.remove("hidden");
+    return;
+  }
+
+  let html = "";
+  for (const inv of matches) {
+    const publicIdSuffix = inv.public_id ? " (" + escapeHtml(inv.public_id) + ")" : "";
+    html += '<div class="px-3 py-2 hover:bg-brand-100 cursor-pointer text-base transition-colors" data-replace-investment-id="' + inv.id + '">';
+    html += escapeHtml(inv.description) + '<span class="text-brand-400 text-sm">' + publicIdSuffix + "</span>";
+    html += "</div>";
+  }
+
+  listEl.innerHTML = html;
+  listEl.classList.remove("hidden");
+}
+
+/**
+ * @description Handle selection of a replacement investment from the search dropdown.
+ * @param {number} investmentId - The selected replacement investment ID
+ */
+function selectReplaceInvestment(investmentId) {
+  const inv = allInvestments.find(function (i) {
+    return i.id === investmentId;
+  });
+  if (!inv) return;
+
+  const publicIdSuffix = inv.public_id ? " (" + inv.public_id + ")" : "";
+  document.getElementById("replace-investment-id").value = inv.id;
+  document.getElementById("replace-investment-search").value = inv.description + publicIdSuffix;
+  document.getElementById("replace-investment-list").classList.add("hidden");
 }
 
 /**
@@ -1728,6 +1904,54 @@ async function handleHoldingSubmit(event) {
   const holdingId = document.getElementById("holding-id").value;
   const isEditing = holdingId !== "";
   const isSplit = document.getElementById("holding-split-check").checked;
+  const isReplace = document.getElementById("holding-replace-check").checked && replaceConfirmed;
+
+  // Replacement path: POST a replacement movement
+  if (isEditing && isReplace) {
+    const newInvestmentId = document.getElementById("replace-investment-id").value;
+    const newQuantity = Number(document.getElementById("replace-quantity").value) || 0;
+    const newPrice = Number(document.getElementById("replace-price").value) || 0;
+    const replaceDate = document.getElementById("replace-date").value;
+    const replaceNotes = document.getElementById("replace-notes").value.trim();
+
+    if (!newInvestmentId) {
+      errorsDiv.textContent = "Please select a replacement investment";
+      return;
+    }
+    if (newQuantity <= 0) {
+      errorsDiv.textContent = "New quantity must be greater than zero";
+      return;
+    }
+    if (newPrice <= 0) {
+      errorsDiv.textContent = "New price must be greater than zero";
+      return;
+    }
+    if (!replaceDate) {
+      errorsDiv.textContent = "Execution date is required";
+      return;
+    }
+
+    const result = await apiRequest("/api/holdings/" + holdingId + "/movements", {
+      method: "POST",
+      body: {
+        movement_type: "replacement",
+        movement_date: replaceDate,
+        new_investment_id: Number(newInvestmentId),
+        new_quantity: newQuantity,
+        new_price: newPrice,
+        notes: replaceNotes || null,
+      },
+    });
+
+    if (result.ok) {
+      hideHoldingForm();
+      await loadHoldings();
+      showSuccess("holdings-messages", "Investment replaced successfully");
+    } else {
+      errorsDiv.textContent = result.detail || result.error;
+    }
+    return;
+  }
 
   // Stock split path: POST an adjustment movement instead of PUT holding
   if (isEditing && isSplit) {
@@ -2902,6 +3126,40 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   // Stock split checkbox
   document.getElementById("holding-split-check").addEventListener("change", onSplitCheckChanged);
+
+  // Replace checkbox and buttons
+  document.getElementById("holding-replace-check").addEventListener("change", onReplaceCheckChanged);
+  document.getElementById("replace-proceed-btn").addEventListener("click", onReplaceProceed);
+  document.getElementById("replace-cancel-btn").addEventListener("click", onReplaceCancel);
+
+  // Replacement investment search — filter as user types
+  const replaceSearchInput = document.getElementById("replace-investment-search");
+  replaceSearchInput.addEventListener("input", function () {
+    document.getElementById("replace-investment-id").value = "";
+    filterReplaceInvestmentList(replaceSearchInput.value);
+  });
+  replaceSearchInput.addEventListener("focus", function () {
+    if (replaceSearchInput.value.trim().length > 0) {
+      filterReplaceInvestmentList(replaceSearchInput.value);
+    }
+  });
+
+  // Replacement investment dropdown — handle clicks on items
+  document.getElementById("replace-investment-list").addEventListener("click", function (event) {
+    const item = event.target.closest("[data-replace-investment-id]");
+    if (item) {
+      selectReplaceInvestment(Number(item.dataset.replaceInvestmentId));
+    }
+  });
+
+  // Close replacement dropdown when clicking outside
+  document.addEventListener("click", function (event) {
+    const listEl = document.getElementById("replace-investment-list");
+    const searchEl = document.getElementById("replace-investment-search");
+    if (!listEl.contains(event.target) && event.target !== searchEl) {
+      listEl.classList.add("hidden");
+    }
+  });
 
   // Cost auto-calculation — recalculate when quantity, avg cost, or book cost changes
   document.getElementById("holding-quantity").addEventListener("input", function () {

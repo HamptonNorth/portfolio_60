@@ -10,8 +10,10 @@ import { createInvestment } from "../../src/server/db/investments-db.js";
 import { getAllInvestmentTypes } from "../../src/server/db/investment-types-db.js";
 import { getAllCurrencies } from "../../src/server/db/currencies-db.js";
 import { createHolding, getHoldingById, getActiveHoldingRaw, getHoldingsByAccountId } from "../../src/server/db/holdings-db.js";
-import { createBuyMovement, createSellMovement, createSplitMovement, getMovementById, getMovementsByHoldingId, scaleValue, unscaleValue } from "../../src/server/db/holding-movements-db.js";
+import { createBuyMovement, createSellMovement, createSplitMovement, createReplacementMovement, getMovementById, getMovementsByHoldingId, scaleValue, unscaleValue } from "../../src/server/db/holding-movements-db.js";
 import { getCashTransactionsByAccountId } from "../../src/server/db/cash-transactions-db.js";
+import { upsertPrice, getPricesInRange, getLatestPrice } from "../../src/server/db/prices-db.js";
+import { getInvestmentById, getManuallyPricedInvestments } from "../../src/server/db/investments-db.js";
 
 const testDbPath = getDatabasePath();
 
@@ -729,5 +731,346 @@ describe("createSplitMovement", () => {
     });
 
     expect(movement.notes).toBeNull();
+  });
+});
+
+// ─── Replacement (Corporate Action) ────────────────────────────────────────────
+
+describe("Replacement movements", () => {
+  /** @type {Object} Replacement investment */
+  let replacementInvestment;
+  /** @type {Object} Holding to be replaced */
+  let replacementHolding;
+
+  /**
+   * @description Set up a fresh holding and replacement investment for each test.
+   * Also seeds price history on the original investment for prorating tests.
+   */
+  function setupReplacementScenario() {
+    const types = getAllInvestmentTypes();
+    const currencies = getAllCurrencies();
+    const shareType = types.find((t) => t.short_description === "SHARE");
+    const fundType = types.find((t) => t.short_description === "MF");
+    const gbp = currencies.find((c) => c.code === "GBP");
+
+    // Create the "old" investment with some price history
+    const oldInvestment = createInvestment({
+      currencies_id: gbp.id,
+      investment_type_id: shareType.id,
+      description: "Smithson Inv Trust Ord " + Date.now(),
+      public_id: "LSE:SSON",
+    });
+
+    // Seed price history for the old investment (priceMinorUnit = pence)
+    upsertPrice(oldInvestment.id, "2026-01-15", "16:30:00", 1000); // £10.00 = 1000p
+    upsertPrice(oldInvestment.id, "2026-01-16", "16:30:00", 1020); // £10.20 = 1020p
+    upsertPrice(oldInvestment.id, "2026-02-27", "16:30:00", 1050); // £10.50 = 1050p
+
+    // Create a holding: 100 shares at £10 avg cost = £1000 book cost
+    replacementHolding = createHolding({
+      account_id: testAccount.id,
+      investment_id: oldInvestment.id,
+      quantity: 100,
+      average_cost: 10.0,
+    });
+
+    // Create the replacement investment
+    replacementInvestment = createInvestment({
+      currencies_id: gbp.id,
+      investment_type_id: (fundType || shareType).id,
+      description: "Smithson Eq Fund S GBP Acc " + Date.now(),
+      public_id: "GB00BLBNK282",
+    });
+
+    return { oldInvestment, replacementHolding, replacementInvestment };
+  }
+
+  test("creates movement record with type 'replacement'", () => {
+    const scenario = setupReplacementScenario();
+
+    const result = createReplacementMovement({
+      holding_id: scenario.replacementHolding.id,
+      movement_date: "2026-02-28",
+      new_investment_id: scenario.replacementInvestment.id,
+      new_quantity: 200,
+      new_price: 5.0,
+      notes: "Fund restructure",
+    });
+
+    expect(result.movement).not.toBeNull();
+    expect(result.movement.movement_type).toBe("replacement");
+    expect(result.movement.notes).toBe("Fund restructure");
+  });
+
+  test("closes original holding via SCD2", () => {
+    const scenario = setupReplacementScenario();
+
+    createReplacementMovement({
+      holding_id: scenario.replacementHolding.id,
+      movement_date: "2026-02-28",
+      new_investment_id: scenario.replacementInvestment.id,
+      new_quantity: 200,
+      new_price: 5.0,
+    });
+
+    // Original holding should be closed (effective_to set)
+    const oldHolding = getActiveHoldingRaw(testAccount.id, scenario.oldInvestment.id);
+    expect(oldHolding).toBeNull(); // No longer active
+  });
+
+  test("creates new holding for replacement investment", () => {
+    const scenario = setupReplacementScenario();
+
+    const result = createReplacementMovement({
+      holding_id: scenario.replacementHolding.id,
+      movement_date: "2026-02-28",
+      new_investment_id: scenario.replacementInvestment.id,
+      new_quantity: 200,
+      new_price: 5.0,
+    });
+
+    // New holding should exist and be active
+    const newHolding = getActiveHoldingRaw(testAccount.id, scenario.replacementInvestment.id);
+    expect(newHolding).not.toBeNull();
+    expect(newHolding.effective_to).toBeNull();
+    expect(newHolding.effective_from).toBe("2026-02-28");
+    // Quantity: 200 × 10000
+    expect(newHolding.quantity).toBe(200 * 10000);
+  });
+
+  test("preserves book cost across replacement", () => {
+    const scenario = setupReplacementScenario();
+
+    // Original: 100 shares × £10 = £1000 book cost
+    // New: 200 units → avg cost should be £1000 / 200 = £5
+
+    const result = createReplacementMovement({
+      holding_id: scenario.replacementHolding.id,
+      movement_date: "2026-02-28",
+      new_investment_id: scenario.replacementInvestment.id,
+      new_quantity: 200,
+      new_price: 5.0,
+    });
+
+    expect(result.movement.book_cost).toBeCloseTo(1000, 2);
+    expect(result.movement.revised_avg_cost).toBeCloseTo(5.0, 4);
+
+    const newHolding = getActiveHoldingRaw(testAccount.id, scenario.replacementInvestment.id);
+    // avg cost = £5.00 → scaled = 5 × 10000 = 50000
+    expect(newHolding.average_cost).toBe(50000);
+  });
+
+  test("prorates historical prices correctly", () => {
+    const scenario = setupReplacementScenario();
+
+    // Old: 100 shares, prices £10.00, £10.20, £10.50
+    // New: 200 units → ratio = 100/200 = 0.5
+    // Prorated: £5.00, £5.10, £5.25
+
+    createReplacementMovement({
+      holding_id: scenario.replacementHolding.id,
+      movement_date: "2026-02-28",
+      new_investment_id: scenario.replacementInvestment.id,
+      new_quantity: 200,
+      new_price: 5.0,
+    });
+
+    const prices = getPricesInRange(scenario.replacementInvestment.id, "2026-01-01", "2026-03-01");
+    // Should have 3 prorated prices + 1 execution date price = 4
+    expect(prices.length).toBe(4);
+
+    // Check prorated values (prices are in pence, unscaled from DB)
+    const jan15 = prices.find((p) => p.price_date === "2026-01-15");
+    expect(jan15.price).toBeCloseTo(500, 0); // £5.00 in pence = 500
+
+    const jan16 = prices.find((p) => p.price_date === "2026-01-16");
+    expect(jan16.price).toBeCloseTo(510, 0); // £5.10 in pence = 510
+
+    const feb27 = prices.find((p) => p.price_date === "2026-02-27");
+    expect(feb27.price).toBeCloseTo(525, 0); // £5.25 in pence = 525
+
+    // Execution date price
+    const feb28 = prices.find((p) => p.price_date === "2026-02-28");
+    expect(feb28.price).toBeCloseTo(500, 0); // £5.00 in pence = 500
+  });
+
+  test("skips price prorating when prices already exist (multi-account)", () => {
+    const scenario = setupReplacementScenario();
+
+    // First replacement writes prorated prices
+    createReplacementMovement({
+      holding_id: scenario.replacementHolding.id,
+      movement_date: "2026-02-28",
+      new_investment_id: scenario.replacementInvestment.id,
+      new_quantity: 200,
+      new_price: 5.0,
+    });
+
+    // Create a second holding in a different account for the same old investment
+    const secondAccount = createAccount({
+      user_id: testUser.id,
+      account_type: "trading",
+      account_ref: "M" + String(Date.now()).slice(-14),
+      cash_balance: 10000,
+      warn_cash: 500,
+    });
+
+    // Create a new "old" investment (same as original but fresh holding)
+    const secondHolding = createHolding({
+      account_id: secondAccount.id,
+      investment_id: scenario.oldInvestment.id,
+      quantity: 50,
+      average_cost: 10.0,
+    });
+
+    // Second replacement should skip prorating (prices already exist)
+    createReplacementMovement({
+      holding_id: secondHolding.id,
+      movement_date: "2026-02-28",
+      new_investment_id: scenario.replacementInvestment.id,
+      new_quantity: 100,
+      new_price: 5.0,
+    });
+
+    // Prices should still be the same (not doubled)
+    const prices = getPricesInRange(scenario.replacementInvestment.id, "2026-01-01", "2026-02-28");
+    // 3 prorated + 1 execution = 4 (unchanged)
+    expect(prices.length).toBe(4);
+  });
+
+  test("sets auto_fetch = 0 on old investment", () => {
+    const scenario = setupReplacementScenario();
+
+    createReplacementMovement({
+      holding_id: scenario.replacementHolding.id,
+      movement_date: "2026-02-28",
+      new_investment_id: scenario.replacementInvestment.id,
+      new_quantity: 200,
+      new_price: 5.0,
+    });
+
+    const oldInv = getInvestmentById(scenario.oldInvestment.id);
+    expect(oldInv.auto_fetch).toBe(0);
+  });
+
+  test("sets replaced = 1 on old investment", () => {
+    const scenario = setupReplacementScenario();
+
+    createReplacementMovement({
+      holding_id: scenario.replacementHolding.id,
+      movement_date: "2026-02-28",
+      new_investment_id: scenario.replacementInvestment.id,
+      new_quantity: 200,
+      new_price: 5.0,
+    });
+
+    const oldInv = getInvestmentById(scenario.oldInvestment.id);
+    expect(oldInv.replaced).toBe(1);
+  });
+
+  test("replaced investment excluded from manually-priced list", () => {
+    const scenario = setupReplacementScenario();
+
+    createReplacementMovement({
+      holding_id: scenario.replacementHolding.id,
+      movement_date: "2026-02-28",
+      new_investment_id: scenario.replacementInvestment.id,
+      new_quantity: 200,
+      new_price: 5.0,
+    });
+
+    const manuallyPriced = getManuallyPricedInvestments();
+    const found = manuallyPriced.find((inv) => inv.id === scenario.oldInvestment.id);
+    expect(found).toBeUndefined();
+  });
+
+  test("writes notes to both investments", () => {
+    const scenario = setupReplacementScenario();
+
+    createReplacementMovement({
+      holding_id: scenario.replacementHolding.id,
+      movement_date: "2026-02-28",
+      new_investment_id: scenario.replacementInvestment.id,
+      new_quantity: 200,
+      new_price: 5.0,
+      notes: "Restructure — see https://example.com",
+    });
+
+    const oldInv = getInvestmentById(scenario.oldInvestment.id);
+    const newInv = getInvestmentById(scenario.replacementInvestment.id);
+    expect(oldInv.notes).toBe("Restructure — see https://example.com");
+    expect(newInv.notes).toBe("Restructure — see https://example.com");
+  });
+
+  test("rejects if holding not found", () => {
+    const scenario = setupReplacementScenario();
+
+    expect(() => {
+      createReplacementMovement({
+        holding_id: 99999,
+        movement_date: "2026-02-28",
+        new_investment_id: scenario.replacementInvestment.id,
+        new_quantity: 200,
+        new_price: 5.0,
+      });
+    }).toThrow("Holding not found");
+  });
+
+  test("rejects if new investment is same as original", () => {
+    const scenario = setupReplacementScenario();
+
+    expect(() => {
+      createReplacementMovement({
+        holding_id: scenario.replacementHolding.id,
+        movement_date: "2026-02-28",
+        new_investment_id: scenario.oldInvestment.id,
+        new_quantity: 200,
+        new_price: 5.0,
+      });
+    }).toThrow("Replacement investment must be different from the current investment");
+  });
+
+  test("rejects if new investment does not exist", () => {
+    const scenario = setupReplacementScenario();
+
+    expect(() => {
+      createReplacementMovement({
+        holding_id: scenario.replacementHolding.id,
+        movement_date: "2026-02-28",
+        new_investment_id: 99999,
+        new_quantity: 200,
+        new_price: 5.0,
+      });
+    }).toThrow("Replacement investment not found");
+  });
+
+  test("rejects if new quantity is zero or negative", () => {
+    const scenario = setupReplacementScenario();
+
+    expect(() => {
+      createReplacementMovement({
+        holding_id: scenario.replacementHolding.id,
+        movement_date: "2026-02-28",
+        new_investment_id: scenario.replacementInvestment.id,
+        new_quantity: 0,
+        new_price: 5.0,
+      });
+    }).toThrow("New quantity must be greater than zero");
+  });
+
+  test("no cash balance change", () => {
+    const scenario = setupReplacementScenario();
+    const accountBefore = getAccountById(testAccount.id);
+
+    createReplacementMovement({
+      holding_id: scenario.replacementHolding.id,
+      movement_date: "2026-02-28",
+      new_investment_id: scenario.replacementInvestment.id,
+      new_quantity: 200,
+      new_price: 5.0,
+    });
+
+    const accountAfter = getAccountById(testAccount.id);
+    expect(accountAfter.cash_balance).toBe(accountBefore.cash_balance);
   });
 });

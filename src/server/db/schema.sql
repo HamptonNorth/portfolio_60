@@ -41,6 +41,8 @@ CREATE TABLE IF NOT EXISTS investments (
     selector TEXT CHECK(selector IS NULL OR length(selector) <= 255),
     auto_fetch INTEGER NOT NULL DEFAULT 1,
     morningstar_id TEXT,
+    notes TEXT CHECK(notes IS NULL OR length(notes) <= 255),
+    replaced INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (currencies_id) REFERENCES currencies(id),
     FOREIGN KEY (investment_type_id) REFERENCES investment_types(id)
 );
@@ -155,7 +157,7 @@ CREATE TABLE IF NOT EXISTS cash_transactions (
 CREATE TABLE IF NOT EXISTS holding_movements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     holding_id INTEGER NOT NULL,
-    movement_type TEXT NOT NULL CHECK(movement_type IN ('buy', 'sell', 'adjustment')),
+    movement_type TEXT NOT NULL CHECK(movement_type IN ('buy', 'sell', 'adjustment', 'replacement')),
     movement_date TEXT NOT NULL,
     quantity INTEGER NOT NULL,
     movement_value INTEGER NOT NULL,

@@ -293,7 +293,7 @@ describe("Holding Movements Routes", () => {
     });
     expect(response.status).toBe(400);
     const data = await response.json();
-    expect(data.detail).toContain("Movement type must be 'buy', 'sell', or 'adjustment'");
+    expect(data.detail).toContain("Movement type must be 'buy', 'sell', 'adjustment', or 'replacement'");
   });
 
   test("POST buy movement: holding not found returns 404", async () => {

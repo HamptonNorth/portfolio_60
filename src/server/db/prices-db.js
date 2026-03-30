@@ -230,6 +230,62 @@ export function getAllInvestmentPricesInRange(fromDate, toDate) {
 }
 
 /**
+ * @description Create prorated historical prices for a replacement investment based on
+ * the old investment's price history. For each old price, the new price is calculated as:
+ * newPrice = oldPrice × (oldQuantity / newQuantity), preserving total value continuity.
+ * Skips if the new investment already has prices before the execution date (multi-account safety).
+ * @param {number} oldInvestmentId - The investment being replaced
+ * @param {number} newInvestmentId - The replacement investment
+ * @param {number} oldQuantity - Quantity held of the old investment (unscaled)
+ * @param {number} newQuantity - Quantity of the replacement investment (unscaled)
+ * @param {string} executionDate - ISO-8601 date of the replacement (exclusive upper bound for old prices)
+ * @param {number} newPrice - Price of the replacement investment at execution date (in minor units, e.g. pence)
+ * @returns {number} Number of prorated prices inserted (0 if skipped)
+ */
+export function prorateHistoricalPrices(oldInvestmentId, newInvestmentId, oldQuantity, newQuantity, executionDate, newPrice) {
+  const db = getDatabase();
+
+  // Check if new investment already has prices before execution date (multi-account case)
+  const existingCount = db
+    .query("SELECT COUNT(*) AS count FROM prices WHERE investment_id = ? AND price_date < ?")
+    .get(newInvestmentId, executionDate);
+
+  if (existingCount.count > 0) {
+    return 0;
+  }
+
+  // Get all old investment prices before the execution date
+  const oldPrices = db
+    .query(
+      `SELECT price_date, price_time, price
+       FROM prices
+       WHERE investment_id = ? AND price_date < ?
+       ORDER BY price_date ASC`,
+    )
+    .all(oldInvestmentId, executionDate);
+
+  // Calculate the ratio for prorating: oldQuantity / newQuantity
+  const ratio = oldQuantity / newQuantity;
+
+  // Insert prorated prices for the new investment
+  const insertStmt = db.prepare(
+    "INSERT OR REPLACE INTO prices (investment_id, price_date, price_time, price) VALUES (?, ?, ?, ?)",
+  );
+
+  for (const oldPrice of oldPrices) {
+    // oldPrice.price is already scaled; multiply by ratio and round
+    const proratedScaledPrice = Math.round(oldPrice.price * ratio);
+    insertStmt.run(newInvestmentId, oldPrice.price_date, oldPrice.price_time, proratedScaledPrice);
+  }
+
+  // Insert the user-supplied execution date price for the new investment
+  const scaledNewPrice = Math.round(newPrice * CURRENCY_SCALE_FACTOR);
+  insertStmt.run(newInvestmentId, executionDate, "00:00:00", scaledNewPrice);
+
+  return oldPrices.length + 1;
+}
+
+/**
  * @description Scale a price value for storage (multiply by CURRENCY_SCALE_FACTOR).
  * @param {number} price - The price in minor units
  * @returns {number} Scaled integer value

@@ -699,12 +699,64 @@ function runMigrations(database) {
     }
   }
 
-  // Migration 25: Add SCD2 temporal columns to holdings (effective_from, effective_to)
+  // Migration 25: Add notes and replaced columns to investments table.
+  // notes: free-text field for replacement audit trail.
+  // replaced: flag (0/1) to mark investments retired via corporate action replacement.
+  const investmentCols25 = database.query("PRAGMA table_info(investments)").all();
+  const hasNotes25 = investmentCols25.some(function (col) {
+    return col.name === "notes";
+  });
+  if (!hasNotes25) {
+    database.exec("ALTER TABLE investments ADD COLUMN notes TEXT CHECK(notes IS NULL OR length(notes) <= 255)");
+  }
+  const hasReplaced25 = investmentCols25.some(function (col) {
+    return col.name === "replaced";
+  });
+  if (!hasReplaced25) {
+    database.exec("ALTER TABLE investments ADD COLUMN replaced INTEGER NOT NULL DEFAULT 0");
+  }
+
+  // Migration 26: Add 'replacement' to holding_movements.movement_type CHECK constraint.
+  // SQLite cannot ALTER CHECK constraints — requires table rebuild.
+  const movementTableInfo26 = database.query("SELECT sql FROM sqlite_master WHERE type='table' AND name='holding_movements'").get();
+  if (movementTableInfo26 && movementTableInfo26.sql && !movementTableInfo26.sql.includes("replacement")) {
+    database.exec("PRAGMA foreign_keys = OFF");
+    database.exec("BEGIN TRANSACTION");
+    try {
+      database.exec(`
+        CREATE TABLE holding_movements_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          holding_id INTEGER NOT NULL,
+          movement_type TEXT NOT NULL CHECK(movement_type IN ('buy', 'sell', 'adjustment', 'replacement')),
+          movement_date TEXT NOT NULL,
+          quantity INTEGER NOT NULL,
+          movement_value INTEGER NOT NULL,
+          book_cost INTEGER NOT NULL DEFAULT 0,
+          deductible_costs INTEGER NOT NULL DEFAULT 0,
+          revised_avg_cost INTEGER NOT NULL DEFAULT 0,
+          notes TEXT CHECK(notes IS NULL OR length(notes) <= 255),
+          FOREIGN KEY (holding_id) REFERENCES holdings(id)
+        )
+      `);
+      database.exec("INSERT INTO holding_movements_new SELECT * FROM holding_movements");
+      database.exec("DROP TABLE holding_movements");
+      database.exec("ALTER TABLE holding_movements_new RENAME TO holding_movements");
+      database.exec("CREATE INDEX IF NOT EXISTS idx_holding_movements_holding ON holding_movements(holding_id, movement_date DESC)");
+      database.exec("COMMIT");
+    } catch (err) {
+      database.exec("ROLLBACK");
+      throw err;
+    } finally {
+      database.exec("PRAGMA foreign_keys = ON");
+    }
+  }
+
+  // Migration 27: Add SCD2 temporal columns to holdings (effective_from, effective_to)
   // Enables historic portfolio composition tracking — each row represents a holding
   // state for a date range. The UNIQUE constraint changes from (account_id, investment_id)
   // to (account_id, investment_id, effective_from).
-  const holdingsCols25 = database.query("PRAGMA table_info(holdings)").all();
-  const hasEffectiveFrom = holdingsCols25.some(function (col) {
+  const holdingsCols27 = database.query("PRAGMA table_info(holdings)").all();
+  const hasEffectiveFrom = holdingsCols27.some(function (col) {
     return col.name === "effective_from";
   });
 

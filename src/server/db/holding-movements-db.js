@@ -1,5 +1,7 @@
 import { getDatabase } from "./connection.js";
 import { CURRENCY_SCALE_FACTOR } from "../../shared/server-constants.js";
+import { prorateHistoricalPrices } from "./prices-db.js";
+import { updateInvestmentNotes, markInvestmentReplaced, updateAutoFetch } from "./investments-db.js";
 
 /**
  * @description Get the current date as ISO-8601 string (YYYY-MM-DD).
@@ -344,6 +346,163 @@ export function createSplitMovement(data) {
     db.exec("COMMIT");
 
     return getMovementById(result.lastInsertRowid);
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
+}
+
+/**
+ * @description Create a replacement movement for a corporate action where one investment
+ * replaces another (e.g. fund restructure, manager acquisition).
+ *
+ * This atomically:
+ * 1. Closes the original holding via SCD2 (effective_to = execution date)
+ * 2. Creates a new holding for the replacement investment
+ * 3. Prorates historical prices from the old investment to the new one
+ * 4. Writes notes to both investments (if provided)
+ * 5. Marks the old investment as replaced and disables auto-fetch
+ *
+ * Book cost is preserved across the replacement. No cash changes hands.
+ *
+ * @param {Object} data - The replacement movement data
+ * @param {number} data.holding_id - FK to the original holding being replaced
+ * @param {string} data.movement_date - Execution date (ISO-8601 YYYY-MM-DD)
+ * @param {number} data.new_investment_id - FK to the replacement investment
+ * @param {number} data.new_quantity - Quantity of the replacement investment (decimal, unscaled)
+ * @param {number} data.new_price - Price of the replacement at execution date (decimal, in major units e.g. pounds)
+ * @param {string} [data.notes] - Optional notes (max 255 chars)
+ * @returns {Object} Object with { movement, oldHolding, newHolding }
+ * @throws {Error} If holding not found, new investment not found, or same investment
+ */
+export function createReplacementMovement(data) {
+  const db = getDatabase();
+
+  if (!data.new_quantity || data.new_quantity <= 0) {
+    throw new Error("New quantity must be greater than zero");
+  }
+
+  if (!data.new_price || data.new_price <= 0) {
+    throw new Error("New price must be greater than zero");
+  }
+
+  if (!data.new_investment_id) {
+    throw new Error("Replacement investment is required");
+  }
+
+  db.exec("BEGIN");
+  try {
+    // Read the current holding (scaled values direct from DB)
+    const holding = db
+      .query("SELECT id, account_id, investment_id, quantity, average_cost FROM holdings WHERE id = ? AND effective_to IS NULL")
+      .get(data.holding_id);
+
+    if (!holding) {
+      throw new Error("Holding not found");
+    }
+
+    if (holding.investment_id === data.new_investment_id) {
+      throw new Error("Replacement investment must be different from the current investment");
+    }
+
+    // Verify the new investment exists
+    const newInvestment = db
+      .query("SELECT id FROM investments WHERE id = ?")
+      .get(data.new_investment_id);
+
+    if (!newInvestment) {
+      throw new Error("Replacement investment not found");
+    }
+
+    // Work in unscaled decimals to avoid overflow
+    const oldQuantity = unscaleValue(holding.quantity);
+    const oldAvgCost = unscaleValue(holding.average_cost);
+    const bookCost = oldQuantity * oldAvgCost;
+
+    // New average cost preserves book cost
+    const newAvgCost = bookCost / data.new_quantity;
+
+    const scaledNewQuantity = scaleValue(data.new_quantity);
+    const scaledNewAvgCost = scaleValue(newAvgCost);
+    const scaledBookCost = scaleValue(bookCost);
+
+    // Insert the replacement movement record (references the old/closing holding row)
+    const result = db.run(
+      `INSERT INTO holding_movements (holding_id, movement_type, movement_date, quantity, movement_value, book_cost, deductible_costs, revised_avg_cost, notes)
+       VALUES (?, 'replacement', ?, ?, 0, ?, 0, ?, ?)`,
+      [data.holding_id, data.movement_date, scaledNewQuantity, scaledBookCost, scaledNewAvgCost, data.notes || null],
+    );
+
+    // Close the original holding at the execution date
+    db.run("UPDATE holdings SET effective_to = ? WHERE id = ?", [data.movement_date, holding.id]);
+
+    // Create the new holding for the replacement investment
+    const newHoldingResult = db.run(
+      `INSERT INTO holdings (account_id, investment_id, quantity, average_cost, effective_from)
+       VALUES (?, ?, ?, ?, ?)`,
+      [holding.account_id, data.new_investment_id, scaledNewQuantity, scaledNewAvgCost, data.movement_date],
+    );
+
+    db.exec("COMMIT");
+
+    // Post-transaction operations (not rolled back if they fail, but these are
+    // supplementary — the core holding swap is already committed)
+
+    // Prorate historical prices from old to new investment
+    // newPrice is in major units (e.g. £5.00), convert to minor units (pence) for storage
+    const newPriceMinorUnit = data.new_price * 100;
+    prorateHistoricalPrices(
+      holding.investment_id,
+      data.new_investment_id,
+      oldQuantity,
+      data.new_quantity,
+      data.movement_date,
+      newPriceMinorUnit,
+    );
+
+    // Write notes to both investments
+    if (data.notes) {
+      updateInvestmentNotes(holding.investment_id, data.notes);
+      updateInvestmentNotes(data.new_investment_id, data.notes);
+    }
+
+    // Disable auto-fetch and mark the old investment as replaced
+    updateAutoFetch(holding.investment_id, false);
+    markInvestmentReplaced(holding.investment_id);
+
+    // Build return objects
+    const movement = getMovementById(result.lastInsertRowid);
+
+    const oldHolding = db
+      .query("SELECT id, account_id, investment_id, quantity, average_cost, effective_from, effective_to FROM holdings WHERE id = ?")
+      .get(holding.id);
+
+    const newHoldingId = Number(newHoldingResult.lastInsertRowid);
+    const newHolding = db
+      .query("SELECT id, account_id, investment_id, quantity, average_cost, effective_from, effective_to FROM holdings WHERE id = ?")
+      .get(newHoldingId);
+
+    return {
+      movement: movement,
+      oldHolding: oldHolding ? {
+        id: oldHolding.id,
+        account_id: oldHolding.account_id,
+        investment_id: oldHolding.investment_id,
+        quantity: unscaleValue(oldHolding.quantity),
+        average_cost: unscaleValue(oldHolding.average_cost),
+        effective_from: oldHolding.effective_from,
+        effective_to: oldHolding.effective_to,
+      } : null,
+      newHolding: newHolding ? {
+        id: newHolding.id,
+        account_id: newHolding.account_id,
+        investment_id: newHolding.investment_id,
+        quantity: unscaleValue(newHolding.quantity),
+        average_cost: unscaleValue(newHolding.average_cost),
+        effective_from: newHolding.effective_from,
+        effective_to: newHolding.effective_to,
+      } : null,
+    };
   } catch (err) {
     db.exec("ROLLBACK");
     throw err;

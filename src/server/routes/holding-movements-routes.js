@@ -1,5 +1,6 @@
 import { Router } from "../router.js";
-import { createBuyMovement, createSellMovement, createSplitMovement, getMovementById, getMovementsByHoldingId } from "../db/holding-movements-db.js";
+import { createBuyMovement, createSellMovement, createSplitMovement, createReplacementMovement, getMovementById, getMovementsByHoldingId } from "../db/holding-movements-db.js";
+import { getInvestmentById } from "../db/investments-db.js";
 import { getHoldingById } from "../db/holdings-db.js";
 import { getAccountById } from "../db/accounts-db.js";
 import { validateHoldingMovement } from "../validation.js";
@@ -93,6 +94,55 @@ movementsRouter.post("/api/holdings/:holdingId/movements", async function (reque
         return new Response(JSON.stringify({ error: err.message }), { status: 400, headers: { "Content-Type": "application/json" } });
       }
       return new Response(JSON.stringify({ error: "Failed to create adjustment", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+    }
+  }
+
+  // Replacement (corporate action) has different fields from buy/sell
+  if (body.movement_type === "replacement") {
+    try {
+      const newInvestmentId = Number(body.new_investment_id);
+      const newInvestment = getInvestmentById(newInvestmentId);
+      if (!newInvestment) {
+        return new Response(JSON.stringify({ error: "Replacement investment not found" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+
+      if (holding.investment_id === newInvestmentId) {
+        return new Response(JSON.stringify({ error: "Replacement investment must be different from the current investment" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+
+      const result = createReplacementMovement({
+        holding_id: holdingId,
+        movement_date: body.movement_date,
+        new_investment_id: newInvestmentId,
+        new_quantity: Number(body.new_quantity),
+        new_price: Number(body.new_price),
+        notes: body.notes || null,
+      });
+
+      const updatedAccount = getAccountById(holding.account_id);
+
+      return new Response(
+        JSON.stringify({
+          movement: result.movement,
+          oldHolding: result.oldHolding,
+          newHolding: result.newHolding,
+          account: updatedAccount,
+        }),
+        { status: 201, headers: { "Content-Type": "application/json" } },
+      );
+    } catch (err) {
+      const knownErrors = [
+        "New quantity must be greater than zero",
+        "New price must be greater than zero",
+        "Replacement investment is required",
+        "Replacement investment must be different from the current investment",
+        "Replacement investment not found",
+        "Holding not found",
+      ];
+      if (knownErrors.includes(err.message)) {
+        return new Response(JSON.stringify({ error: err.message }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+      return new Response(JSON.stringify({ error: "Failed to create replacement", detail: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
     }
   }
 

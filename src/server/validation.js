@@ -368,12 +368,13 @@ export function validateHoldingMovement(data) {
   // movement_type must be 'buy', 'sell', or 'adjustment'
   if (data.movement_type !== undefined && data.movement_type !== null) {
     const movType = String(data.movement_type).trim();
-    if (movType !== "" && movType !== "buy" && movType !== "sell" && movType !== "adjustment") {
-      errors.push("Movement type must be 'buy', 'sell', or 'adjustment'");
+    if (movType !== "" && movType !== "buy" && movType !== "sell" && movType !== "adjustment" && movType !== "replacement") {
+      errors.push("Movement type must be 'buy', 'sell', 'adjustment', or 'replacement'");
     }
   }
 
   const isAdjustment = data.movement_type === "adjustment";
+  const isReplacement = data.movement_type === "replacement";
 
   // movement_date always required
   const dateError = validateRequired(data.movement_date, "Date");
@@ -393,7 +394,38 @@ export function validateHoldingMovement(data) {
     }
   }
 
-  if (isAdjustment) {
+  if (isReplacement) {
+    // Replacement: requires new_investment_id, new_quantity, new_price
+    const newInvError = validateRequired(data.new_investment_id, "Replacement investment");
+    if (newInvError) errors.push(newInvError);
+
+    if (data.new_investment_id !== undefined && data.new_investment_id !== null) {
+      const invId = Number(data.new_investment_id);
+      if (!Number.isInteger(invId) || invId <= 0) {
+        errors.push("Replacement investment must be a valid investment ID");
+      }
+    }
+
+    const newQtyError = validateRequired(data.new_quantity, "New quantity");
+    if (newQtyError) errors.push(newQtyError);
+
+    if (data.new_quantity !== undefined && data.new_quantity !== null) {
+      const newQty = Number(data.new_quantity);
+      if (isNaN(newQty) || newQty <= 0) {
+        errors.push("New quantity must be greater than zero");
+      }
+    }
+
+    const newPriceError = validateRequired(data.new_price, "New price");
+    if (newPriceError) errors.push(newPriceError);
+
+    if (data.new_price !== undefined && data.new_price !== null) {
+      const newPrice = Number(data.new_price);
+      if (isNaN(newPrice) || newPrice <= 0) {
+        errors.push("New price must be greater than zero");
+      }
+    }
+  } else if (isAdjustment) {
     // Adjustment (stock split): requires new_quantity, not quantity/total_consideration
     const newQtyError = validateRequired(data.new_quantity, "New quantity");
     if (newQtyError) errors.push(newQtyError);
