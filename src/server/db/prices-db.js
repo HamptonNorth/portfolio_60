@@ -245,16 +245,9 @@ export function getAllInvestmentPricesInRange(fromDate, toDate) {
 export function prorateHistoricalPrices(oldInvestmentId, newInvestmentId, oldQuantity, newQuantity, executionDate, newPrice) {
   const db = getDatabase();
 
-  // Check if new investment already has prices before execution date (multi-account case)
-  const existingCount = db
-    .query("SELECT COUNT(*) AS count FROM prices WHERE investment_id = ? AND price_date < ?")
-    .get(newInvestmentId, executionDate);
-
-  if (existingCount.count > 0) {
-    return 0;
-  }
-
   // Get all old investment prices before the execution date
+  // Uses INSERT OR REPLACE so this is safe to call multiple times (multi-account case)
+  // — prorated prices simply overwrite any existing prices for the same dates
   const oldPrices = db
     .query(
       `SELECT price_date, price_time, price

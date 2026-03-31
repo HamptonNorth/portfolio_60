@@ -312,11 +312,11 @@
     "title": "Test SSON and new Smithson fund",
     "pdfEndpoint": "/api/reports/pdf/chart",
     "subTitle": "",
-    "monthsToShow": "24",
+    "monthsToShow": "36",
     "smooth": true,
     "showGlobalEvents": false,
     "params": [
-      "LSE:SSON, Inv:GB00BLBNK482, bm: FTSE 100"
+      "inv:LSE:SSON"
     ]
   }
 ]

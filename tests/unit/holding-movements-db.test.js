@@ -894,7 +894,7 @@ describe("Replacement movements", () => {
     expect(feb28.price).toBeCloseTo(500, 0); // £5.00 in pence = 500
   });
 
-  test("skips price prorating when prices already exist (multi-account)", () => {
+  test("price prorating is idempotent across multiple accounts", () => {
     const scenario = setupReplacementScenario();
 
     // First replacement writes prorated prices
@@ -923,7 +923,7 @@ describe("Replacement movements", () => {
       average_cost: 10.0,
     });
 
-    // Second replacement should skip prorating (prices already exist)
+    // Second replacement re-writes prorated prices (idempotent via INSERT OR REPLACE)
     createReplacementMovement({
       holding_id: secondHolding.id,
       movement_date: "2026-02-28",
@@ -932,9 +932,9 @@ describe("Replacement movements", () => {
       new_price: 5.0,
     });
 
-    // Prices should still be the same (not doubled)
+    // Prices should have the same count (INSERT OR REPLACE overwrites, not duplicates)
     const prices = getPricesInRange(scenario.replacementInvestment.id, "2026-01-01", "2026-02-28");
-    // 3 prorated + 1 execution = 4 (unchanged)
+    // 3 prorated + 1 execution = 4 (same count, overwritten in place)
     expect(prices.length).toBe(4);
   });
 
