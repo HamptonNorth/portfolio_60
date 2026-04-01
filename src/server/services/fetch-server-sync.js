@@ -164,7 +164,7 @@ export async function triggerServerFetchAll() {
  * @param {Object} data - The data from GET /api/latest
  * @returns {{ prices: number, rates: number, benchmarks: number }} Count of items upserted
  */
-function upsertIntoDatabase(data) {
+export function upsertIntoDatabase(data) {
   const db = getDatabase();
   const counts = { prices: 0, rates: 0, benchmarks: 0 };
 

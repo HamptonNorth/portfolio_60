@@ -38,7 +38,7 @@ export function getLastSuccessfulFetch() {
       `SELECT fetch_datetime
        FROM fetch_history
        WHERE success = 1
-       ORDER BY fetch_datetime DESC
+       ORDER BY fetch_datetime DESC, id DESC
        LIMIT 1`,
     )
     .get();
@@ -58,7 +58,7 @@ export function getLastSuccessfulFetchByType(fetchType) {
       `SELECT fetch_datetime
        FROM fetch_history
        WHERE success = 1 AND fetch_type = ?
-       ORDER BY fetch_datetime DESC
+       ORDER BY fetch_datetime DESC, id DESC
        LIMIT 1`,
     )
     .get(fetchType);
@@ -113,7 +113,7 @@ export function getFetchHistory(filters = {}) {
       `SELECT id, fetch_type, reference_id, fetch_datetime, started_by, attempt_number, max_attempts, success, error_code, error_message
        FROM fetch_history
        ${whereClause}
-       ORDER BY fetch_datetime DESC
+       ORDER BY fetch_datetime DESC, id DESC
        LIMIT ? OFFSET ?`,
     )
     .all(...params);
@@ -251,7 +251,7 @@ export function getFetchHistoryWithDescriptions(filters = {}) {
        LEFT JOIN investments i ON h.fetch_type = 'investment' AND h.reference_id = i.id
        LEFT JOIN benchmarks b ON h.fetch_type = 'benchmark' AND h.reference_id = b.id
        ${whereClause}
-       ORDER BY h.fetch_datetime DESC
+       ORDER BY h.fetch_datetime DESC, h.id DESC
        LIMIT ? OFFSET ?`,
     )
     .all(...params);
@@ -298,7 +298,7 @@ export function getLatestFailures() {
          AND h.id = (
            SELECT h2.id FROM fetch_history h2
            WHERE h2.fetch_type = h.fetch_type AND h2.reference_id = h.reference_id
-           ORDER BY h2.fetch_datetime DESC LIMIT 1
+           ORDER BY h2.fetch_datetime DESC, h2.id DESC LIMIT 1
          )
          AND CASE h.fetch_type
                WHEN 'investment' THEN i.id IS NOT NULL

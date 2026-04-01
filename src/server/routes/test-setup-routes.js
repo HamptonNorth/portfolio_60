@@ -4,6 +4,9 @@ import { resolve } from "node:path";
 import { getDatabase } from "../db/connection.js";
 import { checkpointDatabase } from "../db/connection.js";
 import { runFullPriceUpdate } from "../services/fetch-service.js";
+import { getFetchServerConfig } from "../config.js";
+import { loadEnvValue } from "../auth.js";
+import { upsertIntoDatabase } from "../services/fetch-server-sync.js";
 
 /**
  * @description Router instance for test database setup routes.
@@ -53,47 +56,92 @@ testSetupRouter.get("/api/test-setup/stream", async function (request) {
         }, 15000);
 
         try {
-          // Phase 1: Fetch All (backfill + latest prices/rates/benchmarks)
-          sendEvent("phase", {
-            phase: 1,
-            total: 3,
-            message: "Fetching currency rates, prices and benchmark values — this may take several minutes",
-          });
+          // Phase 1: Load price/rate/benchmark data
+          // Try fetch-server-60 history first (fast), fall back to public APIs (slow)
+          var historyLoaded = false;
+          var fetchServerConfig = getFetchServerConfig();
 
-          const summary = await runFullPriceUpdate({
-            startedBy: 0,
-            onCurrencyRates: function (result) {
-              sendEvent("progress", {
-                phase: 1,
-                message: result.success
-                  ? "Currency rates updated"
-                  : "Currency rates: " + (result.error || "failed"),
-              });
-            },
-            onPriceResult: function (result) {
-              sendEvent("progress", {
-                phase: 1,
-                message: result.success
-                  ? result.description + " — price updated"
-                  : result.description + " — " + (result.error || "failed"),
-              });
-            },
-            onBenchmarkResult: function (result) {
-              sendEvent("progress", {
-                phase: 1,
-                message: result.success
-                  ? result.description + " — value updated"
-                  : result.description + " — " + (result.error || "failed"),
-              });
-            },
-          });
+          if (fetchServerConfig.enabled && fetchServerConfig.url) {
+            sendEvent("phase", {
+              phase: 1,
+              total: 3,
+              message: "Loading history from fetch server...",
+            });
 
-          sendEvent("progress", {
-            phase: 1,
-            message: "Fetch complete — " +
-              summary.priceSuccessCount + " prices, " +
-              summary.benchmarkSuccessCount + " benchmarks",
-          });
+            try {
+              var apiKey = loadEnvValue("FETCH_SERVER_API_KEY");
+              var historyUrl = fetchServerConfig.url.replace(/\/$/, "") + "/api/history";
+              var historyResponse = await fetch(historyUrl, {
+                method: "GET",
+                headers: { "X-API-Key": apiKey || "" },
+                signal: AbortSignal.timeout(30000),
+              });
+
+              if (historyResponse.ok) {
+                var historyData = await historyResponse.json();
+                if (historyData.fetchedAt) {
+                  var counts = upsertIntoDatabase(historyData);
+                  sendEvent("progress", {
+                    phase: 1,
+                    message: "History loaded from fetch server — " +
+                      counts.prices + " prices, " +
+                      counts.rates + " rates, " +
+                      counts.benchmarks + " benchmarks",
+                  });
+                  historyLoaded = true;
+                }
+              }
+            } catch (fetchErr) {
+              sendEvent("progress", {
+                phase: 1,
+                message: "Fetch server unavailable (" + fetchErr.message + "), falling back to direct fetch",
+              });
+            }
+          }
+
+          if (!historyLoaded) {
+            // Fall back to fetching from public APIs (slow — several minutes)
+            sendEvent("phase", {
+              phase: 1,
+              total: 3,
+              message: "Fetching currency rates, prices and benchmark values — this may take several minutes",
+            });
+
+            const summary = await runFullPriceUpdate({
+              startedBy: 0,
+              onCurrencyRates: function (result) {
+                sendEvent("progress", {
+                  phase: 1,
+                  message: result.success
+                    ? "Currency rates updated"
+                    : "Currency rates: " + (result.error || "failed"),
+                });
+              },
+              onPriceResult: function (result) {
+                sendEvent("progress", {
+                  phase: 1,
+                  message: result.success
+                    ? result.description + " — price updated"
+                    : result.description + " — " + (result.error || "failed"),
+                });
+              },
+              onBenchmarkResult: function (result) {
+                sendEvent("progress", {
+                  phase: 1,
+                  message: result.success
+                    ? result.description + " — value updated"
+                    : result.description + " — " + (result.error || "failed"),
+                });
+              },
+            });
+
+            sendEvent("progress", {
+              phase: 1,
+              message: "Fetch complete — " +
+                summary.priceSuccessCount + " prices, " +
+                summary.benchmarkSuccessCount + " benchmarks",
+            });
+          }
 
           // Phase 2: Apply historic holding changes
           sendEvent("phase", {
