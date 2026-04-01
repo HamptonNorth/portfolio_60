@@ -1150,7 +1150,7 @@ pre, code {
             <div class="step-num">3</div>
             <div class="step-body">
               <strong>The bouncer checks your ID</strong>
-              <p>An <span class="term" data-definition="Authentication middleware is code that runs before your actual request is handled. It checks whether you're allowed in — like a bouncer at the door checking your name is on the list.">auth middleware</span> checks: have you entered the passphrase yet? If not, you get redirected to the passphrase page.</p>
+              <p>An <span class="term" data-definition="Authentication middleware is code that runs before your actual request is handled. It checks whether you're allowed in — like a bouncer at the door checking your name is on the list.">auth middleware</span> checks: have you entered the passphrase yet? If not, you get redirected to the passphrase page. The bouncer also knows special passphrases — <code>test</code> opens an isolated test database, and <code>demo</code> opens a read-only demonstration mode.</p>
             </div>
           </div>
           <div class="step-card animate-in">
@@ -1214,6 +1214,14 @@ pre, code {
             <p>This pattern — a single entry point that receives every request and decides where it goes — is how virtually all web servers work. Whether it's a tiny portfolio tracker or Netflix, there's always one function that catches every incoming request first.</p>
           </div>
         </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">📌</div>
+          <div class="callout-content">
+            <strong class="callout-title">Three Doors, One Bouncer</strong>
+            <p>The auth middleware actually handles three different modes. The real passphrase opens your live portfolio. Entering <code>test</code> opens an isolated test database with sample data. Entering <code>demo</code> opens a read-only demonstration — the middleware blocks all write requests (POST, PUT, DELETE), returning a "read-only" error. Same bouncer, different wristbands.</p>
+          </div>
+        </div>
       </section>
 
       <!-- Screen 4: The request flow diagram -->
@@ -1229,7 +1237,7 @@ pre, code {
           <div class="flow-arrow animate-in">→</div>
           <div class="flow-step animate-in">
             <div class="flow-step-num">2</div>
-            <p><strong>Auth Gate</strong><br>Checks passphrase</p>
+            <p><strong>Auth Gate</strong><br>Checks passphrase<br><span style="font-size: var(--text-xs); color: var(--color-text-muted);">live · test · demo</span></p>
           </div>
           <div class="flow-arrow animate-in">→</div>
           <div class="flow-step animate-in">
@@ -1430,9 +1438,23 @@ pre, code {
                   </div>
                 </div>
               </div>
-              <div class="ft-folder">
+              <div class="ft-folder open">
                 <span class="ft-name">shared/</span>
-                <span class="ft-desc">Constants and utilities shared between server and UI</span>
+                <span class="ft-desc">Constants, config files, and utilities shared between server and UI</span>
+                <div class="ft-children">
+                  <div class="ft-file">
+                    <span class="ft-name">user-settings.json</span>
+                    <span class="ft-desc">App configuration — scheduling, fetch server, providers</span>
+                  </div>
+                  <div class="ft-file">
+                    <span class="ft-name">user-reports.json</span>
+                    <span class="ft-desc">PDF report definitions — charts, summaries, analysis</span>
+                  </div>
+                  <div class="ft-file">
+                    <span class="ft-name">user-lists.json</span>
+                    <span class="ft-desc">Custom spreadsheet lists and document uploads</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1561,6 +1583,51 @@ pre, code {
             <button onclick="playChatAll('m2')">Play All</button>
             <button onclick="resetChat('m2')">Replay</button>
             <span class="chat-progress" id="m2-chat-progress">0 / 8 messages</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 4b: Filters as a concrete example of layer flow -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Filters Flow Down, Results Flow Up</h2>
+        <p>The layer pattern becomes clearer with a real example. The Investment Analysis page lets you filter by time period, user, account type, and whether holdings are current or historic. Watch how a filter choice travels through every layer:</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <strong>Frontend: user picks filters</strong>
+              <p>JavaScript reads the dropdowns and builds a URL: <code>/api/analysis/league?period=1y&amp;holdings=current&amp;accountType=ISA</code></p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <strong>Route: validates and passes through</strong>
+              <p>The route handler checks the period is valid, parses IDs, then calls the analysis service with the validated parameters.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <strong>Service: applies business logic</strong>
+              <p>The service calculates date ranges from the period, decides which holdings query to use, and asks the DB layer for the right data.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">4</div>
+            <div class="step-body">
+              <strong>Database: filters in SQL</strong>
+              <p>The DB layer adds <code>WHERE</code> clauses for account type and date ranges, returning only the matching rows.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Same Pattern, Different Data</strong>
+            <p>This filter-flow pattern repeats across the app — portfolio views, analysis charts, PDF reports. Each page has its own filters, but they all travel the same route → service → database path. Once you understand one, you understand them all.</p>
           </div>
         </div>
       </section>
@@ -1766,6 +1833,45 @@ pre, code {
               <strong>Unique constraint prevents duplicates</strong>
               <p><code>UNIQUE(account_id, investment_id, effective_from)</code> — you can't accidentally create two overlapping records.</p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 4b: Investment replacement / corporate actions -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">When Investments Change Identity — Corporate Actions</h2>
+        <p>Sometimes an investment doesn't just change in quantity — it changes <em>identity</em>. A company merges, a fund restructures, or shares are consolidated (e.g., 10 old shares become 1 new share at 10× the price). In the real world, your broker replaces one holding with another overnight.</p>
+        <p>Portfolio 60 handles this with an <strong>investment replacement</strong> system. It's a coordinated operation across multiple database tables:</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <strong>Close the old holding (SCD2)</strong>
+              <p>The existing holding record gets an <code>effective_to</code> date — just like a normal SCD2 close.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <strong>Open the new holding</strong>
+              <p>A new holding is created for the replacement investment, with the converted quantity and recalculated book cost.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <strong>Prorate historical prices</strong>
+              <p>The old investment's price history is mathematically adjusted to match the new investment's scale. If 10 shares became 1, all old prices are multiplied by 10 — so charts show a continuous line rather than a sudden cliff.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">📌</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why Prorate Prices?</strong>
+            <p>Without prorating, a 10-for-1 consolidation would make the price chart jump 10× overnight — it would look like you made a huge profit when nothing actually changed. Prorating rewrites history so the old prices are expressed in "new share" terms, giving you an accurate performance picture across the corporate action.</p>
           </div>
         </div>
       </section>
@@ -1987,6 +2093,45 @@ pre, code {
         </div>
       </section>
 
+      <!-- Screen 5b: The fetch server — a fourth data source -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A Fourth Source — The Companion Fetch Server</h2>
+        <p>The three API fetchers work well, but they have a weakness: they only run when Portfolio 60 is running. If your laptop is off at 6pm, the scheduled fetch doesn't happen.</p>
+        <p>The solution is an optional companion service called <strong>fetch-server-60</strong> — an always-on server (typically running on a home server or NAS) that fetches prices and rates independently. Portfolio 60 can then <em>pull</em> the latest data from it.</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <strong>Push config</strong>
+              <p>On startup (or when investments change), Portfolio 60 pushes its fetch configuration to the companion server — "here's what I need you to track."</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <strong>Fetch server runs independently</strong>
+              <p>The companion server fetches prices, rates, and benchmarks on its own schedule — even when Portfolio 60 isn't running.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <strong>Pull and sync</strong>
+              <p>Portfolio 60 calls the fetch server's API, maps identifiers (Morningstar IDs, currency codes) to local database IDs, and upserts the data into both the live and test databases.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Push Config, Pull Data</strong>
+            <p>This is a common integration pattern: one system tells another what it needs (push), then later retrieves the results (pull). It decouples the two systems — the fetch server doesn't need to know about Portfolio 60's database structure, and Portfolio 60 doesn't need to be running when prices are collected. You can also view the fetch server's logs and trigger a remote "Fetch All" directly from the Fetching page.</p>
+          </div>
+        </div>
+      </section>
+
       <!-- Screen 6: Quiz -->
       <section class="screen animate-in" id="m4-quiz">
         <h2 class="screen-heading">Check Your Understanding</h2>
@@ -2187,6 +2332,51 @@ pre, code {
         </div>
       </section>
 
+      <!-- Screen 4b: Portfolio comparison -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Side-by-Side — Comparing Then and Now</h2>
+        <p>Time travel valuations answer "what was it worth?" But a more powerful question is: "what changed?" Portfolio 60's comparison mode runs the valuation engine <em>twice</em> — once for today and once for a chosen date — then calculates the differences.</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <strong>Two valuations, one request</strong>
+              <p>The service runs <code>getPortfolioSummary()</code> for today and <code>getPortfolioSummaryAtDate()</code> for the comparison date, using the same formula with different inputs.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <strong>Historic cash balances</strong>
+              <p>Cash balances also have history — the app tracks balance changes over time so the comparison includes cash as well as investment values.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <strong>Inline diffs</strong>
+              <p>The frontend shows both values side by side with the difference highlighted — green for gains, red for losses — at every level from individual holdings up to the household total.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 4c: Chart data service -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Plotting the Journey — Portfolio Value Charts</h2>
+        <p>While comparison shows two snapshots, charts show the full story. A dedicated <code>portfolio-chart-data-service</code> builds time-series data by running the valuation engine for every week (or fortnight) over the chosen period.</p>
+        <p>It generates a date for each data point, queries historic prices and holdings at that date, and produces arrays of GBP values (or percentage changes rebased to zero). The result feeds into PDF charts and on-screen visualisations — same valuation maths, just run dozens of times across a timeline.</p>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Reuse Over Rebuild</strong>
+            <p>The chart service doesn't have its own valuation formula — it calls the same portfolio service used by the main page. This means a bug fix to the valuation engine automatically fixes the charts too. In software, reusing a tested calculation is almost always better than writing a second version.</p>
+          </div>
+        </div>
+      </section>
+
       <!-- Screen 5: Quiz -->
       <section class="screen animate-in" id="m5-quiz">
         <h2 class="screen-heading">Check Your Understanding</h2>
@@ -2319,6 +2509,21 @@ pre, code {
               <strong>JavaScript renders the data</strong>
               <p>The JS loops over the data, creates HTML elements, and inserts them into the page. The spinner disappears.</p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 2b: Convention over configuration — screenshot carousel -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Convention Over Configuration — The Screenshot Carousel</h2>
+        <p>The home page shows a carousel of screenshots. But there's no configuration file listing the images. Instead, the server scans the <code>docs/media/</code> folder for files named <code>thumb-*.jpg</code> on startup and returns the list via an API endpoint.</p>
+        <p>To add a new screenshot, you just drop a file called <code>thumb-something.jpg</code> into the folder. No code changes, no config edits — the carousel picks it up automatically.</p>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Convention Over Configuration</strong>
+            <p>This is a well-known pattern in software: instead of making the developer explicitly list every resource, you agree on a naming convention and let the code discover things automatically. Ruby on Rails popularised this idea — if you follow the naming rules, everything "just works." Here, the convention is simple: thumbnail files start with <code>thumb-</code>.</p>
           </div>
         </div>
       </section>
@@ -2494,6 +2699,11 @@ pre, code {
             <h4 class="pattern-title">Path Traversal Prevention</h4>
             <p class="pattern-desc">The file server strips <code>..</code> from paths and verifies files are inside the allowed directory. This stops attackers from reading files outside the app.</p>
           </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">👁️</div>
+            <h4 class="pattern-title">Demo Mode Write Block</h4>
+            <p class="pattern-desc">In demo mode, the middleware rejects all non-GET requests with a 403 "read-only" response. This lets visitors explore the app without any risk of changing data — the block happens at the middleware level, before any route handler runs.</p>
+          </div>
         </div>
       </section>
 
@@ -2562,15 +2772,15 @@ pre, code {
             </div>
             <div style="grid-column: 1 / -1; padding: var(--space-4); background: rgba(42,123,155,0.08); border-radius: var(--radius-md); border-left: 3px solid var(--color-actor-2);">
               <strong style="color: var(--color-actor-2);">Services</strong>
-              <p style="font-size: var(--text-sm); color: var(--color-text-secondary); margin: var(--space-1) 0 0;">Portfolio valuation · Fetch orchestration · Scheduled fetcher · Analysis · Reports</p>
+              <p style="font-size: var(--text-sm); color: var(--color-text-secondary); margin: var(--space-1) 0 0;">Portfolio valuation · Comparison · Chart data · Fetch orchestration · Scheduled fetcher · Analysis · Reports</p>
             </div>
             <div style="padding: var(--space-4); background: rgba(123,109,170,0.08); border-radius: var(--radius-md); border-left: 3px solid var(--color-actor-3);">
               <strong style="color: var(--color-actor-3);">Database (SQLite)</strong>
-              <p style="font-size: var(--text-sm); color: var(--color-text-secondary); margin: var(--space-1) 0 0;">Singleton connection · WAL mode · Scaled integers · SCD2 holdings</p>
+              <p style="font-size: var(--text-sm); color: var(--color-text-secondary); margin: var(--space-1) 0 0;">Singleton connection · WAL mode · Scaled integers · SCD2 holdings · Corporate actions</p>
             </div>
             <div style="padding: var(--space-4); background: rgba(212,168,67,0.08); border-radius: var(--radius-md); border-left: 3px solid var(--color-actor-4);">
               <strong style="color: var(--color-actor-4);">Fetchers</strong>
-              <p style="font-size: var(--text-sm); color: var(--color-text-secondary); margin: var(--space-1) 0 0;">Morningstar · Frankfurter (ECB) · Yahoo Finance</p>
+              <p style="font-size: var(--text-sm); color: var(--color-text-secondary); margin: var(--space-1) 0 0;">Morningstar · Frankfurter (ECB) · Yahoo Finance · Fetch Server sync</p>
             </div>
           </div>
         </div>
@@ -2698,11 +2908,11 @@ pre, code {
           <div class="pattern-cards" style="max-width: 600px; margin: 0 auto;">
             <div class="pattern-card" style="border-top: 3px solid var(--color-actor-2);">
               <h4 class="pattern-title">You learned</h4>
-              <p class="pattern-desc">Request flow, layered architecture, scaled integers, SCD2 temporal data, API fetching, currency conversion, web components, and test isolation.</p>
+              <p class="pattern-desc">Request flow, layered architecture, scaled integers, SCD2 temporal data, corporate actions, API fetching, fetch server sync, portfolio comparison, currency conversion, web components, convention-over-configuration, and test isolation.</p>
             </div>
             <div class="pattern-card" style="border-top: 3px solid var(--color-actor-5);">
               <h4 class="pattern-title">You can now</h4>
-              <p class="pattern-desc">Read server code, trace data flows, spot scaling bugs, understand database patterns, and direct AI coding tools with precise architectural vocabulary.</p>
+              <p class="pattern-desc">Read server code, trace data flows, spot scaling bugs, understand database patterns, follow filter parameters through layers, and direct AI coding tools with precise architectural vocabulary.</p>
             </div>
           </div>
         </div>
