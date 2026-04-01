@@ -48,12 +48,12 @@ const PERIOD_LABELS = {
  * @param {Array<number>} userIds - Array of user IDs to filter by
  * @returns {Array<number>|null} Array of investment IDs, or null for no filtering
  */
-export function resolveInvestmentIds(holdingsFilter, userIds) {
+export function resolveInvestmentIds(holdingsFilter, userIds, accountTypes) {
   if (holdingsFilter === "current") {
-    return getCurrentHoldingInvestmentIds(userIds);
+    return getCurrentHoldingInvestmentIds(userIds, accountTypes);
   }
   if (holdingsFilter === "historic") {
-    return getHistoricHoldingInvestmentIds(userIds);
+    return getHistoricHoldingInvestmentIds(userIds, accountTypes);
   }
   // "all" — no filtering
   return null;

@@ -22,6 +22,7 @@ import {
   generateRiskReturnPdf,
 } from "../reports/pdf-analysis.js";
 import { getAllUsers } from "../db/users-db.js";
+import { getDistinctAccountTypes } from "../db/accounts-db.js";
 
 const analysisRouter = new Router();
 
@@ -86,18 +87,37 @@ function parseUserIds(param) {
 }
 
 /**
+ * @description Parse a comma-separated list of account types from the query parameter.
+ * Returns an array of valid lowercase account type strings.
+ * @param {string|null} param - The raw query parameter (e.g. "isa,sipp")
+ * @returns {Array<string>} Array of account type strings, empty means all types
+ */
+function parseAccountTypes(param) {
+  if (!param) return [];
+  var valid = ["trading", "isa", "sipp"];
+  var types = [];
+  var parts = param.split(",");
+  for (var i = 0; i < parts.length; i++) {
+    var t = parts[i].trim().toLowerCase();
+    if (valid.indexOf(t) >= 0) types.push(t);
+  }
+  return types;
+}
+
+/**
  * @description Resolve investment IDs and user metadata from filter query parameters.
  * Returns the resolved investment IDs (or null for "all") plus data needed for PDF filter text.
  * @param {URL} url - The parsed request URL
- * @returns {Object} Object with investmentIds, holdingsFilter, userIds, allUserIds, and userNames
+ * @returns {Object} Object with investmentIds, holdingsFilter, userIds, allUserIds, userNames, and accountTypes
  */
 function resolveFilters(url) {
   var holdingsFilter = parseHoldingsFilter(url.searchParams.get("holdings"));
   var userIds = parseUserIds(url.searchParams.get("users"));
+  var accountTypes = parseAccountTypes(url.searchParams.get("accountTypes"));
   var allUsers = getAllUsers();
   var allUserIds = allUsers.map(function (u) { return u.id; });
 
-  var investmentIds = resolveInvestmentIds(holdingsFilter, userIds);
+  var investmentIds = resolveInvestmentIds(holdingsFilter, userIds, accountTypes);
 
   // Build user names lookup for filter text
   var userNames = [];
@@ -116,6 +136,7 @@ function resolveFilters(url) {
     userIds: userIds,
     allUserIds: allUserIds,
     userNames: userNames,
+    accountTypes: accountTypes,
   };
 }
 
@@ -142,8 +163,28 @@ function buildFilterText(filters) {
     ? "All users"
     : filters.userNames.join(", ");
 
-  return holdingsLabel + " \u2014 " + userLabel;
+  var text = holdingsLabel + " \u2014 " + userLabel;
+
+  // Append account type if filtered
+  if (filters.accountTypes && filters.accountTypes.length > 0) {
+    var typeLabels = filters.accountTypes.map(function (t) { return t.toUpperCase(); });
+    text += " \u2014 " + typeLabels.join(", ");
+  }
+
+  return text;
 }
+
+// GET /api/analysis/account-types?users=1,2 — return distinct account types for the given users
+analysisRouter.get("/api/analysis/account-types", function (request) {
+  try {
+    var url = new URL(request.url);
+    var userIds = parseUserIds(url.searchParams.get("users"));
+    var types = getDistinctAccountTypes(userIds);
+    return Response.json(types);
+  } catch (err) {
+    return Response.json([]);
+  }
+});
 
 // GET /api/analysis/league-table?period=1y — return ranked investments with sparklines
 analysisRouter.get("/api/analysis/league-table", function (request) {

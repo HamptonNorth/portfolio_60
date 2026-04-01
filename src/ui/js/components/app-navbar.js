@@ -303,17 +303,12 @@ class AppNavbar extends LitElement {
       const nav = this.querySelector("nav");
 
       if (data.demoMode) {
-        // Demo mode — amber styling with read-only indicator
+        // Demo mode — keep standard navbar colour, add read-only banner
         document.documentElement.dataset.dbMode = "demo";
 
         const titleSpan = this.querySelector("#nav-app-title");
         if (titleSpan) {
           titleSpan.textContent = "Portfolio 60 - Demo";
-        }
-
-        if (nav) {
-          nav.classList.remove("bg-brand-800");
-          nav.classList.add("bg-amber-800");
         }
 
         // Add a read-only banner below the navbar

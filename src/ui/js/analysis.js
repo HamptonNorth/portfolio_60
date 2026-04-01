@@ -72,6 +72,9 @@ var allUsers = [];
 /** @type {Array<number>} Currently selected user IDs */
 var selectedUserIds = [];
 
+/** @type {string} Currently selected account type filter (empty string = all) */
+var accountTypeFilter = "";
+
 // ─── Initialisation ──────────────────────────────────────────────
 
 document.addEventListener("DOMContentLoaded", async function () {
@@ -82,7 +85,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   setupLeagueLimit();
   setupPrintButton();
   setupHoldingsFilter();
-  setupUserFilter();
+  setupAccountTypeFilter();
   loadBenchmarks();
   await loadUsers();
   activateTab("comparison");
@@ -172,6 +175,9 @@ function filterParams() {
   if (selectedUserIds.length > 0 && selectedUserIds.length < allUsers.length) {
     params += "&users=" + selectedUserIds.join(",");
   }
+  if (accountTypeFilter) {
+    params += "&accountTypes=" + accountTypeFilter;
+  }
   return params;
 }
 
@@ -185,131 +191,59 @@ function clearCachedData() {
 }
 
 /**
- * @description Fetch all users and populate the user filter dropdown.
+ * @description Fetch all users that have investment accounts and populate
+ * the user filter dropdown. Users without accounts (e.g. Joint Household)
+ * are excluded as they have no holdings to analyse.
  */
 async function loadUsers() {
   try {
     var result = await apiRequest("/api/users");
     if (!result.ok || !Array.isArray(result.data)) return;
 
-    allUsers = result.data;
+    // Filter to users that have at least one account
+    var usersWithAccounts = [];
+    for (var i = 0; i < result.data.length; i++) {
+      var user = result.data[i];
+      var acctResult = await apiRequest("/api/users/" + user.id + "/accounts");
+      if (acctResult.ok && Array.isArray(acctResult.data) && acctResult.data.length > 0) {
+        usersWithAccounts.push(user);
+      }
+    }
+
+    allUsers = usersWithAccounts;
     selectedUserIds = allUsers.map(function (u) { return u.id; });
 
-    renderUserDropdown();
-    updateUserFilterLabel();
+    renderUserSelect();
+    await loadAccountTypes();
   } catch (err) {
     // Users are required — but if the API fails, degrade gracefully
   }
 }
 
 /**
- * @description Render the user filter dropdown checkboxes.
+ * @description Render the user filter as a simple select dropdown.
  */
-function renderUserDropdown() {
-  var dropdown = document.getElementById("user-filter-dropdown");
-  var html = "";
+function renderUserSelect() {
+  var select = document.getElementById("user-filter");
+  if (!select) return;
 
-  // "Select all" option
-  html += '<label class="flex items-center gap-2 px-3 py-1.5 hover:bg-brand-50 cursor-pointer border-b border-brand-100">';
-  html += '<input type="checkbox" id="user-select-all" checked class="rounded" />';
-  html += '<span class="text-sm font-medium text-brand-700">Select all</span>';
-  html += "</label>";
-
-  // Individual user checkboxes
+  var html = '<option value="all">All users</option>';
   for (var i = 0; i < allUsers.length; i++) {
     var user = allUsers[i];
-    html += '<label class="flex items-center gap-2 px-3 py-1.5 hover:bg-brand-50 cursor-pointer">';
-    html += '<input type="checkbox" class="user-checkbox rounded" value="' + user.id + '" checked />';
-    html += '<span class="text-sm text-brand-700">' + escapeHtml(user.first_name + " " + user.last_name) + "</span>";
-    html += "</label>";
+    html += '<option value="' + user.id + '">' + escapeHtml(user.first_name + " " + user.last_name) + "</option>";
   }
+  select.innerHTML = html;
 
-  dropdown.innerHTML = html;
-
-  // Set up "Select all" handler
-  var selectAll = document.getElementById("user-select-all");
-  selectAll.addEventListener("change", function () {
-    var boxes = dropdown.querySelectorAll(".user-checkbox");
-    for (var j = 0; j < boxes.length; j++) {
-      boxes[j].checked = selectAll.checked;
+  select.addEventListener("change", function () {
+    if (select.value === "all") {
+      selectedUserIds = allUsers.map(function (u) { return u.id; });
+    } else {
+      selectedUserIds = [parseInt(select.value, 10)];
     }
-    updateSelectedUserIds();
+    clearCachedData();
+    loadAccountTypes();
+    loadCurrentView();
   });
-
-  // Set up individual checkbox handlers
-  var boxes = dropdown.querySelectorAll(".user-checkbox");
-  for (var k = 0; k < boxes.length; k++) {
-    boxes[k].addEventListener("change", function () {
-      updateSelectAllState();
-      updateSelectedUserIds();
-    });
-  }
-}
-
-/**
- * @description Sync the "Select all" checkbox state based on individual checkboxes.
- */
-function updateSelectAllState() {
-  var boxes = document.querySelectorAll(".user-checkbox");
-  var allChecked = true;
-  for (var i = 0; i < boxes.length; i++) {
-    if (!boxes[i].checked) { allChecked = false; break; }
-  }
-  var selectAll = document.getElementById("user-select-all");
-  if (selectAll) selectAll.checked = allChecked;
-}
-
-/**
- * @description Read selected user IDs from checkboxes, enforce at least one selected,
- * update state and reload the current view.
- */
-function updateSelectedUserIds() {
-  var boxes = document.querySelectorAll(".user-checkbox");
-  var ids = [];
-  for (var i = 0; i < boxes.length; i++) {
-    if (boxes[i].checked) ids.push(parseInt(boxes[i].value, 10));
-  }
-
-  // Enforce at least one user selected
-  if (ids.length === 0) {
-    // Re-check the first user
-    if (boxes.length > 0) {
-      boxes[0].checked = true;
-      ids.push(parseInt(boxes[0].value, 10));
-    }
-    updateSelectAllState();
-  }
-
-  selectedUserIds = ids;
-  updateUserFilterLabel();
-  clearCachedData();
-  loadCurrentView();
-}
-
-/**
- * @description Update the user filter button label based on the current selection.
- */
-function updateUserFilterLabel() {
-  var label = document.getElementById("user-filter-label");
-  if (!label) return;
-
-  if (selectedUserIds.length === allUsers.length) {
-    label.textContent = "All users";
-  } else if (selectedUserIds.length <= 2) {
-    // Show user names when 1-2 selected
-    var names = [];
-    for (var i = 0; i < allUsers.length; i++) {
-      for (var j = 0; j < selectedUserIds.length; j++) {
-        if (allUsers[i].id === selectedUserIds[j]) {
-          names.push(allUsers[i].first_name);
-          break;
-        }
-      }
-    }
-    label.textContent = names.join(", ");
-  } else {
-    label.textContent = selectedUserIds.length + " of " + allUsers.length + " users";
-  }
 }
 
 /**
@@ -322,17 +256,23 @@ function setupHoldingsFilter() {
   select.addEventListener("change", function () {
     holdingsFilter = this.value;
 
-    // Disable/enable user filter when "All investments" is selected
-    var userBtn = document.getElementById("user-filter-btn");
+    // Disable/enable user and account type filters when "All investments" is selected
+    var userSelect = document.getElementById("user-filter");
     var userLabel = document.getElementById("user-filter-label-prefix");
+    var accountGroup = document.getElementById("account-type-filter-group");
     if (holdingsFilter === "all") {
-      userBtn.disabled = true;
-      userBtn.classList.add("opacity-50", "cursor-not-allowed");
+      userSelect.disabled = true;
+      userSelect.classList.add("opacity-50");
       userLabel.classList.add("opacity-50");
+      accountGroup.classList.add("opacity-50");
+      document.getElementById("account-type-filter").disabled = true;
     } else {
-      userBtn.disabled = false;
-      userBtn.classList.remove("opacity-50", "cursor-not-allowed");
+      userSelect.disabled = false;
+      userSelect.classList.remove("opacity-50");
       userLabel.classList.remove("opacity-50");
+      accountGroup.classList.remove("opacity-50");
+      document.getElementById("account-type-filter").disabled = false;
+      updateAccountTypeVisibility();
     }
 
     clearCachedData();
@@ -341,26 +281,68 @@ function setupHoldingsFilter() {
 }
 
 /**
- * @description Set up the user filter dropdown toggle and close-on-outside-click behaviour.
+ * @description Set up the account type filter dropdown change handler.
  */
-function setupUserFilter() {
-  var btn = document.getElementById("user-filter-btn");
-  var dropdown = document.getElementById("user-filter-dropdown");
-  if (!btn || !dropdown) return;
+function setupAccountTypeFilter() {
+  var select = document.getElementById("account-type-filter");
+  if (!select) return;
 
-  // Toggle dropdown on button click
-  btn.addEventListener("click", function () {
-    if (btn.disabled) return;
-    dropdown.classList.toggle("hidden");
+  select.addEventListener("change", function () {
+    accountTypeFilter = this.value;
+    clearCachedData();
+    loadCurrentView();
   });
+}
 
-  // Close dropdown when clicking outside
-  document.addEventListener("click", function (evt) {
-    var container = document.getElementById("user-filter-container");
-    if (container && !container.contains(evt.target)) {
-      dropdown.classList.add("hidden");
+/**
+ * @description Fetch the distinct account types for the currently selected users
+ * and populate the account type dropdown. Resets the selection to "All".
+ */
+async function loadAccountTypes() {
+  var select = document.getElementById("account-type-filter");
+  if (!select) return;
+
+  // Reset filter value
+  accountTypeFilter = "";
+
+  // When all users are selected, account type filter is not applicable
+  updateAccountTypeVisibility();
+
+  try {
+    var usersParam = selectedUserIds.join(",");
+    var result = await apiRequest("/api/analysis/account-types?users=" + usersParam);
+    if (!result.ok || !Array.isArray(result.data)) return;
+
+    var html = '<option value="" selected>All</option>';
+    for (var i = 0; i < result.data.length; i++) {
+      var type = result.data[i];
+      html += '<option value="' + escapeHtml(type) + '">' + escapeHtml(type.toUpperCase()) + "</option>";
     }
-  });
+    select.innerHTML = html;
+  } catch (_err) {
+    select.innerHTML = '<option value="" selected>All</option>';
+  }
+}
+
+/**
+ * @description Show or hide the account type filter based on user selection.
+ * When all users are selected (joint view), account type is not applicable.
+ */
+function updateAccountTypeVisibility() {
+  var group = document.getElementById("account-type-filter-group");
+  var select = document.getElementById("account-type-filter");
+  if (!group || !select) return;
+
+  var isAllUsers = selectedUserIds.length === allUsers.length;
+  if (isAllUsers) {
+    group.classList.add("opacity-50");
+    select.disabled = true;
+    select.value = "";
+    accountTypeFilter = "";
+  } else {
+    group.classList.remove("opacity-50");
+    select.disabled = false;
+  }
 }
 
 // ─── Tabs ────────────────────────────────────────────────────────

@@ -22,6 +22,24 @@ export function getAccountsByUserId(userId) {
 }
 
 /**
+ * @description Get the distinct account types that exist for the given user IDs.
+ * Returns uppercase labels sorted alphabetically (e.g. ["ISA", "SIPP", "TRADING"]).
+ * @param {Array<number>} userIds - Array of user IDs to query
+ * @returns {Array<string>} Distinct account types
+ */
+export function getDistinctAccountTypes(userIds) {
+  if (!userIds || userIds.length === 0) return [];
+  const db = getDatabase();
+  const placeholders = userIds.map(() => "?").join(", ");
+  const rows = db
+    .query(
+      `SELECT DISTINCT account_type FROM accounts WHERE user_id IN (${placeholders}) ORDER BY account_type`,
+    )
+    .all(...userIds);
+  return rows.map(function (row) { return row.account_type; });
+}
+
+/**
  * @description Get a single account by ID with unscaled cash values.
  * @param {number} id - The account ID
  * @returns {Object|null} The account object, or null if not found

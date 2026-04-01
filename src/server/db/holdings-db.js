@@ -250,20 +250,25 @@ export function hardDeleteHolding(id) {
  * @param {Array<number>} userIds - Array of user IDs to filter by
  * @returns {Array<number>} Array of distinct investment IDs
  */
-export function getCurrentHoldingInvestmentIds(userIds) {
+export function getCurrentHoldingInvestmentIds(userIds, accountTypes) {
   if (!userIds || userIds.length === 0) return [];
 
   const db = getDatabase();
-  const placeholders = userIds.map(() => "?").join(", ");
-  const rows = db
-    .query(
-      `SELECT DISTINCT h.investment_id
+  const userPlaceholders = userIds.map(() => "?").join(", ");
+  var sql = `SELECT DISTINCT h.investment_id
        FROM holdings h
        JOIN accounts a ON h.account_id = a.id
        WHERE h.effective_to IS NULL
-         AND a.user_id IN (${placeholders})`,
-    )
-    .all(...userIds);
+         AND a.user_id IN (${userPlaceholders})`;
+  var params = [...userIds];
+
+  if (accountTypes && accountTypes.length > 0) {
+    var typePlaceholders = accountTypes.map(() => "?").join(", ");
+    sql += ` AND a.account_type IN (${typePlaceholders})`;
+    params.push(...accountTypes);
+  }
+
+  const rows = db.query(sql).all(...params);
 
   return rows.map(function (row) { return row.investment_id; });
 }
@@ -276,26 +281,32 @@ export function getCurrentHoldingInvestmentIds(userIds) {
  * @param {Array<number>} userIds - Array of user IDs to filter by
  * @returns {Array<number>} Array of distinct investment IDs
  */
-export function getHistoricHoldingInvestmentIds(userIds) {
+export function getHistoricHoldingInvestmentIds(userIds, accountTypes) {
   if (!userIds || userIds.length === 0) return [];
 
   const db = getDatabase();
-  const placeholders = userIds.map(() => "?").join(", ");
-  const rows = db
-    .query(
-      `SELECT DISTINCT h.investment_id
+  const userPlaceholders = userIds.map(() => "?").join(", ");
+  var typeClause = "";
+  var typeParams = [];
+  if (accountTypes && accountTypes.length > 0) {
+    var typePlaceholders = accountTypes.map(() => "?").join(", ");
+    typeClause = ` AND a.account_type IN (${typePlaceholders})`;
+    typeParams = [...accountTypes];
+  }
+
+  var sql = `SELECT DISTINCT h.investment_id
        FROM holdings h
        JOIN accounts a ON h.account_id = a.id
-       WHERE a.user_id IN (${placeholders})
+       WHERE a.user_id IN (${userPlaceholders})${typeClause}
          AND h.investment_id NOT IN (
            SELECT DISTINCT h2.investment_id
            FROM holdings h2
            JOIN accounts a2 ON h2.account_id = a2.id
            WHERE h2.effective_to IS NULL
-             AND a2.user_id IN (${placeholders})
-         )`,
-    )
-    .all(...userIds, ...userIds);
+             AND a2.user_id IN (${userPlaceholders})${typeClause}
+         )`;
+
+  const rows = db.query(sql).all(...userIds, ...typeParams, ...userIds, ...typeParams);
 
   return rows.map(function (row) { return row.investment_id; });
 }

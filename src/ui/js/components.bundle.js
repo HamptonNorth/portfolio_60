@@ -1853,10 +1853,6 @@ class AppNavbar extends LitElement {
         if (titleSpan) {
           titleSpan.textContent = "Portfolio 60 - Demo";
         }
-        if (nav) {
-          nav.classList.remove("bg-brand-800");
-          nav.classList.add("bg-amber-800");
-        }
         const banner = document.createElement("div");
         banner.className = "bg-amber-100 text-amber-800 text-center text-sm py-1.5 font-medium border-b border-amber-200";
         banner.textContent = "Read-only demonstration — data cannot be modified";

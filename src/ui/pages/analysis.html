@@ -27,18 +27,18 @@
                     </select>
                 </div>
                 <!-- User filter -->
-                <div class="flex items-center gap-2 relative">
+                <div class="flex items-center gap-2">
                     <span id="user-filter-label-prefix" class="text-sm text-brand-500">Users:</span>
-                    <div id="user-filter-container" class="relative">
-                        <button id="user-filter-btn" type="button"
-                            class="text-sm border border-brand-300 rounded px-3 py-1.5 bg-white min-w-[160px] text-left flex items-center justify-between">
-                            <span id="user-filter-label">Loading...</span>
-                            <span class="text-brand-400 ml-2">&#9662;</span>
-                        </button>
-                        <div id="user-filter-dropdown" class="hidden absolute top-full left-0 mt-1 bg-white border border-brand-200 rounded-lg shadow-lg z-20 min-w-[220px] py-1">
-                            <!-- Populated by JS -->
-                        </div>
-                    </div>
+                    <select id="user-filter" class="text-sm border border-brand-300 rounded px-2 py-1.5 bg-white min-w-[160px]">
+                        <!-- Populated by JS -->
+                    </select>
+                </div>
+                <!-- Account type filter -->
+                <div id="account-type-filter-group" class="flex items-center gap-2">
+                    <span id="account-type-label" class="text-sm text-brand-500">Account:</span>
+                    <select id="account-type-filter" class="text-sm border border-brand-300 rounded px-2 py-1.5 bg-white min-w-[120px]">
+                        <option value="" selected>All</option>
+                    </select>
                 </div>
             </div>
 
