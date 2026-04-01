@@ -1,5 +1,6 @@
 import { SERVER_PORT, getDocsMediaDir } from "../shared/server-constants.js";
 import { resolve, join } from "node:path";
+import { readdir } from "node:fs/promises";
 import { checkAuth, checkDemoBlock } from "./middleware/auth-middleware.js";
 import { handleAuthRoute } from "./routes/auth-routes.js";
 import { handleDbRoute } from "./routes/db-routes.js";
@@ -169,6 +170,7 @@ const server = Bun.serve({
     }
 
     // Docs media files (uploaded images) — served from docs/media/ on disk
+    // Falls back to project-root docs/media/ for bundled assets (e.g. thumbnails)
     if (path.startsWith("/docs/media/")) {
       var safePath = path.replace(/\.\./g, "");
       var mediaPath = safePath.replace(/^\/docs\/media\//, "");
@@ -178,12 +180,23 @@ const server = Bun.serve({
         return new Response("Forbidden", { status: 403 });
       }
       var mediaFile = Bun.file(fullMediaPath);
-      if (!(await mediaFile.exists())) {
-        return new Response("Not found", { status: 404 });
+      if (await mediaFile.exists()) {
+        return new Response(mediaFile, {
+          headers: { "Content-Type": getMimeType(fullMediaPath) },
+        });
       }
-      return new Response(mediaFile, {
-        headers: { "Content-Type": getMimeType(fullMediaPath) },
-      });
+      // Fallback: check project-root docs/media/ for bundled assets
+      var projectMediaRoot = resolve("docs/media");
+      var projectMediaPath = join(projectMediaRoot, mediaPath);
+      if (projectMediaPath.startsWith(projectMediaRoot)) {
+        var projectMediaFile = Bun.file(projectMediaPath);
+        if (await projectMediaFile.exists()) {
+          return new Response(projectMediaFile, {
+            headers: { "Content-Type": getMimeType(projectMediaPath) },
+          });
+        }
+      }
+      return new Response("Not found", { status: 404 });
     }
 
     // Lists PDF files — served from docs/lists/ on disk
@@ -210,6 +223,21 @@ const server = Bun.serve({
     }
 
     // --- API routes ---
+
+    // Home page thumbnail listing (unprotected — used on welcome page)
+    // Uses project root docs/media/ — these are bundled assets, not user data
+    if (method === "GET" && path === "/api/home/thumbnails") {
+      var thumbDir = resolve("docs/media");
+      try {
+        var files = await readdir(thumbDir);
+        var thumbs = files
+          .filter(function (f) { return /^thumb-\d+\.jpg$/i.test(f); })
+          .sort();
+        return Response.json(thumbs);
+      } catch (_err) {
+        return Response.json([]);
+      }
+    }
 
     // Auth routes (set passphrase, verify, status)
     if (path.startsWith("/api/auth/")) {

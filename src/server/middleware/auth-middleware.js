@@ -21,7 +21,7 @@ const DEMO_WRITE_EXEMPT = ["/api/auth/", "/api/fetch/"];
  * - /pages/passphrase.html — the passphrase page itself
  * @type {string[]}
  */
-const UNPROTECTED_PREFIXES = ["/api/auth/", "/api/fetch/", "/api/backfill/", "/api/docs/", "/css/", "/js/", "/images/", "/docs/media/", "/docs/lists/", "/pages/passphrase.html"];
+const UNPROTECTED_PREFIXES = ["/api/auth/", "/api/fetch/", "/api/backfill/", "/api/docs/", "/api/home/", "/css/", "/js/", "/images/", "/docs/media/", "/docs/lists/", "/pages/passphrase.html"];
 
 /**
  * @description Check whether a given URL path requires authentication.

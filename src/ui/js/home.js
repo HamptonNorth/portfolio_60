@@ -156,7 +156,156 @@ async function loadManualPriceAlert() {
   container.innerHTML = html;
 }
 
+// --- Screenshot thumbnails and lightbox ---
+
+/** @type {string[]} List of all thumbnail filenames from the server */
+var allThumbnailFiles = [];
+/** @type {number} Currently displayed image index in the lightbox */
+var lightboxIndex = 0;
+/** @type {number} Maximum number of thumbnails to show on the home page */
+var MAX_VISIBLE_THUMBNAILS = 2;
+
+/**
+ * @description Fetch the list of thumbnail images from the server and render
+ * the first two as clickable thumbnails stacked vertically in the right column.
+ */
+async function loadHomeThumbnails() {
+  var container = document.getElementById("home-thumbnails");
+  if (!container) return;
+
+  try {
+    var response = await fetch("/api/home/thumbnails");
+    var files = await response.json();
+    if (!Array.isArray(files) || files.length === 0) return;
+
+    allThumbnailFiles = files;
+
+    // Show the container now that we have images
+    container.classList.remove("hidden");
+    container.classList.add("flex");
+
+    // Render the first MAX_VISIBLE_THUMBNAILS as clickable thumbnails
+    var count = Math.min(files.length, MAX_VISIBLE_THUMBNAILS);
+    for (var i = 0; i < count; i++) {
+      var wrapper = document.createElement("div");
+      wrapper.className = "relative cursor-pointer group rounded-lg overflow-hidden border border-brand-200 shadow-sm hover:shadow-md transition-shadow";
+      wrapper.dataset.index = String(i);
+      wrapper.addEventListener("click", handleThumbnailClick);
+
+      var img = document.createElement("img");
+      img.src = "/docs/media/" + files[i];
+      img.alt = "Screenshot " + (i + 1);
+      img.className = "w-full h-auto";
+      img.loading = "lazy";
+
+      var overlay = document.createElement("div");
+      overlay.className = "absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center";
+
+      var hint = document.createElement("span");
+      hint.className = "text-white text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity text-center px-4";
+      hint.innerHTML = "Click to show all " + files.length + " screenshots<br>full size";
+
+      overlay.appendChild(hint);
+      wrapper.appendChild(img);
+      wrapper.appendChild(overlay);
+      container.appendChild(wrapper);
+    }
+  } catch (_err) {
+    // Silently ignore — thumbnails are optional
+  }
+}
+
+/**
+ * @description Handle click on a thumbnail image. Opens the lightbox at the
+ * clicked image's index.
+ * @param {Event} event - The click event
+ */
+function handleThumbnailClick(event) {
+  var wrapper = event.currentTarget;
+  var index = parseInt(wrapper.dataset.index, 10);
+  openLightbox(index);
+}
+
+/**
+ * @description Open the screenshot lightbox at the given image index.
+ * @param {number} index - The index into allThumbnailFiles to display
+ */
+function openLightbox(index) {
+  lightboxIndex = index;
+  var lightbox = document.getElementById("screenshot-lightbox");
+  lightbox.classList.remove("hidden");
+  lightbox.classList.add("flex");
+  document.body.style.overflow = "hidden";
+  updateLightboxImage();
+}
+
+/**
+ * @description Close the screenshot lightbox and restore page scrolling.
+ */
+function closeLightbox() {
+  var lightbox = document.getElementById("screenshot-lightbox");
+  lightbox.classList.add("hidden");
+  lightbox.classList.remove("flex");
+  document.body.style.overflow = "";
+}
+
+/**
+ * @description Update the lightbox image and counter to reflect the current index.
+ */
+function updateLightboxImage() {
+  var img = document.getElementById("lightbox-image");
+  var counter = document.getElementById("lightbox-counter");
+  img.src = "/docs/media/" + allThumbnailFiles[lightboxIndex];
+  img.alt = "Screenshot " + (lightboxIndex + 1) + " of " + allThumbnailFiles.length;
+  counter.textContent = (lightboxIndex + 1) + " / " + allThumbnailFiles.length;
+}
+
+/**
+ * @description Navigate to the previous image in the lightbox, wrapping around.
+ */
+function lightboxPrev() {
+  lightboxIndex = (lightboxIndex - 1 + allThumbnailFiles.length) % allThumbnailFiles.length;
+  updateLightboxImage();
+}
+
+/**
+ * @description Navigate to the next image in the lightbox, wrapping around.
+ */
+function lightboxNext() {
+  lightboxIndex = (lightboxIndex + 1) % allThumbnailFiles.length;
+  updateLightboxImage();
+}
+
+/**
+ * @description Set up lightbox event listeners for close, prev, next buttons
+ * and keyboard navigation.
+ */
+function initLightboxControls() {
+  document.getElementById("lightbox-close").addEventListener("click", closeLightbox);
+  document.getElementById("lightbox-prev").addEventListener("click", lightboxPrev);
+  document.getElementById("lightbox-next").addEventListener("click", lightboxNext);
+
+  // Close on backdrop click (clicking outside the image)
+  document.getElementById("screenshot-lightbox").addEventListener("click", function (e) {
+    if (e.target === this) {
+      closeLightbox();
+    }
+  });
+
+  // Keyboard navigation
+  document.addEventListener("keydown", function (e) {
+    var lightbox = document.getElementById("screenshot-lightbox");
+    if (lightbox.classList.contains("hidden")) return;
+
+    if (e.key === "Escape") closeLightbox();
+    if (e.key === "ArrowLeft") lightboxPrev();
+    if (e.key === "ArrowRight") lightboxNext();
+  });
+}
+
 // Check database status when the page loads
 document.addEventListener("DOMContentLoaded", function () {
   checkDatabaseStatus();
+  loadHomeThumbnails();
+  initLightboxControls();
 });
