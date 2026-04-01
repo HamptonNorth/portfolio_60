@@ -28,9 +28,17 @@ async function checkDatabaseStatus() {
 
   if (result.data.exists) {
     container.innerHTML =
-      '<div class="bg-green-50 border border-green-300 text-success rounded-lg px-4 py-3">' +
+      '<div class="bg-green-50 border border-green-300 text-success rounded-lg px-4 py-3 transition-opacity duration-500">' +
       '<p class="text-base">Database is ready.</p>' +
       "</div>";
+    // Auto-hide the status message after 3 seconds
+    setTimeout(function () {
+      var statusDiv = container.firstElementChild;
+      if (statusDiv) {
+        statusDiv.style.opacity = "0";
+        setTimeout(function () { container.innerHTML = ""; }, 500);
+      }
+    }, 3000);
     loadManualPriceAlert();
   } else {
     container.innerHTML =

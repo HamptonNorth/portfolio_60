@@ -12,62 +12,190 @@
         <app-navbar></app-navbar>
 
         <!-- Main content -->
-        <main class="max-w-7xl mx-auto px-6 py-8 flex-1 w-full" id="main-content">
-            <h2 class="text-2xl font-semibold mb-4 text-brand-800">Welcome to Portfolio 60</h2>
-            <p class="text-lg text-brand-600 mb-6">UK Family Investment Portfolio Tracker</p>
+        <main
+            class="max-w-7xl mx-auto px-6 py-8 flex-1 w-full"
+            id="main-content"
+        >
+            <h2 class="text-2xl font-semibold mb-4 text-brand-800">
+                Welcome to Portfolio 60
+            </h2>
+            <p class="text-lg text-brand-600 mb-6">
+                UK Family Investment Portfolio Tracker
+            </p>
 
             <style>
-                #demo-welcome { display: none; }
-                html[data-db-mode="demo"] #demo-welcome { display: block; }
+                #demo-welcome {
+                    display: none;
+                }
+                html[data-db-mode="demo"] #demo-welcome {
+                    display: block;
+                }
             </style>
             <!-- Demo mode welcome card (shown only when demo mode is active) -->
-            <div id="demo-welcome" class="bg-amber-50 rounded-lg border border-amber-200 p-6 mb-6 text-brand-700 leading-relaxed">
-                <p class="mb-4">Welcome &mdash; you are using Portfolio 60 in demonstration mode so you can explore what this application does before installing locally. Have a play &mdash; you can't do any harm and <strong>nothing</strong> is being logged.</p>
-                <p class="mb-4">Start with the <strong>Setup</strong> menu and have a quick look at the dropdown links from top to bottom. If you have an existing portfolio with Interactive Investor, Hargreaves Lansdown, AJ Bell et al. you should feel right at home.</p>
-                <p class="mb-4">If you want a quick technical overview, try <a href="/pages/portfolio60-course.html" class="text-brand-600 underline hover:text-brand-800">How Portfolio 60 Works</a>.</p>
-                <p>If you have suggestions, questions or have hit an issue, just drop an email to <a href="mailto:support@redmug.co.uk" class="text-brand-600 underline hover:text-brand-800">support@redmug.co.uk</a></p>
+            <div
+                id="demo-welcome"
+                class="bg-amber-50 rounded-lg border border-amber-200 p-6 mb-6 text-brand-700 leading-relaxed"
+            >
+                <p class="mb-4">
+                    Welcome &mdash; Portfolio 60 is in demonstration mode so you
+                    can explore the application without installing. Have a play
+                    &mdash; you can't do any harm and
+                    <strong>nothing</strong> is being logged.
+                </p>
+                <p class="mb-4">
+                    Start with the <strong>Setup</strong> menu and have a quick
+                    look at the dropdown links from top to bottom. If you have
+                    an existing portfolio with Interactive Investor, Hargreaves
+                    Lansdown, AJ Bell et al. you should feel right at home.
+                </p>
+                <p class="mb-4">
+                    If you want a quick technical overview, try
+                    <a
+                        href="/pages/portfolio60-course.html"
+                        class="text-brand-600 underline hover:text-brand-800"
+                        >How Portfolio 60 Works</a
+                    >.
+                </p>
+                <p>
+                    If you have suggestions, questions or have hit an issue,
+                    email
+                    <a
+                        href="mailto:support@redmug.co.uk"
+                        class="text-brand-600 underline hover:text-brand-800"
+                        >support@redmug.co.uk</a
+                    >
+                </p>
             </div>
 
             <div class="bg-white rounded-lg border border-brand-200 p-4 mb-6">
-                <p class="text-xs text-blue-700"><strong>Portfolio 60 does not provide financial advice.</strong> The information shown is for tracking purposes only. If you need financial advice, please consult a qualified Financial Adviser.</p>
+                <p class="text-xs text-blue-700">
+                    <strong
+                        >Portfolio 60 does not provide financial advice.</strong
+                    >
+                    The information shown is for tracking purposes only. If you
+                    need financial advice, please consult a qualified Financial
+                    Adviser.
+                </p>
             </div>
 
-            <div class="bg-white rounded-lg border border-brand-200 p-6 mb-6 text-brand-700 leading-relaxed">
+            <div
+                class="bg-white rounded-lg border border-brand-200 p-6 mb-6 text-brand-700 leading-relaxed"
+            >
                 <div class="flex flex-col lg:flex-row gap-6">
                     <!-- Text content -->
                     <div class="flex-1 min-w-0">
-                        <p class="mb-4">Portfolio 60 is a desktop application for UK families to track investments across multiple people and account types. It supports shares, mutual funds, investment trusts, savings accounts and other instruments. All valuations and reports are in GBP, with automatic currency conversion for foreign-currency investments.</p>
-                        <p class="mb-4">The application runs on your desktop and stores all data locally in a SQLite database. It connects to the internet to fetch current prices, currency exchange rates and benchmark index values from public financial websites.</p>
-                        <p class="font-semibold text-brand-800 mb-2">Key features:</p>
+                        <p class="mb-4">
+                            Portfolio 60 is a desktop application for UK
+                            families to track investments across multiple people
+                            and account types. It supports shares, mutual funds,
+                            investment trusts, savings accounts and other
+                            instruments. All valuations and reports are in GBP,
+                            with currency conversion for foreign-currency
+                            investments.
+                        </p>
+                        <p class="mb-4">
+                            The application runs on your desktop and stores all
+                            data locally. It only connects to the internet to
+                            fetch current prices, currency exchange rates and
+                            benchmark index values from public financial
+                            websites.
+                        </p>
+                        <p class="font-semibold text-brand-800 mb-2">
+                            Key features:
+                        </p>
                         <ul class="list-disc list-inside space-y-1 ml-2 mb-4">
-                            <li>Track investments across multiple family members and account types (Trading, ISA, SIPP)</li>
-                            <li>Automatic price fetching from public financial websites</li>
+                            <li>
+                                Track investments across multiple family members
+                                and account types (Trading, ISA, SIPP)
+                            </li>
+                            <li>
+                                Automatic price fetching from public financial
+                                websites
+                            </li>
                             <li>Currency conversion for non-GBP investments</li>
-                            <li>Portfolio valuation with drill-down to individual holdings</li>
-                            <li>Buy/sell transaction recording with automatic cash balance updates</li>
-                            <li>Scheduled price fetching on a configurable timetable</li>
-                            <li>Library of reports comparing performance by holdings against benchmarks over time</li>
-                            <li>Database backup and restore</li>
-                            <li>Built-in documentation system for notes and guides</li>
-                            <li>Embedded spreadsheet lists via Google Sheets or Excel Online</li>
+                            <li>
+                                Portfolio valuation with drill-down to
+                                individual holdings
+                            </li>
+                            <!--<li>
+                                Buy/sell transaction recording with automatic
+                                cash balance updates
+                            </li>-->
+                            <li>
+                                Scheduled price fetching on a configurable
+                                timetable
+                            </li>
+                            <li>
+                                Library of reports comparing performance by
+                                holdings against benchmarks over time
+                            </li>
+                            <!--<li>Database backup and restore</li>-->
+                            <li>
+                                Built-in documentation system for notes and
+                                guides
+                            </li>
+                            <li>
+                                Record savings accounts, occupational pensions,
+                                state pensions and annuities
+                            </li>
+                            <li>
+                                Embedded spreadsheet lists via Google Sheets or
+                                Excel Online
+                            </li>
                         </ul>
-                        <p>Portfolio 60 is a UK-only application due to the complexity of UK tax rules and account types.</p>
+                        <p>
+                            Portfolio 60 is a UK-only application due to UK tax
+                            rules and account types.
+                        </p>
                     </div>
 
                     <!-- Screenshot thumbnails — stacked vertically in right column -->
-                    <div id="home-thumbnails" class="hidden lg:flex flex-col gap-4 w-64 shrink-0">
+                    <div
+                        id="home-thumbnails"
+                        class="hidden lg:flex flex-col gap-4 w-64 shrink-0"
+                    >
                         <!-- Populated by home.js -->
                     </div>
                 </div>
             </div>
 
             <!-- Screenshot lightbox overlay -->
-            <div id="screenshot-lightbox" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80" role="dialog" aria-label="Screenshot viewer">
-                <button id="lightbox-close" class="absolute top-4 right-4 text-white text-3xl font-bold cursor-pointer hover:text-brand-200 z-10" aria-label="Close">&times;</button>
-                <button id="lightbox-prev" class="absolute left-4 top-1/2 -translate-y-1/2 text-white text-4xl font-bold cursor-pointer hover:text-brand-200 z-10 select-none" aria-label="Previous screenshot">&#8249;</button>
-                <button id="lightbox-next" class="absolute right-4 top-1/2 -translate-y-1/2 text-white text-4xl font-bold cursor-pointer hover:text-brand-200 z-10 select-none" aria-label="Next screenshot">&#8250;</button>
-                <img id="lightbox-image" class="max-w-[90vw] max-h-[90vh] rounded-lg shadow-2xl" alt="Screenshot" />
-                <div id="lightbox-counter" class="absolute bottom-4 left-1/2 -translate-x-1/2 text-white text-sm"></div>
+            <div
+                id="screenshot-lightbox"
+                class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80"
+                role="dialog"
+                aria-label="Screenshot viewer"
+            >
+                <button
+                    id="lightbox-close"
+                    class="absolute top-4 right-4 text-white text-3xl font-bold cursor-pointer hover:text-brand-200 z-10"
+                    aria-label="Close"
+                >
+                    &times;
+                </button>
+                <button
+                    id="lightbox-prev"
+                    class="absolute left-4 top-1/2 -translate-y-1/2 text-white text-4xl font-bold cursor-pointer hover:text-brand-200 z-10 select-none"
+                    aria-label="Previous screenshot"
+                >
+                    &#8249;
+                </button>
+                <button
+                    id="lightbox-next"
+                    class="absolute right-4 top-1/2 -translate-y-1/2 text-white text-4xl font-bold cursor-pointer hover:text-brand-200 z-10 select-none"
+                    aria-label="Next screenshot"
+                >
+                    &#8250;
+                </button>
+                <img
+                    id="lightbox-image"
+                    class="max-w-[90vw] max-h-[90vh] rounded-lg shadow-2xl"
+                    alt="Screenshot"
+                />
+                <div
+                    id="lightbox-counter"
+                    class="absolute bottom-4 left-1/2 -translate-x-1/2 text-white text-sm"
+                ></div>
             </div>
 
             <!-- Manually-priced investments alert (populated by JS) -->

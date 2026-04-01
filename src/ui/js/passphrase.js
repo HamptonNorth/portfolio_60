@@ -98,7 +98,7 @@ function showTestDbComplete(contentDiv, dotsInterval) {
       detailEl.textContent = "Redirecting...";
       addLogEntry("— Setup complete");
       setTimeout(function () {
-        window.location.href = "/";
+        window.location.replace("/");
       }, 2000);
     } else {
       phaseEl.textContent = "Setup encountered errors";
@@ -168,7 +168,11 @@ function showLockoutMessage(contentDiv, remainingMs) {
   }, 30000);
 }
 
-document.addEventListener("DOMContentLoaded", async function () {
+/**
+ * @description Initialise the passphrase page. Checks auth status and shows
+ * the appropriate form, or redirects away if already signed in.
+ */
+async function initPassphrasePage() {
   const messagesDiv = document.getElementById("passphrase-messages");
   const contentDiv = document.getElementById("passphrase-content");
 
@@ -180,9 +184,10 @@ document.addEventListener("DOMContentLoaded", async function () {
     return;
   }
 
-  // If already authenticated, redirect to home
+  // If already authenticated (e.g. user pressed back after signing in),
+  // redirect away — sign out is the only intended route back here
   if (result.data.isAuthenticated) {
-    window.location.href = "/";
+    window.location.replace("/");
     return;
   }
 
@@ -190,6 +195,16 @@ document.addEventListener("DOMContentLoaded", async function () {
     showSetPassphraseForm(contentDiv, messagesDiv);
   } else {
     showVerifyPassphraseForm(contentDiv, messagesDiv);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", initPassphrasePage);
+
+// Also handle bfcache restoration — when the user presses back after signing in,
+// the browser may restore this page from cache without firing DOMContentLoaded
+window.addEventListener("pageshow", function (event) {
+  if (event.persisted) {
+    initPassphrasePage();
   }
 });
 
@@ -287,7 +302,7 @@ function showSetPassphraseForm(contentDiv, messagesDiv) {
           showTestDbComplete(contentDiv, dotsInterval);
         } else {
           clearInterval(dotsInterval);
-          window.location.href = "/";
+          window.location.replace("/");
         }
         return;
       }
@@ -295,7 +310,7 @@ function showSetPassphraseForm(contentDiv, messagesDiv) {
       const msg = result.data.databaseCreated ? "Passphrase set and database created. Redirecting..." : "Passphrase set. Redirecting...";
       showSuccess("passphrase-messages", msg);
       setTimeout(function () {
-        window.location.href = "/";
+        window.location.replace("/");
       }, 1500);
     } else {
       clearInterval(dotsInterval);
@@ -316,7 +331,7 @@ function showSetPassphraseForm(contentDiv, messagesDiv) {
       });
 
       if (result.ok && result.data.success) {
-        window.location.href = "/";
+        window.location.replace("/");
       } else {
         if (errorsDiv) errorsDiv.textContent = result.error || "Demo mode is not available.";
       }
@@ -395,12 +410,12 @@ function showVerifyPassphraseForm(contentDiv, messagesDiv) {
           showTestDbComplete(contentDiv, dotsInterval);
         } else {
           clearInterval(dotsInterval);
-          window.location.href = "/";
+          window.location.replace("/");
         }
         return;
       }
       clearInterval(dotsInterval);
-      window.location.href = "/";
+      window.location.replace("/");
     } else {
       clearInterval(dotsInterval);
       // Handle lockout — disable the form and show remaining time
@@ -425,7 +440,7 @@ function showVerifyPassphraseForm(contentDiv, messagesDiv) {
       });
 
       if (result.ok && result.data.success) {
-        window.location.href = "/";
+        window.location.replace("/");
       } else {
         if (errorsDiv) errorsDiv.textContent = result.error || "Demo mode is not available.";
       }
