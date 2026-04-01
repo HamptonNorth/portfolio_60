@@ -7,6 +7,10 @@ import { runFullPriceUpdate } from "../services/fetch-service.js";
 import { getFetchServerConfig } from "../config.js";
 import { loadEnvValue } from "../auth.js";
 import { upsertIntoDatabase } from "../services/fetch-server-sync.js";
+import { resolveMorningstarId } from "../fetchers/morningstar-price-fetcher.js";
+import { resolveBenchmarkTicker } from "../fetchers/yahoo-benchmark-fetcher.js";
+import { getAllInvestments } from "../db/investments-db.js";
+import { getAllBenchmarks } from "../db/benchmarks-db.js";
 
 /**
  * @description Router instance for test database setup routes.
@@ -65,6 +69,38 @@ testSetupRouter.get("/api/test-setup/stream", async function (request) {
             sendEvent("phase", {
               phase: 1,
               total: 3,
+              message: "Resolving investment and benchmark identifiers...",
+            });
+
+            // Resolve morningstar_ids for all investments (fast API lookups)
+            // These are needed to map fetch-server prices to local investments
+            var investments = getAllInvestments();
+            var resolvedCount = 0;
+            for (var i = 0; i < investments.length; i++) {
+              if (!investments[i].morningstar_id) {
+                var result = await resolveMorningstarId(investments[i]);
+                if (result) resolvedCount++;
+              }
+            }
+
+            // Resolve yahoo_tickers for all benchmarks (local lookup, no API call)
+            var benchmarks = getAllBenchmarks();
+            var bmResolvedCount = 0;
+            for (var j = 0; j < benchmarks.length; j++) {
+              if (!benchmarks[j].yahoo_ticker) {
+                var ticker = resolveBenchmarkTicker(benchmarks[j]);
+                if (ticker) bmResolvedCount++;
+              }
+            }
+
+            sendEvent("progress", {
+              phase: 1,
+              message: "Resolved " + resolvedCount + " investments, " + bmResolvedCount + " benchmarks",
+            });
+
+            // Now sync history from the fetch server
+            sendEvent("progress", {
+              phase: 1,
               message: "Loading history from fetch server...",
             });
 

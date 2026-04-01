@@ -1,28 +1,41 @@
 #!/usr/bin/env bun
 /**
  * @description One-off script to export historical prices, currency rates,
- * and benchmark values from the portfolio_60 live database and POST them
- * to fetch-server-60's /api/history endpoint.
+ * and benchmark values from the portfolio_60 test reference database and
+ * POST them to fetch-server-60's /api/history endpoint.
  *
  * This populates the fetch server with 3+ years of history so that new
  * test databases can be seeded from the fetch server (seconds) instead
- * of fetching from public APIs (minutes).
+ * of fetching from public APIs (minutes). Uses the test database, not
+ * the live database, so no private financial data leaves the workstation.
  *
  * Prerequisites:
- *   - The live portfolio_60 database must exist and contain historical data
+ *   - The test reference database must exist (enter test passphrase once first)
  *   - fetch-server-60 must be running and reachable
  *   - FETCH_SERVER_API_KEY must be set in .env
  *   - fetchServer.url must be configured in user-settings.json
  *
  * Usage:
- *   bun scripts/seed-fetch-server-history.js
+ *   PORTFOLIO60_DATA_DIR=$HOME/.config/portfolio_60 bun scripts/seed-fetch-server-history.js
  */
 
-import { getDatabase } from "../src/server/db/connection.js";
+import { getDatabase, resetDatabasePath } from "../src/server/db/connection.js";
 import { getFetchServerConfig } from "../src/server/config.js";
 import { loadEnvValue } from "../src/server/auth.js";
+import { DATA_DIR } from "../src/shared/server-constants.js";
+import { existsSync } from "node:fs";
+import { resolve, join } from "node:path";
 
-// Open the live database
+// Open the test reference database (not the live database — that stays private)
+const testDbPath = resolve(join(DATA_DIR, "data", "test_reference", "portfolio60.db"));
+if (!existsSync(testDbPath)) {
+  console.error("Test reference database not found at: " + testDbPath);
+  console.error("Enter the test passphrase at least once to create it.");
+  process.exit(1);
+}
+
+process.env.DB_PATH = testDbPath;
+resetDatabasePath();
 const db = getDatabase();
 
 // Read fetch server config
@@ -39,7 +52,7 @@ if (!apiKey) {
   process.exit(1);
 }
 
-console.log("Exporting history from live database...");
+console.log("Exporting history from test reference database...");
 
 // Query prices — map investment_id to morningstar_id
 const priceRows = db.query(

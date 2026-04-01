@@ -44,7 +44,7 @@ import {
  * @param {string} [investment.morningstar_id] - Cached Morningstar ID
  * @returns {Promise<{secId: string, universe: string}|null>} Resolved ID or null
  */
-async function resolveMorningstarId(investment) {
+export async function resolveMorningstarId(investment) {
   // Step 1: Check cached morningstar_id
   if (investment.morningstar_id) {
     const parts = investment.morningstar_id.split("|");

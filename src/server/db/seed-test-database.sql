@@ -77,24 +77,53 @@ INSERT INTO investments (currencies_id, investment_type_id, description, public_
     (3, 1, 'ASML Holding NV', 'AEX:ASML');
 
 -- ============================================================================
--- BENCHMARKS
--- All use FT Markets with auto-detected selectors from site config.
--- yahoo_ticker populated for historic backfill via Yahoo Finance API.
+-- INVESTMENT MORNINGSTAR IDs
+-- Pre-resolved Morningstar security identifiers (secId|universe) so the
+-- fetch-server sync can map prices without hitting the Morningstar API.
 -- ============================================================================
 
-INSERT INTO benchmarks (currencies_id, benchmark_type, description, benchmark_url, selector) VALUES
+UPDATE investments SET morningstar_id = 'F00000LK2Q|FOEUR$$ALL_3521' WHERE public_id = 'GB00B41YBW71';
+UPDATE investments SET morningstar_id = 'F00000MLUQ|FOEUR$$ALL_3521' WHERE public_id = 'GB00B4PQW151';
+UPDATE investments SET morningstar_id = 'F00000XXVV|FOEUR$$ALL_3521' WHERE public_id = 'GB00BD3RZ582';
+UPDATE investments SET morningstar_id = 'F00000SRPN|FOEUR$$ALL_3521' WHERE public_id = 'GB00BJS8SJ34';
+UPDATE investments SET morningstar_id = 'F00001275X|FOEUR$$ALL_3521' WHERE public_id = 'GB00BJLP1W53';
+UPDATE investments SET morningstar_id = 'F000011RP0|FOEUR$$ALL_3521' WHERE public_id = 'GB00BH0P2M97';
+UPDATE investments SET morningstar_id = 'F0GBR0506U|FOEUR$$ALL_3521' WHERE public_id = 'GB0006061963';
+UPDATE investments SET morningstar_id = 'F00000WWH3|FOGBR$$ALL' WHERE public_id = 'IE00BYVJRB33';
+UPDATE investments SET morningstar_id = '0P00007OU0|E0EXG$XLON_3520' WHERE public_id = 'LSE:RR.';
+UPDATE investments SET morningstar_id = '0P000094GI|E0EXG$XLON_3520' WHERE public_id = 'LSE:BA.';
+UPDATE investments SET morningstar_id = '0P00007NYP|E0EXG$XLON_3520' WHERE public_id = 'LSE:AZN';
+UPDATE investments SET morningstar_id = '0P00007OU3|E0EXG$XLON_3520' WHERE public_id = 'LSE:SHEL';
+UPDATE investments SET morningstar_id = '0P0001T3HZ|E0EXG$XLON_3520' WHERE public_id = 'LSE:RPI';
+UPDATE investments SET morningstar_id = '0P00007NZP|E0EXG$XLON_3520' WHERE public_id = 'LSE:BARC';
+UPDATE investments SET morningstar_id = '0P00007OJS|E0EXG$XLON_3520' WHERE public_id = 'LSE:LGEN';
+UPDATE investments SET morningstar_id = 'E0GBR00VIE|CEEXG$XLON_3519' WHERE public_id = 'LSE:PCT';
+UPDATE investments SET morningstar_id = '0P000003RE|E0EXG$XNASDAQ_3520' WHERE public_id = 'NSQ:NVDA';
+UPDATE investments SET morningstar_id = '0P000003MH|E0EXG$XNASDAQ_3520' WHERE public_id = 'NSQ:MSFT';
+UPDATE investments SET morningstar_id = '0P00012BBI|E0EXG$XNASDAQ_3520' WHERE public_id = 'NSQ:GOOG';
+UPDATE investments SET morningstar_id = '0P000000B7|E0EXG$XNASDAQ_3520' WHERE public_id = 'NSQ:AMZN';
+UPDATE investments SET morningstar_id = '0P000000RD|E0EXG$XNYSE_3520' WHERE public_id = 'NYQ:BRK.B';
+UPDATE investments SET morningstar_id = '0P0000ALDL|E0EXG$XEURONEXT_3520' WHERE public_id = 'AEX:ASML';
+
+-- ============================================================================
+-- BENCHMARKS
+-- All use FT Markets with auto-detected selectors from site config.
+-- yahoo_ticker pre-resolved for fetch-server sync and historic backfill.
+-- ============================================================================
+
+INSERT INTO benchmarks (currencies_id, benchmark_type, description, benchmark_url, selector, yahoo_ticker) VALUES
     (1, 'index', 'FTSE 100',
-     'https://www.google.com/finance/quote/UKX:INDEXFTSE', NULL),
+     'https://www.google.com/finance/quote/UKX:INDEXFTSE', NULL, '^FTSE'),
     (1, 'index', 'FTSE 250',
-     'https://www.google.com/finance/quote/MCX:INDEXFTSE', NULL),
+     'https://www.google.com/finance/quote/MCX:INDEXFTSE', NULL, '^FTMC'),
      (1, 'index', 'FTSE All Share',
-      'https://www.google.com/finance/quote/ASX:INDEXFTSE', NULL),
+      'https://www.google.com/finance/quote/ASX:INDEXFTSE', NULL, '^FTAS'),
     (2, 'index', 'S&P 500',
-     'https://www.google.com/finance/quote/INX:INDEXSP', NULL),
+     'https://www.google.com/finance/quote/INX:INDEXSP', NULL, '^GSPC'),
     (2, 'index', 'Dow Jones',
-     'https://www.google.com/finance/quote/DJI:INDEXDJX', NULL),
+     'https://www.google.com/finance/quote/DJI:INDEXDJX', NULL, '^DJI'),
      (2, 'index', 'Nasdaq',
-      'https://www.google.com/finance/quote/IXIC:INDEXNASDAQ', NULL);
+      'https://www.google.com/finance/quote/IXIC:INDEXNASDAQ', NULL, '^IXIC');
 
 -- ============================================================================
 -- USERS

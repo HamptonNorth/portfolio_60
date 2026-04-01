@@ -32,7 +32,7 @@ import { toLocalDateStr } from "../../shared/server-constants.js";
  * @param {string} [benchmark.yahoo_ticker] - Cached Yahoo ticker
  * @returns {string|null} Yahoo Finance ticker or null if unresolvable
  */
-function resolveBenchmarkTicker(benchmark) {
+export function resolveBenchmarkTicker(benchmark) {
   // Step 1: Check cached yahoo_ticker
   if (benchmark.yahoo_ticker) {
     return benchmark.yahoo_ticker;
