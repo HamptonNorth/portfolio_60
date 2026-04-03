@@ -36,7 +36,7 @@ async function loadLists() {
  * @returns {string} The src URL, or empty string if not found
  */
 function extractSrcFromIframe(iframeHtml) {
-  const match = iframeHtml.match(/src="([^"]+)"/);
+  let match = iframeHtml.match(/src="([^"]+)"/);
   if (!match) {
     match = iframeHtml.match(/src='([^']+)'/);
   }
@@ -419,7 +419,7 @@ function showDocumentUploadModal() {
       }
 
       closeModal();
-      const msg = "Document uploaded";
+      let msg = "Document uploaded";
       if (data.isDuplicate) {
         msg += " (saved as " + data.filename + " — a file with the original name already existed)";
       }

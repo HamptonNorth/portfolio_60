@@ -124,7 +124,7 @@ function parseDetailParam(param) {
  * @returns {string} The API URL
  */
 function buildDetailApiUrl(user, accountType, periods) {
-  const url = "/api/portfolio/detail?user=" +
+  let url = "/api/portfolio/detail?user=" +
     encodeURIComponent(user) +
     "&account=" +
     encodeURIComponent(accountType);

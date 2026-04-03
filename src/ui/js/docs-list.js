@@ -112,7 +112,7 @@ function renderPages() {
     const isUnpublished = page.published === "n";
     const isSticky = page.sticky === "true" || page.sticky === true;
 
-    const dateStr = "";
+    let dateStr = "";
     if (page.created) {
       const d = new Date(page.created);
       if (!isNaN(d)) {

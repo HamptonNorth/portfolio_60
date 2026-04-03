@@ -49,7 +49,7 @@ function detectReportType(report) {
  */
 function getReportTypeLabel(report) {
   const type = detectReportType(report);
-  const label = REPORT_TYPE_LABELS[type] || type;
+  let label = REPORT_TYPE_LABELS[type] || type;
   if (type === "composite" && report.blocks) {
     label += " (" + report.blocks.length + " block" + (report.blocks.length !== 1 ? "s" : "") + ")";
   }

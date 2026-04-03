@@ -171,7 +171,7 @@ function benchmarksParam() {
  * @returns {string} e.g. "&holdings=current&users=1,2"
  */
 function filterParams() {
-  const params = "&holdings=" + holdingsFilter;
+  let params = "&holdings=" + holdingsFilter;
   if (selectedUserIds.length > 0 && selectedUserIds.length < allUsers.length) {
     params += "&users=" + selectedUserIds.join(",");
   }
