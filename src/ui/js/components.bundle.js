@@ -2021,7 +2021,7 @@ var APP_NAME = "Portfolio 60";
 // package.json
 var package_default = {
   name: "portfolio-60",
-  version: "0.1.6",
+  version: "0.1.7",
   description: "UK Family Investment Portfolio Tracker",
   type: "module",
   private: true,
