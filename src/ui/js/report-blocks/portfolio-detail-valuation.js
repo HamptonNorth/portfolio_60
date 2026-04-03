@@ -101,9 +101,9 @@ function detailChangeClass(pct) {
  * @returns {Object} Parsed object with user, accountType, periods, isCombined, accountTypes
  */
 function parseDetailParam(param) {
-  var parts = param.split(":");
-  var accountPart = (parts[1] || "").trim().toLowerCase();
-  var isCombined = accountPart.indexOf("+") !== -1;
+  const parts = param.split(":");
+  const accountPart = (parts[1] || "").trim().toLowerCase();
+  const isCombined = accountPart.indexOf("+") !== -1;
 
   return {
     user: (parts[0] || "").trim(),
@@ -124,7 +124,7 @@ function parseDetailParam(param) {
  * @returns {string} The API URL
  */
 function buildDetailApiUrl(user, accountType, periods) {
-  var url = "/api/portfolio/detail?user=" +
+  const url = "/api/portfolio/detail?user=" +
     encodeURIComponent(user) +
     "&account=" +
     encodeURIComponent(accountType);
@@ -140,14 +140,14 @@ function buildDetailApiUrl(user, accountType, periods) {
  * @returns {string} HTML string for the account detail section
  */
 function renderDetailAccountSection(data) {
-  var user = data.user;
-  var account = data.account;
-  var typeLabel = DETAIL_ACCOUNT_TYPE_LABELS[account.account_type] || account.account_type;
-  var periods = data.periods || [];
-  var hasPeriods = periods.length > 0;
+  const user = data.user;
+  const account = data.account;
+  const typeLabel = DETAIL_ACCOUNT_TYPE_LABELS[account.account_type] || account.account_type;
+  const periods = data.periods || [];
+  const hasPeriods = periods.length > 0;
 
   // Section heading: "Ben Wilson ISA"
-  var html =
+  let html =
     '<h3 class="text-sm font-bold text-brand-800 mt-5 mb-1">' +
     escapeHtml(user.first_name + " " + user.last_name + " " + typeLabel) +
     "</h3>";
@@ -166,7 +166,7 @@ function renderDetailAccountSection(data) {
   html += '<th class="py-1 px-3 text-xs font-semibold text-brand-700 text-right">Value</th>';
   html += '<th class="py-1 px-3 text-xs font-semibold text-brand-700 text-right">Value GBP</th>';
 
-  for (var p = 0; p < periods.length; p++) {
+  for (let p = 0; p < periods.length; p++) {
     html +=
       '<th class="py-1 px-3 text-xs font-semibold text-brand-700 text-right">' +
       escapeHtml(periods[p].label) +
@@ -176,10 +176,10 @@ function renderDetailAccountSection(data) {
   html += "</thead><tbody>";
 
   // Holdings rows
-  for (var h = 0; h < data.holdings.length; h++) {
-    var holding = data.holdings[h];
-    var isGBP = holding.currency_code === "GBP";
-    var sym = holding.currency_symbol || "";
+  for (let h = 0; h < data.holdings.length; h++) {
+    const holding = data.holdings[h];
+    const isGBP = holding.currency_code === "GBP";
+    const sym = holding.currency_symbol || "";
 
     html += '<tr class="border-b border-brand-100">';
 
@@ -233,8 +233,8 @@ function renderDetailAccountSection(data) {
       "</td>";
 
     // Change columns
-    for (var c = 0; c < (holding.changes || []).length; c++) {
-      var change = holding.changes[c];
+    for (let c = 0; c < (holding.changes || []).length; c++) {
+      const change = holding.changes[c];
       if (change.change_percent !== null) {
         html +=
           '<td class="py-1.5 px-3 text-xs text-right ' +
@@ -260,8 +260,8 @@ function renderDetailAccountSection(data) {
     detailFormatNumber(data.totals.value_gbp) +
     "</td>";
 
-  for (var t = 0; t < (data.totals.changes || []).length; t++) {
-    var totalChange = data.totals.changes[t];
+  for (let t = 0; t < (data.totals.changes || []).length; t++) {
+    const totalChange = data.totals.changes[t];
     if (totalChange.change_percent !== null) {
       html +=
         '<td class="py-1.5 px-3 text-xs text-right font-semibold ' +
@@ -288,33 +288,33 @@ function renderDetailAccountSection(data) {
  * @returns {string} HTML string for the combined totals section
  */
 function renderDetailCombinedTotals(userName, detailResults, periods) {
-  var hasPeriods = periods.length > 0;
+  const hasPeriods = periods.length > 0;
 
   // Aggregate totals across all accounts
-  var combinedValueGBP = 0;
-  var periodWeightedSums = {};
-  var periodWeightedBases = {};
+  let combinedValueGBP = 0;
+  const periodWeightedSums = {};
+  const periodWeightedBases = {};
 
-  for (var p = 0; p < periods.length; p++) {
+  for (let p = 0; p < periods.length; p++) {
     periodWeightedSums[periods[p].code] = 0;
     periodWeightedBases[periods[p].code] = 0;
   }
 
   // Build list of account type labels for the heading
-  var accountLabels = [];
+  const accountLabels = [];
 
-  for (var d = 0; d < detailResults.length; d++) {
-    var data = detailResults[d];
+  for (let d = 0; d < detailResults.length; d++) {
+    const data = detailResults[d];
     combinedValueGBP += data.totals.value_gbp;
-    var typeLabel = DETAIL_ACCOUNT_TYPE_LABELS[data.account.account_type] || data.account.account_type;
+    const typeLabel = DETAIL_ACCOUNT_TYPE_LABELS[data.account.account_type] || data.account.account_type;
     accountLabels.push(typeLabel);
 
     // Accumulate weighted changes from individual holdings (not from per-account totals)
     // to get a true value-weighted average across all holdings in all accounts
-    for (var h = 0; h < data.holdings.length; h++) {
-      var holding = data.holdings[h];
-      for (var c = 0; c < (holding.changes || []).length; c++) {
-        var change = holding.changes[c];
+    for (let h = 0; h < data.holdings.length; h++) {
+      const holding = data.holdings[h];
+      for (let c = 0; c < (holding.changes || []).length; c++) {
+        const change = holding.changes[c];
         if (change.change_percent !== null) {
           periodWeightedSums[change.code] += holding.value_gbp * change.change_percent;
           periodWeightedBases[change.code] += holding.value_gbp;
@@ -324,12 +324,12 @@ function renderDetailCombinedTotals(userName, detailResults, periods) {
   }
 
   // Calculate combined weighted average changes
-  var combinedChanges = [];
-  for (var i = 0; i < periods.length; i++) {
-    var code = periods[i].code;
-    var base = periodWeightedBases[code];
+  const combinedChanges = [];
+  for (let i = 0; i < periods.length; i++) {
+    const code = periods[i].code;
+    const base = periodWeightedBases[code];
     if (base > 0) {
-      var weighted = Math.round((periodWeightedSums[code] / base) * 10) / 10;
+      const weighted = Math.round((periodWeightedSums[code] / base) * 10) / 10;
       combinedChanges.push({ code: code, change_percent: weighted });
     } else {
       combinedChanges.push({ code: code, change_percent: null });
@@ -337,7 +337,7 @@ function renderDetailCombinedTotals(userName, detailResults, periods) {
   }
 
   // Total columns count: Value GBP label + Value GBP value + change columns
-  var html = '<div class="mt-4 border-t-2 border-brand-300 pt-3">';
+  let html = '<div class="mt-4 border-t-2 border-brand-300 pt-3">';
   html +=
     '<h3 class="text-sm font-bold text-brand-800 mb-1">' +
     escapeHtml(userName) +
@@ -352,7 +352,7 @@ function renderDetailCombinedTotals(userName, detailResults, periods) {
     html += "<thead>";
     html += '<tr class="bg-brand-100 border-b border-brand-200">';
     html += '<th class="py-1 px-3 text-xs font-semibold text-brand-700 text-right">Value GBP</th>';
-    for (var j = 0; j < periods.length; j++) {
+    for (let j = 0; j < periods.length; j++) {
       html +=
         '<th class="py-1 px-3 text-xs font-semibold text-brand-700 text-right">' +
         escapeHtml(periods[j].label) +
@@ -370,8 +370,8 @@ function renderDetailCombinedTotals(userName, detailResults, periods) {
     detailFormatNumber(combinedValueGBP) +
     "</td>";
 
-  for (var k = 0; k < combinedChanges.length; k++) {
-    var cc = combinedChanges[k];
+  for (let k = 0; k < combinedChanges.length; k++) {
+    const cc = combinedChanges[k];
     if (cc.change_percent !== null) {
       html +=
         '<td class="py-1.5 px-3 text-xs text-right font-semibold ' +
@@ -401,7 +401,7 @@ function renderDetailCombinedTotals(userName, detailResults, periods) {
  *   or "USER:isa+sipp+trading:period1,period2,..." for combined totals
  */
 async function renderPortfolioDetailValuation(containerId, params) {
-  var container = document.getElementById(containerId);
+  const container = document.getElementById(containerId);
 
   if (!params || params.length === 0) {
     container.innerHTML =
@@ -410,11 +410,11 @@ async function renderPortfolioDetailValuation(containerId, params) {
     return;
   }
 
-  var html =
+  let html =
     '<h2 class="text-lg font-semibold text-brand-800 mb-4">Portfolio Detail Valuation</h2>';
 
-  for (var i = 0; i < params.length; i++) {
-    var parsed = parseDetailParam(params[i]);
+  for (let i = 0; i < params.length; i++) {
+    const parsed = parseDetailParam(params[i]);
 
     if (!parsed.user || !parsed.accountType) {
       html +=
@@ -426,13 +426,13 @@ async function renderPortfolioDetailValuation(containerId, params) {
 
     if (parsed.isCombined) {
       // Combined totals: fetch each account type and aggregate
-      var combinedResults = [];
-      var combinedPeriods = [];
-      var combinedUserName = "";
+      const combinedResults = [];
+      let combinedPeriods = [];
+      let combinedUserName = "";
 
-      for (var a = 0; a < parsed.accountTypes.length; a++) {
-        var url = buildDetailApiUrl(parsed.user, parsed.accountTypes[a], parsed.periods);
-        var result = await apiRequest(url);
+      for (let a = 0; a < parsed.accountTypes.length; a++) {
+        const url = buildDetailApiUrl(parsed.user, parsed.accountTypes[a], parsed.periods);
+        const result = await apiRequest(url);
 
         if (result.ok && result.data && result.data.holdings && result.data.holdings.length > 0) {
           combinedResults.push(result.data);
@@ -450,8 +450,8 @@ async function renderPortfolioDetailValuation(containerId, params) {
       }
     } else {
       // Single account detail table
-      var url = buildDetailApiUrl(parsed.user, parsed.accountType, parsed.periods);
-      var result = await apiRequest(url);
+      const url = buildDetailApiUrl(parsed.user, parsed.accountType, parsed.periods);
+      const result = await apiRequest(url);
 
       if (!result.ok) {
         html +=
@@ -465,7 +465,7 @@ async function renderPortfolioDetailValuation(containerId, params) {
         continue;
       }
 
-      var data = result.data;
+      const data = result.data;
 
       if (!data.holdings || data.holdings.length === 0) {
         html +=
@@ -497,9 +497,9 @@ async function renderPortfolioDetailValuation(containerId, params) {
  * @returns {string} Formatted date string
  */
 function detailTodayFormatted() {
-  var d = new Date();
-  var day = String(d.getDate()).padStart(2, "0");
-  var month = String(d.getMonth() + 1).padStart(2, "0");
-  var year = d.getFullYear();
+  const d = new Date();
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
   return day + "/" + month + "/" + year;
 }

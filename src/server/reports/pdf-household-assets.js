@@ -137,7 +137,7 @@ function drawRightAligned(page, text, x, colWidth, y, font, fontSize, color) {
 function truncateText(text, font, fontSize, maxWidth) {
   if (font.widthOfTextAtSize(text, fontSize) <= maxWidth) return text;
 
-  var truncated = text;
+  let truncated = text;
   while (truncated.length > 0 && font.widthOfTextAtSize(truncated + "...", fontSize) > maxWidth) {
     truncated = truncated.slice(0, -1);
   }
@@ -156,11 +156,11 @@ function truncateText(text, font, fontSize, maxWidth) {
  * @param {Array<number>} ctx.pageWidths - Per-page usable widths (pushed to when new pages added)
  */
 export function renderHouseholdAssetsBlock(ctx) {
-  var pdf = ctx.pdf;
-  var page = ctx.page;
-  var pages = ctx.pages;
-  var y = ctx.y;
-  var fonts = ctx.fonts;
+  const pdf = ctx.pdf;
+  let page = ctx.page;
+  const pages = ctx.pages;
+  let y = ctx.y;
+  const fonts = ctx.fonts;
 
   const data = getHouseholdAssetsSummary();
   const categoryOrder = ["pension", "property", "savings", "alternative"];
@@ -257,13 +257,13 @@ export function renderHouseholdAssetsBlock(ctx) {
     y -= HEADER_ROW_HEIGHT;
 
     // Data rows
-    for (var i = 0; i < cat.items.length; i++) {
+    for (let i = 0; i < cat.items.length; i++) {
       ensureSpace(ROW_HEIGHT + 2);
 
       const item = cat.items[i];
       const rowY = y - ROW_HEIGHT;
       const textY = rowY + 4;
-      var font = fonts.medium;
+      const font = fonts.medium;
 
       // Row values
       const cellValues = {
@@ -276,7 +276,7 @@ export function renderHouseholdAssetsBlock(ctx) {
       };
 
       for (const col of COLUMNS) {
-        var cellText = cellValues[col.key] || "";
+        let cellText = cellValues[col.key] || "";
         // Truncate to fit column width (with 4pt padding)
         cellText = truncateText(cellText, font, FONT_SIZE_ROW, col.width - 4);
 
@@ -397,12 +397,12 @@ export function renderHouseholdAssetsBlock(ctx) {
  */
 export async function generateHouseholdAssetsPdf() {
   const pdf = PDF.create();
-  var fonts = embedRobotoFonts(pdf);
-  var page = pdf.addPage({ size: "a4", orientation: "portrait" });
-  var pages = [page];
-  var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_HEIGHT, MARGIN_TOP, fonts);
+  const fonts = embedRobotoFonts(pdf);
+  const page = pdf.addPage({ size: "a4", orientation: "portrait" });
+  const pages = [page];
+  const y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_HEIGHT, MARGIN_TOP, fonts);
 
-  var ctx = { pdf: pdf, page: page, pages: pages, y: y, fonts: fonts };
+  const ctx = { pdf: pdf, page: page, pages: pages, y: y, fonts: fonts };
   renderHouseholdAssetsBlock(ctx);
 
   drawPageFooters(ctx.pages, "Household Assets", MARGIN_LEFT, USABLE_WIDTH, fonts);

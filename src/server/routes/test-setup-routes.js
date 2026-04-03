@@ -62,8 +62,8 @@ testSetupRouter.get("/api/test-setup/stream", async function (request) {
         try {
           // Phase 1: Load price/rate/benchmark data
           // Try fetch-server-60 history first (fast), fall back to public APIs (slow)
-          var historyLoaded = false;
-          var fetchServerConfig = getFetchServerConfig();
+          let historyLoaded = false;
+          const fetchServerConfig = getFetchServerConfig();
 
           if (fetchServerConfig.enabled && fetchServerConfig.url) {
             sendEvent("phase", {
@@ -74,21 +74,21 @@ testSetupRouter.get("/api/test-setup/stream", async function (request) {
 
             // Resolve morningstar_ids for all investments (fast API lookups)
             // These are needed to map fetch-server prices to local investments
-            var investments = getAllInvestments();
-            var resolvedCount = 0;
-            for (var i = 0; i < investments.length; i++) {
+            const investments = getAllInvestments();
+            let resolvedCount = 0;
+            for (let i = 0; i < investments.length; i++) {
               if (!investments[i].morningstar_id) {
-                var result = await resolveMorningstarId(investments[i]);
+                const result = await resolveMorningstarId(investments[i]);
                 if (result) resolvedCount++;
               }
             }
 
             // Resolve yahoo_tickers for all benchmarks (local lookup, no API call)
-            var benchmarks = getAllBenchmarks();
-            var bmResolvedCount = 0;
-            for (var j = 0; j < benchmarks.length; j++) {
+            const benchmarks = getAllBenchmarks();
+            let bmResolvedCount = 0;
+            for (let j = 0; j < benchmarks.length; j++) {
               if (!benchmarks[j].yahoo_ticker) {
-                var ticker = resolveBenchmarkTicker(benchmarks[j]);
+                const ticker = resolveBenchmarkTicker(benchmarks[j]);
                 if (ticker) bmResolvedCount++;
               }
             }
@@ -105,18 +105,18 @@ testSetupRouter.get("/api/test-setup/stream", async function (request) {
             });
 
             try {
-              var apiKey = loadEnvValue("FETCH_SERVER_API_KEY");
-              var historyUrl = fetchServerConfig.url.replace(/\/$/, "") + "/api/history";
-              var historyResponse = await fetch(historyUrl, {
+              const apiKey = loadEnvValue("FETCH_SERVER_API_KEY");
+              const historyUrl = fetchServerConfig.url.replace(/\/$/, "") + "/api/history";
+              const historyResponse = await fetch(historyUrl, {
                 method: "GET",
                 headers: { "X-API-Key": apiKey || "" },
                 signal: AbortSignal.timeout(30000),
               });
 
               if (historyResponse.ok) {
-                var historyData = await historyResponse.json();
+                const historyData = await historyResponse.json();
                 if (historyData.fetchedAt) {
-                  var counts = upsertIntoDatabase(historyData);
+                  const counts = upsertIntoDatabase(historyData);
                   sendEvent("progress", {
                     phase: 1,
                     message: "History loaded from fetch server — " +

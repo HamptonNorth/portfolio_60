@@ -70,9 +70,9 @@ export function getGoogleFontsUrl(styleConfig) {
  * @returns {string[]} Array of CSS link URLs to include
  */
 export function getFontLinks(styleConfig) {
-  var links = [];
+  const links = [];
 
-  var googleFontsUrl = getGoogleFontsUrl(styleConfig);
+  const googleFontsUrl = getGoogleFontsUrl(styleConfig);
   if (googleFontsUrl) {
     links.push(googleFontsUrl);
   }

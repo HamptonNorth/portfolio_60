@@ -71,14 +71,14 @@ const MARGIN_TOP = 40;
  * @returns {Promise<Uint8Array>} The PDF file bytes
  */
 export async function generateCompositePdf(reportDef) {
-  var blocks = reportDef.blocks || [];
+  const blocks = reportDef.blocks || [];
 
   if (blocks.length === 0) {
     // Return a minimal PDF with a "no blocks" message
     const pdf = PDF.create();
-    var fonts = embedRobotoFonts(pdf);
+    const fonts = embedRobotoFonts(pdf);
     const page = pdf.addPage({ size: "a4", orientation: "portrait" });
-    var emptyY = drawPageHeader(pdf, page, MARGIN_LEFT, 841.89, MARGIN_TOP, fonts);
+    const emptyY = drawPageHeader(pdf, page, MARGIN_LEFT, 841.89, MARGIN_TOP, fonts);
     page.drawText(reportDef.title + " \u2014 no blocks defined.", {
       x: MARGIN_LEFT,
       y: emptyY - 14,
@@ -91,13 +91,13 @@ export async function generateCompositePdf(reportDef) {
   }
 
   const pdf = PDF.create();
-  var fonts = embedRobotoFonts(pdf);
-  var pages = [];
-  var pageWidths = [];
+  const fonts = embedRobotoFonts(pdf);
+  const pages = [];
+  const pageWidths = [];
 
-  for (var i = 0; i < blocks.length; i++) {
-    var block = blocks[i];
-    var blockType = BLOCK_TYPES[block.type];
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i];
+    const blockType = BLOCK_TYPES[block.type];
 
     if (!blockType) {
       // Unknown block type — skip it
@@ -105,18 +105,18 @@ export async function generateCompositePdf(reportDef) {
     }
 
     // Determine layout — static for most block types, dynamic for chart_group
-    var layout = blockType.getLayout ? blockType.getLayout(block) : blockType;
+    const layout = blockType.getLayout ? blockType.getLayout(block) : blockType;
 
     // Start a new page for each block with the correct orientation
-    var page = pdf.addPage({ size: "a4", orientation: layout.orientation });
+    const page = pdf.addPage({ size: "a4", orientation: layout.orientation });
     pages.push(page);
     pageWidths.push(layout.usableWidth);
 
     // Draw page header and get starting y position
-    var y = drawPageHeader(pdf, page, MARGIN_LEFT, layout.pageHeight, MARGIN_TOP, fonts);
+    const y = drawPageHeader(pdf, page, MARGIN_LEFT, layout.pageHeight, MARGIN_TOP, fonts);
 
     // Build context for the block renderer
-    var ctx = {
+    const ctx = {
       pdf: pdf,
       page: page,
       pages: pages,

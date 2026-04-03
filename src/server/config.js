@@ -22,12 +22,12 @@ function isPlainObject(val) {
  * @returns {Object} A new merged object
  */
 function deepMerge(base, override) {
-  var result = {};
+  const result = {};
 
   // Start with all base keys
-  var baseKeys = Object.keys(base);
-  for (var i = 0; i < baseKeys.length; i++) {
-    var key = baseKeys[i];
+  const baseKeys = Object.keys(base);
+  for (let i = 0; i < baseKeys.length; i++) {
+    const key = baseKeys[i];
     if (key in override) {
       if (isPlainObject(base[key]) && isPlainObject(override[key])) {
         result[key] = deepMerge(base[key], override[key]);
@@ -40,9 +40,9 @@ function deepMerge(base, override) {
   }
 
   // Carry over any keys only in override
-  var overrideKeys = Object.keys(override);
-  for (var j = 0; j < overrideKeys.length; j++) {
-    var oKey = overrideKeys[j];
+  const overrideKeys = Object.keys(override);
+  for (let j = 0; j < overrideKeys.length; j++) {
+    const oKey = overrideKeys[j];
     if (!(oKey in result)) {
       result[oKey] = override[oKey];
     }
@@ -60,8 +60,8 @@ function deepMerge(base, override) {
  */
 function getRepoDefaultConfig() {
   try {
-    var repoPath = resolve("src/shared/user-settings.json");
-    var raw = readFileSync(repoPath, "utf-8");
+    const repoPath = resolve("src/shared/user-settings.json");
+    const raw = readFileSync(repoPath, "utf-8");
     return JSON.parse(raw);
   } catch {
     return {};
@@ -184,8 +184,8 @@ export function loadConfig() {
       rawConfig = JSON.parse(readFileSync(configPath, "utf-8"));
     } else {
       // User has a separate config file — deep-merge repo defaults underneath
-      var repoDefaults = getRepoDefaultConfig();
-      var userConfig = JSON.parse(readFileSync(configPath, "utf-8"));
+      const repoDefaults = getRepoDefaultConfig();
+      const userConfig = JSON.parse(readFileSync(configPath, "utf-8"));
       rawConfig = deepMerge(repoDefaults, userConfig);
     }
   } catch (err) {
@@ -245,7 +245,7 @@ export function loadConfig() {
   };
 
   // docs — documentation subsystem categories and guide links
-  var rawDocs = rawConfig.docs || {};
+  const rawDocs = rawConfig.docs || {};
   config.docs = {
     _readme: rawDocs._readme || "",
     categories: typeof rawDocs.categories === "object" && rawDocs.categories !== null ? rawDocs.categories : {},
@@ -464,10 +464,10 @@ export function getListsDir() {
  * @returns {{ categories: Object.<string, {style: string, label: string}> }}
  */
 export function getDocsConfig() {
-  var config = loadConfig();
-  var rawDocs = config.docs || {};
-  var categories = rawDocs.categories || {};
-  var guides = rawDocs.guides || [];
+  const config = loadConfig();
+  const rawDocs = config.docs || {};
+  const categories = rawDocs.categories || {};
+  const guides = rawDocs.guides || [];
   return { categories: categories, guides: guides };
 }
 
@@ -494,16 +494,16 @@ export function getFetchServerConfig() {
  */
 export function getMergedConfigRaw() {
   try {
-    var repoDefaults = getRepoDefaultConfig();
-    var configPath = getConfigFilePath();
-    var repoPath = resolve("src/shared/user-settings.json");
+    const repoDefaults = getRepoDefaultConfig();
+    const configPath = getConfigFilePath();
+    const repoPath = resolve("src/shared/user-settings.json");
 
     if (resolve(configPath) === repoPath) {
       return readFileSync(configPath, "utf-8");
     }
 
-    var userConfig = JSON.parse(readFileSync(configPath, "utf-8"));
-    var merged = deepMerge(repoDefaults, userConfig);
+    const userConfig = JSON.parse(readFileSync(configPath, "utf-8"));
+    const merged = deepMerge(repoDefaults, userConfig);
     return JSON.stringify(merged, null, 2);
   } catch {
     return readFileSync(resolve("src/shared/user-settings.json"), "utf-8");

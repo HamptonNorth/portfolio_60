@@ -9,7 +9,7 @@ export function getReportParams() {
   const db = getDatabase();
   const rows = db.query("SELECT param_key, param_value FROM report_params ORDER BY id").all();
   const result = {};
-  for (var i = 0; i < rows.length; i++) {
+  for (let i = 0; i < rows.length; i++) {
     result[rows[i].param_key] = rows[i].param_value;
   }
   return result;

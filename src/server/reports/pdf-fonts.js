@@ -4,9 +4,9 @@
  * and embeds them into a PDF document. Font bytes are cached after first load.
  *
  * Usage in each PDF generator:
- *   var fonts = embedRobotoFonts(pdf);
+ *   const fonts = embedRobotoFonts(pdf);
  *   page.drawText("Hello", { font: fonts.regular, size: 10 });
- *   var w = fonts.medium.widthOfTextAtSize("Hello", 10);
+ *   const w = fonts.medium.widthOfTextAtSize("Hello", 10);
  */
 
 import { readFileSync } from "node:fs";
@@ -16,9 +16,9 @@ import { resolve } from "node:path";
 const fontsDir = resolve(import.meta.dir, "../../ui/fonts");
 
 /** @description Cached font bytes (loaded once from disk) */
-var regularBytes = null;
-var mediumBytes = null;
-var boldBytes = null;
+let regularBytes = null;
+let mediumBytes = null;
+let boldBytes = null;
 
 /**
  * @description Load font bytes from disk, caching after first call.
@@ -45,7 +45,7 @@ function loadFontBytes() {
  * @returns {{ regular: EmbeddedFont, medium: EmbeddedFont, bold: EmbeddedFont }}
  */
 export function embedRobotoFonts(pdf) {
-  var bytes = loadFontBytes();
+  const bytes = loadFontBytes();
   return {
     regular: pdf.embedFont(bytes.regular),
     medium: pdf.embedFont(bytes.medium),

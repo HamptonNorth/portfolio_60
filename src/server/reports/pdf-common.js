@@ -29,7 +29,7 @@ const logoPath = resolve(import.meta.dir, "../../ui/images/redmug-logo.png");
  * @description Load the logo PNG bytes from disk. Cached after first load.
  * @type {Uint8Array|null}
  */
-var logoBytes = null;
+let logoBytes = null;
 
 /**
  * @description Get the logo PNG bytes, loading from disk on first call.
@@ -112,8 +112,8 @@ export function drawPageFooters(pages, reportTitle, marginLeft, usableWidth, fon
   const dateStr = todayFormatted();
   const totalPages = pages.length;
 
-  for (var p = 0; p < pages.length; p++) {
-    var pageWidth = Array.isArray(usableWidth) ? usableWidth[p] : usableWidth;
+  for (let p = 0; p < pages.length; p++) {
+    const pageWidth = Array.isArray(usableWidth) ? usableWidth[p] : usableWidth;
 
     // Separator line
     pages[p].drawLine({
@@ -133,8 +133,8 @@ export function drawPageFooters(pages, reportTitle, marginLeft, usableWidth, fon
     });
 
     // Report title centred
-    var titleWidth = fonts.regular.widthOfTextAtSize(reportTitle, FONT_SIZE_FOOTER);
-    var titleX = marginLeft + (pageWidth - titleWidth) / 2;
+    const titleWidth = fonts.regular.widthOfTextAtSize(reportTitle, FONT_SIZE_FOOTER);
+    const titleX = marginLeft + (pageWidth - titleWidth) / 2;
     pages[p].drawText(reportTitle, {
       x: titleX,
       y: footerTextY,
@@ -144,8 +144,8 @@ export function drawPageFooters(pages, reportTitle, marginLeft, usableWidth, fon
     });
 
     // Page number on the right
-    var pageStr = "page " + (p + 1) + "/" + totalPages;
-    var pageNumWidth = fonts.regular.widthOfTextAtSize(pageStr, FONT_SIZE_FOOTER);
+    const pageStr = "page " + (p + 1) + "/" + totalPages;
+    const pageNumWidth = fonts.regular.widthOfTextAtSize(pageStr, FONT_SIZE_FOOTER);
     pages[p].drawText(pageStr, {
       x: marginLeft + pageWidth - pageNumWidth,
       y: footerTextY,

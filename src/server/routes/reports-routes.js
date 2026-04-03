@@ -1,6 +1,7 @@
 import { Router } from "../router.js";
-import { readFileSync, writeFileSync, existsSync, copyFileSync } from "node:fs";
-import { resolve, dirname, basename, join } from "node:path";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { resolve } from "node:path";
+import { backupJsonFile } from "../file-utils.js";
 import { getReportParams, getAllReportParams } from "../db/report-params-db.js";
 import { generateHouseholdAssetsPdf } from "../reports/pdf-household-assets.js";
 import { generatePortfolioSummaryPdf } from "../reports/pdf-portfolio-summary.js";
@@ -41,13 +42,13 @@ const reportsTestFilePath = resolve(import.meta.dir, "../../shared/user-reports-
  * @returns {Array} Definitions with tokens replaced in param strings
  */
 function substituteTokens(definitions, tokenMap) {
-  var tokens = Object.keys(tokenMap);
+  const tokens = Object.keys(tokenMap);
   if (tokens.length === 0) return definitions;
 
   return JSON.parse(JSON.stringify(definitions), function (key, value) {
     if (typeof value !== "string") return value;
-    var result = value;
-    for (var i = 0; i < tokens.length; i++) {
+    let result = value;
+    for (let i = 0; i < tokens.length; i++) {
       result = result.split(tokens[i]).join(tokenMap[tokens[i]]);
     }
     return result;
@@ -80,7 +81,7 @@ function loadViewDefinitions() {
  * @returns {Array} Array of PDF report definitions with tokens resolved
  */
 function loadReportDefinitions() {
-  var filePath = isTestMode() ? reportsTestFilePath : reportsFilePath;
+  const filePath = isTestMode() ? reportsTestFilePath : reportsFilePath;
   const raw = readFileSync(filePath, "utf-8");
   const reports = JSON.parse(raw);
 
@@ -92,21 +93,6 @@ function loadReportDefinitions() {
   }
 }
 
-/**
- * @description Create a timestamped backup of a JSON file before overwriting.
- * @param {string} filePath - Absolute path to the file to back up
- */
-function backupJsonFile(filePath) {
-  if (!existsSync(filePath)) return;
-  const dir = dirname(filePath);
-  const base = basename(filePath, ".json");
-  const now = new Date();
-  const pad = function (n) { return String(n).padStart(2, "0"); };
-  const timestamp = now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate()) + "-" + pad(now.getHours()) + "-" + pad(now.getMinutes());
-  const backupName = base + "-backup-" + timestamp + ".json";
-  const backupPath = join(dir, backupName);
-  copyFileSync(filePath, backupPath);
-}
 
 /**
  * @description Read the raw report definitions array from the JSON file
@@ -114,8 +100,8 @@ function backupJsonFile(filePath) {
  * @returns {Array} Array of report definition objects
  */
 function readRawReports() {
-  var filePath = isTestMode() ? reportsTestFilePath : reportsFilePath;
-  var raw = readFileSync(filePath, "utf-8");
+  const filePath = isTestMode() ? reportsTestFilePath : reportsFilePath;
+  const raw = readFileSync(filePath, "utf-8");
   return JSON.parse(raw);
 }
 
@@ -125,7 +111,7 @@ function readRawReports() {
  * @param {Array} reports - The full array of report definitions
  */
 function writeReports(reports) {
-  var filePath = isTestMode() ? reportsTestFilePath : reportsFilePath;
+  const filePath = isTestMode() ? reportsTestFilePath : reportsFilePath;
   backupJsonFile(filePath);
   writeFileSync(filePath, JSON.stringify(reports, null, 2) + "\n", "utf-8");
 }
@@ -285,7 +271,7 @@ reportsRouter.get("/api/reports", function () {
 // Must be registered before /api/reports/:id so "raw" is not matched as an :id param
 reportsRouter.get("/api/reports/raw", function () {
   try {
-    var filePath = isTestMode() ? reportsTestFilePath : reportsFilePath;
+    const filePath = isTestMode() ? reportsTestFilePath : reportsFilePath;
     backupJsonFile(filePath);
     const raw = readFileSync(filePath, "utf-8");
     return new Response(JSON.stringify({ content: raw, path: filePath }), {
@@ -305,7 +291,7 @@ reportsRouter.get("/api/reports/raw", function () {
 // Must be registered before /api/reports/:id so "definitions" is not matched as :id
 reportsRouter.get("/api/reports/definitions", function () {
   try {
-    var reports = readRawReports();
+    const reports = readRawReports();
     return new Response(JSON.stringify(reports), {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -348,7 +334,7 @@ reportsRouter.get("/api/reports/pdf/portfolio-summary", async function (request)
     const url = new URL(request.url);
     const paramsStr = url.searchParams.get("params");
     const compareTo = url.searchParams.get("compareTo") || null;
-    var params = [];
+    let params = [];
     if (paramsStr) {
       params = paramsStr.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
     }
@@ -379,7 +365,7 @@ reportsRouter.get("/api/reports/pdf/portfolio-detail", async function (request) 
   try {
     const url = new URL(request.url);
     const paramsStr = url.searchParams.get("params");
-    var params = [];
+    let params = [];
     if (paramsStr) {
       params = paramsStr.split("|").map(function (s) { return s.trim(); }).filter(Boolean);
     }
@@ -436,7 +422,7 @@ reportsRouter.get("/api/reports/pdf/composite", async function (request) {
     }
 
     const pdfBytes = await generateCompositePdf(report);
-    var filename = (report.id || "report").replace(/[^a-z0-9_-]/gi, "-") + ".pdf";
+    const filename = (report.id || "report").replace(/[^a-z0-9_-]/gi, "-") + ".pdf";
     return new Response(pdfBytes, {
       status: 200,
       headers: {
@@ -481,7 +467,7 @@ reportsRouter.get("/api/reports/pdf/chart", async function (request) {
     }
 
     const pdfBytes = await generateChartPdf(report);
-    var filename = (report.id || "chart").replace(/[^a-z0-9_-]/gi, "-") + ".pdf";
+    const filename = (report.id || "chart").replace(/[^a-z0-9_-]/gi, "-") + ".pdf";
     return new Response(pdfBytes, {
       status: 200,
       headers: {
@@ -525,7 +511,7 @@ reportsRouter.get("/api/reports/pdf/portfolio-value-chart", async function (requ
     }
 
     const pdfBytes = await generatePortfolioValueChartPdf(report);
-    var filename = (report.id || "portfolio-value-chart").replace(/[^a-z0-9_-]/gi, "-") + ".pdf";
+    const filename = (report.id || "portfolio-value-chart").replace(/[^a-z0-9_-]/gi, "-") + ".pdf";
     return new Response(pdfBytes, {
       status: 200,
       headers: {
@@ -569,7 +555,7 @@ reportsRouter.get("/api/reports/pdf/chart-group", async function (request) {
     }
 
     const pdfBytes = await generateChartGroupPdf(report);
-    var filename = (report.id || "chart-group").replace(/[^a-z0-9_-]/gi, "-") + ".pdf";
+    const filename = (report.id || "chart-group").replace(/[^a-z0-9_-]/gi, "-") + ".pdf";
     return new Response(pdfBytes, {
       status: 200,
       headers: {
@@ -635,7 +621,7 @@ reportsRouter.put("/api/reports/raw", async function (request) {
       );
     }
 
-    var filePath = isTestMode() ? reportsTestFilePath : reportsFilePath;
+    const filePath = isTestMode() ? reportsTestFilePath : reportsFilePath;
     writeFileSync(filePath, content, "utf-8");
 
     return new Response(JSON.stringify({ success: true }), {
@@ -655,7 +641,7 @@ reportsRouter.put("/api/reports/raw", async function (request) {
 // GET /api/reports/tokens — return the report_params token map for the UI
 reportsRouter.get("/api/reports/tokens", function () {
   try {
-    var params = getAllReportParams();
+    const params = getAllReportParams();
     return new Response(JSON.stringify(params), {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -671,18 +657,18 @@ reportsRouter.get("/api/reports/tokens", function () {
 // POST /api/reports/definition — add a new report definition
 reportsRouter.post("/api/reports/definition", async function (request) {
   try {
-    var body = await request.json();
-    var error = validateReportDefinition(body);
+    const body = await request.json();
+    const error = validateReportDefinition(body);
     if (error) {
       return new Response(JSON.stringify({ error: error }), {
         status: 400, headers: { "Content-Type": "application/json" },
       });
     }
 
-    var reports = readRawReports();
+    const reports = readRawReports();
 
     // Check for duplicate ID
-    var duplicate = reports.find(function (r) { return r.id === body.id; });
+    const duplicate = reports.find(function (r) { return r.id === body.id; });
     if (duplicate) {
       return new Response(JSON.stringify({ error: "A report with ID '" + body.id + "' already exists" }), {
         status: 409, headers: { "Content-Type": "application/json" },
@@ -706,8 +692,8 @@ reportsRouter.post("/api/reports/definition", async function (request) {
 // PUT /api/reports/definition/:index — update a report definition at index
 reportsRouter.put("/api/reports/definition/:index", async function (request, params) {
   try {
-    var index = parseInt(params.index, 10);
-    var reports = readRawReports();
+    const index = parseInt(params.index, 10);
+    const reports = readRawReports();
 
     if (isNaN(index) || index < 0 || index >= reports.length) {
       return new Response(JSON.stringify({ error: "Report not found" }), {
@@ -715,8 +701,8 @@ reportsRouter.put("/api/reports/definition/:index", async function (request, par
       });
     }
 
-    var body = await request.json();
-    var error = validateReportDefinition(body);
+    const body = await request.json();
+    const error = validateReportDefinition(body);
     if (error) {
       return new Response(JSON.stringify({ error: error }), {
         status: 400, headers: { "Content-Type": "application/json" },
@@ -724,7 +710,7 @@ reportsRouter.put("/api/reports/definition/:index", async function (request, par
     }
 
     // Check for duplicate ID (excluding the current index)
-    var duplicate = reports.find(function (r, i) { return i !== index && r.id === body.id; });
+    const duplicate = reports.find(function (r, i) { return i !== index && r.id === body.id; });
     if (duplicate) {
       return new Response(JSON.stringify({ error: "A report with ID '" + body.id + "' already exists" }), {
         status: 409, headers: { "Content-Type": "application/json" },
@@ -748,8 +734,8 @@ reportsRouter.put("/api/reports/definition/:index", async function (request, par
 // DELETE /api/reports/definition/:index — delete a report definition
 reportsRouter.delete("/api/reports/definition/:index", async function (request, params) {
   try {
-    var index = parseInt(params.index, 10);
-    var reports = readRawReports();
+    const index = parseInt(params.index, 10);
+    const reports = readRawReports();
 
     if (isNaN(index) || index < 0 || index >= reports.length) {
       return new Response(JSON.stringify({ error: "Report not found" }), {
@@ -774,11 +760,11 @@ reportsRouter.delete("/api/reports/definition/:index", async function (request, 
 // PUT /api/reports/reorder — reorder reports by moving an item from one index to another
 reportsRouter.put("/api/reports/reorder", async function (request) {
   try {
-    var body = await request.json();
-    var fromIndex = body.from;
-    var toIndex = body.to;
+    const body = await request.json();
+    const fromIndex = body.from;
+    const toIndex = body.to;
 
-    var reports = readRawReports();
+    const reports = readRawReports();
 
     if (typeof fromIndex !== "number" || typeof toIndex !== "number" ||
         fromIndex < 0 || fromIndex >= reports.length ||
@@ -788,7 +774,7 @@ reportsRouter.put("/api/reports/reorder", async function (request) {
       });
     }
 
-    var item = reports.splice(fromIndex, 1)[0];
+    const item = reports.splice(fromIndex, 1)[0];
     reports.splice(toIndex, 0, item);
     writeReports(reports);
 
@@ -806,8 +792,8 @@ reportsRouter.put("/api/reports/reorder", async function (request) {
 // POST /api/reports/duplicate/:index — duplicate a report definition
 reportsRouter.post("/api/reports/duplicate/:index", async function (request, params) {
   try {
-    var index = parseInt(params.index, 10);
-    var reports = readRawReports();
+    const index = parseInt(params.index, 10);
+    const reports = readRawReports();
 
     if (isNaN(index) || index < 0 || index >= reports.length) {
       return new Response(JSON.stringify({ error: "Report not found" }), {
@@ -815,13 +801,13 @@ reportsRouter.post("/api/reports/duplicate/:index", async function (request, par
       });
     }
 
-    var original = reports[index];
-    var copy = JSON.parse(JSON.stringify(original));
+    const original = reports[index];
+    const copy = JSON.parse(JSON.stringify(original));
     copy.id = original.id + "_copy";
     copy.title = original.title + " (Copy)";
 
     // Ensure unique ID
-    var counter = 1;
+    let counter = 1;
     while (reports.find(function (r) { return r.id === copy.id; })) {
       counter++;
       copy.id = original.id + "_copy" + counter;

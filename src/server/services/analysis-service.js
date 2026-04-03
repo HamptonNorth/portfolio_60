@@ -79,9 +79,9 @@ function getFilteredInvestments(investmentIds) {
  * @returns {Object} Object with startDate (Date), endDate (Date), fromStr and toStr (ISO strings)
  */
 function getDateRange(periodCode) {
-  var weeks = PERIOD_WEEKS[periodCode] || 52;
-  var endDate = new Date();
-  var startDate = new Date(endDate);
+  const weeks = PERIOD_WEEKS[periodCode] || 52;
+  const endDate = new Date();
+  const startDate = new Date(endDate);
   startDate.setDate(startDate.getDate() - weeks * 7);
 
   return {
@@ -103,11 +103,11 @@ function getDateRange(periodCode) {
  * @returns {Array<Object>|null} GBP-converted price records or null if no data
  */
 function getGBPPrices(investment, allPricesMap, fromStr, toStr) {
-  var prices = allPricesMap.get(investment.id);
+  let prices = allPricesMap.get(investment.id);
   if (!prices || prices.length === 0) return null;
 
   if (investment.currency_code && investment.currency_code !== "GBP") {
-    var rates = getRatesInRange(investment.currencies_id, fromStr, toStr);
+    const rates = getRatesInRange(investment.currencies_id, fromStr, toStr);
     prices = convertPricesToGBP(prices, rates);
   }
 
@@ -125,9 +125,9 @@ function calculateReturn(prices) {
     return { returnPct: null, startPrice: null, endPrice: null, startDate: null, endDate: null };
   }
 
-  var startPrice = prices[0].price;
-  var endPrice = prices[prices.length - 1].price;
-  var returnPct = startPrice > 0 ? ((endPrice - startPrice) / startPrice) * 100 : null;
+  const startPrice = prices[0].price;
+  const endPrice = prices[prices.length - 1].price;
+  const returnPct = startPrice > 0 ? ((endPrice - startPrice) / startPrice) * 100 : null;
 
   return {
     returnPct: returnPct,
@@ -150,14 +150,14 @@ function calculateVolatility(prices) {
   }
 
   // Sample to weekly intervals to avoid double-counting daily data
-  var startDate = new Date(prices[0].price_date);
-  var endDate = new Date(prices[prices.length - 1].price_date);
-  var sampleDates = generateWeeklyDates(startDate, endDate);
-  var weeklyValues = sampleWeekly(sampleDates, prices, "price_date", "price");
+  const startDate = new Date(prices[0].price_date);
+  const endDate = new Date(prices[prices.length - 1].price_date);
+  const sampleDates = generateWeeklyDates(startDate, endDate);
+  const weeklyValues = sampleWeekly(sampleDates, prices, "price_date", "price");
 
   // Calculate weekly returns
-  var weeklyReturns = [];
-  for (var i = 1; i < weeklyValues.length; i++) {
+  const weeklyReturns = [];
+  for (let i = 1; i < weeklyValues.length; i++) {
     if (weeklyValues[i] !== null && weeklyValues[i - 1] !== null && weeklyValues[i - 1] > 0) {
       weeklyReturns.push((weeklyValues[i] - weeklyValues[i - 1]) / weeklyValues[i - 1]);
     }
@@ -168,22 +168,22 @@ function calculateVolatility(prices) {
   }
 
   // Calculate mean
-  var sum = 0;
-  for (var j = 0; j < weeklyReturns.length; j++) {
+  let sum = 0;
+  for (let j = 0; j < weeklyReturns.length; j++) {
     sum += weeklyReturns[j];
   }
-  var mean = sum / weeklyReturns.length;
+  const mean = sum / weeklyReturns.length;
 
   // Calculate variance
-  var sumSquaredDiffs = 0;
-  for (var k = 0; k < weeklyReturns.length; k++) {
-    var diff = weeklyReturns[k] - mean;
+  let sumSquaredDiffs = 0;
+  for (let k = 0; k < weeklyReturns.length; k++) {
+    const diff = weeklyReturns[k] - mean;
     sumSquaredDiffs += diff * diff;
   }
-  var variance = sumSquaredDiffs / (weeklyReturns.length - 1); // Sample variance
+  const variance = sumSquaredDiffs / (weeklyReturns.length - 1); // Sample variance
 
   // Annualise: stdDev * sqrt(52) and convert to percentage
-  var annualisedVolatility = Math.sqrt(variance) * Math.sqrt(52) * 100;
+  const annualisedVolatility = Math.sqrt(variance) * Math.sqrt(52) * 100;
 
   return {
     volatility: annualisedVolatility,
@@ -201,11 +201,11 @@ function calculateVolatility(prices) {
 function buildSparkline(prices, sampleDates) {
   if (!prices || prices.length === 0) return [];
 
-  var weeklyValues = sampleWeekly(sampleDates, prices, "price_date", "price");
+  const weeklyValues = sampleWeekly(sampleDates, prices, "price_date", "price");
 
   // Rebase to 100 at the first non-null value
-  var base = null;
-  for (var i = 0; i < weeklyValues.length; i++) {
+  let base = null;
+  for (let i = 0; i < weeklyValues.length; i++) {
     if (weeklyValues[i] !== null) {
       base = weeklyValues[i];
       break;
@@ -214,8 +214,8 @@ function buildSparkline(prices, sampleDates) {
 
   if (base === null || base === 0) return weeklyValues;
 
-  var rebased = [];
-  for (var j = 0; j < weeklyValues.length; j++) {
+  const rebased = [];
+  for (let j = 0; j < weeklyValues.length; j++) {
     if (weeklyValues[j] === null) {
       rebased.push(null);
     } else {
@@ -233,22 +233,22 @@ function buildSparkline(prices, sampleDates) {
  * @returns {Object} League table data with period info and ranked investments
  */
 export function buildLeagueTable(periodCode, investmentIds) {
-  var range = getDateRange(periodCode);
-  var investments = getFilteredInvestments(investmentIds);
-  var allPricesMap = getAllInvestmentPricesInRange(range.fromStr, range.toStr);
-  var sampleDates = generateWeeklyDates(range.startDate, range.endDate);
+  const range = getDateRange(periodCode);
+  const investments = getFilteredInvestments(investmentIds);
+  const allPricesMap = getAllInvestmentPricesInRange(range.fromStr, range.toStr);
+  const sampleDates = generateWeeklyDates(range.startDate, range.endDate);
 
-  var rows = [];
+  const rows = [];
 
-  for (var i = 0; i < investments.length; i++) {
-    var inv = investments[i];
-    var prices = getGBPPrices(inv, allPricesMap, range.fromStr, range.toStr);
+  for (let i = 0; i < investments.length; i++) {
+    const inv = investments[i];
+    const prices = getGBPPrices(inv, allPricesMap, range.fromStr, range.toStr);
     if (!prices || prices.length < 2) continue;
 
-    var returnData = calculateReturn(prices);
+    const returnData = calculateReturn(prices);
     if (returnData.returnPct === null) continue;
 
-    var sparkline = buildSparkline(prices, sampleDates);
+    const sparkline = buildSparkline(prices, sampleDates);
 
     rows.push({
       id: inv.id,
@@ -285,21 +285,21 @@ export function buildLeagueTable(periodCode, investmentIds) {
  * @returns {Object} Scatter data with period info and investment data points
  */
 export function buildRiskReturnData(periodCode, investmentIds) {
-  var range = getDateRange(periodCode);
-  var investments = getFilteredInvestments(investmentIds);
-  var allPricesMap = getAllInvestmentPricesInRange(range.fromStr, range.toStr);
+  const range = getDateRange(periodCode);
+  const investments = getFilteredInvestments(investmentIds);
+  const allPricesMap = getAllInvestmentPricesInRange(range.fromStr, range.toStr);
 
-  var points = [];
+  const points = [];
 
-  for (var i = 0; i < investments.length; i++) {
-    var inv = investments[i];
-    var prices = getGBPPrices(inv, allPricesMap, range.fromStr, range.toStr);
+  for (let i = 0; i < investments.length; i++) {
+    const inv = investments[i];
+    const prices = getGBPPrices(inv, allPricesMap, range.fromStr, range.toStr);
     if (!prices || prices.length < 3) continue;
 
-    var returnData = calculateReturn(prices);
+    const returnData = calculateReturn(prices);
     if (returnData.returnPct === null) continue;
 
-    var volData = calculateVolatility(prices);
+    const volData = calculateVolatility(prices);
     if (volData.volatility === null) continue;
 
     points.push({
@@ -331,24 +331,24 @@ export function buildRiskReturnData(periodCode, investmentIds) {
  */
 export function buildTopBottomPerformers(periodCode, count, investmentIds) {
   count = count || 5;
-  var range = getDateRange(periodCode);
-  var investments = getFilteredInvestments(investmentIds);
-  var allPricesMap = getAllInvestmentPricesInRange(range.fromStr, range.toStr);
-  var sampleDates = generateWeeklyDates(range.startDate, range.endDate);
+  const range = getDateRange(periodCode);
+  const investments = getFilteredInvestments(investmentIds);
+  const allPricesMap = getAllInvestmentPricesInRange(range.fromStr, range.toStr);
+  const sampleDates = generateWeeklyDates(range.startDate, range.endDate);
 
   // Calculate returns for all investments to rank them
-  var ranked = [];
-  for (var i = 0; i < investments.length; i++) {
-    var inv = investments[i];
-    var prices = getGBPPrices(inv, allPricesMap, range.fromStr, range.toStr);
+  const ranked = [];
+  for (let i = 0; i < investments.length; i++) {
+    const inv = investments[i];
+    const prices = getGBPPrices(inv, allPricesMap, range.fromStr, range.toStr);
     if (!prices || prices.length < 2) continue;
 
-    var returnData = calculateReturn(prices);
+    const returnData = calculateReturn(prices);
     if (returnData.returnPct === null) continue;
 
     // Build rebased series (percentage change from 0)
-    var weeklyValues = sampleWeekly(sampleDates, prices, "price_date", "price");
-    var rebased = rebaseToZero(weeklyValues);
+    const weeklyValues = sampleWeekly(sampleDates, prices, "price_date", "price");
+    const rebased = rebaseToZero(weeklyValues);
 
     ranked.push({
       id: inv.id,
@@ -367,23 +367,23 @@ export function buildTopBottomPerformers(periodCode, count, investmentIds) {
   });
 
   // Take top N and bottom N (avoiding overlap if fewer than 2*count investments)
-  var topN = ranked.slice(0, count);
-  var bottomN = ranked.slice(-count);
+  const topN = ranked.slice(0, count);
+  const bottomN = ranked.slice(-count);
 
   // Remove any overlap (if total investments <= 2 * count)
-  var topIds = {};
-  for (var t = 0; t < topN.length; t++) {
+  const topIds = {};
+  for (let t = 0; t < topN.length; t++) {
     topIds[topN[t].id] = true;
   }
-  var filteredBottom = [];
-  for (var b = 0; b < bottomN.length; b++) {
+  const filteredBottom = [];
+  for (let b = 0; b < bottomN.length; b++) {
     if (!topIds[bottomN[b].id]) {
       filteredBottom.push(bottomN[b]);
     }
   }
 
   // Build series objects for the chart
-  var buildSeries = function (items) {
+  const buildSeries = function (items) {
     return items.map(function (item) {
       return {
         label: item.description,
@@ -413,8 +413,8 @@ export function buildTopBottomPerformers(periodCode, count, investmentIds) {
  * @returns {Array<Object>} Records with price_date and price fields
  */
 function mapBenchmarkToPrice(bmValues) {
-  var mapped = [];
-  for (var i = 0; i < bmValues.length; i++) {
+  const mapped = [];
+  for (let i = 0; i < bmValues.length; i++) {
     mapped.push({ price_date: bmValues[i].benchmark_date, price: bmValues[i].value });
   }
   return mapped;
@@ -430,21 +430,21 @@ function mapBenchmarkToPrice(bmValues) {
 export function buildBenchmarkReturnData(benchmarkIds, periodCode) {
   if (!benchmarkIds || benchmarkIds.length === 0) return [];
 
-  var range = getDateRange(periodCode);
-  var results = [];
+  const range = getDateRange(periodCode);
+  const results = [];
 
-  for (var i = 0; i < benchmarkIds.length; i++) {
-    var bm = getBenchmarkById(benchmarkIds[i]);
+  for (let i = 0; i < benchmarkIds.length; i++) {
+    const bm = getBenchmarkById(benchmarkIds[i]);
     if (!bm) continue;
 
-    var bmValues = getBenchmarkDataInRange(bm.id, range.fromStr, range.toStr);
+    const bmValues = getBenchmarkDataInRange(bm.id, range.fromStr, range.toStr);
     if (!bmValues || bmValues.length < 3) continue;
 
-    var mapped = mapBenchmarkToPrice(bmValues);
-    var returnData = calculateReturn(mapped);
+    const mapped = mapBenchmarkToPrice(bmValues);
+    const returnData = calculateReturn(mapped);
     if (returnData.returnPct === null) continue;
 
-    var volData = calculateVolatility(mapped);
+    const volData = calculateVolatility(mapped);
 
     results.push({
       id: bm.id,
@@ -467,22 +467,22 @@ export function buildBenchmarkReturnData(benchmarkIds, periodCode) {
 export function buildBenchmarkRebasedSeries(benchmarkIds, periodCode) {
   if (!benchmarkIds || benchmarkIds.length === 0) return { benchmarkSeries: [], sampleDates: [] };
 
-  var range = getDateRange(periodCode);
-  var sampleDates = generateWeeklyDates(range.startDate, range.endDate);
-  var series = [];
+  const range = getDateRange(periodCode);
+  const sampleDates = generateWeeklyDates(range.startDate, range.endDate);
+  const series = [];
 
-  for (var i = 0; i < benchmarkIds.length; i++) {
-    var bm = getBenchmarkById(benchmarkIds[i]);
+  for (let i = 0; i < benchmarkIds.length; i++) {
+    const bm = getBenchmarkById(benchmarkIds[i]);
     if (!bm) continue;
 
-    var bmValues = getBenchmarkDataInRange(bm.id, range.fromStr, range.toStr);
+    const bmValues = getBenchmarkDataInRange(bm.id, range.fromStr, range.toStr);
     if (!bmValues || bmValues.length < 2) continue;
 
-    var weeklyValues = sampleWeekly(sampleDates, bmValues, "benchmark_date", "value");
-    var rebased = rebaseToZero(weeklyValues);
+    const weeklyValues = sampleWeekly(sampleDates, bmValues, "benchmark_date", "value");
+    const rebased = rebaseToZero(weeklyValues);
 
-    var mapped = mapBenchmarkToPrice(bmValues);
-    var returnData = calculateReturn(mapped);
+    const mapped = mapBenchmarkToPrice(bmValues);
+    const returnData = calculateReturn(mapped);
 
     series.push({
       label: bm.description,
@@ -512,47 +512,47 @@ export function buildComparisonTable(periodCodes, benchmarkIds, investmentIds) {
     return (PERIOD_WEEKS[a] || 0) - (PERIOD_WEEKS[b] || 0);
   });
 
-  var periods = [];
-  for (var p = 0; p < periodCodes.length; p++) {
+  const periods = [];
+  for (let p = 0; p < periodCodes.length; p++) {
     periods.push({ code: periodCodes[p], label: PERIOD_LABELS[periodCodes[p]] || periodCodes[p] });
   }
 
   // Use the widest period for the bulk price query
-  var widestCode = periodCodes[periodCodes.length - 1];
-  var widestRange = getDateRange(widestCode);
-  var investments = getFilteredInvestments(investmentIds);
-  var allPricesMap = getAllInvestmentPricesInRange(widestRange.fromStr, widestRange.toStr);
+  const widestCode = periodCodes[periodCodes.length - 1];
+  const widestRange = getDateRange(widestCode);
+  const investments = getFilteredInvestments(investmentIds);
+  const allPricesMap = getAllInvestmentPricesInRange(widestRange.fromStr, widestRange.toStr);
 
   // Pre-compute date ranges for each period
-  var ranges = {};
-  for (var r = 0; r < periodCodes.length; r++) {
+  const ranges = {};
+  for (let r = 0; r < periodCodes.length; r++) {
     ranges[periodCodes[r]] = getDateRange(periodCodes[r]);
   }
 
   // Build investment rows
-  var investmentRows = [];
-  for (var i = 0; i < investments.length; i++) {
-    var inv = investments[i];
-    var widestPrices = getGBPPrices(inv, allPricesMap, widestRange.fromStr, widestRange.toStr);
+  const investmentRows = [];
+  for (let i = 0; i < investments.length; i++) {
+    const inv = investments[i];
+    const widestPrices = getGBPPrices(inv, allPricesMap, widestRange.fromStr, widestRange.toStr);
     if (!widestPrices || widestPrices.length < 2) continue;
 
-    var returns = {};
-    var hasAnyReturn = false;
+    const returns = {};
+    let hasAnyReturn = false;
 
-    for (var pc = 0; pc < periodCodes.length; pc++) {
-      var code = periodCodes[pc];
-      var periodRange = ranges[code];
+    for (let pc = 0; pc < periodCodes.length; pc++) {
+      const code = periodCodes[pc];
+      const periodRange = ranges[code];
 
       // Filter the already-fetched prices to this period's start date
-      var filtered = [];
-      for (var f = 0; f < widestPrices.length; f++) {
+      const filtered = [];
+      for (let f = 0; f < widestPrices.length; f++) {
         if (widestPrices[f].price_date >= periodRange.fromStr) {
           filtered.push(widestPrices[f]);
         }
       }
 
       if (filtered.length >= 2) {
-        var returnData = calculateReturn(filtered);
+        const returnData = calculateReturn(filtered);
         if (returnData.returnPct !== null) {
           returns[code] = Math.round(returnData.returnPct * 100) / 100;
           hasAnyReturn = true;
@@ -578,20 +578,20 @@ export function buildComparisonTable(periodCodes, benchmarkIds, investmentIds) {
   }
 
   // Build benchmark rows
-  var benchmarkRows = [];
-  for (var b = 0; b < benchmarkIds.length; b++) {
-    var bm = getBenchmarkById(benchmarkIds[b]);
+  const benchmarkRows = [];
+  for (let b = 0; b < benchmarkIds.length; b++) {
+    const bm = getBenchmarkById(benchmarkIds[b]);
     if (!bm) continue;
 
-    var bmReturns = {};
-    for (var bpc = 0; bpc < periodCodes.length; bpc++) {
-      var bmCode = periodCodes[bpc];
-      var bmRange = ranges[bmCode];
-      var bmValues = getBenchmarkDataInRange(bm.id, bmRange.fromStr, bmRange.toStr);
+    const bmReturns = {};
+    for (let bpc = 0; bpc < periodCodes.length; bpc++) {
+      const bmCode = periodCodes[bpc];
+      const bmRange = ranges[bmCode];
+      const bmValues = getBenchmarkDataInRange(bm.id, bmRange.fromStr, bmRange.toStr);
 
       if (bmValues && bmValues.length >= 2) {
-        var bmMapped = mapBenchmarkToPrice(bmValues);
-        var bmReturnData = calculateReturn(bmMapped);
+        const bmMapped = mapBenchmarkToPrice(bmValues);
+        const bmReturnData = calculateReturn(bmMapped);
         bmReturns[bmCode] = bmReturnData.returnPct !== null
           ? Math.round(bmReturnData.returnPct * 100) / 100
           : null;

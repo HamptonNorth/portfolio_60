@@ -103,24 +103,24 @@ function createTestDatabase() {
  */
 function syncRepoGuidesToTestDocs(testDocsDir) {
   try {
-    var repoDocsDir = resolve("docs");
+    const repoDocsDir = resolve("docs");
     if (!existsSync(repoDocsDir)) return;
 
-    var categories = readdirSync(repoDocsDir, { withFileTypes: true });
-    for (var i = 0; i < categories.length; i++) {
+    const categories = readdirSync(repoDocsDir, { withFileTypes: true });
+    for (let i = 0; i < categories.length; i++) {
       if (!categories[i].isDirectory()) continue;
 
-      var categoryName = categories[i].name;
-      var srcDir = join(repoDocsDir, categoryName);
-      var destDir = join(testDocsDir, categoryName);
+      const categoryName = categories[i].name;
+      const srcDir = join(repoDocsDir, categoryName);
+      const destDir = join(testDocsDir, categoryName);
 
       mkdirSync(destDir, { recursive: true });
 
-      var files = readdirSync(srcDir);
-      for (var j = 0; j < files.length; j++) {
+      const files = readdirSync(srcDir);
+      for (let j = 0; j < files.length; j++) {
         if (!files[j].endsWith(".md")) continue;
-        var srcFile = join(srcDir, files[j]);
-        var destFile = join(destDir, files[j]);
+        const srcFile = join(srcDir, files[j]);
+        const destFile = join(destDir, files[j]);
         if (!existsSync(destFile)) {
           copyFileSync(srcFile, destFile);
         }
@@ -168,7 +168,7 @@ export function activateTestMode() {
   resetDatabasePath();
 
   // Point docs at test reference, copying repo guide files if needed
-  var testDocsDir = resolve(TEST_REF_DIR, "docs");
+  const testDocsDir = resolve(TEST_REF_DIR, "docs");
   process.env.DOCS_DIR = testDocsDir;
   syncRepoGuidesToTestDocs(testDocsDir);
 

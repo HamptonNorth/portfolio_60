@@ -115,7 +115,7 @@ function drawRightAligned(page, text, x, colWidth, y, font, fontSize, color) {
 function truncateText(text, font, fontSize, maxWidth) {
   if (font.widthOfTextAtSize(text, fontSize) <= maxWidth) return text;
 
-  var truncated = text;
+  let truncated = text;
   while (truncated.length > 0 && font.widthOfTextAtSize(truncated + "...", fontSize) > maxWidth) {
     truncated = truncated.slice(0, -1);
   }
@@ -166,16 +166,16 @@ function formatDiffCell(diff, base) {
   if (diff === null || diff === undefined) return "N/A";
 
   // Format value part
-  var sign = diff > 0 ? "+" : "";
-  var valueStr = sign + formatGBP(diff);
+  const sign = diff > 0 ? "+" : "";
+  const valueStr = sign + formatGBP(diff);
 
   // Format percent part
-  var pctStr;
+  let pctStr;
   if (base === null || base === undefined || base === 0) {
     pctStr = "(n/a)";
   } else {
-    var pct = (diff / base) * 100;
-    var pctSign = pct > 0 ? "+" : "";
+    const pct = (diff / base) * 100;
+    const pctSign = pct > 0 ? "+" : "";
     pctStr = "(" + pctSign + pct.toFixed(1) + "%)";
   }
 
@@ -194,8 +194,8 @@ function resolveParams(params) {
     const tokenMap = getReportParams();
     const tokens = Object.keys(tokenMap);
     return params.map(function (param) {
-      var result = param;
-      for (var i = 0; i < tokens.length; i++) {
+      let result = param;
+      for (let i = 0; i < tokens.length; i++) {
         result = result.split(tokens[i]).join(tokenMap[tokens[i]]);
       }
       return result;
@@ -212,9 +212,9 @@ function resolveParams(params) {
  * @returns {Object} Map of initials to summary
  */
 function buildInitialsMap(summaries) {
-  var map = {};
-  for (var i = 0; i < summaries.length; i++) {
-    var s = summaries[i];
+  const map = {};
+  for (let i = 0; i < summaries.length; i++) {
+    const s = summaries[i];
     if (s.accounts && s.accounts.length > 0 && s.user.initials) {
       map[s.user.initials.toUpperCase()] = s;
     }
@@ -240,11 +240,11 @@ function buildInitialsMap(summaries) {
  *   May contain `compareTo` (e.g. "3m", "1y") to enable comparison mode.
  */
 export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
-  var pdf = ctx.pdf;
-  var page = ctx.page;
-  var pages = ctx.pages;
-  var y = ctx.y;
-  var fonts = ctx.fonts;
+  const pdf = ctx.pdf;
+  let page = ctx.page;
+  const pages = ctx.pages;
+  let y = ctx.y;
+  const fonts = ctx.fonts;
 
   // Fetch all user summaries
   const users = getAllUsers();
@@ -332,7 +332,7 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
     ensureSpace(ROW_HEIGHT + 2);
     const rowY = y - ROW_HEIGHT;
     const textY = rowY + 4;
-    var font = isBold ? fonts.bold : fonts.medium;
+    const font = isBold ? fonts.bold : fonts.medium;
 
     if (bgColour) {
       page.drawRectangle({
@@ -345,7 +345,7 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
     }
 
     for (const col of COLUMNS) {
-      var cellText = values[col.key] || "";
+      let cellText = values[col.key] || "";
       cellText = truncateText(cellText, font, FONT_SIZE_ROW, col.width - 4);
 
       if (col.align === "right") {
@@ -386,7 +386,7 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
     ensureSpace(ROW_HEIGHT + 2);
     const rowY = y - ROW_HEIGHT;
     const textY = rowY + 4;
-    var font = isBold ? fonts.bold : fonts.medium;
+    const font = isBold ? fonts.bold : fonts.medium;
 
     if (bgColour) {
       page.drawRectangle({
@@ -399,11 +399,11 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
     }
 
     for (const col of COLUMNS) {
-      var cellText = values[col.key] || "";
-      var diffVal = diffs ? diffs[col.key] : null;
+      let cellText = values[col.key] || "";
+      const diffVal = diffs ? diffs[col.key] : null;
 
       // Choose colour based on diff value (null = N/A grey, >0 green, <0 red)
-      var textColour;
+      let textColour;
       if (col.key === "account" || col.key === "reference") {
         textColour = COLOURS.black;
       } else if (cellText === "N/A") {
@@ -469,10 +469,10 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
   function renderSummaryTable(summary) {
     drawHeaderRow();
 
-    for (var a = 0; a < summary.accounts.length; a++) {
-      var account = summary.accounts[a];
-      var typeLabel = ACCOUNT_TYPE_LABELS[account.account_type] || account.account_type;
-      var cashNA = account.cash_available === false;
+    for (let a = 0; a < summary.accounts.length; a++) {
+      const account = summary.accounts[a];
+      const typeLabel = ACCOUNT_TYPE_LABELS[account.account_type] || account.account_type;
+      const cashNA = account.cash_available === false;
 
       drawDataRow({
         account: typeLabel,
@@ -483,7 +483,7 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
       }, false, null);
     }
 
-    var totalsCashNA = summary.totals.cash_available === false;
+    const totalsCashNA = summary.totals.cash_available === false;
     drawDataRow({
       account: "",
       reference: "",
@@ -502,25 +502,25 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
   function renderDiffTable(current, historic) {
     drawHeaderRow();
 
-    for (var a = 0; a < current.accounts.length; a++) {
-      var acct = current.accounts[a];
-      var hAcct = null;
-      for (var h = 0; h < historic.accounts.length; h++) {
+    for (let a = 0; a < current.accounts.length; a++) {
+      const acct = current.accounts[a];
+      let hAcct = null;
+      for (let h = 0; h < historic.accounts.length; h++) {
         if (historic.accounts[h].id === acct.id) {
           hAcct = historic.accounts[h];
           break;
         }
       }
 
-      var typeLabel = ACCOUNT_TYPE_LABELS[acct.account_type] || acct.account_type;
-      var cashUnavailable = (acct.cash_available === false) || (hAcct && hAcct.cash_available === false);
+      const typeLabel = ACCOUNT_TYPE_LABELS[acct.account_type] || acct.account_type;
+      const cashUnavailable = (acct.cash_available === false) || (hAcct && hAcct.cash_available === false);
 
-      var invDiff = hAcct ? acct.investments_total - hAcct.investments_total : null;
-      var invBase = hAcct ? hAcct.investments_total : null;
-      var cashDiff = (!cashUnavailable && hAcct) ? acct.cash_balance - hAcct.cash_balance : null;
-      var cashBase = (!cashUnavailable && hAcct) ? hAcct.cash_balance : null;
-      var totalDiff = (!cashUnavailable && hAcct) ? acct.account_total - hAcct.account_total : null;
-      var totalBase = (!cashUnavailable && hAcct) ? hAcct.account_total : null;
+      const invDiff = hAcct ? acct.investments_total - hAcct.investments_total : null;
+      const invBase = hAcct ? hAcct.investments_total : null;
+      const cashDiff = (!cashUnavailable && hAcct) ? acct.cash_balance - hAcct.cash_balance : null;
+      const cashBase = (!cashUnavailable && hAcct) ? hAcct.cash_balance : null;
+      const totalDiff = (!cashUnavailable && hAcct) ? acct.account_total - hAcct.account_total : null;
+      const totalBase = (!cashUnavailable && hAcct) ? hAcct.account_total : null;
 
       drawDiffDataRow({
         account: typeLabel,
@@ -536,16 +536,16 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
     }
 
     // Totals row
-    var anyNA = current.accounts.some(function (a) { return a.cash_available === false; }) ||
+    const anyNA = current.accounts.some(function (a) { return a.cash_available === false; }) ||
                 historic.accounts.some(function (a) { return a.cash_available === false; });
-    var totalsNA = anyNA || current.totals.cash_available === false || historic.totals.cash_available === false;
+    const totalsNA = anyNA || current.totals.cash_available === false || historic.totals.cash_available === false;
 
-    var invTotalDiff = current.totals.investments - historic.totals.investments;
-    var invTotalBase = historic.totals.investments;
-    var cashTotalDiff = totalsNA ? null : current.totals.cash - historic.totals.cash;
-    var cashTotalBase = totalsNA ? null : historic.totals.cash;
-    var grandTotalDiff = totalsNA ? null : current.totals.grand_total - historic.totals.grand_total;
-    var grandTotalBase = totalsNA ? null : historic.totals.grand_total;
+    const invTotalDiff = current.totals.investments - historic.totals.investments;
+    const invTotalBase = historic.totals.investments;
+    const cashTotalDiff = totalsNA ? null : current.totals.cash - historic.totals.cash;
+    const cashTotalBase = totalsNA ? null : historic.totals.cash;
+    const grandTotalDiff = totalsNA ? null : current.totals.grand_total - historic.totals.grand_total;
+    const grandTotalBase = totalsNA ? null : historic.totals.grand_total;
 
     drawDiffDataRow({
       account: "",
@@ -568,8 +568,8 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
    * @param {string} dateStr - Formatted comparison date (DD/MM/YYYY)
    */
   function renderUserComparisonSections(currentSummary, historicSummary, dateStr) {
-    var user = currentSummary.user;
-    var userName = user.first_name + " " + user.last_name;
+    const user = currentSummary.user;
+    const userName = user.first_name + " " + user.last_name;
 
     // User heading
     ensureSpace(USER_HEADING_HEIGHT + HEADER_ROW_HEIGHT + ROW_HEIGHT);
@@ -607,8 +607,8 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
    */
   function renderCombinedComparisonSections(currentSummaries, historicSummaries, dateStr) {
     // Build aggregated summary objects for current and historic
-    var currentAgg = aggregateSummaries(currentSummaries);
-    var historicAgg = aggregateSummaries(historicSummaries);
+    const currentAgg = aggregateSummaries(currentSummaries);
+    const historicAgg = aggregateSummaries(historicSummaries);
 
     // Separator line and heading
     ensureSpace(30 + HEADER_ROW_HEIGHT + ROW_HEIGHT * 4);
@@ -652,16 +652,16 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
    * @returns {Object} { byType, totalInvestments, totalCash, totalGrand, cashAvailable }
    */
   function aggregateSummaries(userSummaries) {
-    var byType = {};
-    var totalInvestments = 0;
-    var totalCash = 0;
-    var totalGrand = 0;
-    var anyCashUnavailable = false;
+    const byType = {};
+    let totalInvestments = 0;
+    let totalCash = 0;
+    let totalGrand = 0;
+    let anyCashUnavailable = false;
 
-    for (var u = 0; u < userSummaries.length; u++) {
-      var summary = userSummaries[u];
-      for (var a = 0; a < summary.accounts.length; a++) {
-        var account = summary.accounts[a];
+    for (let u = 0; u < userSummaries.length; u++) {
+      const summary = userSummaries[u];
+      for (let a = 0; a < summary.accounts.length; a++) {
+        const account = summary.accounts[a];
         if (!byType[account.account_type]) {
           byType[account.account_type] = { investments: 0, cash: 0, total: 0, cashAvailable: true };
         }
@@ -699,10 +699,10 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
   function renderAggregatedTable(agg) {
     drawHeaderRow();
 
-    var typeOrder = ["isa", "sipp", "trading"];
-    for (var t = 0; t < typeOrder.length; t++) {
-      var type = typeOrder[t];
-      var totals = agg.byType[type];
+    const typeOrder = ["isa", "sipp", "trading"];
+    for (let t = 0; t < typeOrder.length; t++) {
+      const type = typeOrder[t];
+      const totals = agg.byType[type];
       if (!totals) continue;
 
       drawDataRow({
@@ -731,22 +731,22 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
   function renderAggregatedDiffTable(currentAgg, historicAgg) {
     drawHeaderRow();
 
-    var typeOrder = ["isa", "sipp", "trading"];
-    for (var t = 0; t < typeOrder.length; t++) {
-      var type = typeOrder[t];
-      var cTotals = currentAgg.byType[type];
-      var hTotals = historicAgg.byType[type];
+    const typeOrder = ["isa", "sipp", "trading"];
+    for (let t = 0; t < typeOrder.length; t++) {
+      const type = typeOrder[t];
+      const cTotals = currentAgg.byType[type];
+      const hTotals = historicAgg.byType[type];
       if (!cTotals && !hTotals) continue;
 
-      var cInv = cTotals ? cTotals.investments : 0;
-      var hInv = hTotals ? hTotals.investments : 0;
-      var cashNA = (cTotals && !cTotals.cashAvailable) || (hTotals && !hTotals.cashAvailable);
-      var invDiff = cInv - hInv;
+      const cInv = cTotals ? cTotals.investments : 0;
+      const hInv = hTotals ? hTotals.investments : 0;
+      const cashNA = (cTotals && !cTotals.cashAvailable) || (hTotals && !hTotals.cashAvailable);
+      const invDiff = cInv - hInv;
 
-      var cashDiff = null;
-      var cashBase = null;
-      var totalDiff = null;
-      var totalBase = null;
+      let cashDiff = null;
+      let cashBase = null;
+      let totalDiff = null;
+      let totalBase = null;
       if (!cashNA && cTotals && hTotals) {
         cashDiff = cTotals.cash - hTotals.cash;
         cashBase = hTotals.cash;
@@ -768,10 +768,10 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
     }
 
     // Grand total diff
-    var totalsNA = !currentAgg.cashAvailable || !historicAgg.cashAvailable;
-    var invTotalDiff = currentAgg.totalInvestments - historicAgg.totalInvestments;
-    var cashTDiff = totalsNA ? null : currentAgg.totalCash - historicAgg.totalCash;
-    var grandTDiff = totalsNA ? null : currentAgg.totalGrand - historicAgg.totalGrand;
+    const totalsNA = !currentAgg.cashAvailable || !historicAgg.cashAvailable;
+    const invTotalDiff = currentAgg.totalInvestments - historicAgg.totalInvestments;
+    const cashTDiff = totalsNA ? null : currentAgg.totalCash - historicAgg.totalCash;
+    const grandTDiff = totalsNA ? null : currentAgg.totalGrand - historicAgg.totalGrand;
 
     drawDiffDataRow({
       account: "",
@@ -792,7 +792,7 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
    * @param {Object} summary - A user's portfolio summary
    */
   function renderUserSection(summary) {
-    var user = summary.user;
+    const user = summary.user;
 
     // User heading
     ensureSpace(USER_HEADING_HEIGHT + HEADER_ROW_HEIGHT + ROW_HEIGHT);
@@ -809,10 +809,10 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
     drawHeaderRow();
 
     // Account rows
-    for (var a = 0; a < summary.accounts.length; a++) {
-      var account = summary.accounts[a];
-      var typeLabel = ACCOUNT_TYPE_LABELS[account.account_type] || account.account_type;
-      var cashSuffix = account.cash_warning ? " *" : "";
+    for (let a = 0; a < summary.accounts.length; a++) {
+      const account = summary.accounts[a];
+      const typeLabel = ACCOUNT_TYPE_LABELS[account.account_type] || account.account_type;
+      const cashSuffix = account.cash_warning ? " *" : "";
 
       drawDataRow({
         account: typeLabel,
@@ -841,15 +841,15 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
    */
   function renderCombinedSection(userSummaries) {
     // Aggregate by account type
-    var byType = {};
-    var totalInvestments = 0;
-    var totalCash = 0;
-    var totalGrand = 0;
+    const byType = {};
+    let totalInvestments = 0;
+    let totalCash = 0;
+    let totalGrand = 0;
 
-    for (var u = 0; u < userSummaries.length; u++) {
-      var summary = userSummaries[u];
-      for (var a = 0; a < summary.accounts.length; a++) {
-        var account = summary.accounts[a];
+    for (let u = 0; u < userSummaries.length; u++) {
+      const summary = userSummaries[u];
+      for (let a = 0; a < summary.accounts.length; a++) {
+        const account = summary.accounts[a];
         if (!byType[account.account_type]) {
           byType[account.account_type] = { investments: 0, cash: 0, total: 0 };
         }
@@ -886,10 +886,10 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
     drawHeaderRow();
 
     // Account type rows
-    var typeOrder = ["isa", "sipp", "trading"];
-    for (var t = 0; t < typeOrder.length; t++) {
-      var type = typeOrder[t];
-      var totals = byType[type];
+    const typeOrder = ["isa", "sipp", "trading"];
+    for (let t = 0; t < typeOrder.length; t++) {
+      const type = typeOrder[t];
+      const totals = byType[type];
       if (!totals) continue;
 
       drawDataRow({
@@ -912,16 +912,16 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
   }
 
   // --- Comparison mode ---
-  var compareTo = blockDef && blockDef.compareTo ? blockDef.compareTo : null;
-  var compareDate = parseCompareToDate(compareTo);
-  var compareDateStr = compareDate ? formatDateUK(compareDate) : null;
+  const compareTo = blockDef && blockDef.compareTo ? blockDef.compareTo : null;
+  const compareDate = parseCompareToDate(compareTo);
+  const compareDateStr = compareDate ? formatDateUK(compareDate) : null;
 
   // Fetch historic summaries if comparing
-  var historicSummaries = [];
-  var historicInitialsMap = {};
+  const historicSummaries = [];
+  let historicInitialsMap = {};
   if (compareDate) {
     for (const user of users) {
-      var hSummary = getPortfolioSummaryAtDate(user.id, compareDate);
+      const hSummary = getPortfolioSummaryAtDate(user.id, compareDate);
       if (hSummary) {
         historicSummaries.push(hSummary);
       }
@@ -953,13 +953,13 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
   }
 
   // --- Render sections based on params ---
-  var resolvedParams = resolveParams(params);
+  const resolvedParams = resolveParams(params);
 
   if (!resolvedParams || resolvedParams.length === 0) {
     // No params: show all users + combined if 2+ users
     if (compareDate) {
-      for (var u = 0; u < activeUsers.length; u++) {
-        var hUser = historicInitialsMap[activeUsers[u].user.initials.toUpperCase()];
+      for (let u = 0; u < activeUsers.length; u++) {
+        const hUser = historicInitialsMap[activeUsers[u].user.initials.toUpperCase()];
         if (hUser) {
           renderUserComparisonSections(activeUsers[u], hUser, compareDateStr);
         } else {
@@ -967,13 +967,13 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
         }
       }
       if (activeUsers.length > 1) {
-        var hActiveUsers = historicSummaries.filter(function (s) {
+        const hActiveUsers = historicSummaries.filter(function (s) {
           return s.accounts && s.accounts.length > 0;
         });
         renderCombinedComparisonSections(activeUsers, hActiveUsers, compareDateStr);
       }
     } else {
-      for (var u2 = 0; u2 < activeUsers.length; u2++) {
+      for (let u2 = 0; u2 < activeUsers.length; u2++) {
         renderUserSection(activeUsers[u2]);
       }
       if (activeUsers.length > 1) {
@@ -981,10 +981,10 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
       }
     }
   } else {
-    var initialsMap = buildInitialsMap(summaries);
+    const initialsMap = buildInitialsMap(summaries);
 
-    for (var p = 0; p < resolvedParams.length; p++) {
-      var entry = resolvedParams[p].trim();
+    for (let p = 0; p < resolvedParams.length; p++) {
+      const entry = resolvedParams[p].trim();
 
       // "new_page" forces a page break and redraws the page header
       if (entry === "new_page") {
@@ -997,11 +997,11 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
 
       if (entry.indexOf("+") !== -1) {
         // Combined section
-        var parts = entry.split("+");
-        var combinedCurrentUsers = [];
-        var combinedHistoricUsers = [];
-        for (var c = 0; c < parts.length; c++) {
-          var key = parts[c].trim().toUpperCase();
+        const parts = entry.split("+");
+        const combinedCurrentUsers = [];
+        const combinedHistoricUsers = [];
+        for (let c = 0; c < parts.length; c++) {
+          const key = parts[c].trim().toUpperCase();
           if (initialsMap[key]) {
             combinedCurrentUsers.push(initialsMap[key]);
           }
@@ -1018,7 +1018,7 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
         }
       } else {
         // Single user section
-        var userKey = entry.toUpperCase();
+        const userKey = entry.toUpperCase();
         if (initialsMap[userKey]) {
           if (compareDate && historicInitialsMap[userKey]) {
             renderUserComparisonSections(initialsMap[userKey], historicInitialsMap[userKey], compareDateStr);
@@ -1045,13 +1045,13 @@ export function renderPortfolioSummaryBlock(ctx, params, blockDef) {
  */
 export async function generatePortfolioSummaryPdf(params, compareTo) {
   const pdf = PDF.create();
-  var fonts = embedRobotoFonts(pdf);
-  var page = pdf.addPage({ size: "a4", orientation: "portrait" });
-  var pages = [page];
-  var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_HEIGHT, MARGIN_TOP, fonts);
+  const fonts = embedRobotoFonts(pdf);
+  const page = pdf.addPage({ size: "a4", orientation: "portrait" });
+  const pages = [page];
+  const y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_HEIGHT, MARGIN_TOP, fonts);
 
-  var blockDef = compareTo ? { compareTo: compareTo } : {};
-  var ctx = { pdf: pdf, page: page, pages: pages, y: y, fonts: fonts };
+  const blockDef = compareTo ? { compareTo: compareTo } : {};
+  const ctx = { pdf: pdf, page: page, pages: pages, y: y, fonts: fonts };
   renderPortfolioSummaryBlock(ctx, params, blockDef);
 
   drawPageFooters(ctx.pages, "Portfolio Summary Valuation", MARGIN_LEFT, USABLE_WIDTH, fonts);

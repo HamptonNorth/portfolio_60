@@ -17,14 +17,14 @@ export const SEARCH_MAX_RESULTS = 25;
 export const SEARCH_MIN_QUERY_LENGTH = 3;
 
 /** @type {number} Characters of context on each side of a match in snippets */
-var SEARCH_CONTEXT_CHARS = 60;
+const SEARCH_CONTEXT_CHARS = 60;
 
 /**
  * @description Content weight configuration for BM25 ranking.
  * Higher weight = more important in search results.
  * @type {Object.<string, number>}
  */
-var WEIGHTS = {
+const WEIGHTS = {
   title: 10,
   description: 8,
   h1: 6,
@@ -57,7 +57,7 @@ export function initSearchIndex(db) {
  * @returns {Object} Content regions grouped by type
  */
 function extractContentRegions(markdown) {
-  var regions = {
+  const regions = {
     h1: [],
     h2: [],
     h3: [],
@@ -69,12 +69,12 @@ function extractContentRegions(markdown) {
     body: [],
   };
 
-  var remaining = markdown;
+  let remaining = markdown;
 
   // Extract code blocks first (to avoid parsing markdown inside them)
   remaining = remaining.replace(/```[\s\S]*?```/g, function (match) {
-    var lines = match.split("\n");
-    var codeContent = lines.slice(1, -1).join(" ");
+    const lines = match.split("\n");
+    const codeContent = lines.slice(1, -1).join(" ");
     if (codeContent.trim()) {
       regions.code.push(codeContent.trim());
     }
@@ -179,17 +179,17 @@ function extractContentRegions(markdown) {
  * @returns {boolean} True if the page was indexed, false if skipped
  */
 function indexPage(db, category, slug, content) {
-  var parsed = parseFrontMatter(content);
-  var meta = parsed.attributes;
-  var body = parsed.body;
+  const parsed = parseFrontMatter(content);
+  const meta = parsed.attributes;
+  const body = parsed.body;
 
   if (!meta.title) {
     return false;
   }
 
-  var regions = extractContentRegions(body);
+  const regions = extractContentRegions(body);
 
-  var insertStmt = db.prepare("INSERT INTO docs_search (" + "category, slug, published, lapse_date, " + "title, description, h1_content, h2_content, h3_content, h4_h6_content, " + "bold_content, link_text, blockquote_content, body_text, code_content" + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+  const insertStmt = db.prepare("INSERT INTO docs_search (" + "category, slug, published, lapse_date, " + "title, description, h1_content, h2_content, h3_content, h4_h6_content, " + "bold_content, link_text, blockquote_content, body_text, code_content" + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
   insertStmt.run(category, slug, meta.published || "y", meta.lapse || null, meta.title || "", meta.summary || meta.description || "", regions.h1.join(" "), regions.h2.join(" "), regions.h3.join(" "), regions.h4_h6.join(" "), regions.bold.join(" "), regions.link_text.join(" "), regions.blockquote.join(" "), regions.body.join(" "), regions.code.join(" "));
 
@@ -204,12 +204,12 @@ function indexPage(db, category, slug, content) {
  * @returns {Promise<{success: boolean, indexed: number, categories: number, duration: string, error?: string}>}
  */
 export async function reindexAllPages(db, categories) {
-  var startTime = Date.now();
-  var indexedCount = 0;
-  var categoriesProcessed = 0;
+  const startTime = Date.now();
+  let indexedCount = 0;
+  let categoriesProcessed = 0;
 
   try {
-    var categoryNames = Object.keys(categories);
+    const categoryNames = Object.keys(categories);
 
     if (categoryNames.length === 0) {
       return {
@@ -224,22 +224,22 @@ export async function reindexAllPages(db, categories) {
     // Clear existing index
     db.run("DELETE FROM docs_search");
 
-    for (var i = 0; i < categoryNames.length; i++) {
-      var category = categoryNames[i];
-      var dirPath = resolve(getDocsDir(), category);
+    for (let i = 0; i < categoryNames.length; i++) {
+      const category = categoryNames[i];
+      const dirPath = resolve(getDocsDir(), category);
 
       try {
-        var files = await readdir(dirPath);
+        const files = await readdir(dirPath);
         categoriesProcessed++;
 
-        for (var j = 0; j < files.length; j++) {
-          var file = files[j];
+        for (let j = 0; j < files.length; j++) {
+          const file = files[j];
           if (!file.endsWith(".md")) continue;
 
           try {
-            var filePath = join(dirPath, file);
-            var content = await Bun.file(filePath).text();
-            var slug = file.replace(".md", "");
+            const filePath = join(dirPath, file);
+            const content = await Bun.file(filePath).text();
+            const slug = file.replace(".md", "");
 
             if (indexPage(db, category, slug, content)) {
               indexedCount++;
@@ -254,10 +254,10 @@ export async function reindexAllPages(db, categories) {
     }
 
     // Update metadata
-    var now = new Date().toISOString();
+    const now = new Date().toISOString();
     db.run("INSERT OR REPLACE INTO docs_search_meta (key, value) VALUES ('last_indexed', ?)", [now]);
 
-    var duration = Date.now() - startTime;
+    const duration = Date.now() - startTime;
     console.log("[Docs Search] Indexed " + indexedCount + " pages from " + categoriesProcessed + " categories in " + duration + "ms");
 
     return {
@@ -300,23 +300,23 @@ function generateSnippet(text, query, contextChars) {
   if (!text || !query) return null;
   if (contextChars === undefined) contextChars = SEARCH_CONTEXT_CHARS;
 
-  var wordBoundaryRegex = new RegExp("(^|\\s)(" + escapeRegex(query.toLowerCase()) + "\\w*)", "i");
-  var match = text.match(wordBoundaryRegex);
+  const wordBoundaryRegex = new RegExp("(^|\\s)(" + escapeRegex(query.toLowerCase()) + "\\w*)", "i");
+  const match = text.match(wordBoundaryRegex);
 
   if (!match) return null;
 
-  var matchIndex = match.index + (match[1] ? 1 : 0);
-  var matchedWord = match[2];
+  const matchIndex = match.index + (match[1] ? 1 : 0);
+  const matchedWord = match[2];
 
-  var start = Math.max(0, matchIndex - contextChars);
-  var end = Math.min(text.length, matchIndex + matchedWord.length + contextChars);
+  const start = Math.max(0, matchIndex - contextChars);
+  const end = Math.min(text.length, matchIndex + matchedWord.length + contextChars);
 
-  var snippet = text.slice(start, end);
+  let snippet = text.slice(start, end);
 
   if (start > 0) snippet = "..." + snippet;
   if (end < text.length) snippet = snippet + "...";
 
-  var highlightRegex = new RegExp("(^|\\s)(" + escapeRegex(query.toLowerCase()) + ")(\\w*)", "gi");
+  const highlightRegex = new RegExp("(^|\\s)(" + escapeRegex(query.toLowerCase()) + ")(\\w*)", "gi");
   snippet = snippet.replace(highlightRegex, "$1<mark>$2</mark>$3");
 
   return snippet;
@@ -332,8 +332,8 @@ function generateSnippet(text, query, contextChars) {
  * @returns {{query: string, results: Array, total: number, duration: string, error?: string}}
  */
 export function searchPages(db, query, options) {
-  var startTime = Date.now();
-  var limit = (options && options.limit) || SEARCH_MAX_RESULTS;
+  const startTime = Date.now();
+  const limit = (options && options.limit) || SEARCH_MAX_RESULTS;
 
   if (!query || query.trim().length < SEARCH_MIN_QUERY_LENGTH) {
     return {
@@ -345,14 +345,14 @@ export function searchPages(db, query, options) {
     };
   }
 
-  var cleanQuery = query.trim();
+  const cleanQuery = query.trim();
 
   try {
     // Build FTS5 query with prefix matching
-    var ftsQuery = cleanQuery
+    const ftsQuery = cleanQuery
       .split(/\s+/)
       .map(function (term) {
-        var escaped = term.replace(/"/g, '""');
+        const escaped = term.replace(/"/g, '""');
         return '"' + escaped + '"*';
       })
       .join(" ");
@@ -361,39 +361,39 @@ export function searchPages(db, query, options) {
     // category(0), slug(0), published(0), lapse_date(0),
     // title(10), description(8), h1(6), h2(5), h3(4), h4_h6(2),
     // bold(2), link_text(2), blockquote(1.5), body(1), code(0.5)
-    var bm25Weights = "0, 0, 0, 0, " + WEIGHTS.title + ", " + WEIGHTS.description + ", " + WEIGHTS.h1 + ", " + WEIGHTS.h2 + ", " + WEIGHTS.h3 + ", " + WEIGHTS.h4_h6 + ", " + WEIGHTS.bold + ", " + WEIGHTS.link_text + ", " + WEIGHTS.blockquote + ", " + WEIGHTS.body + ", " + WEIGHTS.code;
+    const bm25Weights = "0, 0, 0, 0, " + WEIGHTS.title + ", " + WEIGHTS.description + ", " + WEIGHTS.h1 + ", " + WEIGHTS.h2 + ", " + WEIGHTS.h3 + ", " + WEIGHTS.h4_h6 + ", " + WEIGHTS.bold + ", " + WEIGHTS.link_text + ", " + WEIGHTS.blockquote + ", " + WEIGHTS.body + ", " + WEIGHTS.code;
 
-    var searchSql = "SELECT category, slug, title, description, published, lapse_date, " + "h1_content, h2_content, body_text, " + "bm25(docs_search, " + bm25Weights + ") as score " + "FROM docs_search WHERE docs_search MATCH ? ORDER BY score LIMIT ?";
+    const searchSql = "SELECT category, slug, title, description, published, lapse_date, " + "h1_content, h2_content, body_text, " + "bm25(docs_search, " + bm25Weights + ") as score " + "FROM docs_search WHERE docs_search MATCH ? ORDER BY score LIMIT ?";
 
-    var rawResults = db.query(searchSql).all(ftsQuery, limit * 2);
+    const rawResults = db.query(searchSql).all(ftsQuery, limit * 2);
 
     // Filter out unpublished and lapsed pages
-    var now = new Date();
-    var filteredResults = rawResults.filter(function (row) {
+    const now = new Date();
+    const filteredResults = rawResults.filter(function (row) {
       if (row.published === "n") return false;
       if (row.lapse_date && now > new Date(row.lapse_date)) return false;
       return true;
     });
 
-    var limitedResults = filteredResults.slice(0, limit);
+    const limitedResults = filteredResults.slice(0, limit);
 
     // Format results with snippets
-    var results = limitedResults.map(function (row) {
-      var matches = [];
+    const results = limitedResults.map(function (row) {
+      const matches = [];
 
-      var titleSnippet = generateSnippet(row.title, cleanQuery);
+      const titleSnippet = generateSnippet(row.title, cleanQuery);
       if (titleSnippet) matches.push({ region: "title", fragment: titleSnippet });
 
-      var descSnippet = generateSnippet(row.description, cleanQuery);
+      const descSnippet = generateSnippet(row.description, cleanQuery);
       if (descSnippet) matches.push({ region: "description", fragment: descSnippet });
 
-      var h1Snippet = generateSnippet(row.h1_content, cleanQuery);
+      const h1Snippet = generateSnippet(row.h1_content, cleanQuery);
       if (h1Snippet) matches.push({ region: "heading", fragment: h1Snippet });
 
-      var h2Snippet = generateSnippet(row.h2_content, cleanQuery);
+      const h2Snippet = generateSnippet(row.h2_content, cleanQuery);
       if (h2Snippet) matches.push({ region: "heading", fragment: h2Snippet });
 
-      var bodySnippet = generateSnippet(row.body_text, cleanQuery);
+      const bodySnippet = generateSnippet(row.body_text, cleanQuery);
       if (bodySnippet) matches.push({ region: "body", fragment: bodySnippet });
 
       if (matches.length === 0 && row.description) {
@@ -414,7 +414,7 @@ export function searchPages(db, query, options) {
       };
     });
 
-    var duration = Date.now() - startTime;
+    const duration = Date.now() - startTime;
 
     return {
       query: cleanQuery,
@@ -441,8 +441,8 @@ export function searchPages(db, query, options) {
  */
 export function getSearchMeta(db) {
   try {
-    var lastIndexed = db.query("SELECT value FROM docs_search_meta WHERE key = 'last_indexed'").get();
-    var countResult = db.query("SELECT COUNT(*) as count FROM docs_search").get();
+    const lastIndexed = db.query("SELECT value FROM docs_search_meta WHERE key = 'last_indexed'").get();
+    const countResult = db.query("SELECT COUNT(*) as count FROM docs_search").get();
 
     return {
       lastIndexed: lastIndexed ? lastIndexed.value : null,

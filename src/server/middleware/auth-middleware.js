@@ -52,7 +52,7 @@ export function checkDemoBlock(method, path) {
   if (method === "GET") return null;
 
   // Allow auth routes through (sign-in, sign-out)
-  for (var i = 0; i < DEMO_WRITE_EXEMPT.length; i++) {
+  for (let i = 0; i < DEMO_WRITE_EXEMPT.length; i++) {
     if (path.startsWith(DEMO_WRITE_EXEMPT[i])) return null;
   }
 

@@ -228,7 +228,7 @@ function escapeHtml(text) {
  */
 function buildFtMarketsUrl(publicId, currencyCode) {
   if (!publicId || typeof publicId !== "string") return null;
-  var trimmed = publicId.trim().toUpperCase();
+  const trimmed = publicId.trim().toUpperCase();
   if (!trimmed) return null;
 
   // ISIN: 2 uppercase letters + 10 alphanumeric
@@ -244,7 +244,7 @@ function buildFtMarketsUrl(publicId, currencyCode) {
 
   // Ticker: EXCHANGE:TICKER (one colon)
   if (/^[A-Z]{1,10}:[A-Z0-9.]{1,10}$/.test(trimmed)) {
-    var parts = trimmed.split(":");
+    const parts = trimmed.split(":");
     return "https://markets.ft.com/data/equities/tearsheet/summary?s=" + parts[1] + ":" + parts[0];
   }
 
@@ -265,14 +265,14 @@ function buildFtMarketsUrl(publicId, currencyCode) {
  * @returns {string} HTML string for the research link(s)
  */
 function buildResearchLinkHtml(description, publicId, currencyCode, morningstarId, options) {
-  var escaped = escapeHtml(description);
-  var ftUrl = buildFtMarketsUrl(publicId, currencyCode);
-  var msUrl = buildMorningstarUrl(morningstarId);
-  var stopClick = (options && options.stopPropagation) ? ' onclick="event.stopPropagation()"' : "";
+  const escaped = escapeHtml(description);
+  const ftUrl = buildFtMarketsUrl(publicId, currencyCode);
+  const msUrl = buildMorningstarUrl(morningstarId);
+  const stopClick = (options && options.stopPropagation) ? ' onclick="event.stopPropagation()"' : "";
 
   if (ftUrl && msUrl) {
     // Both links available — show hover tooltip with both options
-    var html = '<span class="relative inline-block research-link-wrapper"' + stopClick + ">";
+    let html = '<span class="relative inline-block research-link-wrapper"' + stopClick + ">";
     html += '<span class="text-blue-700 cursor-pointer hover:underline">' + escaped + "</span>";
     html += '<div class="research-link-tooltip hidden absolute left-0 top-full z-50 mt-0.5 bg-white border border-brand-200 rounded shadow-lg py-1 min-w-[180px]">';
     html += '<a href="' + escapeHtml(ftUrl) + '" target="_blank" rel="noopener" class="block px-3 py-1.5 text-sm text-blue-700 hover:bg-brand-50 hover:underline"' + stopClick + ">FT Markets</a>";
@@ -301,11 +301,11 @@ function buildResearchLinkHtml(description, publicId, currencyCode, morningstarI
  */
 function buildMorningstarUrl(morningstarId) {
   if (!morningstarId || typeof morningstarId !== "string") return null;
-  var parts = morningstarId.split("|");
-  var secId = parts[0].trim();
+  const parts = morningstarId.split("|");
+  const secId = parts[0].trim();
   if (!secId) return null;
-  var universe = (parts[1] || "").trim();
-  var category = "funds";
+  const universe = (parts[1] || "").trim();
+  let category = "funds";
   if (universe.substring(0, 2) === "FE") {
     category = "etf";
   } else if (universe.substring(0, 2) === "E0") {
@@ -349,8 +349,8 @@ function attachLineNumbers(textarea) {
 
   function updateLineNumbers() {
     const lineCount = textarea.value.split("\n").length;
-    var nums = "";
-    for (var i = 1; i <= lineCount; i++) {
+    let nums = "";
+    for (let i = 1; i <= lineCount; i++) {
       nums += i + "\n";
     }
     gutter.textContent = nums;
@@ -831,7 +831,7 @@ async function showEditReportsModal() {
     }
 
     // Check for warnings (new_page or layout in reports file)
-    var warnings = validateJsonWarnings(content, "reports");
+    const warnings = validateJsonWarnings(content, "reports");
     if (warnings.length > 0) {
       warningDiv.innerHTML = "<strong>Warning:</strong> " + warnings.map(escapeHtml).join("<br>");
       warningDiv.classList.remove("hidden");
@@ -867,28 +867,28 @@ async function showEditReportsModal() {
  * @returns {Array<string>} Warning messages (empty if none)
  */
 function validateJsonWarnings(content, fileType) {
-  var warnings = [];
+  const warnings = [];
   try {
-    var parsed = JSON.parse(content);
+    const parsed = JSON.parse(content);
     if (!Array.isArray(parsed)) return warnings;
 
     if (fileType === "views") {
       // Warn if any entry contains pdfEndpoint (belongs in user-reports.json)
-      for (var i = 0; i < parsed.length; i++) {
+      for (let i = 0; i < parsed.length; i++) {
         if (parsed[i].pdfEndpoint) {
           warnings.push('Entry "' + (parsed[i].id || parsed[i].title || "index " + i) + '" has "pdfEndpoint" — this belongs in user-reports.json (PDF reports), not user-views.json.');
         }
       }
     } else if (fileType === "reports") {
       // Warn if any entry or its blocks contain new_page or layout (belongs in user-views.json)
-      for (var i = 0; i < parsed.length; i++) {
-        var entry = parsed[i];
-        var entryName = entry.id || entry.title || "index " + i;
+      for (let i = 0; i < parsed.length; i++) {
+        const entry = parsed[i];
+        const entryName = entry.id || entry.title || "index " + i;
         if (entry.layout) {
           warnings.push('Entry "' + entryName + '" has "layout" — this belongs in user-views.json (HTML views), not user-reports.json.');
         }
         if (entry.blocks && Array.isArray(entry.blocks)) {
-          for (var j = 0; j < entry.blocks.length; j++) {
+          for (let j = 0; j < entry.blocks.length; j++) {
             if (entry.blocks[j].type === "new_page") {
               warnings.push('Entry "' + entryName + '" has a "new_page" block — this belongs in user-views.json (HTML views), not user-reports.json.');
               break;
@@ -1008,7 +1008,7 @@ async function showEditViewsModal() {
     }
 
     // Check for warnings (pdfEndpoint in views file)
-    var warnings = validateJsonWarnings(content, "views");
+    const warnings = validateJsonWarnings(content, "views");
     if (warnings.length > 0) {
       warningDiv.innerHTML = "<strong>Warning:</strong> " + warnings.map(escapeHtml).join("<br>");
       warningDiv.classList.remove("hidden");
@@ -1036,10 +1036,6 @@ async function showEditViewsModal() {
   editor.focus();
 }
 
-/**
- * @description Show the About modal with system information useful for
- * first-line support.
- */
 /**
  * @description Show the Fetch Server Settings info modal.
  * Displays instructions for configuring the optional remote fetch server.
@@ -1081,6 +1077,12 @@ FETCH_SERVER_API_KEY=your-secret-key</pre>
   showModalHtml("Fetch Server Settings", htmlContent);
 }
 
+/**
+ * @description Show the About modal with system information useful for
+ * first-line support. Displays version, build time, platform details, and
+ * file paths in a tabbed dialog with a Copy to Clipboard button.
+ * Also includes an Acknowledgements tab listing open-source dependencies.
+ */
 async function showAboutModal() {
   // Remove any existing modal
   const existingModal = document.getElementById("app-modal");
@@ -1115,13 +1117,49 @@ async function showAboutModal() {
   // Build the info text block (same format as the screenshot reference)
   const infoLines = [info.appName + " v" + info.version, "Built: " + info.buildTime, "", "--- System ---", "Platform:   " + info.platform, "Arch:       " + info.arch, "OS:         " + info.os, "Runtime:    " + info.runtime, "", "--- Paths ---", "Config:     " + info.configPath, "Database:   " + info.dbPath, "Backups:    " + info.backupPath].join("\n");
 
+  // Tab labels and active/inactive styles
+  const activeTabClass = "border-b-2 border-brand-700 text-brand-800 font-semibold";
+  const inactiveTabClass = "text-brand-500 hover:text-brand-700";
+
   modal.innerHTML = `
     <div class="bg-white rounded-lg shadow-xl max-w-xl w-full mx-4 overflow-hidden">
       <div class="bg-brand-800 text-white px-4 py-3">
         <h3 class="text-lg font-semibold">About Portfolio 60</h3>
       </div>
-      <div class="p-4">
+      <div class="flex border-b border-brand-200 px-4 pt-2 gap-6 text-sm">
+        <button id="about-tab-version" class="pb-2 cursor-pointer ${activeTabClass}">Version</button>
+        <button id="about-tab-ack" class="pb-2 cursor-pointer ${inactiveTabClass}">Acknowledgements</button>
+      </div>
+      <div id="about-panel-version" class="p-4">
         <pre id="about-info-text" class="bg-brand-25 border border-brand-200 rounded-lg p-4 text-sm font-mono text-brand-700 whitespace-pre overflow-x-auto">${escapeHtml(infoLines)}</pre>
+      </div>
+      <div id="about-panel-ack" class="p-4 hidden text-sm text-brand-700 max-h-80 overflow-y-auto">
+        <p class="mb-4 text-brand-600">Built with open-source software. Thanks to all the contributors who share their work freely — you make the web a better place.</p>
+        <table class="w-full text-left">
+          <thead>
+            <tr class="border-b border-brand-200 text-brand-500 text-xs uppercase tracking-wide">
+              <th class="pb-2 pr-3">Library</th>
+              <th class="pb-2">Description</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-brand-100">
+            <tr><td class="py-1.5 pr-3 font-medium"><a href="https://github.com/oven-sh/bun" target="_blank" rel="noopener" class="text-brand-700 underline hover:text-brand-900">Bun</a></td><td class="py-1.5">JavaScript runtime, server, and toolkit</td></tr>
+            <tr><td class="py-1.5 pr-3 font-medium"><a href="https://github.com/sqlite/sqlite" target="_blank" rel="noopener" class="text-brand-700 underline hover:text-brand-900">SQLite</a></td><td class="py-1.5">Embedded relational database engine</td></tr>
+            <tr><td class="py-1.5 pr-3 font-medium"><a href="https://github.com/tailwindlabs/tailwindcss" target="_blank" rel="noopener" class="text-brand-700 underline hover:text-brand-900">Tailwind CSS</a></td><td class="py-1.5">Utility-first CSS framework</td></tr>
+            <tr><td class="py-1.5 pr-3 font-medium"><a href="https://github.com/lit/lit" target="_blank" rel="noopener" class="text-brand-700 underline hover:text-brand-900">Lit</a></td><td class="py-1.5">Web components library</td></tr>
+            <tr><td class="py-1.5 pr-3 font-medium"><a href="https://github.com/markedjs/marked" target="_blank" rel="noopener" class="text-brand-700 underline hover:text-brand-900">Marked</a></td><td class="py-1.5">Markdown parser and compiler</td></tr>
+            <tr><td class="py-1.5 pr-3 font-medium"><a href="https://github.com/nicholasgasior/libpdf" target="_blank" rel="noopener" class="text-brand-700 underline hover:text-brand-900">@libpdf/core</a></td><td class="py-1.5">PDF generation</td></tr>
+            <tr><td class="py-1.5 pr-3 font-medium"><a href="https://github.com/gadicc/node-yahoo-finance2" target="_blank" rel="noopener" class="text-brand-700 underline hover:text-brand-900">yahoo-finance2</a></td><td class="py-1.5">Yahoo Finance API client</td></tr>
+            <tr><td class="py-1.5 pr-3 font-medium"><a href="https://github.com/hexagon/croner" target="_blank" rel="noopener" class="text-brand-700 underline hover:text-brand-900">Croner</a></td><td class="py-1.5">Cron job scheduler</td></tr>
+            <tr><td class="py-1.5 pr-3 font-medium"><a href="https://github.com/archiverjs/node-archiver" target="_blank" rel="noopener" class="text-brand-700 underline hover:text-brand-900">Archiver</a></td><td class="py-1.5">Archive/ZIP file creation</td></tr>
+            <tr><td class="py-1.5 pr-3 font-medium"><a href="https://github.com/cthackers/adm-zip" target="_blank" rel="noopener" class="text-brand-700 underline hover:text-brand-900">ADM-ZIP</a></td><td class="py-1.5">ZIP file extraction</td></tr>
+            <tr><td class="py-1.5 pr-3 font-medium"><a href="https://github.com/open-cli-tools/concurrently" target="_blank" rel="noopener" class="text-brand-700 underline hover:text-brand-900">Concurrently</a></td><td class="py-1.5">Run multiple commands concurrently</td></tr>
+            <tr><td class="py-1.5 pr-3 font-medium"><a href="https://github.com/streetsidesoftware/cspell" target="_blank" rel="noopener" class="text-brand-700 underline hover:text-brand-900">cspell-lib</a></td><td class="py-1.5">Spell-checking library</td></tr>
+            <tr><td class="py-1.5 pr-3 font-medium"><a href="https://github.com/microsoft/playwright" target="_blank" rel="noopener" class="text-brand-700 underline hover:text-brand-900">Playwright</a></td><td class="py-1.5">End-to-end browser testing</td></tr>
+            <tr><td class="py-1.5 pr-3 font-medium"><a href="https://github.com/cloudflare/cloudflared" target="_blank" rel="noopener" class="text-brand-700 underline hover:text-brand-900">Cloudflare Tunnel</a></td><td class="py-1.5">Secure remote access without port forwarding</td></tr>
+          </tbody>
+        </table>
+        <p class="mt-4 pt-3 border-t border-brand-200 text-brand-500 text-xs">Portfolio 60 was built with the help of <a href="https://claude.ai" target="_blank" rel="noopener" class="underline hover:text-brand-700"><strong>Claude</strong></a> by Anthropic.</p>
       </div>
       <div class="px-4 py-3 bg-brand-50 flex justify-between">
         <button id="about-copy-btn" class="bg-brand-200 hover:bg-brand-300 text-brand-700 font-medium px-4 py-2 rounded transition-colors">Copy to Clipboard</button>
@@ -1132,6 +1170,27 @@ async function showAboutModal() {
 
   const okBtn = document.getElementById("about-ok-btn");
   const copyBtn = document.getElementById("about-copy-btn");
+  const tabVersion = document.getElementById("about-tab-version");
+  const tabAck = document.getElementById("about-tab-ack");
+  const panelVersion = document.getElementById("about-panel-version");
+  const panelAck = document.getElementById("about-panel-ack");
+
+  /**
+   * @description Switches the active tab in the About modal
+   * @param {"version"|"ack"} tab - Which tab to activate
+   */
+  function switchTab(tab) {
+    const isVersion = tab === "version";
+    panelVersion.classList.toggle("hidden", !isVersion);
+    panelAck.classList.toggle("hidden", isVersion);
+    tabVersion.className = "pb-2 cursor-pointer " + (isVersion ? activeTabClass : inactiveTabClass);
+    tabAck.className = "pb-2 cursor-pointer " + (isVersion ? inactiveTabClass : activeTabClass);
+    // Only show Copy to Clipboard on the Version tab
+    copyBtn.classList.toggle("invisible", !isVersion);
+  }
+
+  tabVersion.addEventListener("click", function () { switchTab("version"); });
+  tabAck.addEventListener("click", function () { switchTab("ack"); });
 
   function closeAboutModal() {
     modal.remove();

@@ -21,8 +21,8 @@ function showTestDbProgress(contentDiv) {
     '</div>' +
     '</div>';
 
-  var dotCount = 0;
-  var dotsSpan = document.getElementById("progress-dots");
+  let dotCount = 0;
+  const dotsSpan = document.getElementById("progress-dots");
   return setInterval(function () {
     dotCount = (dotCount + 1) % 4;
     dotsSpan.textContent = ".".repeat(dotCount);
@@ -54,42 +54,42 @@ function showTestDbComplete(contentDiv, dotsInterval) {
     '<div id="setup-log" class="mt-4 max-h-48 overflow-y-auto text-xs text-brand-500 font-mono bg-brand-50 rounded-lg p-3 space-y-0.5"></div>' +
     '</div>';
 
-  var phaseEl = document.getElementById("setup-phase");
-  var detailEl = document.getElementById("setup-detail");
-  var logEl = document.getElementById("setup-log");
-  var spinnerEl = document.getElementById("setup-spinner");
+  const phaseEl = document.getElementById("setup-phase");
+  const detailEl = document.getElementById("setup-detail");
+  const logEl = document.getElementById("setup-log");
+  const spinnerEl = document.getElementById("setup-spinner");
 
   function addLogEntry(text) {
-    var entry = document.createElement("div");
+    const entry = document.createElement("div");
     entry.textContent = text;
     logEl.appendChild(entry);
     logEl.scrollTop = logEl.scrollHeight;
   }
 
-  var source = new EventSource("/api/test-setup/stream");
+  const source = new EventSource("/api/test-setup/stream");
 
   source.addEventListener("phase", function (event) {
-    var data = JSON.parse(event.data);
+    const data = JSON.parse(event.data);
     phaseEl.textContent = "Step " + data.phase + " of " + data.total + ": " + data.message;
     addLogEntry("— " + data.message);
   });
 
   source.addEventListener("progress", function (event) {
-    var data = JSON.parse(event.data);
+    const data = JSON.parse(event.data);
     detailEl.textContent = data.message;
     addLogEntry("  " + data.message);
   });
 
   source.addEventListener("error", function (event) {
     if (event.data) {
-      var data = JSON.parse(event.data);
+      const data = JSON.parse(event.data);
       addLogEntry("  Warning: " + data.message);
     }
   });
 
   source.addEventListener("done", function (event) {
     source.close();
-    var data = JSON.parse(event.data);
+    const data = JSON.parse(event.data);
     spinnerEl.style.display = "none";
 
     if (data.success) {
@@ -154,11 +154,11 @@ function showLockoutMessage(contentDiv, remainingMs) {
     '<p class="text-brand-700 font-medium">Try again in: <span id="lockout-countdown">' + formatRemaining(remainingMs) + '</span></p>' +
     '</div>';
 
-  var endTime = Date.now() + remainingMs;
-  var countdownSpan = document.getElementById("lockout-countdown");
+  const endTime = Date.now() + remainingMs;
+  const countdownSpan = document.getElementById("lockout-countdown");
 
-  var countdownInterval = setInterval(function () {
-    var remaining = endTime - Date.now();
+  const countdownInterval = setInterval(function () {
+    const remaining = endTime - Date.now();
     if (remaining <= 0) {
       clearInterval(countdownInterval);
       showVerifyPassphraseForm(contentDiv, messagesDiv);
@@ -284,7 +284,7 @@ function showSetPassphraseForm(contentDiv, messagesDiv) {
     }
 
     // Show progress indicator for test mode while the server creates the database
-    var dotsInterval = null;
+    let dotsInterval = null;
     if (isTestEntry) {
       dotsInterval = showTestDbProgress(contentDiv);
     }
@@ -319,13 +319,13 @@ function showSetPassphraseForm(contentDiv, messagesDiv) {
   });
 
   // "Try the demo" button — submits "demo" as the passphrase automatically
-  var demoBtn = document.getElementById("demo-btn");
+  const demoBtn = document.getElementById("demo-btn");
   if (demoBtn) {
     demoBtn.addEventListener("click", async function () {
-      var errorsDiv = document.getElementById("form-errors");
+      const errorsDiv = document.getElementById("form-errors");
       if (errorsDiv) errorsDiv.textContent = "";
 
-      var result = await apiRequest("/api/auth/set-passphrase", {
+      const result = await apiRequest("/api/auth/set-passphrase", {
         method: "POST",
         body: { passphrase: "demo" },
       });
@@ -392,8 +392,8 @@ function showVerifyPassphraseForm(contentDiv, messagesDiv) {
     }
 
     // Show progress indicator for test mode while the server creates the database
-    var isTestEntry = passphrase.toLowerCase() === "test";
-    var dotsInterval = null;
+    const isTestEntry = passphrase.toLowerCase() === "test";
+    let dotsInterval = null;
     if (isTestEntry) {
       dotsInterval = showTestDbProgress(contentDiv);
     }
@@ -428,13 +428,13 @@ function showVerifyPassphraseForm(contentDiv, messagesDiv) {
   });
 
   // "Try the demo" button — submits "demo" as the passphrase automatically
-  var demoBtn = document.getElementById("demo-btn");
+  const demoBtn = document.getElementById("demo-btn");
   if (demoBtn) {
     demoBtn.addEventListener("click", async function () {
-      var errorsDiv = document.getElementById("form-errors");
+      const errorsDiv = document.getElementById("form-errors");
       if (errorsDiv) errorsDiv.textContent = "";
 
-      var result = await apiRequest("/api/auth/verify", {
+      const result = await apiRequest("/api/auth/verify", {
         method: "POST",
         body: { passphrase: "demo" },
       });

@@ -255,15 +255,15 @@ export function getCurrentHoldingInvestmentIds(userIds, accountTypes) {
 
   const db = getDatabase();
   const userPlaceholders = userIds.map(() => "?").join(", ");
-  var sql = `SELECT DISTINCT h.investment_id
+  let sql = `SELECT DISTINCT h.investment_id
        FROM holdings h
        JOIN accounts a ON h.account_id = a.id
        WHERE h.effective_to IS NULL
          AND a.user_id IN (${userPlaceholders})`;
-  var params = [...userIds];
+  const params = [...userIds];
 
   if (accountTypes && accountTypes.length > 0) {
-    var typePlaceholders = accountTypes.map(() => "?").join(", ");
+    const typePlaceholders = accountTypes.map(() => "?").join(", ");
     sql += ` AND a.account_type IN (${typePlaceholders})`;
     params.push(...accountTypes);
   }
@@ -286,15 +286,15 @@ export function getHistoricHoldingInvestmentIds(userIds, accountTypes) {
 
   const db = getDatabase();
   const userPlaceholders = userIds.map(() => "?").join(", ");
-  var typeClause = "";
-  var typeParams = [];
+  let typeClause = "";
+  let typeParams = [];
   if (accountTypes && accountTypes.length > 0) {
-    var typePlaceholders = accountTypes.map(() => "?").join(", ");
+    const typePlaceholders = accountTypes.map(() => "?").join(", ");
     typeClause = ` AND a.account_type IN (${typePlaceholders})`;
     typeParams = [...accountTypes];
   }
 
-  var sql = `SELECT DISTINCT h.investment_id
+  const sql = `SELECT DISTINCT h.investment_id
        FROM holdings h
        JOIN accounts a ON h.account_id = a.id
        WHERE a.user_id IN (${userPlaceholders})${typeClause}

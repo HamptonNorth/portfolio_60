@@ -9,10 +9,19 @@ import "./docs-search-modal.js";
  * Uses light DOM so Tailwind CSS utility classes work without Shadow DOM.
  */
 class AppNavbar extends LitElement {
+  /**
+   * @description Use light DOM instead of Shadow DOM so Tailwind utility classes apply directly.
+   * @returns {HTMLElement} The component element itself
+   */
   createRenderRoot() {
     return this;
   }
 
+  /**
+   * @description Render the full navigation bar including logo, dropdown menus,
+   * and settings gear icon.
+   * @returns {import('lit').TemplateResult} The navbar template
+   */
   render() {
     return html`
       <nav class="bg-brand-800 text-white px-6 py-4 shadow-md">
@@ -107,7 +116,10 @@ class AppNavbar extends LitElement {
     `;
   }
 
-  /** @description Call the global showEditSettingsModal function from app.js */
+  /**
+   * @description Call the global showEditSettingsModal function from app.js.
+   * @param {Event} event - The click event from the menu link
+   */
   _editSettings(event) {
     event.preventDefault();
     if (typeof showEditSettingsModal === "function") {
@@ -115,7 +127,10 @@ class AppNavbar extends LitElement {
     }
   }
 
-  /** @description Call the global showEditViewsModal function from app.js */
+  /**
+   * @description Call the global showEditViewsModal function from app.js.
+   * @param {Event} event - The click event from the menu link
+   */
   _editViews(event) {
     event.preventDefault();
     if (typeof showEditViewsModal === "function") {
@@ -123,7 +138,10 @@ class AppNavbar extends LitElement {
     }
   }
 
-  /** @description Call the global showEditReportsModal function from app.js */
+  /**
+   * @description Call the global showEditReportsModal function from app.js.
+   * @param {Event} event - The click event from the menu link
+   */
   _editReports(event) {
     event.preventDefault();
     if (typeof showEditReportsModal === "function") {
@@ -131,7 +149,10 @@ class AppNavbar extends LitElement {
     }
   }
 
-  /** @description Sign out and redirect to the passphrase screen. */
+  /**
+   * @description Sign out and redirect to the passphrase screen.
+   * @param {Event} event - The click event from the menu link
+   */
   async _signOut(event) {
     event.preventDefault();
     try {
@@ -142,8 +163,10 @@ class AppNavbar extends LitElement {
     window.location.href = "/";
   }
 
-  /** @description Call the global showAboutModal function from app.js */
-  /** @description Show the Fetch Server Settings info modal */
+  /**
+   * @description Show the Fetch Server Settings info modal.
+   * @param {Event} event - The click event from the menu link
+   */
   _fetchServerInfo(event) {
     event.preventDefault();
     if (typeof showFetchServerInfoModal === "function") {
@@ -151,6 +174,10 @@ class AppNavbar extends LitElement {
     }
   }
 
+  /**
+   * @description Call the global showAboutModal function from app.js.
+   * @param {Event} event - The click event from the menu link
+   */
   _about(event) {
     event.preventDefault();
     if (typeof showAboutModal === "function") {
@@ -165,18 +192,19 @@ class AppNavbar extends LitElement {
    * comma "," as separator.
    * @param {string} endpoint - The PDF API endpoint path
    * @param {Array<string>} params - The params array from the report definition
+   * @param {string} [compareTo] - Optional compare-to benchmark or date for the report
    * @returns {string} The full URL with encoded params query parameter
    */
   _buildPdfUrl(endpoint, params, compareTo) {
-    var url = endpoint;
-    var hasQuery = false;
+    let url = endpoint;
+    let hasQuery = false;
 
     if (params && params.length > 0) {
       // Detail params contain colons and commas (e.g. "BW:ISA:1m,3m,1y,3y")
       // so use pipe separator for detail, comma for summary
-      var isDetail = endpoint.indexOf("portfolio-detail") !== -1;
-      var separator = isDetail ? "|" : ",";
-      var joined = params.join(separator);
+      const isDetail = endpoint.indexOf("portfolio-detail") !== -1;
+      const separator = isDetail ? "|" : ",";
+      const joined = params.join(separator);
       url += "?params=" + encodeURIComponent(joined);
       hasQuery = true;
     }
@@ -188,6 +216,10 @@ class AppNavbar extends LitElement {
     return url;
   }
 
+  /**
+   * @description Lit lifecycle callback invoked after the first render. Highlights the
+   * active nav link, then loads lists, docs, views, and reports into dropdown menus.
+   */
   async firstUpdated() {
     if (typeof highlightActiveNav === "function") {
       highlightActiveNav();
@@ -481,7 +513,7 @@ class AppNavbar extends LitElement {
         dropdown.appendChild(heading);
 
         // Direct guide links for this category (indented beneath heading)
-        var categoryGuides = guides.filter(function (g) { return g.category === name; });
+        const categoryGuides = guides.filter(function (g) { return g.category === name; });
         categoryGuides.forEach(function (guide) {
           const link = document.createElement("a");
           link.href = "/pages/docs-page.html?category=" + encodeURIComponent(guide.category) + "&slug=" + encodeURIComponent(guide.slug);
@@ -504,7 +536,7 @@ class AppNavbar extends LitElement {
         e.preventDefault();
         e.stopPropagation();
         // Find or create the search modal
-        var modal = document.querySelector("docs-search-modal");
+        let modal = document.querySelector("docs-search-modal");
         if (!modal) {
           modal = document.createElement("docs-search-modal");
           document.body.appendChild(modal);

@@ -164,7 +164,7 @@ function drawRightAligned(page, text, x, colWidth, y, font, fontSize, color) {
 function truncateText(text, font, fontSize, maxWidth) {
   if (font.widthOfTextAtSize(text, fontSize) <= maxWidth) return text;
 
-  var truncated = text;
+  let truncated = text;
   while (truncated.length > 0 && font.widthOfTextAtSize(truncated + "...", fontSize) > maxWidth) {
     truncated = truncated.slice(0, -1);
   }
@@ -179,9 +179,9 @@ function truncateText(text, font, fontSize, maxWidth) {
  * @returns {Object} Parsed object
  */
 function parseDetailParam(param) {
-  var parts = param.split(":");
-  var accountPart = (parts[1] || "").trim().toLowerCase();
-  var isCombined = accountPart.indexOf("+") !== -1;
+  const parts = param.split(":");
+  const accountPart = (parts[1] || "").trim().toLowerCase();
+  const isCombined = accountPart.indexOf("+") !== -1;
 
   return {
     user: (parts[0] || "").trim(),
@@ -205,8 +205,8 @@ function resolveParams(params) {
     const tokenMap = getReportParams();
     const tokens = Object.keys(tokenMap);
     return params.map(function (param) {
-      var result = param;
-      for (var i = 0; i < tokens.length; i++) {
+      let result = param;
+      for (let i = 0; i < tokens.length; i++) {
         result = result.split(tokens[i]).join(tokenMap[tokens[i]]);
       }
       return result;
@@ -222,11 +222,11 @@ function resolveParams(params) {
  * @returns {Array<{key: string, label: string, width: number, align: string, x: number}>}
  */
 function buildColumns(periods) {
-  var cols = BASE_COLUMNS.map(function (col) {
+  const cols = BASE_COLUMNS.map(function (col) {
     return { key: col.key, label: col.label, width: col.width, align: col.align };
   });
 
-  for (var i = 0; i < periods.length; i++) {
+  for (let i = 0; i < periods.length; i++) {
     cols.push({
       key: "change_" + i,
       label: periods[i].label,
@@ -236,8 +236,8 @@ function buildColumns(periods) {
   }
 
   // Calculate x positions
-  var x = 0;
-  for (var c = 0; c < cols.length; c++) {
+  let x = 0;
+  for (let c = 0; c < cols.length; c++) {
     cols[c].x = x;
     x += cols[c].width;
   }
@@ -263,13 +263,13 @@ function buildColumns(periods) {
  *   Tokens like "USER1" are substituted from report_params.
  */
 export function renderPortfolioDetailBlock(ctx, params) {
-  var pdf = ctx.pdf;
-  var page = ctx.page;
-  var pages = ctx.pages;
-  var y = ctx.y;
-  var fonts = ctx.fonts;
+  const pdf = ctx.pdf;
+  let page = ctx.page;
+  const pages = ctx.pages;
+  let y = ctx.y;
+  const fonts = ctx.fonts;
 
-  var resolvedParams = resolveParams(params);
+  const resolvedParams = resolveParams(params);
 
   if (!resolvedParams || resolvedParams.length === 0) {
     page.drawText("Portfolio Detail Valuation \u2014 no parameters provided.", {
@@ -312,7 +312,7 @@ export function renderPortfolioDetailBlock(ctx, params) {
   y -= FONT_SIZE_TITLE + 12;
 
   // --- Process each param entry ---
-  for (var i = 0; i < resolvedParams.length; i++) {
+  for (let i = 0; i < resolvedParams.length; i++) {
     // "new_page" forces a page break and redraws the title
     if (resolvedParams[i] === "new_page") {
       page = pdf.addPage({ size: "a4", orientation: "landscape" });
@@ -330,7 +330,7 @@ export function renderPortfolioDetailBlock(ctx, params) {
       continue;
     }
 
-    var parsed = parseDetailParam(resolvedParams[i]);
+    const parsed = parseDetailParam(resolvedParams[i]);
 
     if (!parsed.user || !parsed.accountType) continue;
 
@@ -348,17 +348,17 @@ export function renderPortfolioDetailBlock(ctx, params) {
    * @param {Object} parsed - Parsed param object
    */
   function renderAccountSection(parsed) {
-    var data = getPortfolioDetail(parsed.user, parsed.accountType, parsed.periods);
+    const data = getPortfolioDetail(parsed.user, parsed.accountType, parsed.periods);
     if (!data || !data.holdings || data.holdings.length === 0) return;
 
-    var periods = data.periods || [];
-    var columns = buildColumns(periods);
-    var lastCol = columns[columns.length - 1];
-    var tableWidth = lastCol.x + lastCol.width;
+    const periods = data.periods || [];
+    const columns = buildColumns(periods);
+    const lastCol = columns[columns.length - 1];
+    const tableWidth = lastCol.x + lastCol.width;
 
     // Section heading
-    var typeLabel = ACCOUNT_TYPE_LABELS[data.account.account_type] || data.account.account_type;
-    var heading = data.user.first_name + " " + data.user.last_name + " " + typeLabel;
+    const typeLabel = ACCOUNT_TYPE_LABELS[data.account.account_type] || data.account.account_type;
+    const heading = data.user.first_name + " " + data.user.last_name + " " + typeLabel;
 
     ensureSpace(SECTION_HEADING_HEIGHT + HEADER_ROW_HEIGHT + ROW_HEIGHT);
     page.drawText(heading, {
@@ -374,17 +374,17 @@ export function renderPortfolioDetailBlock(ctx, params) {
     drawTableHeader(columns, tableWidth);
 
     // Holdings rows
-    for (var h = 0; h < data.holdings.length; h++) {
-      var holding = data.holdings[h];
-      var isGBP = holding.currency_code === "GBP";
-      var sym = holding.currency_symbol || "";
+    for (let h = 0; h < data.holdings.length; h++) {
+      const holding = data.holdings[h];
+      const isGBP = holding.currency_code === "GBP";
+      const sym = holding.currency_symbol || "";
 
       ensureSpace(ROW_HEIGHT + 2);
-      var rowY = y - ROW_HEIGHT;
-      var textY = rowY + 4;
+      const rowY = y - ROW_HEIGHT;
+      const textY = rowY + 4;
 
       // Build cell values
-      var values = {
+      const values = {
         investment: holding.description,
         currency: holding.currency_code,
         quantity: formatQuantity(holding.quantity),
@@ -395,24 +395,24 @@ export function renderPortfolioDetailBlock(ctx, params) {
       };
 
       // Add change values
-      for (var c = 0; c < (holding.changes || []).length; c++) {
-        var change = holding.changes[c];
+      for (let c = 0; c < (holding.changes || []).length; c++) {
+        const change = holding.changes[c];
         values["change_" + c] = change.change_percent !== null
           ? formatChange(change.change_percent)
           : "\u2014"; // em dash
       }
 
       // Draw each cell
-      for (var col = 0; col < columns.length; col++) {
-        var colDef = columns[col];
-        var cellText = values[colDef.key] || "";
-        var font = fonts.medium;
-        var cellColour = COLOURS.black;
+      for (let col = 0; col < columns.length; col++) {
+        const colDef = columns[col];
+        let cellText = values[colDef.key] || "";
+        let font = fonts.medium;
+        let cellColour = COLOURS.black;
 
         // Change columns get colour coding
         if (colDef.key.startsWith("change_")) {
-          var changeIdx = parseInt(colDef.key.split("_")[1]);
-          var holdingChange = (holding.changes || [])[changeIdx];
+          const changeIdx = parseInt(colDef.key.split("_")[1]);
+          const holdingChange = (holding.changes || [])[changeIdx];
           if (holdingChange && holdingChange.change_percent !== null) {
             cellColour = changeColour(holdingChange.change_percent);
           } else {
@@ -426,7 +426,7 @@ export function renderPortfolioDetailBlock(ctx, params) {
         }
 
         // Investment name: blue text with clickable research links
-        var isInvestmentLink = colDef.key === "investment" && (holding.public_id || holding.morningstar_id);
+        const isInvestmentLink = colDef.key === "investment" && (holding.public_id || holding.morningstar_id);
         if (isInvestmentLink) {
           cellColour = COLOURS.linkBlue;
         }
@@ -449,14 +449,14 @@ export function renderPortfolioDetailBlock(ctx, params) {
 
           // Add clickable link annotations for investment research pages
           if (isInvestmentLink) {
-            var ftLinkUrl = holding.public_id ? buildFtMarketsUrl(holding.public_id, holding.currency_code) : null;
-            var msLinkUrl = holding.morningstar_id ? buildMorningstarUrl(holding.morningstar_id) : null;
-            var cellTextWidth = font.widthOfTextAtSize(cellText, FONT_SIZE_ROW);
-            var linkX = MARGIN_LEFT + colDef.x + 2;
+            const ftLinkUrl = holding.public_id ? buildFtMarketsUrl(holding.public_id, holding.currency_code) : null;
+            const msLinkUrl = holding.morningstar_id ? buildMorningstarUrl(holding.morningstar_id) : null;
+            const cellTextWidth = font.widthOfTextAtSize(cellText, FONT_SIZE_ROW);
+            const linkX = MARGIN_LEFT + colDef.x + 2;
 
             if (ftLinkUrl && msLinkUrl) {
               // Both links: FT Markets on left half, Morningstar on right half
-              var halfW = cellTextWidth / 2;
+              const halfW = cellTextWidth / 2;
               page.addLinkAnnotation({
                 rect: { x: linkX, y: textY - 1, width: halfW, height: FONT_SIZE_ROW + 3 },
                 uri: ftLinkUrl,
@@ -496,8 +496,8 @@ export function renderPortfolioDetailBlock(ctx, params) {
 
     // Totals row
     ensureSpace(ROW_HEIGHT + 2);
-    var totalsRowY = y - ROW_HEIGHT;
-    var totalsTextY = totalsRowY + 4;
+    const totalsRowY = y - ROW_HEIGHT;
+    const totalsTextY = totalsRowY + 4;
 
     // Totals row background
     page.drawRectangle({
@@ -509,7 +509,7 @@ export function renderPortfolioDetailBlock(ctx, params) {
     });
 
     // "Total GBP" label in the valueLocal column
-    var valueLocalCol = columns.find(function (c) { return c.key === "valueLocal"; });
+    const valueLocalCol = columns.find(function (c) { return c.key === "valueLocal"; });
     if (valueLocalCol) {
       drawRightAligned(
         page, "Total GBP", MARGIN_LEFT + valueLocalCol.x, valueLocalCol.width,
@@ -518,7 +518,7 @@ export function renderPortfolioDetailBlock(ctx, params) {
     }
 
     // Total value GBP
-    var valueGBPCol = columns.find(function (c) { return c.key === "valueGBP"; });
+    const valueGBPCol = columns.find(function (c) { return c.key === "valueGBP"; });
     if (valueGBPCol) {
       drawRightAligned(
         page, formatNumber(data.totals.value_gbp),
@@ -528,9 +528,9 @@ export function renderPortfolioDetailBlock(ctx, params) {
     }
 
     // Total change columns
-    for (var t = 0; t < (data.totals.changes || []).length; t++) {
-      var totalChange = data.totals.changes[t];
-      var changeCol = columns.find(function (c) { return c.key === "change_" + t; });
+    for (let t = 0; t < (data.totals.changes || []).length; t++) {
+      const totalChange = data.totals.changes[t];
+      const changeCol = columns.find(function (c) { return c.key === "change_" + t; });
       if (!changeCol) continue;
 
       if (totalChange.change_percent !== null) {
@@ -567,12 +567,12 @@ export function renderPortfolioDetailBlock(ctx, params) {
    * @param {Object} parsed - Parsed param object with isCombined=true
    */
   function renderCombinedTotals(parsed) {
-    var combinedResults = [];
-    var combinedPeriods = [];
-    var combinedUserName = "";
+    const combinedResults = [];
+    let combinedPeriods = [];
+    let combinedUserName = "";
 
-    for (var a = 0; a < parsed.accountTypes.length; a++) {
-      var data = getPortfolioDetail(parsed.user, parsed.accountTypes[a], parsed.periods);
+    for (let a = 0; a < parsed.accountTypes.length; a++) {
+      const data = getPortfolioDetail(parsed.user, parsed.accountTypes[a], parsed.periods);
       if (data && data.holdings && data.holdings.length > 0) {
         combinedResults.push(data);
         if (combinedPeriods.length === 0 && data.periods) {
@@ -587,26 +587,26 @@ export function renderPortfolioDetailBlock(ctx, params) {
     if (combinedResults.length === 0) return;
 
     // Aggregate
-    var combinedValueGBP = 0;
-    var periodWeightedSums = {};
-    var periodWeightedBases = {};
-    var accountLabels = [];
+    let combinedValueGBP = 0;
+    const periodWeightedSums = {};
+    const periodWeightedBases = {};
+    const accountLabels = [];
 
-    for (var p = 0; p < combinedPeriods.length; p++) {
+    for (let p = 0; p < combinedPeriods.length; p++) {
       periodWeightedSums[combinedPeriods[p].code] = 0;
       periodWeightedBases[combinedPeriods[p].code] = 0;
     }
 
-    for (var d = 0; d < combinedResults.length; d++) {
-      var detail = combinedResults[d];
+    for (let d = 0; d < combinedResults.length; d++) {
+      const detail = combinedResults[d];
       combinedValueGBP += detail.totals.value_gbp;
-      var typeLabel = ACCOUNT_TYPE_LABELS[detail.account.account_type] || detail.account.account_type;
+      const typeLabel = ACCOUNT_TYPE_LABELS[detail.account.account_type] || detail.account.account_type;
       accountLabels.push(typeLabel);
 
-      for (var h = 0; h < detail.holdings.length; h++) {
-        var holding = detail.holdings[h];
-        for (var c = 0; c < (holding.changes || []).length; c++) {
-          var change = holding.changes[c];
+      for (let h = 0; h < detail.holdings.length; h++) {
+        const holding = detail.holdings[h];
+        for (let c = 0; c < (holding.changes || []).length; c++) {
+          const change = holding.changes[c];
           if (change.change_percent !== null) {
             periodWeightedSums[change.code] += holding.value_gbp * change.change_percent;
             periodWeightedBases[change.code] += holding.value_gbp;
@@ -616,12 +616,12 @@ export function renderPortfolioDetailBlock(ctx, params) {
     }
 
     // Calculate combined weighted average changes
-    var combinedChanges = [];
-    for (var j = 0; j < combinedPeriods.length; j++) {
-      var code = combinedPeriods[j].code;
-      var base = periodWeightedBases[code];
+    const combinedChanges = [];
+    for (let j = 0; j < combinedPeriods.length; j++) {
+      const code = combinedPeriods[j].code;
+      const base = periodWeightedBases[code];
       if (base > 0) {
-        var weighted = Math.round((periodWeightedSums[code] / base) * 10) / 10;
+        const weighted = Math.round((periodWeightedSums[code] / base) * 10) / 10;
         combinedChanges.push({ code: code, change_percent: weighted });
       } else {
         combinedChanges.push({ code: code, change_percent: null });
@@ -639,7 +639,7 @@ export function renderPortfolioDetailBlock(ctx, params) {
     });
     y -= 14;
 
-    var heading = combinedUserName + " Combined Total (" + accountLabels.join(" + ") + ")";
+    const heading = combinedUserName + " Combined Total (" + accountLabels.join(" + ") + ")";
     page.drawText(heading, {
       x: MARGIN_LEFT,
       y: y - FONT_SIZE_SECTION_HEADING,
@@ -650,12 +650,12 @@ export function renderPortfolioDetailBlock(ctx, params) {
     y -= FONT_SIZE_SECTION_HEADING + 6;
 
     // Build columns for the combined row (Value GBP + change columns)
-    var hasPeriods = combinedPeriods.length > 0;
-    var combinedCols = [
+    const hasPeriods = combinedPeriods.length > 0;
+    const combinedCols = [
       { key: "valueGBP", label: "Value GBP", width: 70, align: "right", x: 0 },
     ];
-    var cx = 70;
-    for (var k = 0; k < combinedPeriods.length; k++) {
+    let cx = 70;
+    for (let k = 0; k < combinedPeriods.length; k++) {
       combinedCols.push({
         key: "change_" + k,
         label: combinedPeriods[k].label,
@@ -668,7 +668,7 @@ export function renderPortfolioDetailBlock(ctx, params) {
 
     // Header row (if periods exist)
     if (hasPeriods) {
-      var headerWidth = cx;
+      const headerWidth = cx;
       ensureSpace(HEADER_ROW_HEIGHT + ROW_HEIGHT);
 
       page.drawRectangle({
@@ -679,7 +679,7 @@ export function renderPortfolioDetailBlock(ctx, params) {
         color: headerRowColour,
       });
 
-      for (var hc = 0; hc < combinedCols.length; hc++) {
+      for (let hc = 0; hc < combinedCols.length; hc++) {
         drawRightAligned(
           page, combinedCols[hc].label, MARGIN_LEFT + combinedCols[hc].x,
           combinedCols[hc].width, y - HEADER_ROW_HEIGHT + 5,
@@ -698,9 +698,9 @@ export function renderPortfolioDetailBlock(ctx, params) {
 
     // Combined totals data row
     ensureSpace(ROW_HEIGHT + 2);
-    var rowY = y - ROW_HEIGHT;
-    var textY = rowY + 4;
-    var rowWidth = cx;
+    const rowY = y - ROW_HEIGHT;
+    const textY = rowY + 4;
+    const rowWidth = cx;
 
     page.drawRectangle({
       x: MARGIN_LEFT,
@@ -718,9 +718,9 @@ export function renderPortfolioDetailBlock(ctx, params) {
     );
 
     // Change columns
-    for (var m = 0; m < combinedChanges.length; m++) {
-      var cc = combinedChanges[m];
-      var colDef = combinedCols[m + 1]; // +1 to skip the valueGBP column
+    for (let m = 0; m < combinedChanges.length; m++) {
+      const cc = combinedChanges[m];
+      const colDef = combinedCols[m + 1]; // +1 to skip the valueGBP column
 
       if (cc.change_percent !== null) {
         drawRightAligned(
@@ -765,8 +765,8 @@ export function renderPortfolioDetailBlock(ctx, params) {
       color: headerRowColour,
     });
 
-    for (var col = 0; col < columns.length; col++) {
-      var colDef = columns[col];
+    for (let col = 0; col < columns.length; col++) {
+      const colDef = columns[col];
       if (colDef.align === "right") {
         drawRightAligned(
           page, colDef.label, MARGIN_LEFT + colDef.x, colDef.width,
@@ -806,12 +806,12 @@ export function renderPortfolioDetailBlock(ctx, params) {
  */
 export async function generatePortfolioDetailPdf(params) {
   const pdf = PDF.create();
-  var fonts = embedRobotoFonts(pdf);
-  var page = pdf.addPage({ size: "a4", orientation: "landscape" });
-  var pages = [page];
-  var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_LANDSCAPE_HEIGHT, MARGIN_TOP, fonts);
+  const fonts = embedRobotoFonts(pdf);
+  const page = pdf.addPage({ size: "a4", orientation: "landscape" });
+  const pages = [page];
+  const y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_LANDSCAPE_HEIGHT, MARGIN_TOP, fonts);
 
-  var ctx = { pdf: pdf, page: page, pages: pages, y: y, fonts: fonts };
+  const ctx = { pdf: pdf, page: page, pages: pages, y: y, fonts: fonts };
   renderPortfolioDetailBlock(ctx, params);
 
   drawPageFooters(ctx.pages, "Portfolio Detail Valuation", MARGIN_LEFT, USABLE_WIDTH, fonts);

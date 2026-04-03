@@ -33,7 +33,7 @@ async function checkDatabaseStatus() {
       "</div>";
     // Auto-hide the status message after 3 seconds
     setTimeout(function () {
-      var statusDiv = container.firstElementChild;
+      const statusDiv = container.firstElementChild;
       if (statusDiv) {
         statusDiv.style.opacity = "0";
         setTimeout(function () { container.innerHTML = ""; }, 500);
@@ -167,23 +167,23 @@ async function loadManualPriceAlert() {
 // --- Screenshot thumbnails and lightbox ---
 
 /** @type {string[]} List of all thumbnail filenames from the server */
-var allThumbnailFiles = [];
+let allThumbnailFiles = [];
 /** @type {number} Currently displayed image index in the lightbox */
-var lightboxIndex = 0;
+let lightboxIndex = 0;
 /** @type {number} Maximum number of thumbnails to show on the home page */
-var MAX_VISIBLE_THUMBNAILS = 2;
+const MAX_VISIBLE_THUMBNAILS = 2;
 
 /**
  * @description Fetch the list of thumbnail images from the server and render
  * the first two as clickable thumbnails stacked vertically in the right column.
  */
 async function loadHomeThumbnails() {
-  var container = document.getElementById("home-thumbnails");
+  const container = document.getElementById("home-thumbnails");
   if (!container) return;
 
   try {
-    var response = await fetch("/api/home/thumbnails");
-    var files = await response.json();
+    const response = await fetch("/api/home/thumbnails");
+    const files = await response.json();
     if (!Array.isArray(files) || files.length === 0) return;
 
     allThumbnailFiles = files;
@@ -193,23 +193,23 @@ async function loadHomeThumbnails() {
     container.classList.add("flex");
 
     // Render the first MAX_VISIBLE_THUMBNAILS as clickable thumbnails
-    var count = Math.min(files.length, MAX_VISIBLE_THUMBNAILS);
-    for (var i = 0; i < count; i++) {
-      var wrapper = document.createElement("div");
+    const count = Math.min(files.length, MAX_VISIBLE_THUMBNAILS);
+    for (let i = 0; i < count; i++) {
+      const wrapper = document.createElement("div");
       wrapper.className = "relative cursor-pointer group rounded-lg overflow-hidden border border-brand-200 shadow-sm hover:shadow-md transition-shadow";
       wrapper.dataset.index = String(i);
       wrapper.addEventListener("click", handleThumbnailClick);
 
-      var img = document.createElement("img");
+      const img = document.createElement("img");
       img.src = "/docs/media/" + files[i];
       img.alt = "Screenshot " + (i + 1);
       img.className = "w-full h-auto";
       img.loading = "lazy";
 
-      var overlay = document.createElement("div");
+      const overlay = document.createElement("div");
       overlay.className = "absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center";
 
-      var hint = document.createElement("span");
+      const hint = document.createElement("span");
       hint.className = "text-white text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity text-center px-4";
       hint.innerHTML = "Click to show all " + files.length + " screenshots<br>full size";
 
@@ -229,8 +229,8 @@ async function loadHomeThumbnails() {
  * @param {Event} event - The click event
  */
 function handleThumbnailClick(event) {
-  var wrapper = event.currentTarget;
-  var index = parseInt(wrapper.dataset.index, 10);
+  const wrapper = event.currentTarget;
+  const index = parseInt(wrapper.dataset.index, 10);
   openLightbox(index);
 }
 
@@ -240,7 +240,7 @@ function handleThumbnailClick(event) {
  */
 function openLightbox(index) {
   lightboxIndex = index;
-  var lightbox = document.getElementById("screenshot-lightbox");
+  const lightbox = document.getElementById("screenshot-lightbox");
   lightbox.classList.remove("hidden");
   lightbox.classList.add("flex");
   document.body.style.overflow = "hidden";
@@ -251,7 +251,7 @@ function openLightbox(index) {
  * @description Close the screenshot lightbox and restore page scrolling.
  */
 function closeLightbox() {
-  var lightbox = document.getElementById("screenshot-lightbox");
+  const lightbox = document.getElementById("screenshot-lightbox");
   lightbox.classList.add("hidden");
   lightbox.classList.remove("flex");
   document.body.style.overflow = "";
@@ -261,8 +261,8 @@ function closeLightbox() {
  * @description Update the lightbox image and counter to reflect the current index.
  */
 function updateLightboxImage() {
-  var img = document.getElementById("lightbox-image");
-  var counter = document.getElementById("lightbox-counter");
+  const img = document.getElementById("lightbox-image");
+  const counter = document.getElementById("lightbox-counter");
   img.src = "/docs/media/" + allThumbnailFiles[lightboxIndex];
   img.alt = "Screenshot " + (lightboxIndex + 1) + " of " + allThumbnailFiles.length;
   counter.textContent = (lightboxIndex + 1) + " / " + allThumbnailFiles.length;
@@ -302,7 +302,7 @@ function initLightboxControls() {
 
   // Keyboard navigation
   document.addEventListener("keydown", function (e) {
-    var lightbox = document.getElementById("screenshot-lightbox");
+    const lightbox = document.getElementById("screenshot-lightbox");
     if (lightbox.classList.contains("hidden")) return;
 
     if (e.key === "Escape") closeLightbox();

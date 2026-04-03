@@ -37,20 +37,20 @@ async function getConfig() {
  *   in the document, and the word length.
  */
 export async function spellCheckContent(text, customWords) {
-  var config = await getConfig();
+  const config = await getConfig();
 
-  var allWords = [...(config.words || [])];
+  const allWords = [...(config.words || [])];
   if (customWords && customWords.length > 0) {
     allWords.push(...customWords);
   }
 
-  var doc = createTextDocument({
+  const doc = createTextDocument({
     uri: "file:///editor.md",
     languageId: "markdown",
     content: text,
   });
 
-  var validator = new DocumentValidator(
+  const validator = new DocumentValidator(
     doc,
     { configFile: CONFIG_PATH, noConfigSearch: true },
     { ...config, words: allWords }
@@ -58,7 +58,7 @@ export async function spellCheckContent(text, customWords) {
 
   await validator.prepare();
 
-  var issues = [...validator.checkDocument()];
+  const issues = [...validator.checkDocument()];
 
   return issues.map(function (issue) {
     return {
@@ -75,7 +75,7 @@ export async function spellCheckContent(text, customWords) {
  * @returns {string[]} Array of custom words
  */
 export function getCustomDictionary(db) {
-  var rows = db.query("SELECT word FROM custom_dictionary ORDER BY word").all();
+  const rows = db.query("SELECT word FROM custom_dictionary ORDER BY word").all();
   return rows.map(function (row) {
     return row.word;
   });
@@ -88,7 +88,7 @@ export function getCustomDictionary(db) {
  * @param {string} word - The word to add (stored lowercase)
  */
 export function addCustomWord(db, word) {
-  var today = new Date().toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
   db.query("INSERT OR IGNORE INTO custom_dictionary (word, added_date) VALUES (?, ?)").run(
     word.toLowerCase(),
     today

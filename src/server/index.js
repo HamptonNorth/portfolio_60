@@ -172,24 +172,24 @@ const server = Bun.serve({
     // Docs media files (uploaded images) — served from docs/media/ on disk
     // Falls back to project-root docs/media/ for bundled assets (e.g. thumbnails)
     if (path.startsWith("/docs/media/")) {
-      var safePath = path.replace(/\.\./g, "");
-      var mediaPath = safePath.replace(/^\/docs\/media\//, "");
-      var mediaRoot = resolve(getDocsMediaDir());
-      var fullMediaPath = join(mediaRoot, mediaPath);
+      const safePath = path.replace(/\.\./g, "");
+      const mediaPath = safePath.replace(/^\/docs\/media\//, "");
+      const mediaRoot = resolve(getDocsMediaDir());
+      const fullMediaPath = join(mediaRoot, mediaPath);
       if (!fullMediaPath.startsWith(mediaRoot)) {
         return new Response("Forbidden", { status: 403 });
       }
-      var mediaFile = Bun.file(fullMediaPath);
+      const mediaFile = Bun.file(fullMediaPath);
       if (await mediaFile.exists()) {
         return new Response(mediaFile, {
           headers: { "Content-Type": getMimeType(fullMediaPath) },
         });
       }
       // Fallback: check project-root docs/media/ for bundled assets
-      var projectMediaRoot = resolve("docs/media");
-      var projectMediaPath = join(projectMediaRoot, mediaPath);
+      const projectMediaRoot = resolve("docs/media");
+      const projectMediaPath = join(projectMediaRoot, mediaPath);
       if (projectMediaPath.startsWith(projectMediaRoot)) {
-        var projectMediaFile = Bun.file(projectMediaPath);
+        const projectMediaFile = Bun.file(projectMediaPath);
         if (await projectMediaFile.exists()) {
           return new Response(projectMediaFile, {
             headers: { "Content-Type": getMimeType(projectMediaPath) },
@@ -201,14 +201,14 @@ const server = Bun.serve({
 
     // Lists PDF files — served from docs/lists/ on disk
     if (path.startsWith("/docs/lists/")) {
-      var safeListPath = path.replace(/\.\./g, "");
-      var listFilePath = safeListPath.replace(/^\/docs\/lists\//, "");
-      var listsRoot = resolve(getListsDir());
-      var fullListPath = join(listsRoot, listFilePath);
+      const safeListPath = path.replace(/\.\./g, "");
+      const listFilePath = safeListPath.replace(/^\/docs\/lists\//, "");
+      const listsRoot = resolve(getListsDir());
+      const fullListPath = join(listsRoot, listFilePath);
       if (!fullListPath.startsWith(listsRoot)) {
         return new Response("Forbidden", { status: 403 });
       }
-      var listFile = Bun.file(fullListPath);
+      const listFile = Bun.file(fullListPath);
       if (!(await listFile.exists())) {
         return new Response("Not found", { status: 404 });
       }
@@ -227,10 +227,10 @@ const server = Bun.serve({
     // Home page thumbnail listing (unprotected — used on welcome page)
     // Uses project root docs/media/ — these are bundled assets, not user data
     if (method === "GET" && path === "/api/home/thumbnails") {
-      var thumbDir = resolve("docs/media");
+      const thumbDir = resolve("docs/media");
       try {
-        var files = await readdir(thumbDir);
-        var thumbs = files
+        const files = await readdir(thumbDir);
+        const thumbs = files
           .filter(function (f) { return /^thumb-\d+\.jpg$/i.test(f); })
           .sort();
         return Response.json(thumbs);
@@ -514,7 +514,7 @@ initScheduledFetcher();
 
 // Index documentation for search (runs in background, non-blocking)
 if (databaseExists()) {
-  var docsConfig = getDocsConfig();
+  const docsConfig = getDocsConfig();
   if (docsConfig.categories && Object.keys(docsConfig.categories).length > 0) {
     reindexAllPages(getDatabase(), docsConfig.categories).then(function (result) {
       if (result.success) {

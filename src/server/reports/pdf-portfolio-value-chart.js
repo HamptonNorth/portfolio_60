@@ -26,7 +26,7 @@ const USABLE_WIDTH = 841.89 - MARGIN_LEFT - 40;
  */
 export function renderPortfolioValueChartBlock(ctx, params, blockDef) {
   // Build the chart definition for the data service
-  var chartDef = {
+  const chartDef = {
     title: (blockDef && blockDef.title) || "Portfolio Value",
     subTitle: (blockDef && blockDef.subTitle) || "",
     monthsToShow: (blockDef && blockDef.monthsToShow) || "12",
@@ -36,10 +36,10 @@ export function renderPortfolioValueChartBlock(ctx, params, blockDef) {
   };
 
   // Gather portfolio valuation data at regular intervals
-  var chartData = getPortfolioChartData(chartDef);
+  const chartData = getPortfolioChartData(chartDef);
 
   // Delegate to the standard line chart renderer with pre-built data
-  var rendererDef = {
+  const rendererDef = {
     title: chartData.title,
     subTitle: chartData.subTitle,
     monthsToShow: chartDef.monthsToShow,
@@ -65,12 +65,12 @@ export function renderPortfolioValueChartBlock(ctx, params, blockDef) {
  */
 export async function generatePortfolioValueChartPdf(chartDef) {
   const pdf = PDF.create();
-  var fonts = embedRobotoFonts(pdf);
-  var page = pdf.addPage({ size: "a4", orientation: "landscape" });
-  var pages = [page];
-  var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_LANDSCAPE_HEIGHT, MARGIN_TOP, fonts);
+  const fonts = embedRobotoFonts(pdf);
+  const page = pdf.addPage({ size: "a4", orientation: "landscape" });
+  const pages = [page];
+  const y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_LANDSCAPE_HEIGHT, MARGIN_TOP, fonts);
 
-  var ctx = { pdf: pdf, page: page, pages: pages, y: y, pageWidths: [USABLE_WIDTH], fonts: fonts };
+  const ctx = { pdf: pdf, page: page, pages: pages, y: y, pageWidths: [USABLE_WIDTH], fonts: fonts };
   renderPortfolioValueChartBlock(ctx, chartDef.params || [], chartDef);
 
   drawPageFooters(ctx.pages, chartDef.title || "Portfolio Value", MARGIN_LEFT, USABLE_WIDTH, fonts);

@@ -18,10 +18,18 @@ class DocsSearchModal extends LitElement {
     _docCount: { type: Number, state: true },
   };
 
+  /**
+   * @description Use light DOM instead of Shadow DOM so Tailwind utility classes apply directly.
+   * @returns {HTMLElement} The component element itself
+   */
   createRenderRoot() {
     return this;
   }
 
+  /**
+   * @description Initialise component state with default values for search query,
+   * results, error state, and debounce timer.
+   */
   constructor() {
     super();
     this._open = false;
@@ -46,7 +54,7 @@ class DocsSearchModal extends LitElement {
     this._error = "";
     this._fetchMeta();
     this.updateComplete.then(() => {
-      var input = this.querySelector("#docs-search-input");
+      const input = this.querySelector("#docs-search-input");
       if (input) input.focus();
     });
   }
@@ -63,23 +71,23 @@ class DocsSearchModal extends LitElement {
    */
   async _fetchMeta() {
     try {
-      var response = await fetch("/api/docs/search-meta");
+      const response = await fetch("/api/docs/search-meta");
       if (response.ok) {
-        var data = await response.json();
+        const data = await response.json();
         this._lastIndexed = data.lastIndexed;
         this._docCount = data.documentCount;
       }
-    } catch (e) {
+    } catch (err) {
       // Non-critical
     }
   }
 
   /**
    * @description Handle input changes with debouncing.
-   * @param {Event} e - Input event
+   * @param {Event} event - Input event
    */
-  _onInput(e) {
-    this._query = e.target.value;
+  _onInput(event) {
+    this._query = event.target.value;
     this._error = "";
 
     if (this._debounceTimer) {
@@ -103,14 +111,14 @@ class DocsSearchModal extends LitElement {
   async _doSearch() {
     this._searching = true;
     try {
-      var response = await fetch("/api/docs/search?q=" + encodeURIComponent(this._query.trim()));
+      const response = await fetch("/api/docs/search?q=" + encodeURIComponent(this._query.trim()));
       if (!response.ok) {
         this._error = "Search failed";
         this._results = [];
         return;
       }
 
-      var data = await response.json();
+      const data = await response.json();
       this._results = data.results || [];
       this._total = data.total || 0;
       this._duration = data.duration || "";
@@ -128,37 +136,42 @@ class DocsSearchModal extends LitElement {
    */
   async _reindex() {
     try {
-      var response = await fetch("/api/docs/reindex", { method: "POST" });
-      var data = await response.json();
+      const response = await fetch("/api/docs/reindex", { method: "POST" });
+      const data = await response.json();
       if (data.success) {
         this._fetchMeta();
       }
-    } catch (e) {
+    } catch (err) {
       // Non-critical
     }
   }
 
   /**
    * @description Handle keyboard events (Escape to close).
-   * @param {KeyboardEvent} e
+   * @param {KeyboardEvent} event
    */
-  _onKeyDown(e) {
-    if (e.key === "Escape") {
+  _onKeyDown(event) {
+    if (event.key === "Escape") {
       this.close();
     }
   }
 
+  /**
+   * @description Render the search modal overlay with input field, results list,
+   * and footer showing result count and reindex button. Returns empty when closed.
+   * @returns {import('lit').TemplateResult} The modal template or empty template
+   */
   render() {
     if (!this._open) return html``;
 
-    var lastIndexedStr = "";
+    let lastIndexedStr = "";
     if (this._lastIndexed) {
-      var d = new Date(this._lastIndexed);
-      lastIndexedStr = d.toLocaleDateString("en-GB", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+      const indexedDate = new Date(this._lastIndexed);
+      lastIndexedStr = indexedDate.toLocaleDateString("en-GB", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
     }
 
     return html`
-      <div class="fixed inset-0 bg-black/50 flex items-start justify-center pt-16 z-50" @click=${(e) => { if (e.target === e.currentTarget) this.close(); }} @keydown=${this._onKeyDown}>
+      <div class="fixed inset-0 bg-black/50 flex items-start justify-center pt-16 z-50" @click=${(event) => { if (event.target === event.currentTarget) this.close(); }} @keydown=${this._onKeyDown}>
         <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col mx-4">
           <!-- Header -->
           <div class="p-4 border-b border-brand-200">
@@ -199,7 +212,7 @@ class DocsSearchModal extends LitElement {
                   ${result.matches && result.matches.length > 0
                     ? html`<div class="mt-1">
                         ${result.matches.map(
-                          (m) => html`<p class="text-xs text-brand-400 mt-0.5"><span class="text-brand-300">${m.region}:</span> <span .innerHTML=${m.fragment}></span></p>`
+                          (match) => html`<p class="text-xs text-brand-400 mt-0.5"><span class="text-brand-300">${match.region}:</span> <span .innerHTML=${match.fragment}></span></p>`
                         )}
                       </div>`
                     : ""}

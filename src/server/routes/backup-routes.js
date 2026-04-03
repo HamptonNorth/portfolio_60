@@ -68,28 +68,28 @@ backupRouter.get("/api/backup/download/:filename", function (request, params) {
 // POST /api/backup/upload — upload a backup file into the backups directory
 backupRouter.post("/api/backup/upload", async function (request) {
   try {
-    var formData;
+    let formData;
     try {
       formData = await request.formData();
     } catch (err) {
       return new Response(JSON.stringify({ error: "Invalid form data", detail: err.message }), { status: 400, headers: { "Content-Type": "application/json" } });
     }
 
-    var file = formData.get("file");
+    const file = formData.get("file");
     if (!file || !(file instanceof File)) {
       return new Response(JSON.stringify({ error: "No file provided" }), { status: 400, headers: { "Content-Type": "application/json" } });
     }
 
     // Validate file extension
-    var filename = file.name;
+    const filename = file.name;
     if (!filename.endsWith(".zip") && !filename.endsWith(".db")) {
       return new Response(JSON.stringify({ error: "Invalid file type", detail: "Only .zip and .db backup files are accepted" }), { status: 400, headers: { "Content-Type": "application/json" } });
     }
 
-    var buffer = await file.arrayBuffer();
-    var data = Buffer.from(buffer);
+    const buffer = await file.arrayBuffer();
+    const data = Buffer.from(buffer);
 
-    var result = uploadBackup(filename, data);
+    const result = uploadBackup(filename, data);
 
     if (!result.success) {
       return new Response(JSON.stringify({ error: result.message, detail: result.error || "" }), { status: 400, headers: { "Content-Type": "application/json" } });

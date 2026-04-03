@@ -275,14 +275,14 @@ export function buildMorningstarUrl(morningstarId) {
     return null;
   }
 
-  var parts = morningstarId.split("|");
-  var secId = parts[0].trim();
+  const parts = morningstarId.split("|");
+  const secId = parts[0].trim();
   if (!secId) return null;
 
-  var universe = (parts[1] || "").trim();
+  const universe = (parts[1] || "").trim();
 
   // Determine the page category from the universe prefix
-  var category = "funds";
+  let category = "funds";
   if (universe.substring(0, 2) === "FE") {
     category = "etf";
   } else if (universe.substring(0, 2) === "E0") {

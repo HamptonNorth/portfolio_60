@@ -686,7 +686,7 @@ function renderDetailHoldings(account) {
     html += "</button></td>";
 
     // Investment: public_id on line 1, name on line 2 (linked to research page(s) if possible)
-    var descriptionLink = buildResearchLinkHtml(h.description, h.public_id, h.currency_code, h.morningstar_id);
+    const descriptionLink = buildResearchLinkHtml(h.description, h.public_id, h.currency_code, h.morningstar_id);
     html += '<td class="py-2 px-3">';
     if (publicIdText) {
       html += '<div class="text-sm font-medium text-brand-500">' + escapeHtml(publicIdText) + "</div>";
@@ -899,7 +899,7 @@ async function showAddAccountForm() {
   document.getElementById("account-delete-btn").classList.add("hidden");
 
   // Cash balance is editable for new accounts (sets the opening balance)
-  var cashBalanceInput = document.getElementById("cash-balance");
+  const cashBalanceInput = document.getElementById("cash-balance");
   cashBalanceInput.readOnly = false;
   cashBalanceInput.classList.remove("bg-brand-50", "text-brand-500");
 
@@ -1056,7 +1056,7 @@ function hideAccountForm() {
  * Sets the date to today and resets all fields.
  */
 function showCashTxSubForm() {
-  var section = document.getElementById("cash-tx-section");
+  const section = document.getElementById("cash-tx-section");
   section.classList.remove("hidden");
   document.getElementById("cash-tx-type").value = "";
   document.getElementById("cash-tx-amount").value = "";
@@ -1068,7 +1068,7 @@ function showCashTxSubForm() {
   document.getElementById("cash-tx-amount-label").textContent = "Amount (£) *";
 
   // Default date to today
-  var today = new Date().toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
   document.getElementById("cash-tx-date").value = today;
 
   setTimeout(function () {
@@ -1089,10 +1089,10 @@ function hideCashTxSubForm() {
  * Shows/hides the direction selector and replace-balance checkbox for adjustments.
  */
 function onCashTxTypeChange() {
-  var txType = document.getElementById("cash-tx-type").value;
-  var dirGroup = document.getElementById("cash-tx-direction-group");
-  var replaceGroup = document.getElementById("cash-tx-replace-group");
-  var replaceCheckbox = document.getElementById("cash-tx-replace");
+  const txType = document.getElementById("cash-tx-type").value;
+  const dirGroup = document.getElementById("cash-tx-direction-group");
+  const replaceGroup = document.getElementById("cash-tx-replace-group");
+  const replaceCheckbox = document.getElementById("cash-tx-replace");
 
   if (txType === "adjustment") {
     dirGroup.classList.remove("hidden");
@@ -1110,9 +1110,9 @@ function onCashTxTypeChange() {
  * When checked, hides the direction selector and changes the amount label.
  */
 function onCashTxReplaceToggle() {
-  var isReplace = document.getElementById("cash-tx-replace").checked;
-  var dirGroup = document.getElementById("cash-tx-direction-group");
-  var amountLabel = document.getElementById("cash-tx-amount-label");
+  const isReplace = document.getElementById("cash-tx-replace").checked;
+  const dirGroup = document.getElementById("cash-tx-direction-group");
+  const amountLabel = document.getElementById("cash-tx-amount-label");
 
   if (isReplace) {
     dirGroup.classList.add("hidden");
@@ -1128,21 +1128,21 @@ function onCashTxReplaceToggle() {
  * Creates a cash transaction via the API and refreshes the cash balance display.
  */
 async function handleCashTxSubFormSave() {
-  var errorsDiv = document.getElementById("cash-tx-errors");
+  const errorsDiv = document.getElementById("cash-tx-errors");
   errorsDiv.textContent = "";
 
-  var accountId = document.getElementById("account-id").value;
+  const accountId = document.getElementById("account-id").value;
   if (!accountId) {
     errorsDiv.textContent = "No account selected.";
     return;
   }
 
-  var txType = document.getElementById("cash-tx-type").value;
-  var txDate = document.getElementById("cash-tx-date").value;
-  var rawAmount = Number(document.getElementById("cash-tx-amount").value);
-  var notes = document.getElementById("cash-tx-notes").value.trim();
-  var isReplace = document.getElementById("cash-tx-replace").checked;
-  var direction = document.getElementById("cash-tx-direction").value;
+  const txType = document.getElementById("cash-tx-type").value;
+  const txDate = document.getElementById("cash-tx-date").value;
+  const rawAmount = Number(document.getElementById("cash-tx-amount").value);
+  const notes = document.getElementById("cash-tx-notes").value.trim();
+  const isReplace = document.getElementById("cash-tx-replace").checked;
+  const direction = document.getElementById("cash-tx-direction").value;
 
   // Client-side validation
   if (!txType) {
@@ -1159,7 +1159,7 @@ async function handleCashTxSubFormSave() {
   }
 
   // Build the request body
-  var body = {
+  const body = {
     transaction_type: txType,
     transaction_date: txDate,
     amount: rawAmount,
@@ -1168,8 +1168,8 @@ async function handleCashTxSubFormSave() {
 
   // Handle adjustment with "replace balance" — calculate the delta
   if (txType === "adjustment" && isReplace) {
-    var currentBalance = Number(document.getElementById("cash-balance").value) || 0;
-    var delta = rawAmount - currentBalance;
+    const currentBalance = Number(document.getElementById("cash-balance").value) || 0;
+    const delta = rawAmount - currentBalance;
     if (delta === 0) {
       errorsDiv.textContent = "New balance is the same as the current balance.";
       return;
@@ -1183,14 +1183,14 @@ async function handleCashTxSubFormSave() {
     body.direction = direction;
   }
 
-  var result = await apiRequest("/api/accounts/" + accountId + "/cash-transactions", {
+  const result = await apiRequest("/api/accounts/" + accountId + "/cash-transactions", {
     method: "POST",
     body: body,
   });
 
   if (result.ok) {
     // Refresh the account to get the updated cash balance
-    var acctResult = await apiRequest("/api/accounts/" + accountId);
+    const acctResult = await apiRequest("/api/accounts/" + accountId);
     if (acctResult.ok) {
       document.getElementById("cash-balance").value = acctResult.data.cash_balance;
       // Also update the holdings/detail view cash balance if visible
@@ -1200,9 +1200,9 @@ async function handleCashTxSubFormSave() {
       }
     }
     hideCashTxSubForm();
-    var holdingsVisible = !document.getElementById("holdings-view").classList.contains("hidden");
-    var detailVisible = !document.getElementById("detail-view").classList.contains("hidden");
-    var msgTarget = holdingsVisible ? "holdings-messages" : detailVisible ? "page-messages" : "page-messages";
+    const holdingsVisible = !document.getElementById("holdings-view").classList.contains("hidden");
+    const detailVisible = !document.getElementById("detail-view").classList.contains("hidden");
+    const msgTarget = holdingsVisible ? "holdings-messages" : detailVisible ? "page-messages" : "page-messages";
     showSuccess(msgTarget, "Cash transaction recorded successfully");
     if (!holdingsVisible && !detailVisible) {
       await loadAccounts();
@@ -1357,7 +1357,7 @@ async function loadHoldings() {
     const publicIdText = h.investment_public_id ? " (" + h.investment_public_id + ")" : "";
 
     html += '<tr class="' + rowClass + ' border-b border-brand-100 hover:bg-brand-100 transition-colors">';
-    var holdingDescLink = buildResearchLinkHtml(h.investment_description, h.investment_public_id, h.currency_code, h.investment_morningstar_id);
+    const holdingDescLink = buildResearchLinkHtml(h.investment_description, h.investment_public_id, h.currency_code, h.investment_morningstar_id);
     html += '<td class="py-3 px-3 text-base">' + holdingDescLink + '<span class="text-brand-400 text-sm">' + escapeHtml(publicIdText) + "</span></td>";
     html += '<td class="py-3 px-3 text-base">' + escapeHtml(h.currency_code) + "</td>";
     html += '<td class="py-3 px-3 text-base text-right font-mono">' + formatQuantity(h.quantity) + "</td>";

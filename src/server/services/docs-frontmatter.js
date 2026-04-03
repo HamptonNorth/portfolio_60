@@ -14,24 +14,24 @@ import { toLocalDateStr } from "../../shared/server-constants.js";
  * @returns {{ attributes: Object, body: string }} Parsed front matter and body
  */
 export function parseFrontMatter(text) {
-  var match = text.match(/^---\n([\s\S]*?)\n---/);
+  const match = text.match(/^---\n([\s\S]*?)\n---/);
   if (!match) {
     return { attributes: {}, body: text };
   }
 
-  var attributes = {};
-  var yamlLines = match[1].split("\n");
+  const attributes = {};
+  const yamlLines = match[1].split("\n");
 
   yamlLines.forEach(function (line) {
-    var colonIndex = line.indexOf(":");
+    const colonIndex = line.indexOf(":");
     if (colonIndex !== -1) {
-      var key = line.slice(0, colonIndex).trim();
-      var value = line.slice(colonIndex + 1).trim();
+      const key = line.slice(0, colonIndex).trim();
+      const value = line.slice(colonIndex + 1).trim();
       attributes[key] = value;
     }
   });
 
-  var body = text.replace(match[0], "").trim();
+  const body = text.replace(match[0], "").trim();
   return { attributes: attributes, body: body };
 }
 
@@ -44,22 +44,22 @@ export function parseFrontMatter(text) {
  * @returns {string} Content with front matter guaranteed
  */
 export function ensureUnpublishedFrontMatter(content, defaultStyle) {
-  var hasFrontMatter = content.trim().startsWith("---");
+  const hasFrontMatter = content.trim().startsWith("---");
 
   if (!hasFrontMatter) {
-    var today = toLocalDateStr(new Date());
-    var defaultFrontMatter = "---\ntitle: Untitled\nsummary:\ncreated: " + today + "\npublished: n\nstyle: " + (defaultStyle || "github") + "\n---\n\n";
+    const today = toLocalDateStr(new Date());
+    const defaultFrontMatter = "---\ntitle: Untitled\nsummary:\ncreated: " + today + "\npublished: n\nstyle: " + (defaultStyle || "github") + "\n---\n\n";
     return defaultFrontMatter + content;
   }
 
   // Has front matter — ensure published: n
-  var match = content.match(/^---\n([\s\S]*?)\n---/);
+  const match = content.match(/^---\n([\s\S]*?)\n---/);
   if (!match) {
     return content;
   }
 
-  var frontMatter = match[1];
-  var body = content.slice(match[0].length);
+  let frontMatter = match[1];
+  const body = content.slice(match[0].length);
 
   if (/^published\s*:/m.test(frontMatter)) {
     frontMatter = frontMatter.replace(/^(published\s*:\s*).*$/m, "$1n");

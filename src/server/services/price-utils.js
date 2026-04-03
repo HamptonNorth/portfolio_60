@@ -15,12 +15,12 @@
 export function convertPricesToGBP(prices, rates) {
   if (rates.length === 0) return prices;
 
-  var converted = [];
-  var rateIdx = 0;
-  var lastRate = null;
+  const converted = [];
+  let rateIdx = 0;
+  let lastRate = null;
 
-  for (var i = 0; i < prices.length; i++) {
-    var priceDate = prices[i].price_date;
+  for (let i = 0; i < prices.length; i++) {
+    const priceDate = prices[i].price_date;
 
     // Advance rate index to the last rate on or before this price date
     while (rateIdx < rates.length - 1 && rates[rateIdx + 1].rate_date <= priceDate) {
@@ -59,12 +59,12 @@ export function convertPricesToGBP(prices, rates) {
  * @returns {Array<number|null>} Sampled values (null where no data available)
  */
 export function sampleWeekly(sampleDates, rawData, dateKey, valueKey) {
-  var values = [];
-  var dataIdx = 0;
-  var lastValue = null;
+  const values = [];
+  let dataIdx = 0;
+  let lastValue = null;
 
-  for (var i = 0; i < sampleDates.length; i++) {
-    var targetDate = sampleDates[i];
+  for (let i = 0; i < sampleDates.length; i++) {
+    const targetDate = sampleDates[i];
 
     // Advance data index to the last record on or before targetDate
     while (dataIdx < rawData.length - 1 && rawData[dataIdx + 1][dateKey] <= targetDate) {
@@ -90,8 +90,8 @@ export function sampleWeekly(sampleDates, rawData, dateKey, valueKey) {
  */
 export function rebaseToZero(values) {
   // Find the first non-null value as the base
-  var base = null;
-  for (var i = 0; i < values.length; i++) {
+  let base = null;
+  for (let i = 0; i < values.length; i++) {
     if (values[i] !== null) {
       base = values[i];
       break;
@@ -100,8 +100,8 @@ export function rebaseToZero(values) {
 
   if (base === null || base === 0) return values;
 
-  var rebased = [];
-  for (var j = 0; j < values.length; j++) {
+  const rebased = [];
+  for (let j = 0; j < values.length; j++) {
     if (values[j] === null) {
       rebased.push(null);
     } else {
@@ -119,8 +119,8 @@ export function rebaseToZero(values) {
  * @returns {Array<string>} Array of ISO-8601 date strings
  */
 export function generateWeeklyDates(startDate, endDate) {
-  var dates = [];
-  var current = new Date(startDate);
+  const dates = [];
+  const current = new Date(startDate);
 
   while (current <= endDate) {
     dates.push(formatISODate(current));
@@ -128,8 +128,8 @@ export function generateWeeklyDates(startDate, endDate) {
   }
 
   // Ensure the end date is included if not already
-  var lastDate = dates[dates.length - 1];
-  var endStr = formatISODate(endDate);
+  const lastDate = dates[dates.length - 1];
+  const endStr = formatISODate(endDate);
   if (lastDate !== endStr) {
     dates.push(endStr);
   }
@@ -146,8 +146,8 @@ export function generateWeeklyDates(startDate, endDate) {
  * @returns {Array<string>} Array of ISO-8601 date strings
  */
 export function generateFortnightlyDates(startDate, endDate) {
-  var dates = [];
-  var current = new Date(startDate);
+  const dates = [];
+  const current = new Date(startDate);
 
   while (current <= endDate) {
     dates.push(formatISODate(current));
@@ -155,8 +155,8 @@ export function generateFortnightlyDates(startDate, endDate) {
   }
 
   // Ensure the end date is included if not already
-  var lastDate = dates[dates.length - 1];
-  var endStr = formatISODate(endDate);
+  const lastDate = dates[dates.length - 1];
+  const endStr = formatISODate(endDate);
   if (lastDate !== endStr) {
     dates.push(endStr);
   }
@@ -170,8 +170,8 @@ export function generateFortnightlyDates(startDate, endDate) {
  * @returns {string} ISO-8601 date string
  */
 export function formatISODate(date) {
-  var y = date.getFullYear();
-  var m = String(date.getMonth() + 1).padStart(2, "0");
-  var d = String(date.getDate()).padStart(2, "0");
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
   return y + "-" + m + "-" + d;
 }

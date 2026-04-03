@@ -1793,10 +1793,10 @@ async function loadFetchServerStatus() {
     if (!data.enabled) return;
 
     // Show the section
-    var section = document.getElementById("fetch-server-section");
+    const section = document.getElementById("fetch-server-section");
     section.classList.remove("hidden");
 
-    var statusEl = document.getElementById("fetch-server-status");
+    const statusEl = document.getElementById("fetch-server-status");
 
     if (!data.reachable) {
       statusEl.textContent = "Server not reachable";
@@ -1804,17 +1804,17 @@ async function loadFetchServerStatus() {
       return;
     }
 
-    var parts = [];
+    const parts = [];
     if (data.lastFetch) {
       parts.push("Last fetch: " + formatDisplayDate(data.lastFetch.split("T")[0]) + " " + data.lastFetch.split("T")[1].substring(0, 5));
     }
     if (data.lastFetchResult) {
-      var r = data.lastFetchResult;
+      const r = data.lastFetchResult;
       parts.push("Prices: " + r.priceSuccess + " OK" + (r.priceFailed > 0 ? ", " + r.priceFailed + " failed" : ""));
       parts.push("Currency: " + (r.currencySuccess ? "OK" : "failed"));
     }
     if (data.nextScheduledFetch) {
-      var nextDate = new Date(data.nextScheduledFetch);
+      const nextDate = new Date(data.nextScheduledFetch);
       parts.push("Next: " + formatDisplayDate(nextDate.toISOString().split("T")[0]) + " " + nextDate.toTimeString().substring(0, 5));
     }
     if (data.serverUptime) {
@@ -1832,19 +1832,19 @@ async function loadFetchServerStatus() {
  * @description Trigger a manual sync from the fetch server.
  */
 async function syncFromServer() {
-  var btn = document.getElementById("sync-from-server-btn");
-  var resultEl = document.getElementById("fetch-server-sync-result");
+  const btn = document.getElementById("sync-from-server-btn");
+  const resultEl = document.getElementById("fetch-server-sync-result");
 
   btn.disabled = true;
   btn.textContent = "Syncing...";
   resultEl.textContent = "";
 
   try {
-    var response = await fetch("/api/fetch/sync", { method: "POST" });
-    var data = await response.json();
+    const response = await fetch("/api/fetch/sync", { method: "POST" });
+    const data = await response.json();
 
     if (data.success) {
-      var parts = [];
+      const parts = [];
       if (data.live) {
         parts.push("Live: " + data.live.prices + " prices, " + data.live.rates + " rates, " + data.live.benchmarks + " benchmarks");
       }
@@ -1874,13 +1874,13 @@ async function syncFromServer() {
  */
 async function loadFetchServerLog() {
   try {
-    var response = await fetch("/api/fetch/server-log");
-    var data = await response.json();
+    const response = await fetch("/api/fetch/server-log");
+    const data = await response.json();
 
     if (!data.enabled) return;
 
-    var section = document.getElementById("fetch-server-log-section");
-    var container = document.getElementById("fetch-server-log-container");
+    const section = document.getElementById("fetch-server-log-section");
+    const container = document.getElementById("fetch-server-log-container");
 
     if (!data.reachable || !data.entries || data.entries.length === 0) {
       section.classList.remove("hidden");
@@ -1891,8 +1891,8 @@ async function loadFetchServerLog() {
     section.classList.remove("hidden");
 
     // Build the log table — entries arrive newest-first, display newest first
-    var entries = data.entries;
-    var html = '<table class="w-full text-xs">';
+    const entries = data.entries;
+    let html = '<table class="w-full text-xs">';
     html += '<thead class="sticky top-0 bg-brand-50"><tr class="text-left">';
     html += '<th class="py-1.5 px-3 font-medium text-brand-700">Date/Time</th>';
     html += '<th class="py-1.5 px-3 font-medium text-brand-700">Type</th>';
@@ -1901,13 +1901,13 @@ async function loadFetchServerLog() {
     html += '<th class="py-1.5 px-3 font-medium text-brand-700">Error</th>';
     html += '</tr></thead><tbody>';
 
-    for (var i = 0; i < entries.length; i++) {
-      var entry = entries[i];
-      var dt = entry.fetch_datetime || "";
-      var displayDate = dt.length >= 16 ? dt.substring(0, 10) + " " + dt.substring(11, 16) : dt;
-      var hasFailed = entry.items_failed > 0;
-      var hasError = entry.error_message && entry.error_message.length > 0;
-      var rowClass = (hasFailed || hasError) ? "bg-red-50" : "";
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      const dt = entry.fetch_datetime || "";
+      const displayDate = dt.length >= 16 ? dt.substring(0, 10) + " " + dt.substring(11, 16) : dt;
+      const hasFailed = entry.items_failed > 0;
+      const hasError = entry.error_message && entry.error_message.length > 0;
+      const rowClass = (hasFailed || hasError) ? "bg-red-50" : "";
 
       html += '<tr class="border-t border-brand-100 ' + rowClass + '">';
       html += '<td class="py-1.5 px-3 text-brand-600 whitespace-nowrap">' + escapeHtml(displayDate) + '</td>';
@@ -1930,16 +1930,16 @@ async function loadFetchServerLog() {
  * The fetch runs asynchronously; the user can refresh the log to see results.
  */
 async function rerunServerFetchAll() {
-  var btn = document.getElementById("rerun-fetch-btn");
-  var resultEl = document.getElementById("rerun-fetch-result");
+  const btn = document.getElementById("rerun-fetch-btn");
+  const resultEl = document.getElementById("rerun-fetch-result");
 
   btn.disabled = true;
   btn.textContent = "Starting...";
   resultEl.textContent = "";
 
   try {
-    var response = await fetch("/api/fetch/server-rerun", { method: "POST" });
-    var data = await response.json();
+    const response = await fetch("/api/fetch/server-rerun", { method: "POST" });
+    const data = await response.json();
 
     if (data.success) {
       resultEl.textContent = data.message || "Fetch started — refresh log to see results";
@@ -1970,10 +1970,10 @@ document.addEventListener("DOMContentLoaded", async function () {
   document.getElementById("retry-failed-benchmarks-btn").addEventListener("click", retryFailedBenchmarksFromDb);
   document.getElementById("sync-from-server-btn").addEventListener("click", syncFromServer);
 
-  var showLogBtn = document.getElementById("show-server-log-btn");
+  const showLogBtn = document.getElementById("show-server-log-btn");
   if (showLogBtn) {
     showLogBtn.addEventListener("click", function () {
-      var logSection = document.getElementById("fetch-server-log-section");
+      const logSection = document.getElementById("fetch-server-log-section");
       if (logSection && logSection.classList.contains("hidden")) {
         loadFetchServerLog();
         showLogBtn.textContent = "Hide Fetch Server Log";
@@ -1984,12 +1984,12 @@ document.addEventListener("DOMContentLoaded", async function () {
     });
   }
 
-  var refreshLogBtn = document.getElementById("refresh-server-log-btn");
+  const refreshLogBtn = document.getElementById("refresh-server-log-btn");
   if (refreshLogBtn) {
     refreshLogBtn.addEventListener("click", loadFetchServerLog);
   }
 
-  var rerunBtn = document.getElementById("rerun-fetch-btn");
+  const rerunBtn = document.getElementById("rerun-fetch-btn");
   if (rerunBtn) {
     rerunBtn.addEventListener("click", rerunServerFetchAll);
   }

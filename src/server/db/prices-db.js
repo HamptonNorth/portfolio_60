@@ -214,10 +214,10 @@ export function getAllInvestmentPricesInRange(fromDate, toDate) {
     )
     .all(fromDate, toDate);
 
-  var result = new Map();
-  for (var i = 0; i < rows.length; i++) {
-    var row = rows[i];
-    var invId = row.investment_id;
+  const result = new Map();
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const invId = row.investment_id;
     if (!result.has(invId)) {
       result.set(invId, []);
     }

@@ -1,26 +1,10 @@
-import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync, unlinkSync, readdirSync } from "node:fs";
-import { resolve, dirname, basename, join, extname } from "node:path";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, readdirSync } from "node:fs";
+import { resolve, join, extname } from "node:path";
+import { backupJsonFile } from "../file-utils.js";
 import { loadConfig, getAllowedProviders, getSchedulingConfig, reloadConfig, getListItems, getListDocuments, saveListItems, saveListDocuments, getListsDir, getConfigFilePath, getWritableConfigPath, getReportsOpenInNewTab, getMergedConfigRaw } from "../config.js";
 import { isTestMode } from "../test-mode.js";
 import { DB_PATH, BACKUP_DIR, APP_NAME, APP_VERSION } from "../../shared/server-constants.js";
 
-/**
- * @description Create a timestamped backup of a JSON file before overwriting.
- * The backup is written to the same directory as the original file with a
- * timestamp suffix: filename-backup-yyyy-mm-dd-hh-mm.json.
- * @param {string} filePath - Absolute path to the file to back up
- */
-function backupJsonFile(filePath) {
-  if (!existsSync(filePath)) return;
-  const dir = dirname(filePath);
-  const base = basename(filePath, ".json");
-  const now = new Date();
-  const pad = function (n) { return String(n).padStart(2, "0"); };
-  const timestamp = now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate()) + "-" + pad(now.getHours()) + "-" + pad(now.getMinutes());
-  const backupName = base + "-backup-" + timestamp + ".json";
-  const backupPath = join(dir, backupName);
-  copyFileSync(filePath, backupPath);
-}
 
 /**
  * @description Get the list of allowed provider codes.
@@ -271,13 +255,6 @@ function convertMarkdownToHtml(markdown) {
   return html;
 }
 
-/**
- * @description Handle async config API routes (for POST requests with body).
- * @param {string} method - HTTP method
- * @param {string} path - URL pathname
- * @param {Request} request - The full Request object
- * @returns {Promise<Response|null>} Response if matched, null otherwise
- */
 /** @type {number} Maximum PDF upload size in bytes (20 MB) */
 const MAX_PDF_SIZE = 20 * 1024 * 1024;
 
@@ -313,6 +290,13 @@ function getUniqueFilename(dir, filename) {
   return { filename: candidate, isDuplicate: counter > 0 };
 }
 
+/**
+ * @description Handle async config API routes (for POST requests with body).
+ * @param {string} method - HTTP method
+ * @param {string} path - URL pathname
+ * @param {Request} request - The full Request object
+ * @returns {Promise<Response|null>} Response if matched, null otherwise
+ */
 export async function handleConfigRouteAsync(method, path, request) {
 
   // --- Spreadsheet CRUD ---
@@ -349,7 +333,7 @@ export async function handleConfigRouteAsync(method, path, request) {
   }
 
   // PUT /api/config/lists/spreadsheet/:index — edit a spreadsheet entry
-  var spreadsheetPutMatch = path.match(/^\/api\/config\/lists\/spreadsheet\/(\d+)$/);
+  const spreadsheetPutMatch = path.match(/^\/api\/config\/lists\/spreadsheet\/(\d+)$/);
   if (method === "PUT" && spreadsheetPutMatch) {
     try {
       const index = parseInt(spreadsheetPutMatch[1], 10);
@@ -387,7 +371,7 @@ export async function handleConfigRouteAsync(method, path, request) {
   }
 
   // DELETE /api/config/lists/spreadsheet/:index — delete a spreadsheet entry
-  var spreadsheetDeleteMatch = path.match(/^\/api\/config\/lists\/spreadsheet\/(\d+)$/);
+  const spreadsheetDeleteMatch = path.match(/^\/api\/config\/lists\/spreadsheet\/(\d+)$/);
   if (method === "DELETE" && spreadsheetDeleteMatch) {
     try {
       const index = parseInt(spreadsheetDeleteMatch[1], 10);
@@ -412,7 +396,7 @@ export async function handleConfigRouteAsync(method, path, request) {
   // POST /api/config/lists/document — upload a PDF document
   if (method === "POST" && path === "/api/config/lists/document") {
     try {
-      var formData;
+      let formData;
       try {
         formData = await request.formData();
       } catch {
@@ -439,7 +423,7 @@ export async function handleConfigRouteAsync(method, path, request) {
       mkdirSync(listsDir, { recursive: true });
 
       // Sanitise the original filename: lowercase, replace spaces with dashes, strip unsafe chars
-      var sanitised = file.name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9\-_.]/g, "");
+      let sanitised = file.name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9\-_.]/g, "");
       if (!sanitised || sanitised === ".pdf") {
         sanitised = "document.pdf";
       }
@@ -466,7 +450,7 @@ export async function handleConfigRouteAsync(method, path, request) {
   }
 
   // PUT /api/config/lists/document/:index — edit a document title
-  var documentPutMatch = path.match(/^\/api\/config\/lists\/document\/(\d+)$/);
+  const documentPutMatch = path.match(/^\/api\/config\/lists\/document\/(\d+)$/);
   if (method === "PUT" && documentPutMatch) {
     try {
       const index = parseInt(documentPutMatch[1], 10);
@@ -494,7 +478,7 @@ export async function handleConfigRouteAsync(method, path, request) {
   }
 
   // DELETE /api/config/lists/document/:index — delete a document entry and its file
-  var documentDeleteMatch = path.match(/^\/api\/config\/lists\/document\/(\d+)$/);
+  const documentDeleteMatch = path.match(/^\/api\/config\/lists\/document\/(\d+)$/);
   if (method === "DELETE" && documentDeleteMatch) {
     try {
       const index = parseInt(documentDeleteMatch[1], 10);

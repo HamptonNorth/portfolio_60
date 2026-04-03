@@ -72,8 +72,8 @@ function portfolioSectionHeader() {
  * @returns {string} HTML string for the user section
  */
 function renderUserSection(summary) {
-  var user = summary.user;
-  var html =
+  const user = summary.user;
+  let html =
     '<h3 class="text-sm font-bold text-brand-800 mt-5 mb-1">' +
     escapeHtml(user.first_name + " " + user.last_name) +
     "</h3>";
@@ -82,11 +82,11 @@ function renderUserSection(summary) {
   html += "<thead>" + portfolioSectionHeader() + "</thead>";
   html += "<tbody>";
 
-  for (var a = 0; a < summary.accounts.length; a++) {
-    var account = summary.accounts[a];
-    var typeLabel =
+  for (let a = 0; a < summary.accounts.length; a++) {
+    const account = summary.accounts[a];
+    const typeLabel =
       ACCOUNT_TYPE_LABELS[account.account_type] || account.account_type;
-    var cashSuffix = account.cash_warning ? " *" : "";
+    const cashSuffix = account.cash_warning ? " *" : "";
 
     html += '<tr class="border-b border-brand-100">';
     html +=
@@ -142,15 +142,15 @@ function renderUserSection(summary) {
  */
 function renderCombinedSection(userSummaries) {
   // Aggregate by account type across the provided users
-  var byType = {};
-  var totalInvestments = 0;
-  var totalCash = 0;
-  var totalGrand = 0;
+  const byType = {};
+  let totalInvestments = 0;
+  let totalCash = 0;
+  let totalGrand = 0;
 
-  for (var u = 0; u < userSummaries.length; u++) {
-    var summary = userSummaries[u];
-    for (var a = 0; a < summary.accounts.length; a++) {
-      var account = summary.accounts[a];
+  for (let u = 0; u < userSummaries.length; u++) {
+    const summary = userSummaries[u];
+    for (let a = 0; a < summary.accounts.length; a++) {
+      const account = summary.accounts[a];
       if (!byType[account.account_type]) {
         byType[account.account_type] = { investments: 0, cash: 0, total: 0 };
       }
@@ -163,7 +163,7 @@ function renderCombinedSection(userSummaries) {
     totalGrand += summary.totals.grand_total;
   }
 
-  var html = '<div class="mt-6 border-t-2 border-brand-300 pt-3">';
+  let html = '<div class="mt-6 border-t-2 border-brand-300 pt-3">';
   html +=
     '<h3 class="text-sm font-bold text-brand-800 mb-1">Combined Totals</h3>';
 
@@ -171,10 +171,10 @@ function renderCombinedSection(userSummaries) {
   html += "<thead>" + portfolioSectionHeader() + "</thead>";
   html += "<tbody>";
 
-  var typeOrder = ["isa", "sipp", "trading"];
-  for (var t = 0; t < typeOrder.length; t++) {
-    var type = typeOrder[t];
-    var totals = byType[type];
+  const typeOrder = ["isa", "sipp", "trading"];
+  for (let t = 0; t < typeOrder.length; t++) {
+    const type = typeOrder[t];
+    const totals = byType[type];
     if (!totals) continue;
 
     html += '<tr class="border-b border-brand-100">';
@@ -227,9 +227,9 @@ function renderCombinedSection(userSummaries) {
  * @returns {Object} Map of initials (uppercase) to summary object
  */
 function buildInitialsMap(summaries) {
-  var map = {};
-  for (var i = 0; i < summaries.length; i++) {
-    var s = summaries[i];
+  const map = {};
+  for (let i = 0; i < summaries.length; i++) {
+    const s = summaries[i];
     if (s.accounts && s.accounts.length > 0 && s.user.initials) {
       map[s.user.initials.toUpperCase()] = s;
     }
@@ -267,10 +267,10 @@ async function renderPortfolioSummary(containerId, params) {
     return;
   }
 
-  var summaries = result.data;
+  const summaries = result.data;
 
   // Filter to users that have at least one account
-  var activeUsers = summaries.filter(function (s) {
+  const activeUsers = summaries.filter(function (s) {
     return s.accounts && s.accounts.length > 0;
   });
 
@@ -281,12 +281,12 @@ async function renderPortfolioSummary(containerId, params) {
     return;
   }
 
-  var html =
+  let html =
     '<h2 class="text-lg font-semibold text-brand-800 mb-4">Portfolio Summary Valuation</h2>';
 
   // If no params provided, use original behaviour: show all users + combined
   if (!params || params.length === 0) {
-    for (var u = 0; u < activeUsers.length; u++) {
+    for (let u = 0; u < activeUsers.length; u++) {
       html += renderUserSection(activeUsers[u]);
     }
     if (activeUsers.length > 1) {
@@ -294,17 +294,17 @@ async function renderPortfolioSummary(containerId, params) {
     }
   } else {
     // Params-driven rendering: each entry is a section to render
-    var initialsMap = buildInitialsMap(summaries);
+    const initialsMap = buildInitialsMap(summaries);
 
-    for (var p = 0; p < params.length; p++) {
-      var entry = params[p].trim();
+    for (let p = 0; p < params.length; p++) {
+      const entry = params[p].trim();
 
       if (entry.indexOf("+") !== -1) {
         // Combined section: "AW + BW" → aggregate those users
-        var parts = entry.split("+");
-        var combinedUsers = [];
-        for (var c = 0; c < parts.length; c++) {
-          var key = parts[c].trim().toUpperCase();
+        const parts = entry.split("+");
+        const combinedUsers = [];
+        for (let c = 0; c < parts.length; c++) {
+          const key = parts[c].trim().toUpperCase();
           if (initialsMap[key]) {
             combinedUsers.push(initialsMap[key]);
           }
@@ -314,7 +314,7 @@ async function renderPortfolioSummary(containerId, params) {
         }
       } else {
         // Single user section
-        var userKey = entry.toUpperCase();
+        const userKey = entry.toUpperCase();
         if (initialsMap[userKey]) {
           html += renderUserSection(initialsMap[userKey]);
         }

@@ -20,49 +20,49 @@ import { convertPricesToGBP, sampleWeekly, rebaseToZero, generateWeeklyDates, fo
  * @returns {Object} Chart data with series array and metadata
  */
 export function getChartData(chartDef) {
-  var fromMonthsAgo = parseInt(chartDef.fromMonthsAgo) || 0;
-  var monthsToShow = parseInt(chartDef.monthsToShow) || 12;
+  const fromMonthsAgo = parseInt(chartDef.fromMonthsAgo) || 0;
+  const monthsToShow = parseInt(chartDef.monthsToShow) || 12;
 
   // Calculate date range
-  var endDate = new Date();
+  const endDate = new Date();
   if (fromMonthsAgo > 0) {
     endDate.setMonth(endDate.getMonth() - fromMonthsAgo);
   }
-  var startDate = new Date(endDate);
+  const startDate = new Date(endDate);
   startDate.setMonth(startDate.getMonth() - monthsToShow);
 
-  var fromStr = formatISODate(startDate);
-  var toStr = formatISODate(endDate);
+  const fromStr = formatISODate(startDate);
+  const toStr = formatISODate(endDate);
 
   // Generate weekly sample dates (every 7 days from start to end)
-  var sampleDates = generateWeeklyDates(startDate, endDate);
+  const sampleDates = generateWeeklyDates(startDate, endDate);
 
   // Parse params to identify series
-  var params = chartDef.params || [];
-  var series = [];
+  const params = chartDef.params || [];
+  const series = [];
 
-  for (var i = 0; i < params.length; i++) {
-    var param = params[i];
-    var colonIdx = param.indexOf(":");
+  for (let i = 0; i < params.length; i++) {
+    const param = params[i];
+    const colonIdx = param.indexOf(":");
     if (colonIdx === -1) continue;
 
-    var prefix = param.substring(0, colonIdx).trim();
-    var identifier = param.substring(colonIdx + 1).trim();
+    const prefix = param.substring(0, colonIdx).trim();
+    const identifier = param.substring(colonIdx + 1).trim();
 
     if (prefix === "inv") {
-      var invSeries = buildInvestmentSeries(identifier, fromStr, toStr, sampleDates);
+      const invSeries = buildInvestmentSeries(identifier, fromStr, toStr, sampleDates);
       if (invSeries) series.push(invSeries);
     } else if (prefix === "bm") {
-      var bmSeries = buildBenchmarkSeries(identifier, fromStr, toStr, sampleDates);
+      const bmSeries = buildBenchmarkSeries(identifier, fromStr, toStr, sampleDates);
       if (bmSeries) series.push(bmSeries);
     }
   }
 
   // Fetch global events within the date range if requested
-  var events = [];
+  const events = [];
   if (chartDef.showGlobalEvents) {
-    var rawEvents = getGlobalEventsInRange(fromStr, toStr);
-    for (var e = 0; e < rawEvents.length; e++) {
+    const rawEvents = getGlobalEventsInRange(fromStr, toStr);
+    for (let e = 0; e < rawEvents.length; e++) {
       events.push({
         date: rawEvents[e].event_date,
         description: rawEvents[e].description.substring(0, 15),
@@ -91,22 +91,22 @@ export function getChartData(chartDef) {
  * @returns {Object|null} Series object or null if investment not found
  */
 function buildInvestmentSeries(publicId, fromStr, toStr, sampleDates) {
-  var inv = getInvestmentByPublicId(publicId);
+  const inv = getInvestmentByPublicId(publicId);
   if (!inv) return null;
 
-  var allPrices = getPricesInRange(inv.id, fromStr, toStr);
+  let allPrices = getPricesInRange(inv.id, fromStr, toStr);
   if (allPrices.length === 0) return null;
 
   // Convert non-GBP prices to GBP using contemporaneous currency rates
-  var needsConversion = inv.currency_code && inv.currency_code !== "GBP";
+  const needsConversion = inv.currency_code && inv.currency_code !== "GBP";
   if (needsConversion) {
-    var allRates = getRatesInRange(inv.currencies_id, fromStr, toStr);
+    const allRates = getRatesInRange(inv.currencies_id, fromStr, toStr);
     allPrices = convertPricesToGBP(allPrices, allRates);
   }
 
   // Sample weekly: for each sample date, find the nearest price on or before
-  var weeklyValues = sampleWeekly(sampleDates, allPrices, "price_date", "price");
-  var rebased = rebaseToZero(weeklyValues);
+  const weeklyValues = sampleWeekly(sampleDates, allPrices, "price_date", "price");
+  const rebased = rebaseToZero(weeklyValues);
 
   return {
     label: inv.description,
@@ -127,15 +127,15 @@ function buildInvestmentSeries(publicId, fromStr, toStr, sampleDates) {
  * @returns {Object|null} Series object or null if benchmark not found
  */
 function buildBenchmarkSeries(description, fromStr, toStr, sampleDates) {
-  var bm = getBenchmarkByDescription(description);
+  const bm = getBenchmarkByDescription(description);
   if (!bm) return null;
 
-  var allValues = getBenchmarkDataInRange(bm.id, fromStr, toStr);
+  const allValues = getBenchmarkDataInRange(bm.id, fromStr, toStr);
   if (allValues.length === 0) return null;
 
   // Sample weekly: for each sample date, find the nearest value on or before
-  var weeklyValues = sampleWeekly(sampleDates, allValues, "benchmark_date", "value");
-  var rebased = rebaseToZero(weeklyValues);
+  const weeklyValues = sampleWeekly(sampleDates, allValues, "benchmark_date", "value");
+  const rebased = rebaseToZero(weeklyValues);
 
   return {
     label: bm.description,

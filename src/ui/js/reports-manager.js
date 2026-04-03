@@ -6,15 +6,15 @@
  */
 
 /** @type {Array<Object>} Raw report definitions loaded from the server */
-var reportDefinitions = [];
+let reportDefinitions = [];
 
 /** @type {Array<{param_key: string, param_value: string}>} Available token mappings */
-var reportTokens = [];
+let reportTokens = [];
 
 // ─── Report type helpers ─────────────────────────────────────────────────────
 
 /** @type {Object<string, string>} Mapping of pdfEndpoint patterns to type labels */
-var REPORT_TYPE_LABELS = {
+const REPORT_TYPE_LABELS = {
   household_assets: "Household Assets",
   portfolio_summary: "Portfolio Summary",
   portfolio_detail: "Portfolio Detail",
@@ -48,8 +48,8 @@ function detectReportType(report) {
  * @returns {string} Display label
  */
 function getReportTypeLabel(report) {
-  var type = detectReportType(report);
-  var label = REPORT_TYPE_LABELS[type] || type;
+  const type = detectReportType(report);
+  const label = REPORT_TYPE_LABELS[type] || type;
   if (type === "composite" && report.blocks) {
     label += " (" + report.blocks.length + " block" + (report.blocks.length !== 1 ? "s" : "") + ")";
   }
@@ -65,7 +65,7 @@ function getReportTypeLabel(report) {
  * @description Load report definitions and tokens from the server, then render.
  */
 async function loadReports() {
-  var result = await apiRequest("/api/reports/definitions");
+  const result = await apiRequest("/api/reports/definitions");
   if (!result.ok) {
     showError("page-messages", result.error || "Failed to load reports", result.detail || "");
     return;
@@ -74,7 +74,7 @@ async function loadReports() {
 
   // Load tokens (non-blocking — used for hints in modals)
   try {
-    var tokenResult = await apiRequest("/api/reports/tokens");
+    const tokenResult = await apiRequest("/api/reports/tokens");
     if (tokenResult.ok) {
       reportTokens = tokenResult.data || [];
     }
@@ -91,7 +91,7 @@ async function loadReports() {
  * @description Render the main reports table showing all defined reports.
  */
 function renderReportsTable() {
-  var container = document.getElementById("reports-list");
+  const container = document.getElementById("reports-list");
   if (!container) return;
 
   if (reportDefinitions.length === 0) {
@@ -99,7 +99,7 @@ function renderReportsTable() {
     return;
   }
 
-  var html = '<table class="w-full text-sm">';
+  let html = '<table class="w-full text-sm">';
   html += '<thead><tr class="border-b border-brand-200 text-left">';
   html += '<th class="py-2 pr-2 w-8 font-medium text-brand-700">#</th>';
   html += '<th class="py-2 pr-4 font-medium text-brand-700">Title</th>';
@@ -108,8 +108,8 @@ function renderReportsTable() {
   html += '<th class="py-2 text-right font-medium text-brand-700">Actions</th>';
   html += '</tr></thead><tbody>';
 
-  for (var i = 0; i < reportDefinitions.length; i++) {
-    var report = reportDefinitions[i];
+  for (let i = 0; i < reportDefinitions.length; i++) {
+    const report = reportDefinitions[i];
     html += '<tr class="border-b border-brand-100">';
     html += '<td class="py-3 pr-2 text-brand-400">' + (i + 1) + '</td>';
     html += '<td class="py-3 pr-4">' + escapeHtml(report.title || "(untitled)") + '</td>';
@@ -145,10 +145,10 @@ function renderReportsTable() {
  * @param {number} direction - -1 for up, +1 for down
  */
 async function moveReport(index, direction) {
-  var newIndex = index + direction;
+  const newIndex = index + direction;
   if (newIndex < 0 || newIndex >= reportDefinitions.length) return;
 
-  var result = await apiRequest("/api/reports/reorder", {
+  const result = await apiRequest("/api/reports/reorder", {
     method: "PUT",
     body: { from: index, to: newIndex },
   });
@@ -165,7 +165,7 @@ async function moveReport(index, direction) {
  * @param {number} index - Index of the report to duplicate
  */
 async function duplicateReport(index) {
-  var result = await apiRequest("/api/reports/duplicate/" + index, { method: "POST" });
+  const result = await apiRequest("/api/reports/duplicate/" + index, { method: "POST" });
   if (result.ok) {
     showSuccess("page-messages", "Report duplicated");
     loadReports();
@@ -179,7 +179,7 @@ async function duplicateReport(index) {
  * @param {number} index - Index of the report to delete
  */
 function confirmDeleteReport(index) {
-  var report = reportDefinitions[index];
+  const report = reportDefinitions[index];
   if (!report) return;
   showConfirmDialog(
     "Delete Report",
@@ -193,7 +193,7 @@ function confirmDeleteReport(index) {
  * @param {number} index - Index to delete
  */
 async function deleteReport(index) {
-  var result = await apiRequest("/api/reports/definition/" + index, { method: "DELETE" });
+  const result = await apiRequest("/api/reports/definition/" + index, { method: "DELETE" });
   if (result.ok) {
     showSuccess("page-messages", "Report deleted");
     loadReports();
@@ -209,9 +209,9 @@ async function deleteReport(index) {
  * @param {number} index - Index of the report to edit
  */
 function editReport(index) {
-  var report = reportDefinitions[index];
+  const report = reportDefinitions[index];
   if (!report) return;
-  var type = detectReportType(report);
+  const type = detectReportType(report);
   showReportModal(type, index);
 }
 
@@ -223,7 +223,7 @@ function editReport(index) {
  */
 function tokenHint() {
   if (reportTokens.length === 0) return "";
-  var parts = reportTokens.map(function (t) {
+  const parts = reportTokens.map(function (t) {
     return t.param_key + " \u2192 " + t.param_value;
   });
   return "Available tokens: " + parts.join(", ");
@@ -235,7 +235,7 @@ function tokenHint() {
  * @description Close any open modal overlay.
  */
 function closeModal() {
-  var overlay = document.getElementById("reports-modal-overlay");
+  const overlay = document.getElementById("reports-modal-overlay");
   if (overlay) overlay.remove();
 }
 
@@ -246,7 +246,7 @@ function closeModal() {
  */
 function createModalOverlay(innerHtml) {
   closeModal();
-  var overlay = document.createElement("div");
+  const overlay = document.createElement("div");
   overlay.id = "reports-modal-overlay";
   overlay.className = "fixed inset-0 bg-black/40 flex items-center justify-center z-50";
   overlay.innerHTML = '<div class="bg-white rounded-lg shadow-xl border border-brand-200 w-full max-w-2xl mx-4 p-6 max-h-[85vh] overflow-y-auto">' + innerHtml + '</div>';
@@ -266,11 +266,11 @@ function createModalOverlay(innerHtml) {
  * @param {Function} onConfirm - Callback if user confirms
  */
 function showConfirmDialog(title, message, onConfirm) {
-  var overlay = document.createElement("div");
+  const overlay = document.createElement("div");
   overlay.id = "reports-modal-overlay";
   overlay.className = "fixed inset-0 bg-black/40 flex items-center justify-center z-50";
 
-  var html = '<div class="bg-white rounded-lg shadow-xl border border-brand-200 w-full max-w-sm mx-4 p-6">';
+  let html = '<div class="bg-white rounded-lg shadow-xl border border-brand-200 w-full max-w-sm mx-4 p-6">';
   html += '<h3 class="text-lg font-semibold text-brand-800 mb-3">' + title + '</h3>';
   html += '<p class="text-sm text-brand-700 mb-6">' + message + '</p>';
   html += '<div class="flex justify-end gap-3">';
@@ -301,13 +301,13 @@ function showConfirmDialog(title, message, onConfirm) {
  * @returns {string} HTML string
  */
 function buildDynamicList(fieldId, label, values, placeholder, hint) {
-  var html = '<div>';
+  let html = '<div>';
   html += '<label class="block text-sm font-medium text-brand-700 mb-1">' + label + '</label>';
   if (hint) {
     html += '<p class="text-xs text-brand-500 mb-2">' + escapeHtml(hint) + '</p>';
   }
   html += '<div id="' + fieldId + '-container">';
-  for (var i = 0; i < values.length; i++) {
+  for (let i = 0; i < values.length; i++) {
     html += buildDynamicListRow(fieldId, values[i], placeholder);
   }
   html += '</div>';
@@ -337,9 +337,9 @@ function buildDynamicListRow(fieldId, value, placeholder) {
  * @param {string} placeholder - Placeholder text for the new input
  */
 function addDynamicListRow(fieldId, placeholder) {
-  var container = document.getElementById(fieldId + "-container");
+  const container = document.getElementById(fieldId + "-container");
   if (!container) return;
-  var row = document.createElement("div");
+  const row = document.createElement("div");
   row.className = "flex items-center gap-2 mb-1 dynamic-row";
   row.setAttribute("data-field", fieldId);
   row.innerHTML = '<input type="text" class="flex-1 border border-brand-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400" ' +
@@ -355,12 +355,12 @@ function addDynamicListRow(fieldId, placeholder) {
  * @returns {Array<string>} Non-empty trimmed values
  */
 function collectDynamicList(fieldId) {
-  var container = document.getElementById(fieldId + "-container");
+  const container = document.getElementById(fieldId + "-container");
   if (!container) return [];
-  var inputs = container.querySelectorAll("input[type='text']");
-  var values = [];
-  for (var i = 0; i < inputs.length; i++) {
-    var val = inputs[i].value.trim();
+  const inputs = container.querySelectorAll("input[type='text']");
+  const values = [];
+  for (let i = 0; i < inputs.length; i++) {
+    const val = inputs[i].value.trim();
     if (val) values.push(val);
   }
   return values;
@@ -374,19 +374,19 @@ function collectDynamicList(fieldId) {
  * @returns {{ values: Array<string>, errors: Array<string> }} Normalised values and any errors
  */
 function validateDataSeries(entries) {
-  var values = [];
-  var errors = [];
+  const values = [];
+  const errors = [];
 
-  for (var i = 0; i < entries.length; i++) {
-    var entry = entries[i];
-    var colonIdx = entry.indexOf(":");
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    const colonIdx = entry.indexOf(":");
     if (colonIdx === -1) {
       errors.push('"' + entry + '" — must be prefixed with inv: or bm:');
       continue;
     }
 
-    var prefix = entry.substring(0, colonIdx).trim().toLowerCase();
-    var identifier = entry.substring(colonIdx + 1).trim();
+    const prefix = entry.substring(0, colonIdx).trim().toLowerCase();
+    const identifier = entry.substring(colonIdx + 1).trim();
 
     if (prefix !== "inv" && prefix !== "bm") {
       errors.push('"' + entry + '" — prefix must be inv: or bm: (got "' + prefix + ':")');
@@ -412,11 +412,11 @@ function validateDataSeries(entries) {
  * @param {number|null} editIndex - Index of report to edit, or null for new
  */
 function showReportModal(type, editIndex) {
-  var isEdit = editIndex !== null && editIndex >= 0;
-  var report = isEdit ? JSON.parse(JSON.stringify(reportDefinitions[editIndex])) : {};
-  var typeLabel = REPORT_TYPE_LABELS[type] || type;
+  const isEdit = editIndex !== null && editIndex >= 0;
+  const report = isEdit ? JSON.parse(JSON.stringify(reportDefinitions[editIndex])) : {};
+  const typeLabel = REPORT_TYPE_LABELS[type] || type;
 
-  var html = '<h3 class="text-lg font-semibold text-brand-800 mb-4">' + (isEdit ? "Edit" : "Add") + " " + typeLabel + '</h3>';
+  let html = '<h3 class="text-lg font-semibold text-brand-800 mb-4">' + (isEdit ? "Edit" : "Add") + " " + typeLabel + '</h3>';
   html += '<div class="space-y-4">';
 
   // Common fields: ID and Title
@@ -467,7 +467,7 @@ function showReportModal(type, editIndex) {
   createModalOverlay(html);
 
   // Focus ID field
-  var idInput = document.getElementById("rpt-id");
+  const idInput = document.getElementById("rpt-id");
   if (idInput) idInput.focus();
 
   document.getElementById("rpt-cancel").addEventListener("click", closeModal);
@@ -488,7 +488,7 @@ function showReportModal(type, editIndex) {
  * @returns {string} HTML string
  */
 function buildTextField(id, label, value, placeholder, hint) {
-  var html = '<div>';
+  let html = '<div>';
   html += '<label class="block text-sm font-medium text-brand-700 mb-1" for="' + id + '">' + label + '</label>';
   html += '<input id="' + id + '" type="text" class="w-full border border-brand-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400" value="' + escapeHtml(value) + '" placeholder="' + escapeHtml(placeholder) + '" />';
   if (hint) {
@@ -507,11 +507,11 @@ function buildTextField(id, label, value, placeholder, hint) {
  * @returns {string} HTML string
  */
 function buildSelect(id, label, currentValue, options) {
-  var html = '<div>';
+  let html = '<div>';
   html += '<label class="block text-sm font-medium text-brand-700 mb-1" for="' + id + '">' + label + '</label>';
   html += '<select id="' + id + '" class="w-full border border-brand-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400">';
-  for (var i = 0; i < options.length; i++) {
-    var sel = options[i].value === currentValue ? ' selected' : '';
+  for (let i = 0; i < options.length; i++) {
+    const sel = options[i].value === currentValue ? ' selected' : '';
     html += '<option value="' + escapeHtml(options[i].value) + '"' + sel + '>' + escapeHtml(options[i].label) + '</option>';
   }
   html += '</select></div>';
@@ -540,7 +540,7 @@ function buildCheckbox(id, label, checked) {
  * @returns {string} HTML string
  */
 function buildChartFields(prefix, data) {
-  var html = '';
+  let html = '';
   html += buildTextField(prefix + "-subtitle", "Subtitle", data.subTitle || "", "e.g. 36 month performance versus FTSE 100");
   html += buildSelect(prefix + "-months", "Months to Show", data.monthsToShow || "36", [
     { value: "6", label: "6 months" }, { value: "12", label: "12 months" },
@@ -576,11 +576,11 @@ function collectChartFields(prefix) {
  * @returns {string} HTML string
  */
 function buildChartGroupFields(report) {
-  var charts = report.charts || [{}];
-  var html = '<div id="chart-group-container">';
+  const charts = report.charts || [{}];
+  let html = '<div id="chart-group-container">';
   html += '<label class="block text-sm font-medium text-brand-700 mb-2">Charts (1–4)</label>';
 
-  for (var i = 0; i < charts.length; i++) {
+  for (let i = 0; i < charts.length; i++) {
     html += buildChartGroupPanel(i, charts[i]);
   }
 
@@ -596,8 +596,8 @@ function buildChartGroupFields(report) {
  * @returns {string} HTML string
  */
 function buildChartGroupPanel(index, chart) {
-  var prefix = "cg-" + index;
-  var html = '<div class="border border-brand-200 rounded-md p-4 mb-3 chart-group-panel" data-panel-index="' + index + '">';
+  const prefix = "cg-" + index;
+  let html = '<div class="border border-brand-200 rounded-md p-4 mb-3 chart-group-panel" data-panel-index="' + index + '">';
   html += '<div class="flex items-center justify-between mb-3">';
   html += '<span class="text-sm font-medium text-brand-700">Chart ' + (index + 1) + '</span>';
   html += '<button type="button" class="text-red-500 hover:text-red-700 text-sm" onclick="removeChartGroupPanel(this)">Remove</button>';
@@ -619,15 +619,15 @@ function buildChartGroupPanel(index, chart) {
  * @description Add a new chart panel to the chart group editor.
  */
 function addChartGroupPanel() {
-  var container = document.getElementById("chart-group-container");
+  const container = document.getElementById("chart-group-container");
   if (!container) return;
-  var panels = container.querySelectorAll(".chart-group-panel");
+  const panels = container.querySelectorAll(".chart-group-panel");
   if (panels.length >= 4) {
     showError("rpt-modal-messages", "Maximum of 4 charts allowed");
     return;
   }
-  var newIndex = panels.length;
-  var temp = document.createElement("div");
+  const newIndex = panels.length;
+  const temp = document.createElement("div");
   temp.innerHTML = buildChartGroupPanel(newIndex, {});
   container.appendChild(temp.firstElementChild);
 }
@@ -637,14 +637,14 @@ function addChartGroupPanel() {
  * @param {HTMLElement} btn - The remove button that was clicked
  */
 function removeChartGroupPanel(btn) {
-  var panel = btn.closest(".chart-group-panel");
+  const panel = btn.closest(".chart-group-panel");
   if (panel) panel.remove();
   // Re-number remaining panels
-  var container = document.getElementById("chart-group-container");
+  const container = document.getElementById("chart-group-container");
   if (!container) return;
-  var panels = container.querySelectorAll(".chart-group-panel");
-  for (var i = 0; i < panels.length; i++) {
-    var heading = panels[i].querySelector("span");
+  const panels = container.querySelectorAll(".chart-group-panel");
+  for (let i = 0; i < panels.length; i++) {
+    const heading = panels[i].querySelector("span");
     if (heading) heading.textContent = "Chart " + (i + 1);
   }
 }
@@ -654,12 +654,12 @@ function removeChartGroupPanel(btn) {
  * @returns {Array<Object>} Array of chart definitions
  */
 function collectChartGroupPanels() {
-  var container = document.getElementById("chart-group-container");
+  const container = document.getElementById("chart-group-container");
   if (!container) return [];
-  var panels = container.querySelectorAll(".chart-group-panel");
-  var charts = [];
-  for (var i = 0; i < panels.length; i++) {
-    var prefix = "cg-" + panels[i].getAttribute("data-panel-index");
+  const panels = container.querySelectorAll(".chart-group-panel");
+  const charts = [];
+  for (let i = 0; i < panels.length; i++) {
+    const prefix = "cg-" + panels[i].getAttribute("data-panel-index");
     charts.push({
       title: getVal(prefix + "-title"),
       subTitle: getVal(prefix + "-subtitle"),
@@ -679,11 +679,11 @@ function collectChartGroupPanels() {
  * @returns {string} HTML string
  */
 function buildCompositeBlocksEditor(blocks) {
-  var html = '<div>';
+  let html = '<div>';
   html += '<label class="block text-sm font-medium text-brand-700 mb-2">Report Blocks</label>';
   html += '<div id="composite-blocks-container">';
 
-  for (var i = 0; i < blocks.length; i++) {
+  for (let i = 0; i < blocks.length; i++) {
     html += buildCompositeBlockCard(i, blocks[i]);
   }
 
@@ -712,11 +712,11 @@ function buildCompositeBlocksEditor(blocks) {
  * @returns {string} HTML string
  */
 function buildCompositeBlockCard(index, block) {
-  var blockType = block.type || "household_assets";
-  var typeLabel = REPORT_TYPE_LABELS[blockType] || blockType;
-  var prefix = "blk-" + index;
+  const blockType = block.type || "household_assets";
+  const typeLabel = REPORT_TYPE_LABELS[blockType] || blockType;
+  const prefix = "blk-" + index;
 
-  var html = '<div class="border border-brand-200 rounded-md mb-2 composite-block-card" data-block-index="' + index + '">';
+  let html = '<div class="border border-brand-200 rounded-md mb-2 composite-block-card" data-block-index="' + index + '">';
 
   // Header bar with type label, order arrows, and remove button
   html += '<div class="flex items-center justify-between px-4 py-2 bg-brand-50 rounded-t-md cursor-pointer" onclick="toggleBlockCard(this)">';
@@ -753,9 +753,9 @@ function buildCompositeBlockCard(index, block) {
   } else if (blockType === "chart_group") {
     // Simplified chart group inside composite — use sub-panels
     html += buildCheckbox(prefix + "-globalevents", "Show global events", block.showGlobalEvents || false);
-    var charts = block.charts || [{}];
+    const charts = block.charts || [{}];
     html += '<div id="' + prefix + '-charts-container">';
-    for (var c = 0; c < charts.length; c++) {
+    for (let c = 0; c < charts.length; c++) {
       html += buildInlineChartPanel(prefix, c, charts[c]);
     }
     html += '</div>';
@@ -786,8 +786,8 @@ function buildCompositeBlockCard(index, block) {
  * @returns {string} HTML string
  */
 function buildInlineChartPanel(blockPrefix, chartIndex, chart) {
-  var prefix = blockPrefix + "-ch-" + chartIndex;
-  var html = '<div class="border border-brand-100 rounded p-3 mb-2 inline-chart-panel" data-chart-index="' + chartIndex + '">';
+  const prefix = blockPrefix + "-ch-" + chartIndex;
+  let html = '<div class="border border-brand-100 rounded p-3 mb-2 inline-chart-panel" data-chart-index="' + chartIndex + '">';
   html += '<div class="flex items-center justify-between mb-2">';
   html += '<span class="text-xs font-medium text-brand-600">Chart ' + (chartIndex + 1) + '</span>';
   html += '<button type="button" class="text-red-500 hover:text-red-700 text-xs" onclick="this.closest(\'.inline-chart-panel\').remove()">Remove</button>';
@@ -808,11 +808,11 @@ function buildInlineChartPanel(blockPrefix, chartIndex, chart) {
  * @param {string} blockPrefix - Parent block prefix
  */
 function addInlineChartPanel(blockPrefix) {
-  var container = document.getElementById(blockPrefix + "-charts-container");
+  const container = document.getElementById(blockPrefix + "-charts-container");
   if (!container) return;
-  var panels = container.querySelectorAll(".inline-chart-panel");
+  const panels = container.querySelectorAll(".inline-chart-panel");
   if (panels.length >= 4) return;
-  var temp = document.createElement("div");
+  const temp = document.createElement("div");
   temp.innerHTML = buildInlineChartPanel(blockPrefix, panels.length, {});
   container.appendChild(temp.firstElementChild);
 }
@@ -822,7 +822,7 @@ function addInlineChartPanel(blockPrefix) {
  * @param {HTMLElement} header - The header element that was clicked
  */
 function toggleBlockCard(header) {
-  var body = header.nextElementSibling;
+  const body = header.nextElementSibling;
   if (body) {
     body.classList.toggle("hidden");
   }
@@ -832,17 +832,17 @@ function toggleBlockCard(header) {
  * @description Add a new block to the composite editor.
  */
 function addCompositeBlock() {
-  var typeSelect = document.getElementById("add-block-type");
+  const typeSelect = document.getElementById("add-block-type");
   if (!typeSelect) return;
-  var blockType = typeSelect.value;
-  var container = document.getElementById("composite-blocks-container");
+  const blockType = typeSelect.value;
+  const container = document.getElementById("composite-blocks-container");
   if (!container) return;
 
-  var existingCards = container.querySelectorAll(".composite-block-card");
-  var newIndex = existingCards.length;
-  var block = { type: blockType };
+  const existingCards = container.querySelectorAll(".composite-block-card");
+  const newIndex = existingCards.length;
+  const block = { type: blockType };
 
-  var temp = document.createElement("div");
+  const temp = document.createElement("div");
   temp.innerHTML = buildCompositeBlockCard(newIndex, block);
   container.appendChild(temp.firstElementChild);
 }
@@ -852,18 +852,18 @@ function addCompositeBlock() {
  * @param {number} index - The block index to remove
  */
 function removeCompositeBlock(index) {
-  var container = document.getElementById("composite-blocks-container");
+  const container = document.getElementById("composite-blocks-container");
   if (!container) return;
-  var cards = container.querySelectorAll(".composite-block-card");
+  const cards = container.querySelectorAll(".composite-block-card");
   if (index < cards.length) {
     cards[index].remove();
   }
   // Re-number headers
-  var remaining = container.querySelectorAll(".composite-block-card");
-  for (var i = 0; i < remaining.length; i++) {
-    var heading = remaining[i].querySelector("span");
+  const remaining = container.querySelectorAll(".composite-block-card");
+  for (let i = 0; i < remaining.length; i++) {
+    const heading = remaining[i].querySelector("span");
     if (heading) {
-      var typeText = heading.textContent.replace(/^\d+\.\s*/, "");
+      const typeText = heading.textContent.replace(/^\d+\.\s*/, "");
       heading.textContent = (i + 1) + ". " + typeText;
     }
   }
@@ -876,19 +876,19 @@ function removeCompositeBlock(index) {
  * @param {number} direction - -1 for up, +1 for down
  */
 function moveBlock(index, direction) {
-  var blocks = collectCompositeBlocks();
-  var newIndex = index + direction;
+  const blocks = collectCompositeBlocks();
+  const newIndex = index + direction;
   if (newIndex < 0 || newIndex >= blocks.length) return;
 
-  var item = blocks.splice(index, 1)[0];
+  const item = blocks.splice(index, 1)[0];
   blocks.splice(newIndex, 0, item);
 
   // Re-render all blocks
-  var container = document.getElementById("composite-blocks-container");
+  const container = document.getElementById("composite-blocks-container");
   if (!container) return;
   container.innerHTML = "";
-  for (var i = 0; i < blocks.length; i++) {
-    var temp = document.createElement("div");
+  for (let i = 0; i < blocks.length; i++) {
+    const temp = document.createElement("div");
     temp.innerHTML = buildCompositeBlockCard(i, blocks[i]);
     container.appendChild(temp.firstElementChild);
   }
@@ -899,21 +899,21 @@ function moveBlock(index, direction) {
  * @returns {Array<Object>} Array of block definition objects
  */
 function collectCompositeBlocks() {
-  var container = document.getElementById("composite-blocks-container");
+  const container = document.getElementById("composite-blocks-container");
   if (!container) return [];
-  var cards = container.querySelectorAll(".composite-block-card");
-  var blocks = [];
+  const cards = container.querySelectorAll(".composite-block-card");
+  const blocks = [];
 
-  for (var i = 0; i < cards.length; i++) {
-    var card = cards[i];
-    var prefix = "blk-" + card.getAttribute("data-block-index");
-    var typeInput = card.querySelector('input[type="hidden"]');
-    var blockType = typeInput ? typeInput.value : "household_assets";
-    var block = { type: blockType };
+  for (let i = 0; i < cards.length; i++) {
+    const card = cards[i];
+    const prefix = "blk-" + card.getAttribute("data-block-index");
+    const typeInput = card.querySelector('input[type="hidden"]');
+    const blockType = typeInput ? typeInput.value : "household_assets";
+    const block = { type: blockType };
 
     if (blockType === "portfolio_summary") {
       block.params = collectDynamicList(prefix + "-params");
-      var compareTo = getVal(prefix + "-compareto");
+      const compareTo = getVal(prefix + "-compareto");
       if (compareTo) block.compareTo = compareTo;
     } else if (blockType === "portfolio_detail") {
       block.params = collectDynamicList(prefix + "-params");
@@ -949,13 +949,13 @@ function collectCompositeBlocks() {
  * @returns {Array<Object>} Array of chart objects
  */
 function collectInlineChartPanels(blockPrefix) {
-  var container = document.getElementById(blockPrefix + "-charts-container");
+  const container = document.getElementById(blockPrefix + "-charts-container");
   if (!container) return [];
-  var panels = container.querySelectorAll(".inline-chart-panel");
-  var charts = [];
-  for (var i = 0; i < panels.length; i++) {
-    var chartIndex = panels[i].getAttribute("data-chart-index");
-    var prefix = blockPrefix + "-ch-" + chartIndex;
+  const panels = container.querySelectorAll(".inline-chart-panel");
+  const charts = [];
+  for (let i = 0; i < panels.length; i++) {
+    const chartIndex = panels[i].getAttribute("data-chart-index");
+    const prefix = blockPrefix + "-ch-" + chartIndex;
     charts.push({
       title: getVal(prefix + "-title"),
       subTitle: getVal(prefix + "-subtitle"),
@@ -975,7 +975,7 @@ function collectInlineChartPanels(blockPrefix) {
  * @returns {string} Trimmed value or empty string
  */
 function getVal(id) {
-  var el = document.getElementById(id);
+  const el = document.getElementById(id);
   return el ? el.value.trim() : "";
 }
 
@@ -985,7 +985,7 @@ function getVal(id) {
  * @returns {boolean} Whether the checkbox is checked
  */
 function getChecked(id) {
-  var el = document.getElementById(id);
+  const el = document.getElementById(id);
   return el ? el.checked : false;
 }
 
@@ -997,8 +997,8 @@ function getChecked(id) {
  * @param {number|null} editIndex - Index to update, or null for new
  */
 async function saveReport(type, editIndex) {
-  var id = getVal("rpt-id");
-  var title = getVal("rpt-title");
+  const id = getVal("rpt-id");
+  const title = getVal("rpt-title");
 
   if (!id) {
     showError("rpt-modal-messages", "ID is required");
@@ -1009,7 +1009,7 @@ async function saveReport(type, editIndex) {
     return;
   }
 
-  var report = { id: id, title: title };
+  const report = { id: id, title: title };
 
   if (type === "household_assets") {
     report.pdfEndpoint = "/api/reports/pdf/household-assets";
@@ -1017,19 +1017,19 @@ async function saveReport(type, editIndex) {
   } else if (type === "portfolio_summary") {
     report.pdfEndpoint = "/api/reports/pdf/portfolio-summary";
     report.params = collectDynamicList("rpt-params");
-    var compareTo = getVal("rpt-compareto");
+    const compareTo = getVal("rpt-compareto");
     if (compareTo) report.compareTo = compareTo;
   } else if (type === "portfolio_detail") {
     report.pdfEndpoint = "/api/reports/pdf/portfolio-detail";
     report.params = collectDynamicList("rpt-params");
   } else if (type === "chart") {
     report.pdfEndpoint = "/api/reports/pdf/chart";
-    var chartFields = collectChartFields("rpt");
+    const chartFields = collectChartFields("rpt");
     report.subTitle = chartFields.subTitle;
     report.monthsToShow = chartFields.monthsToShow;
     report.smooth = chartFields.smooth;
     report.showGlobalEvents = chartFields.showGlobalEvents;
-    var chartValidation = validateDataSeries(chartFields.params);
+    const chartValidation = validateDataSeries(chartFields.params);
     if (chartValidation.errors.length > 0) {
       showError("rpt-modal-messages", "Invalid data series: " + chartValidation.errors.join("; "));
       return;
@@ -1048,8 +1048,8 @@ async function saveReport(type, editIndex) {
       return;
     }
     // Validate data series in each chart panel
-    for (var ci = 0; ci < report.charts.length; ci++) {
-      var panelValidation = validateDataSeries(report.charts[ci].params);
+    for (let ci = 0; ci < report.charts.length; ci++) {
+      const panelValidation = validateDataSeries(report.charts[ci].params);
       if (panelValidation.errors.length > 0) {
         showError("rpt-modal-messages", "Chart " + (ci + 1) + " — invalid data series: " + panelValidation.errors.join("; "));
         return;
@@ -1071,10 +1071,10 @@ async function saveReport(type, editIndex) {
       return;
     }
     // Validate data series in chart-type composite blocks
-    for (var bi = 0; bi < report.blocks.length; bi++) {
-      var blk = report.blocks[bi];
+    for (let bi = 0; bi < report.blocks.length; bi++) {
+      const blk = report.blocks[bi];
       if (blk.type === "chart" && blk.params) {
-        var blkValidation = validateDataSeries(blk.params);
+        const blkValidation = validateDataSeries(blk.params);
         if (blkValidation.errors.length > 0) {
           showError("rpt-modal-messages", "Block " + (bi + 1) + " — invalid data series: " + blkValidation.errors.join("; "));
           return;
@@ -1082,8 +1082,8 @@ async function saveReport(type, editIndex) {
         blk.params = blkValidation.values;
       }
       if (blk.type === "chart_group" && blk.charts) {
-        for (var bci = 0; bci < blk.charts.length; bci++) {
-          var blkPanelValidation = validateDataSeries(blk.charts[bci].params || []);
+        for (let bci = 0; bci < blk.charts.length; bci++) {
+          const blkPanelValidation = validateDataSeries(blk.charts[bci].params || []);
           if (blkPanelValidation.errors.length > 0) {
             showError("rpt-modal-messages", "Block " + (bi + 1) + ", Chart " + (bci + 1) + " — invalid data series: " + blkPanelValidation.errors.join("; "));
             return;
@@ -1094,13 +1094,13 @@ async function saveReport(type, editIndex) {
     }
   }
 
-  var isEdit = editIndex !== null && editIndex >= 0;
-  var url = isEdit
+  const isEdit = editIndex !== null && editIndex >= 0;
+  const url = isEdit
     ? "/api/reports/definition/" + editIndex
     : "/api/reports/definition";
-  var method = isEdit ? "PUT" : "POST";
+  const method = isEdit ? "PUT" : "POST";
 
-  var result = await apiRequest(url, { method: method, body: report });
+  const result = await apiRequest(url, { method: method, body: report });
 
   if (!result.ok) {
     showError("rpt-modal-messages", result.error || "Failed to save", result.detail || "");
@@ -1118,8 +1118,8 @@ document.addEventListener("DOMContentLoaded", function () {
   loadReports();
 
   // Add Report dropdown toggle
-  var addBtn = document.getElementById("btn-add-report");
-  var addMenu = document.getElementById("add-report-menu");
+  const addBtn = document.getElementById("btn-add-report");
+  const addMenu = document.getElementById("add-report-menu");
 
   if (addBtn && addMenu) {
     addBtn.addEventListener("click", function (e) {
@@ -1133,8 +1133,8 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // Handle type selection from the Add Report menu
-    var typeButtons = addMenu.querySelectorAll("button[data-type]");
-    for (var i = 0; i < typeButtons.length; i++) {
+    const typeButtons = addMenu.querySelectorAll("button[data-type]");
+    for (let i = 0; i < typeButtons.length; i++) {
       typeButtons[i].addEventListener("click", function () {
         addMenu.classList.add("hidden");
         showReportModal(this.getAttribute("data-type"), null);
@@ -1143,7 +1143,7 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   // Edit as JSON button — opens the existing raw editor from app.js
-  var jsonBtn = document.getElementById("btn-edit-json");
+  const jsonBtn = document.getElementById("btn-edit-json");
   if (jsonBtn) {
     jsonBtn.addEventListener("click", function () {
       if (typeof showEditReportsModal === "function") {

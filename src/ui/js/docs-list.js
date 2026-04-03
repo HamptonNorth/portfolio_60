@@ -7,38 +7,38 @@
 /* global apiRequest, showSuccess, showError, escapeHtml */
 
 /** @type {Array} All pages loaded from the API */
-var allPages = [];
+let allPages = [];
 
 /** @type {number} Number of pages currently visible (pagination) */
-var visibleCount = 15;
+let visibleCount = 15;
 
 /** @type {string} Current category from URL query parameter */
-var currentCategory = "";
+let currentCategory = "";
 
 /** @type {string|null} Slug of the page currently being edited */
-var editingSlug = null;
+let editingSlug = null;
 
 /** @type {string|null} Slug of the page pending deletion */
-var deletingSlug = null;
+let deletingSlug = null;
 
 /** @type {Array<{word: string, offset: number, length: number}>} Current spell errors */
-var spellErrors = [];
+let spellErrors = [];
 
 /** @type {boolean} Whether spellcheck is active for this editor session */
-var spellActive = false;
+let spellActive = false;
 
 /** @type {number|null} Debounce timer for auto-rerun on edit */
-var spellDebounceTimer = null;
+let spellDebounceTimer = null;
 
 /** @type {string|null} Word targeted by the right-click context menu */
-var contextMenuWord = null;
+let contextMenuWord = null;
 
 /**
  * @description Initialise the page on load. Reads the category from the
  * URL query string and loads the page list.
  */
 function init() {
-  var params = new URLSearchParams(window.location.search);
+  const params = new URLSearchParams(window.location.search);
   currentCategory = params.get("category") || "";
 
   if (!currentCategory) {
@@ -58,10 +58,10 @@ function init() {
  */
 async function fetchCategoryLabel() {
   try {
-    var response = await fetch("/api/docs/config");
+    const response = await fetch("/api/docs/config");
     if (!response.ok) return;
-    var data = await response.json();
-    var catConfig = data.categories[currentCategory];
+    const data = await response.json();
+    const catConfig = data.categories[currentCategory];
     if (catConfig && catConfig.label) {
       document.getElementById("page-heading").textContent = catConfig.label;
       document.title = "Portfolio 60 — " + catConfig.label;
@@ -76,13 +76,13 @@ async function fetchCategoryLabel() {
  */
 async function loadPages() {
   try {
-    var response = await fetch("/api/docs/list/" + encodeURIComponent(currentCategory));
+    const response = await fetch("/api/docs/list/" + encodeURIComponent(currentCategory));
     if (!response.ok) {
       showError("page-messages", "Failed to load pages");
       return;
     }
 
-    var data = await response.json();
+    const data = await response.json();
     allPages = data.pages || [];
     visibleCount = 15;
     renderPages();
@@ -96,7 +96,7 @@ async function loadPages() {
  * with a "Load more" button if there are more.
  */
 function renderPages() {
-  var container = document.getElementById("pages-container");
+  const container = document.getElementById("pages-container");
 
   if (allPages.length === 0) {
     container.innerHTML = '<div class="bg-white rounded-lg border border-brand-200 p-8 text-center">' + '<p class="text-brand-500 text-lg mb-2">No documents yet</p>' + '<p class="text-brand-400">Upload a markdown file to get started.</p>' + "</div>";
@@ -104,17 +104,17 @@ function renderPages() {
     return;
   }
 
-  var visible = allPages.slice(0, visibleCount);
-  var html = "";
+  const visible = allPages.slice(0, visibleCount);
+  let html = "";
 
-  for (var i = 0; i < visible.length; i++) {
-    var page = visible[i];
-    var isUnpublished = page.published === "n";
-    var isSticky = page.sticky === "true" || page.sticky === true;
+  for (let i = 0; i < visible.length; i++) {
+    const page = visible[i];
+    const isUnpublished = page.published === "n";
+    const isSticky = page.sticky === "true" || page.sticky === true;
 
-    var dateStr = "";
+    const dateStr = "";
     if (page.created) {
-      var d = new Date(page.created);
+      const d = new Date(page.created);
       if (!isNaN(d)) {
         dateStr = d.toLocaleDateString("en-GB", { year: "numeric", month: "short", day: "numeric" });
       }
@@ -159,7 +159,7 @@ function renderPages() {
   container.innerHTML = html;
 
   // Load more button
-  var loadMoreContainer = document.getElementById("load-more-container");
+  const loadMoreContainer = document.getElementById("load-more-container");
   if (allPages.length > visibleCount) {
     loadMoreContainer.classList.remove("hidden");
   } else {
@@ -169,7 +169,7 @@ function renderPages() {
   // Attach click handlers for navigation
   container.querySelectorAll("[data-nav-slug]").forEach(function (el) {
     el.addEventListener("click", function () {
-      var slug = el.getAttribute("data-nav-slug");
+      const slug = el.getAttribute("data-nav-slug");
       window.location.href = "/pages/docs-page.html?category=" + encodeURIComponent(currentCategory) + "&slug=" + encodeURIComponent(slug);
     });
   });
@@ -201,7 +201,7 @@ function setupEventListeners() {
   });
 
   // Drag and drop
-  var dropZone = document.getElementById("upload-drop-zone");
+  const dropZone = document.getElementById("upload-drop-zone");
   dropZone.addEventListener("click", function () {
     document.getElementById("upload-file-input").click();
   });
@@ -289,7 +289,7 @@ function setupEventListeners() {
 
   // Hide context menu on click elsewhere
   document.addEventListener("click", function (e) {
-    var menu = document.getElementById("spell-context-menu");
+    const menu = document.getElementById("spell-context-menu");
     if (!menu.contains(e.target)) {
       hideContextMenu();
     }
@@ -321,7 +321,7 @@ function closeUploadModal() {
  * @param {File} file - The file to upload
  */
 async function uploadFile(file) {
-  var errorsEl = document.getElementById("upload-errors");
+  const errorsEl = document.getElementById("upload-errors");
   errorsEl.textContent = "";
 
   if (!file.name.endsWith(".md")) {
@@ -329,16 +329,16 @@ async function uploadFile(file) {
     return;
   }
 
-  var formData = new FormData();
+  const formData = new FormData();
   formData.append("file", file);
 
   try {
-    var response = await fetch("/api/docs/upload/" + encodeURIComponent(currentCategory), {
+    const response = await fetch("/api/docs/upload/" + encodeURIComponent(currentCategory), {
       method: "POST",
       body: formData,
     });
 
-    var data = await response.json();
+    const data = await response.json();
 
     if (!response.ok) {
       errorsEl.textContent = data.error || "Upload failed";
@@ -363,18 +363,18 @@ async function uploadFile(file) {
  */
 async function openEditor(slug) {
   editingSlug = slug;
-  var errorsEl = document.getElementById("editor-errors");
+  const errorsEl = document.getElementById("editor-errors");
   errorsEl.textContent = "";
   document.getElementById("editor-media-result").classList.add("hidden");
 
   try {
-    var response = await fetch("/api/docs/raw/" + encodeURIComponent(currentCategory) + "/" + encodeURIComponent(slug));
+    const response = await fetch("/api/docs/raw/" + encodeURIComponent(currentCategory) + "/" + encodeURIComponent(slug));
     if (!response.ok) {
       showError("page-messages", "Failed to load document for editing");
       return;
     }
 
-    var data = await response.json();
+    const data = await response.json();
     document.getElementById("editor-title").textContent = "Edit: " + (data.meta.title || slug);
     document.getElementById("editor-textarea").value = data.raw;
     document.getElementById("editor-modal").classList.remove("hidden");
@@ -399,18 +399,18 @@ function closeEditor() {
 async function saveEditor() {
   if (!editingSlug) return;
 
-  var content = document.getElementById("editor-textarea").value;
-  var errorsEl = document.getElementById("editor-errors");
+  const content = document.getElementById("editor-textarea").value;
+  const errorsEl = document.getElementById("editor-errors");
   errorsEl.textContent = "";
 
   try {
-    var response = await fetch("/api/docs/raw/" + encodeURIComponent(currentCategory) + "/" + encodeURIComponent(editingSlug), {
+    const response = await fetch("/api/docs/raw/" + encodeURIComponent(currentCategory) + "/" + encodeURIComponent(editingSlug), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: content }),
     });
 
-    var data = await response.json();
+    const data = await response.json();
 
     if (!response.ok) {
       errorsEl.textContent = data.error || "Save failed";
@@ -430,19 +430,19 @@ async function saveEditor() {
  * @param {File} file - The image file to upload
  */
 async function uploadMedia(file) {
-  var resultEl = document.getElementById("editor-media-result");
+  const resultEl = document.getElementById("editor-media-result");
   resultEl.classList.add("hidden");
 
-  var formData = new FormData();
+  const formData = new FormData();
   formData.append("file", file);
 
   try {
-    var response = await fetch("/api/docs/media/" + encodeURIComponent(currentCategory), {
+    const response = await fetch("/api/docs/media/" + encodeURIComponent(currentCategory), {
       method: "POST",
       body: formData,
     });
 
-    var data = await response.json();
+    const data = await response.json();
 
     if (!response.ok) {
       resultEl.textContent = data.error || "Upload failed";
@@ -492,9 +492,9 @@ async function confirmDelete() {
   if (!deletingSlug) return;
 
   try {
-    var response = await fetch("/api/docs/" + encodeURIComponent(currentCategory) + "/" + encodeURIComponent(deletingSlug), { method: "DELETE" });
+    const response = await fetch("/api/docs/" + encodeURIComponent(currentCategory) + "/" + encodeURIComponent(deletingSlug), { method: "DELETE" });
 
-    var data = await response.json();
+    const data = await response.json();
 
     if (!response.ok) {
       showError("page-messages", data.error || "Delete failed");
@@ -520,8 +520,8 @@ async function confirmDelete() {
  * the server API. Updates the highlights overlay and error count display.
  */
 async function runSpellCheck() {
-  var textarea = document.getElementById("editor-textarea");
-  var content = textarea.value;
+  const textarea = document.getElementById("editor-textarea");
+  const content = textarea.value;
 
   if (!content.trim()) {
     spellErrors = [];
@@ -531,7 +531,7 @@ async function runSpellCheck() {
   }
 
   try {
-    var response = await fetch("/api/docs/spellcheck", {
+    const response = await fetch("/api/docs/spellcheck", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: content }),
@@ -541,7 +541,7 @@ async function runSpellCheck() {
       return;
     }
 
-    var data = await response.json();
+    const data = await response.json();
     spellErrors = data.errors || [];
     updateHighlights();
     updateSpellCount();
@@ -556,9 +556,9 @@ async function runSpellCheck() {
  * underline decorations are visible beneath the textarea.
  */
 function updateHighlights() {
-  var textarea = document.getElementById("editor-textarea");
-  var highlights = document.getElementById("editor-highlights");
-  var text = textarea.value;
+  const textarea = document.getElementById("editor-textarea");
+  const highlights = document.getElementById("editor-highlights");
+  const text = textarea.value;
 
   if (spellErrors.length === 0) {
     // Show plain escaped text to maintain layout synchronisation
@@ -568,16 +568,16 @@ function updateHighlights() {
   }
 
   // Sort errors by offset so we can process left-to-right
-  var sorted = spellErrors.slice().sort(function (a, b) {
+  const sorted = spellErrors.slice().sort(function (a, b) {
     return a.offset - b.offset;
   });
 
   // Build highlighted HTML by inserting <mark> tags at error positions
-  var html = "";
-  var lastIndex = 0;
+  let html = "";
+  let lastIndex = 0;
 
-  for (var i = 0; i < sorted.length; i++) {
-    var err = sorted[i];
+  for (let i = 0; i < sorted.length; i++) {
+    const err = sorted[i];
     // Skip overlapping or out-of-range errors
     if (err.offset < lastIndex || err.offset + err.length > text.length) {
       continue;
@@ -600,7 +600,7 @@ function updateHighlights() {
  * @description Update the spell error count display in the editor footer.
  */
 function updateSpellCount() {
-  var countEl = document.getElementById("editor-spell-count");
+  const countEl = document.getElementById("editor-spell-count");
   if (spellErrors.length === 0) {
     countEl.textContent = "No errors";
     countEl.classList.remove("hidden", "text-red-500");
@@ -617,8 +617,8 @@ function updateSpellCount() {
  * the textarea so underlines stay aligned with the text.
  */
 function syncScroll() {
-  var textarea = document.getElementById("editor-textarea");
-  var highlights = document.getElementById("editor-highlights");
+  const textarea = document.getElementById("editor-textarea");
+  const highlights = document.getElementById("editor-highlights");
   highlights.scrollTop = textarea.scrollTop;
   highlights.scrollLeft = textarea.scrollLeft;
 }
@@ -631,13 +631,13 @@ function syncScroll() {
 function handleContextMenu(e) {
   if (!spellActive || spellErrors.length === 0) return;
 
-  var textarea = document.getElementById("editor-textarea");
-  var cursorPos = textarea.selectionStart;
+  const textarea = document.getElementById("editor-textarea");
+  const cursorPos = textarea.selectionStart;
 
   // Find if cursor is within a misspelt word
-  var matchedError = null;
-  for (var i = 0; i < spellErrors.length; i++) {
-    var err = spellErrors[i];
+  let matchedError = null;
+  for (let i = 0; i < spellErrors.length; i++) {
+    const err = spellErrors[i];
     if (cursorPos >= err.offset && cursorPos <= err.offset + err.length) {
       matchedError = err;
       break;
@@ -649,7 +649,7 @@ function handleContextMenu(e) {
   e.preventDefault();
   contextMenuWord = matchedError.word;
 
-  var menu = document.getElementById("spell-context-menu");
+  const menu = document.getElementById("spell-context-menu");
   menu.style.left = e.clientX + "px";
   menu.style.top = e.clientY + "px";
   menu.classList.remove("hidden");
@@ -670,7 +670,7 @@ function hideContextMenu() {
 async function addWordToDictionary() {
   if (!contextMenuWord) return;
 
-  var word = contextMenuWord;
+  const word = contextMenuWord;
   hideContextMenu();
 
   try {
@@ -698,10 +698,10 @@ function resetSpellCheck() {
   contextMenuWord = null;
   hideContextMenu();
 
-  var highlights = document.getElementById("editor-highlights");
+  const highlights = document.getElementById("editor-highlights");
   highlights.innerHTML = "";
 
-  var countEl = document.getElementById("editor-spell-count");
+  const countEl = document.getElementById("editor-spell-count");
   countEl.classList.add("hidden");
   countEl.classList.remove("text-red-500", "text-green-600");
 }

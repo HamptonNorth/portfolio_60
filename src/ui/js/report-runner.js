@@ -22,7 +22,7 @@ function injectPageLayoutStyles() {
   // Only inject once
   if (document.getElementById("report-layout-style")) return;
 
-  var style = document.createElement("style");
+  const style = document.createElement("style");
   style.id = "report-layout-style";
   style.textContent =
     "@page report-portrait { size: A4 portrait; } " +
@@ -40,7 +40,7 @@ function injectPageLayoutStyles() {
  * @returns {string} "portrait" or "landscape"
  */
 function getPageLayout(pageBlocks) {
-  for (var i = 0; i < pageBlocks.length; i++) {
+  for (let i = 0; i < pageBlocks.length; i++) {
     if (pageBlocks[i].layout) {
       return pageBlocks[i].layout === "landscape" ? "landscape" : "portrait";
     }
@@ -130,7 +130,7 @@ async function runCompositeReport(reportId, containerId) {
     return;
   }
 
-  var report = result.data;
+  const report = result.data;
 
   // Inject CSS named page rules for per-page layout switching
   injectPageLayoutStyles();
@@ -139,8 +139,8 @@ async function runCompositeReport(reportId, containerId) {
   window._compositeReport = true;
 
   // Split blocks into pages (groups separated by new_page entries)
-  var pages = [[]];
-  for (var i = 0; i < report.blocks.length; i++) {
+  const pages = [[]];
+  for (let i = 0; i < report.blocks.length; i++) {
     if (report.blocks[i].type === "new_page") {
       pages.push([]);
     } else {
@@ -153,27 +153,27 @@ async function runCompositeReport(reportId, containerId) {
     pages.pop();
   }
 
-  var totalPages = pages.length;
+  const totalPages = pages.length;
   container.innerHTML = "";
 
-  for (var p = 0; p < pages.length; p++) {
+  for (let p = 0; p < pages.length; p++) {
     // Determine page layout from its blocks (portrait or landscape)
-    var pageLayout = getPageLayout(pages[p]);
+    const pageLayout = getPageLayout(pages[p]);
 
     // Page wrapper — mb-16 for screen spacing between pages
     // report-layout-* class triggers the CSS named page for print orientation
-    var pageDiv = document.createElement("div");
+    const pageDiv = document.createElement("div");
     pageDiv.className =
       "report-page mb-16 report-layout-" + pageLayout +
       (p > 0 ? " break-before-page" : "");
 
     // Page header
-    var headerDiv = document.createElement("div");
+    const headerDiv = document.createElement("div");
     headerDiv.innerHTML = buildPageHeader();
     pageDiv.appendChild(headerDiv);
 
     // Page content area — in print, flex:1 pushes footer to bottom
-    var contentDiv = document.createElement("div");
+    const contentDiv = document.createElement("div");
     contentDiv.className = "report-page-content";
     pageDiv.appendChild(contentDiv);
 
@@ -182,20 +182,20 @@ async function runCompositeReport(reportId, containerId) {
     container.appendChild(pageDiv);
 
     // Render each block into the content area
-    var pageBlocks = pages[p];
-    for (var b = 0; b < pageBlocks.length; b++) {
-      var block = pageBlocks[b];
-      var renderFn = REPORT_BLOCK_REGISTRY[block.type];
+    const pageBlocks = pages[p];
+    for (let b = 0; b < pageBlocks.length; b++) {
+      const block = pageBlocks[b];
+      const renderFn = REPORT_BLOCK_REGISTRY[block.type];
 
       if (!renderFn) {
-        var errDiv = document.createElement("div");
+        const errDiv = document.createElement("div");
         errDiv.className = "text-error text-sm py-2";
         errDiv.textContent = "Unknown report block type: " + block.type;
         contentDiv.appendChild(errDiv);
         continue;
       }
 
-      var blockDiv = document.createElement("div");
+      const blockDiv = document.createElement("div");
       blockDiv.id = "report-block-" + p + "-" + b;
       contentDiv.appendChild(blockDiv);
 
@@ -203,7 +203,7 @@ async function runCompositeReport(reportId, containerId) {
     }
 
     // Page footer
-    var footerDiv = document.createElement("div");
+    const footerDiv = document.createElement("div");
     footerDiv.innerHTML = buildPageFooter(report.title, p + 1, totalPages);
     pageDiv.appendChild(footerDiv);
   }

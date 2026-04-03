@@ -365,7 +365,7 @@ async function loadInvestments() {
 
     html += '<tr data-id="' + inv.id + '" class="' + rowClass + ' border-b border-brand-100 hover:bg-brand-100 transition-colors cursor-pointer" ondblclick="viewInvestment(' + inv.id + ')">';
     const manualBadge = inv.auto_fetch === 0 ? ' <span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">Manually Priced</span>' : "";
-    var descriptionLink = buildResearchLinkHtml(inv.description, inv.public_id, inv.currency_code, inv.morningstar_id, { stopPropagation: true });
+    const descriptionLink = buildResearchLinkHtml(inv.description, inv.public_id, inv.currency_code, inv.morningstar_id, { stopPropagation: true });
     html += '<td class="py-3 px-3 text-base">' + descriptionLink + manualBadge + "</td>";
     html += '<td class="py-3 px-3 text-base">' + escapeHtml(getTypeDisplayName(inv.type_short, inv.type_description)) + "</td>";
     html += '<td class="py-3 px-3 text-base">' + escapeHtml(inv.currency_code) + "</td>";
@@ -408,11 +408,11 @@ async function loadInvestments() {
  */
 function copyPublicId(text, btn) {
   navigator.clipboard.writeText(text).then(function () {
-    var svg = btn.querySelector("svg");
-    var original = svg.outerHTML;
+    const svg = btn.querySelector("svg");
+    const original = svg.outerHTML;
     svg.outerHTML = '<svg class="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>';
     setTimeout(function () {
-      var tick = btn.querySelector("svg");
+      const tick = btn.querySelector("svg");
       if (tick) tick.outerHTML = original;
     }, 1500);
   });

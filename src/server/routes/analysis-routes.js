@@ -44,10 +44,10 @@ function validatePeriod(period) {
  */
 function parseBenchmarkIds(param) {
   if (!param) return [];
-  var ids = [];
-  var parts = param.split(",");
-  for (var i = 0; i < parts.length && ids.length < 3; i++) {
-    var id = parseInt(parts[i], 10);
+  const ids = [];
+  const parts = param.split(",");
+  for (let i = 0; i < parts.length && ids.length < 3; i++) {
+    const id = parseInt(parts[i], 10);
     if (id > 0) ids.push(id);
   }
   return ids;
@@ -71,15 +71,15 @@ function parseHoldingsFilter(param) {
  * @returns {Array<number>} Array of user IDs
  */
 function parseUserIds(param) {
-  var allUsers = getAllUsers();
-  var allUserIds = allUsers.map(function (u) { return u.id; });
+  const allUsers = getAllUsers();
+  const allUserIds = allUsers.map(function (u) { return u.id; });
 
   if (!param) return allUserIds;
 
-  var ids = [];
-  var parts = param.split(",");
-  for (var i = 0; i < parts.length; i++) {
-    var id = parseInt(parts[i], 10);
+  const ids = [];
+  const parts = param.split(",");
+  for (let i = 0; i < parts.length; i++) {
+    const id = parseInt(parts[i], 10);
     if (id > 0) ids.push(id);
   }
 
@@ -94,11 +94,11 @@ function parseUserIds(param) {
  */
 function parseAccountTypes(param) {
   if (!param) return [];
-  var valid = ["trading", "isa", "sipp"];
-  var types = [];
-  var parts = param.split(",");
-  for (var i = 0; i < parts.length; i++) {
-    var t = parts[i].trim().toLowerCase();
+  const valid = ["trading", "isa", "sipp"];
+  const types = [];
+  const parts = param.split(",");
+  for (let i = 0; i < parts.length; i++) {
+    const t = parts[i].trim().toLowerCase();
     if (valid.indexOf(t) >= 0) types.push(t);
   }
   return types;
@@ -111,18 +111,18 @@ function parseAccountTypes(param) {
  * @returns {Object} Object with investmentIds, holdingsFilter, userIds, allUserIds, userNames, and accountTypes
  */
 function resolveFilters(url) {
-  var holdingsFilter = parseHoldingsFilter(url.searchParams.get("holdings"));
-  var userIds = parseUserIds(url.searchParams.get("users"));
-  var accountTypes = parseAccountTypes(url.searchParams.get("accountTypes"));
-  var allUsers = getAllUsers();
-  var allUserIds = allUsers.map(function (u) { return u.id; });
+  const holdingsFilter = parseHoldingsFilter(url.searchParams.get("holdings"));
+  const userIds = parseUserIds(url.searchParams.get("users"));
+  const accountTypes = parseAccountTypes(url.searchParams.get("accountTypes"));
+  const allUsers = getAllUsers();
+  const allUserIds = allUsers.map(function (u) { return u.id; });
 
-  var investmentIds = resolveInvestmentIds(holdingsFilter, userIds, accountTypes);
+  const investmentIds = resolveInvestmentIds(holdingsFilter, userIds, accountTypes);
 
   // Build user names lookup for filter text
-  var userNames = [];
-  for (var i = 0; i < allUsers.length; i++) {
-    for (var j = 0; j < userIds.length; j++) {
+  const userNames = [];
+  for (let i = 0; i < allUsers.length; i++) {
+    for (let j = 0; j < userIds.length; j++) {
       if (allUsers[i].id === userIds[j]) {
         userNames.push(allUsers[i].first_name + " " + allUsers[i].last_name);
         break;
@@ -146,28 +146,28 @@ function resolveFilters(url) {
  * @returns {string} Filter description (e.g. "Current holdings \u2014 All users")
  */
 function buildFilterText(filters) {
-  var holdingsLabels = {
+  const holdingsLabels = {
     current: "Current holdings",
     historic: "Historic holdings only",
     all: "All investments",
   };
 
-  var holdingsLabel = holdingsLabels[filters.holdingsFilter] || "Current holdings";
+  const holdingsLabel = holdingsLabels[filters.holdingsFilter] || "Current holdings";
 
   // "All investments" doesn't depend on users
   if (filters.holdingsFilter === "all") {
     return holdingsLabel;
   }
 
-  var userLabel = filters.userIds.length === filters.allUserIds.length
+  const userLabel = filters.userIds.length === filters.allUserIds.length
     ? "All users"
     : filters.userNames.join(", ");
 
-  var text = holdingsLabel + " \u2014 " + userLabel;
+  let text = holdingsLabel + " \u2014 " + userLabel;
 
   // Append account type if filtered
   if (filters.accountTypes && filters.accountTypes.length > 0) {
-    var typeLabels = filters.accountTypes.map(function (t) { return t.toUpperCase(); });
+    const typeLabels = filters.accountTypes.map(function (t) { return t.toUpperCase(); });
     text += " \u2014 " + typeLabels.join(", ");
   }
 
@@ -177,9 +177,9 @@ function buildFilterText(filters) {
 // GET /api/analysis/account-types?users=1,2 — return distinct account types for the given users
 analysisRouter.get("/api/analysis/account-types", function (request) {
   try {
-    var url = new URL(request.url);
-    var userIds = parseUserIds(url.searchParams.get("users"));
-    var types = getDistinctAccountTypes(userIds);
+    const url = new URL(request.url);
+    const userIds = parseUserIds(url.searchParams.get("users"));
+    const types = getDistinctAccountTypes(userIds);
     return Response.json(types);
   } catch (err) {
     return Response.json([]);
@@ -189,10 +189,10 @@ analysisRouter.get("/api/analysis/account-types", function (request) {
 // GET /api/analysis/league-table?period=1y — return ranked investments with sparklines
 analysisRouter.get("/api/analysis/league-table", function (request) {
   try {
-    var url = new URL(request.url);
-    var period = validatePeriod(url.searchParams.get("period")) || "1y";
-    var filters = resolveFilters(url);
-    var data = buildLeagueTable(period, filters.investmentIds);
+    const url = new URL(request.url);
+    const period = validatePeriod(url.searchParams.get("period")) || "1y";
+    const filters = resolveFilters(url);
+    const data = buildLeagueTable(period, filters.investmentIds);
 
     return new Response(JSON.stringify(data), {
       headers: { "Content-Type": "application/json" },
@@ -208,11 +208,11 @@ analysisRouter.get("/api/analysis/league-table", function (request) {
 // GET /api/analysis/risk-return?period=1y&benchmarks=1,3 — return risk vs return scatter data
 analysisRouter.get("/api/analysis/risk-return", function (request) {
   try {
-    var url = new URL(request.url);
-    var period = validatePeriod(url.searchParams.get("period")) || "1y";
-    var benchmarkIds = parseBenchmarkIds(url.searchParams.get("benchmarks"));
-    var filters = resolveFilters(url);
-    var data = buildRiskReturnData(period, filters.investmentIds);
+    const url = new URL(request.url);
+    const period = validatePeriod(url.searchParams.get("period")) || "1y";
+    const benchmarkIds = parseBenchmarkIds(url.searchParams.get("benchmarks"));
+    const filters = resolveFilters(url);
+    const data = buildRiskReturnData(period, filters.investmentIds);
 
     // Add benchmark scatter points if requested
     if (benchmarkIds.length > 0) {
@@ -233,19 +233,19 @@ analysisRouter.get("/api/analysis/risk-return", function (request) {
 // GET /api/analysis/top-bottom?period=1y&count=5&benchmarks=1,3 — return top/bottom performer series
 analysisRouter.get("/api/analysis/top-bottom", function (request) {
   try {
-    var url = new URL(request.url);
-    var period = validatePeriod(url.searchParams.get("period")) || "1y";
-    var count = parseInt(url.searchParams.get("count"), 10) || 5;
+    const url = new URL(request.url);
+    let count = parseInt(url.searchParams.get("count"), 10) || 5;
     if (count < 1) count = 1;
     if (count > 20) count = 20;
-    var benchmarkIds = parseBenchmarkIds(url.searchParams.get("benchmarks"));
-    var filters = resolveFilters(url);
+    const period = validatePeriod(url.searchParams.get("period")) || "1y";
+    const benchmarkIds = parseBenchmarkIds(url.searchParams.get("benchmarks"));
+    const filters = resolveFilters(url);
 
-    var data = buildTopBottomPerformers(period, count, filters.investmentIds);
+    const data = buildTopBottomPerformers(period, count, filters.investmentIds);
 
     // Add benchmark reference series if requested
     if (benchmarkIds.length > 0) {
-      var bmData = buildBenchmarkRebasedSeries(benchmarkIds, period);
+      const bmData = buildBenchmarkRebasedSeries(benchmarkIds, period);
       data.benchmarkSeries = bmData.benchmarkSeries;
     }
 
@@ -263,21 +263,21 @@ analysisRouter.get("/api/analysis/top-bottom", function (request) {
 // GET /api/analysis/comparison?periods=3m,6m,1y,3y&benchmarks=1,3 — multi-period comparison table
 analysisRouter.get("/api/analysis/comparison", function (request) {
   try {
-    var url = new URL(request.url);
-    var periodsParam = url.searchParams.get("periods") || "3m,6m,1y,3y";
-    var benchmarkIds = parseBenchmarkIds(url.searchParams.get("benchmarks"));
+    const url = new URL(request.url);
+    const periodsParam = url.searchParams.get("periods") || "3m,6m,1y,3y";
+    const benchmarkIds = parseBenchmarkIds(url.searchParams.get("benchmarks"));
 
     // Parse and validate period codes (max 4)
-    var periodCodes = [];
-    var parts = periodsParam.split(",");
-    for (var i = 0; i < parts.length && periodCodes.length < 4; i++) {
-      var validated = validatePeriod(parts[i].trim());
+    let periodCodes = [];
+    const parts = periodsParam.split(",");
+    for (let i = 0; i < parts.length && periodCodes.length < 4; i++) {
+      const validated = validatePeriod(parts[i].trim());
       if (validated) periodCodes.push(validated);
     }
     if (periodCodes.length === 0) periodCodes = ["3m", "6m", "1y", "3y"];
-    var filters = resolveFilters(url);
+    const filters = resolveFilters(url);
 
-    var data = buildComparisonTable(periodCodes, benchmarkIds, filters.investmentIds);
+    const data = buildComparisonTable(periodCodes, benchmarkIds, filters.investmentIds);
 
     return new Response(JSON.stringify(data), {
       headers: { "Content-Type": "application/json" },
@@ -295,21 +295,21 @@ analysisRouter.get("/api/analysis/comparison", function (request) {
 // GET /api/analysis/pdf/comparison?periods=3m,6m,1y,3y&benchmarks=1,3
 analysisRouter.get("/api/analysis/pdf/comparison", async function (request) {
   try {
-    var url = new URL(request.url);
-    var periodsParam = url.searchParams.get("periods") || "3m,6m,1y,3y";
-    var benchmarkIds = parseBenchmarkIds(url.searchParams.get("benchmarks"));
+    const url = new URL(request.url);
+    const periodsParam = url.searchParams.get("periods") || "3m,6m,1y,3y";
+    const benchmarkIds = parseBenchmarkIds(url.searchParams.get("benchmarks"));
 
-    var periodCodes = [];
-    var parts = periodsParam.split(",");
-    for (var i = 0; i < parts.length && periodCodes.length < 4; i++) {
-      var validated = validatePeriod(parts[i].trim());
+    let periodCodes = [];
+    const parts = periodsParam.split(",");
+    for (let i = 0; i < parts.length && periodCodes.length < 4; i++) {
+      const validated = validatePeriod(parts[i].trim());
       if (validated) periodCodes.push(validated);
     }
     if (periodCodes.length === 0) periodCodes = ["3m", "6m", "1y", "3y"];
-    var filters = resolveFilters(url);
-    var filterText = buildFilterText(filters);
+    const filters = resolveFilters(url);
+    const filterText = buildFilterText(filters);
 
-    var pdfBytes = await generateComparisonPdf(periodCodes, benchmarkIds, filters.investmentIds, filterText);
+    const pdfBytes = await generateComparisonPdf(periodCodes, benchmarkIds, filters.investmentIds, filterText);
     return new Response(pdfBytes, {
       headers: {
         "Content-Type": "application/pdf",
@@ -327,16 +327,16 @@ analysisRouter.get("/api/analysis/pdf/comparison", async function (request) {
 // GET /api/analysis/pdf/league-table?period=1y&sort=return&dir=desc&limit=all&benchmarks=1,3
 analysisRouter.get("/api/analysis/pdf/league-table", async function (request) {
   try {
-    var url = new URL(request.url);
-    var period = validatePeriod(url.searchParams.get("period")) || "1y";
-    var sort = url.searchParams.get("sort") || "return";
-    var dir = url.searchParams.get("dir") || "desc";
-    var limit = url.searchParams.get("limit") || "all";
-    var benchmarkIds = parseBenchmarkIds(url.searchParams.get("benchmarks"));
-    var filters = resolveFilters(url);
-    var filterText = buildFilterText(filters);
+    const url = new URL(request.url);
+    const period = validatePeriod(url.searchParams.get("period")) || "1y";
+    const sort = url.searchParams.get("sort") || "return";
+    const dir = url.searchParams.get("dir") || "desc";
+    const limit = url.searchParams.get("limit") || "all";
+    const benchmarkIds = parseBenchmarkIds(url.searchParams.get("benchmarks"));
+    const filters = resolveFilters(url);
+    const filterText = buildFilterText(filters);
 
-    var pdfBytes = await generateLeagueTablePdf(period, sort, dir, limit, benchmarkIds, filters.investmentIds, filterText);
+    const pdfBytes = await generateLeagueTablePdf(period, sort, dir, limit, benchmarkIds, filters.investmentIds, filterText);
     return new Response(pdfBytes, {
       headers: {
         "Content-Type": "application/pdf",
@@ -354,14 +354,14 @@ analysisRouter.get("/api/analysis/pdf/league-table", async function (request) {
 // GET /api/analysis/pdf/risk-return?period=1y&benchmarks=1,3
 analysisRouter.get("/api/analysis/pdf/risk-return", async function (request) {
   try {
-    var url = new URL(request.url);
-    var period = validatePeriod(url.searchParams.get("period")) || "1y";
-    var benchmarkIds = parseBenchmarkIds(url.searchParams.get("benchmarks"));
+    const url = new URL(request.url);
+    const period = validatePeriod(url.searchParams.get("period")) || "1y";
+    const benchmarkIds = parseBenchmarkIds(url.searchParams.get("benchmarks"));
 
-    var filters = resolveFilters(url);
-    var filterText = buildFilterText(filters);
+    const filters = resolveFilters(url);
+    const filterText = buildFilterText(filters);
 
-    var pdfBytes = await generateRiskReturnPdf(period, benchmarkIds, filters.investmentIds, filterText);
+    const pdfBytes = await generateRiskReturnPdf(period, benchmarkIds, filters.investmentIds, filterText);
     return new Response(pdfBytes, {
       headers: {
         "Content-Type": "application/pdf",
@@ -379,17 +379,17 @@ analysisRouter.get("/api/analysis/pdf/risk-return", async function (request) {
 // GET /api/analysis/pdf/top-bottom?period=1y&count=5&benchmarks=1,3
 analysisRouter.get("/api/analysis/pdf/top-bottom", async function (request) {
   try {
-    var url = new URL(request.url);
-    var period = validatePeriod(url.searchParams.get("period")) || "1y";
-    var count = parseInt(url.searchParams.get("count"), 10) || 5;
+    const url = new URL(request.url);
+    const period = validatePeriod(url.searchParams.get("period")) || "1y";
+    let count = parseInt(url.searchParams.get("count"), 10) || 5;
     if (count < 1) count = 1;
     if (count > 20) count = 20;
-    var benchmarkIds = parseBenchmarkIds(url.searchParams.get("benchmarks"));
+    const benchmarkIds = parseBenchmarkIds(url.searchParams.get("benchmarks"));
 
-    var filters = resolveFilters(url);
-    var filterText = buildFilterText(filters);
+    const filters = resolveFilters(url);
+    const filterText = buildFilterText(filters);
 
-    var pdfBytes = await generateTopBottomPdf(period, count, benchmarkIds, filters.investmentIds, filterText);
+    const pdfBytes = await generateTopBottomPdf(period, count, benchmarkIds, filters.investmentIds, filterText);
     return new Response(pdfBytes, {
       headers: {
         "Content-Type": "application/pdf",

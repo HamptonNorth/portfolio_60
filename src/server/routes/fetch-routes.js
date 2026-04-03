@@ -42,8 +42,8 @@ fetchRouter.post("/api/fetch/currency-rates", async function (request) {
   try {
     // Demo mode — return latest rates from DB without fetching or writing
     if (isDemoMode()) {
-      var latestRates = getLatestRates();
-      var demoRates = latestRates.map(function (r) {
+      const latestRates = getLatestRates();
+      const demoRates = latestRates.map(function (r) {
         return { code: r.currency_code, description: r.currency_description, rate: r.rate / CURRENCY_SCALE_FACTOR, date: r.rate_date };
       });
       return new Response(JSON.stringify({
@@ -1194,10 +1194,10 @@ fetchRouter.post("/api/fetch/server-rerun", async function () {
  * @returns {Response} SSE stream response
  */
 function buildDemoPriceStream(request) {
-  var stream = new ReadableStream({
+  const stream = new ReadableStream({
     async start(controller) {
-      var encoder = new TextEncoder();
-      var eventId = 0;
+      const encoder = new TextEncoder();
+      let eventId = 0;
 
       function sendEvent(eventName, data) {
         try {
@@ -1208,14 +1208,14 @@ function buildDemoPriceStream(request) {
       }
 
       try {
-        var url = new URL(request.url);
-        var idsParam = url.searchParams.get("ids");
-        var skipCurrencyRates = url.searchParams.get("skipCurrencyRates") === "true";
+        const url = new URL(request.url);
+        const idsParam = url.searchParams.get("ids");
+        const skipCurrencyRates = url.searchParams.get("skipCurrencyRates") === "true";
 
         // Get currency rates result for init event
-        var currencyRatesResult = null;
+        let currencyRatesResult = null;
         if (!skipCurrencyRates) {
-          var latestRates = getLatestRates();
+          const latestRates = getLatestRates();
           currencyRatesResult = {
             success: true,
             message: "Currency rates (demo)",
@@ -1225,9 +1225,9 @@ function buildDemoPriceStream(request) {
           };
         }
 
-        var investments = getMorningstarFetchableInvestments();
+        let investments = getMorningstarFetchableInvestments();
         if (idsParam) {
-          var requestedIds = new Set(idsParam.split(",").map(Number));
+          const requestedIds = new Set(idsParam.split(",").map(Number));
           investments = investments.filter(function (inv) { return requestedIds.has(inv.id); });
         }
 
@@ -1245,11 +1245,11 @@ function buildDemoPriceStream(request) {
           method: "demo",
         });
 
-        var successCount = 0;
-        var failedIds = [];
+        let successCount = 0;
+        const failedIds = [];
 
-        for (var i = 0; i < investments.length; i++) {
-          var inv = investments[i];
+        for (let i = 0; i < investments.length; i++) {
+          const inv = investments[i];
 
           // Short random delay (500–2000ms) to look realistic
           if (i > 0) {
@@ -1279,7 +1279,7 @@ function buildDemoPriceStream(request) {
           }
 
           // Read latest price from DB
-          var latest = getLatestPrice(inv.id);
+          const latest = getLatestPrice(inv.id);
           if (latest) {
             sendEvent("price", {
               success: true,
@@ -1348,10 +1348,10 @@ function buildDemoPriceStream(request) {
  * @returns {Response} SSE stream response
  */
 function buildDemoBenchmarkStream(request) {
-  var stream = new ReadableStream({
+  const stream = new ReadableStream({
     async start(controller) {
-      var encoder = new TextEncoder();
-      var eventId = 0;
+      const encoder = new TextEncoder();
+      let eventId = 0;
 
       function sendEvent(eventName, data) {
         try {
@@ -1362,12 +1362,12 @@ function buildDemoBenchmarkStream(request) {
       }
 
       try {
-        var url = new URL(request.url);
-        var idsParam = url.searchParams.get("ids");
+        const url = new URL(request.url);
+        const idsParam = url.searchParams.get("ids");
 
-        var benchmarks = getYahooFetchableBenchmarks();
+        let benchmarks = getYahooFetchableBenchmarks();
         if (idsParam) {
-          var requestedIds = new Set(idsParam.split(",").map(Number));
+          const requestedIds = new Set(idsParam.split(",").map(Number));
           benchmarks = benchmarks.filter(function (bm) { return requestedIds.has(bm.id); });
         }
 
@@ -1385,11 +1385,11 @@ function buildDemoBenchmarkStream(request) {
           method: "demo",
         });
 
-        var successCount = 0;
-        var failedIds = [];
+        let successCount = 0;
+        const failedIds = [];
 
-        for (var i = 0; i < benchmarks.length; i++) {
-          var bm = benchmarks[i];
+        for (let i = 0; i < benchmarks.length; i++) {
+          const bm = benchmarks[i];
 
           // Short random delay (500–2000ms) to look realistic
           if (i > 0) {
@@ -1417,7 +1417,7 @@ function buildDemoBenchmarkStream(request) {
           }
 
           // Read latest value from DB
-          var latest = getLatestBenchmarkData(bm.id);
+          const latest = getLatestBenchmarkData(bm.id);
           if (latest) {
             sendEvent("benchmark", {
               success: true,
@@ -1474,6 +1474,13 @@ function buildDemoBenchmarkStream(request) {
   });
 }
 
+/**
+ * @description Handle a fetch API request. Delegates to the fetch router.
+ * @param {string} method - HTTP method
+ * @param {string} path - URL pathname
+ * @param {Request} request - The full Request object
+ * @returns {Promise<Response|null>} Response if matched, null otherwise
+ */
 export async function handleFetchRoute(method, path, request) {
   return await fetchRouter.match(method, path, request);
 }

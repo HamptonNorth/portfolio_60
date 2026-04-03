@@ -91,13 +91,13 @@ const CHART_RENDERERS = {
  * @param {Object} [blockDef] - Block definition with optional chartType field
  */
 export function renderChartBlock(ctx, params, blockDef) {
-  var chartType = (blockDef && blockDef.chartType) || "line";
-  var renderer = CHART_RENDERERS[chartType];
+  const chartType = (blockDef && blockDef.chartType) || "line";
+  const renderer = CHART_RENDERERS[chartType];
 
   if (!renderer) {
     // Unknown chart type — draw a message and skip
-    var page = ctx.page;
-    var fonts = ctx.fonts;
+    const page = ctx.page;
+    const fonts = ctx.fonts;
     page.drawText("Unknown chart type: " + chartType, {
       x: 40,
       y: ctx.y - 14,
@@ -126,22 +126,22 @@ export function renderChartBlock(ctx, params, blockDef) {
  * @param {Object} [blockDef] - Optional block definition with title, subTitle, etc.
  */
 function renderLineChart(ctx, params, blockDef) {
-  var pdf = ctx.pdf;
-  var page = ctx.page;
-  var y = ctx.y;
-  var fonts = ctx.fonts;
+  const pdf = ctx.pdf;
+  const page = ctx.page;
+  let y = ctx.y;
+  const fonts = ctx.fonts;
 
   // Support bounded rendering for multi-chart layouts.
   // _bounds overrides the module-level margin/width constants so that
   // multiple charts can share a single page.
-  var bounds = (blockDef && blockDef._bounds) || null;
-  var areaLeft = bounds ? bounds.left : MARGIN_LEFT;
-  var areaWidth = bounds ? bounds.width : USABLE_WIDTH;
-  var areaBottom = bounds ? bounds.bottom : MARGIN_BOTTOM;
-  var footerClearance = bounds ? 5 : 20;
+  const bounds = (blockDef && blockDef._bounds) || null;
+  const areaLeft = bounds ? bounds.left : MARGIN_LEFT;
+  const areaWidth = bounds ? bounds.width : USABLE_WIDTH;
+  const areaBottom = bounds ? bounds.bottom : MARGIN_BOTTOM;
+  const footerClearance = bounds ? 5 : 20;
 
   // Build chart definition from blockDef + params
-  var chartDef = {
+  const chartDef = {
     title: (blockDef && blockDef.title) || "Performance Chart",
     subTitle: (blockDef && blockDef.subTitle) || "",
     fromMonthsAgo: (blockDef && blockDef.fromMonthsAgo) || "0",
@@ -153,7 +153,7 @@ function renderLineChart(ctx, params, blockDef) {
 
   // Use pre-built chart data if provided (e.g. portfolio value charts),
   // otherwise fetch investment/benchmark data via getChartData()
-  var data = (blockDef && blockDef._chartData) ? blockDef._chartData : getChartData(chartDef);
+  const data = (blockDef && blockDef._chartData) ? blockDef._chartData : getChartData(chartDef);
 
   if (!data.series || data.series.length === 0) {
     page.drawText(chartDef.title + " \u2014 no data available.", {
@@ -168,35 +168,35 @@ function renderLineChart(ctx, params, blockDef) {
   }
 
   // Calculate chart area
-  var chartLeft = areaLeft + Y_AXIS_WIDTH;
-  var chartRight = areaLeft + areaWidth - CHART_RIGHT_PAD;
-  var chartWidth = chartRight - chartLeft;
+  const chartLeft = areaLeft + Y_AXIS_WIDTH;
+  const chartRight = areaLeft + areaWidth - CHART_RIGHT_PAD;
+  const chartWidth = chartRight - chartLeft;
 
   // Reserve extra space below X-axis for event legend when events are present.
   // In chart groups, the legend is drawn once at page level, so individual
   // charts suppress the legend and don't reserve space for it.
-  var hasEvents = data.events && data.events.length > 0;
-  var suppressEventLegend = blockDef && blockDef._suppressEventLegend === true;
-  var eventAreaHeight = (hasEvents && !suppressEventLegend) ? 24 : 0;
+  const hasEvents = data.events && data.events.length > 0;
+  const suppressEventLegend = blockDef && blockDef._suppressEventLegend === true;
+  const eventAreaHeight = (hasEvents && !suppressEventLegend) ? 24 : 0;
 
   // Determine legend row count before calculating chart area
-  var legendRows = calculateLegendRows(data.series);
-  var legendHeight = legendRows * LEGEND_ROW_HEIGHT + LEGEND_PADDING;
+  const legendRows = calculateLegendRows(data.series);
+  const legendHeight = legendRows * LEGEND_ROW_HEIGHT + LEGEND_PADDING;
 
-  var chartTop = y - TITLE_BAR_HEIGHT - SUBTITLE_HEIGHT - legendHeight;
-  var chartBottom = areaBottom + X_AXIS_HEIGHT + eventAreaHeight + footerClearance;
-  var chartHeight = chartTop - chartBottom;
+  const chartTop = y - TITLE_BAR_HEIGHT - SUBTITLE_HEIGHT - legendHeight;
+  const chartBottom = areaBottom + X_AXIS_HEIGHT + eventAreaHeight + footerClearance;
+  const chartHeight = chartTop - chartBottom;
 
   // Minimum chart height: 60pt for bounded (multi-chart) layouts where space
   // is tight, 100pt for standalone charts where we have a full page.
-  var minChartHeight = bounds ? 60 : 100;
+  const minChartHeight = bounds ? 60 : 100;
   if (chartHeight < minChartHeight) {
     ctx.y = y;
     return;
   }
 
   // --- Title bar (white text on coloured rectangle — emerald in test mode) ---
-  var titleBarColour = isTestMode() ? COLOURS.emerald900 : COLOURS.brand800;
+  const titleBarColour = isTestMode() ? COLOURS.emerald900 : COLOURS.brand800;
   page.drawRectangle({
     x: areaLeft,
     y: y - TITLE_BAR_HEIGHT,
@@ -230,10 +230,10 @@ function renderLineChart(ctx, params, blockDef) {
   y -= legendHeight;
 
   // --- Determine Y-axis range ---
-  var yRange = calculateYRange(data.series, data.valueMode);
-  var yMin = yRange.min;
-  var yMax = yRange.max;
-  var yTicks = yRange.ticks;
+  const yRange = calculateYRange(data.series, data.valueMode);
+  const yMin = yRange.min;
+  const yMax = yRange.max;
+  const yTicks = yRange.ticks;
 
   // --- Draw grid and axes ---
   drawGrid(page, chartLeft, chartBottom, chartWidth, chartHeight, yMin, yMax, yTicks);
@@ -241,10 +241,10 @@ function renderLineChart(ctx, params, blockDef) {
   drawXAxis(page, data.sampleDates, chartLeft, chartBottom, chartWidth, data.monthsToShow, fonts);
 
   // --- Plot data lines ---
-  for (var s = 0; s < data.series.length; s++) {
-    var series = data.series[s];
-    var colour = LINE_COLOURS[s % LINE_COLOURS.length];
-    var isDashed = series.type === "benchmark";
+  for (let s = 0; s < data.series.length; s++) {
+    const series = data.series[s];
+    const colour = LINE_COLOURS[s % LINE_COLOURS.length];
+    const isDashed = series.type === "benchmark";
 
     plotLine(page, series.values, data.sampleDates, chartLeft, chartBottom,
       chartWidth, chartHeight, yMin, yMax, colour, isDashed, chartDef.smooth);
@@ -274,17 +274,17 @@ function renderLineChart(ctx, params, blockDef) {
  * @returns {number} Number of legend rows
  */
 function calculateLegendRows(series) {
-  var invCount = 0;
-  var bmCount = 0;
-  for (var i = 0; i < series.length; i++) {
+  let invCount = 0;
+  let bmCount = 0;
+  for (let i = 0; i < series.length; i++) {
     if (series[i].type === "benchmark") {
       bmCount++;
     } else {
       invCount++;
     }
   }
-  var invRows = invCount > 0 ? Math.ceil(invCount / 4) : 0;
-  var bmRows = bmCount > 0 ? Math.ceil(bmCount / 4) : 0;
+  const invRows = invCount > 0 ? Math.ceil(invCount / 4) : 0;
+  const bmRows = bmCount > 0 ? Math.ceil(bmCount / 4) : 0;
   return Math.max(invRows + bmRows, 1);
 }
 
@@ -297,8 +297,8 @@ function calculateLegendRows(series) {
  * @returns {number} Total width in points
  */
 function measureLegendRow(font, labels, boxSize, gap, extraWidths) {
-  var width = 0;
-  for (var i = 0; i < labels.length; i++) {
+  let width = 0;
+  for (let i = 0; i < labels.length; i++) {
     width += boxSize + 3 + font.widthOfTextAtSize(labels[i], FONT_SIZE_LEGEND);
     if (extraWidths && extraWidths[i]) width += extraWidths[i];
     if (i < labels.length - 1) width += gap;
@@ -316,15 +316,15 @@ function measureLegendRow(font, labels, boxSize, gap, extraWidths) {
  * @param {number} gap - Gap between items
  */
 function truncateLabelsToFit(font, labels, availableWidth, boxSize, gap, extraWidths) {
-  var maxChars = Math.max.apply(null, labels.map(function (l) { return l.length; }));
+  let maxChars = Math.max.apply(null, labels.map(function (l) { return l.length; }));
 
   // Progressively shorten all labels until row fits
   while (maxChars > 5) {
-    var totalWidth = measureLegendRow(font, labels, boxSize, gap, extraWidths);
+    const totalWidth = measureLegendRow(font, labels, boxSize, gap, extraWidths);
     if (totalWidth <= availableWidth) return;
 
     maxChars -= 1;
-    for (var i = 0; i < labels.length; i++) {
+    for (let i = 0; i < labels.length; i++) {
       if (labels[i].length > maxChars) {
         labels[i] = labels[i].substring(0, maxChars - 1) + "\u2026";
       }
@@ -341,18 +341,18 @@ function truncateLabelsToFit(font, labels, availableWidth, boxSize, gap, extraWi
  * @param {number} legendY - Y position for this row
  */
 function drawLegendRow(page, items, displayLabels, startX, legendY, fonts) {
-  var boxSize = 8;
-  var gap = 14;
-  var x = startX;
+  const boxSize = 8;
+  const gap = 14;
+  let x = startX;
 
-  for (var i = 0; i < items.length; i++) {
-    var item = items[i];
-    var label = displayLabels[i];
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const label = displayLabels[i];
 
     if (item.isBenchmark) {
       // Dotted line indicator for benchmarks
-      var dotY = legendY + boxSize / 2 - 1;
-      for (var d = 0; d < 3; d++) {
+      const dotY = legendY + boxSize / 2 - 1;
+      for (let d = 0; d < 3; d++) {
         page.drawRectangle({
           x: x + d * 3,
           y: dotY,
@@ -375,8 +375,8 @@ function drawLegendRow(page, items, displayLabels, startX, legendY, fonts) {
     x += boxSize + 3;
 
     // Investment labels: blue text with clickable research links
-    var hasAnyLink = !item.isBenchmark && (item.publicId || item.morningstarId);
-    var textColour = hasAnyLink ? COLOURS.linkBlue : COLOURS.brand800;
+    const hasAnyLink = !item.isBenchmark && (item.publicId || item.morningstarId);
+    const textColour = hasAnyLink ? COLOURS.linkBlue : COLOURS.brand800;
 
     page.drawText(label, {
       x: x,
@@ -386,28 +386,28 @@ function drawLegendRow(page, items, displayLabels, startX, legendY, fonts) {
       color: textColour,
     });
 
-    var textWidth = fonts.regular.widthOfTextAtSize(label, FONT_SIZE_LEGEND);
+    let textWidth = fonts.regular.widthOfTextAtSize(label, FONT_SIZE_LEGEND);
 
     // Add visible clickable link indicators after the label text
     if (hasAnyLink) {
-      var ftLinkUrl = item.publicId ? buildFtMarketsUrl(item.publicId, item.currencyCode) : null;
-      var msLinkUrl = item.morningstarId ? buildMorningstarUrl(item.morningstarId) : null;
-      var linkTagSize = FONT_SIZE_LEGEND - 1;
-      var linkX = x + textWidth + 2;
+      const ftLinkUrl = item.publicId ? buildFtMarketsUrl(item.publicId, item.currencyCode) : null;
+      const msLinkUrl = item.morningstarId ? buildMorningstarUrl(item.morningstarId) : null;
+      const linkTagSize = FONT_SIZE_LEGEND - 1;
+      let linkX = x + textWidth + 2;
 
       if (ftLinkUrl && msLinkUrl) {
         // Both links: draw "(FT)" and "(MS)" with underlined letters only
-        var parenOpenW = fonts.regular.widthOfTextAtSize("(", linkTagSize);
-        var parenCloseW = fonts.regular.widthOfTextAtSize(")", linkTagSize);
-        var ftLettersW = fonts.regular.widthOfTextAtSize("FT", linkTagSize);
-        var msLettersW = fonts.regular.widthOfTextAtSize("MS", linkTagSize);
-        var ftTagWidth = parenOpenW + ftLettersW + parenCloseW;
-        var msTagWidth = parenOpenW + msLettersW + parenCloseW;
-        var underlineY = legendY;
+        const parenOpenW = fonts.regular.widthOfTextAtSize("(", linkTagSize);
+        const parenCloseW = fonts.regular.widthOfTextAtSize(")", linkTagSize);
+        const ftLettersW = fonts.regular.widthOfTextAtSize("FT", linkTagSize);
+        const msLettersW = fonts.regular.widthOfTextAtSize("MS", linkTagSize);
+        const ftTagWidth = parenOpenW + ftLettersW + parenCloseW;
+        const msTagWidth = parenOpenW + msLettersW + parenCloseW;
+        const underlineY = legendY;
 
         // Draw "(FT)" — underline only the "FT" letters
         page.drawText("(", { x: linkX, y: legendY + 1, font: fonts.regular, size: linkTagSize, color: COLOURS.linkBlue });
-        var ftLettersX = linkX + parenOpenW;
+        const ftLettersX = linkX + parenOpenW;
         page.drawText("FT", { x: ftLettersX, y: legendY + 1, font: fonts.regular, size: linkTagSize, color: COLOURS.linkBlue });
         page.drawLine({ start: { x: ftLettersX, y: underlineY }, end: { x: ftLettersX + ftLettersW, y: underlineY }, color: COLOURS.linkBlue, thickness: 0.5 });
         page.drawText(")", { x: ftLettersX + ftLettersW, y: legendY + 1, font: fonts.regular, size: linkTagSize, color: COLOURS.linkBlue });
@@ -420,7 +420,7 @@ function drawLegendRow(page, items, displayLabels, startX, legendY, fonts) {
         // Draw "(MS)" — underline only the "MS" letters
         linkX += ftTagWidth + 2;
         page.drawText("(", { x: linkX, y: legendY + 1, font: fonts.regular, size: linkTagSize, color: COLOURS.linkBlue });
-        var msLettersX = linkX + parenOpenW;
+        const msLettersX = linkX + parenOpenW;
         page.drawText("MS", { x: msLettersX, y: legendY + 1, font: fonts.regular, size: linkTagSize, color: COLOURS.linkBlue });
         page.drawLine({ start: { x: msLettersX, y: underlineY }, end: { x: msLettersX + msLettersW, y: underlineY }, color: COLOURS.linkBlue, thickness: 0.5 });
         page.drawText(")", { x: msLettersX + msLettersW, y: legendY + 1, font: fonts.regular, size: linkTagSize, color: COLOURS.linkBlue });
@@ -464,16 +464,16 @@ function drawLegendRow(page, items, displayLabels, startX, legendY, fonts) {
  * @param {number} availableWidth - Maximum width for legend content
  */
 function drawLegend(page, series, startX, y, availableWidth, fonts) {
-  var font = fonts.regular;
-  var boxSize = 8;
-  var gap = 14;
-  var maxPerRow = 4;
+  const font = fonts.regular;
+  const boxSize = 8;
+  const gap = 14;
+  const maxPerRow = 4;
 
   // Split series into investments and benchmarks, preserving original colour index
-  var investments = [];
-  var benchmarks = [];
-  for (var i = 0; i < series.length; i++) {
-    var item = {
+  const investments = [];
+  const benchmarks = [];
+  for (let i = 0; i < series.length; i++) {
+    const item = {
       label: series[i].label,
       colour: LINE_COLOURS[i % LINE_COLOURS.length],
       isBenchmark: series[i].type === "benchmark",
@@ -490,19 +490,19 @@ function drawLegend(page, series, startX, y, availableWidth, fonts) {
   }
 
   // Split a list of items into chunks of maxPerRow and draw each chunk as a row
-  var currentY = y - 12;
+  let currentY = y - 12;
 
   // Pre-calculate extra width for "(FT) (MS)" link tags on investments with both links
-  var linkTagSize = FONT_SIZE_LEGEND - 1;
-  var ftTagWidth = font.widthOfTextAtSize("(FT)", linkTagSize);
-  var msTagWidth = font.widthOfTextAtSize("(MS)", linkTagSize);
-  var dualLinkExtra = 2 + ftTagWidth + 2 + msTagWidth;
+  const linkTagSize = FONT_SIZE_LEGEND - 1;
+  const ftTagWidth = font.widthOfTextAtSize("(FT)", linkTagSize);
+  const msTagWidth = font.widthOfTextAtSize("(MS)", linkTagSize);
+  const dualLinkExtra = 2 + ftTagWidth + 2 + msTagWidth;
 
   // Draw investment rows
-  for (var r = 0; r < investments.length; r += maxPerRow) {
-    var chunk = investments.slice(r, r + maxPerRow);
-    var labels = chunk.map(function (item) { return item.label; });
-    var extraWidths = chunk.map(function (item) {
+  for (let r = 0; r < investments.length; r += maxPerRow) {
+    const chunk = investments.slice(r, r + maxPerRow);
+    const labels = chunk.map(function (item) { return item.label; });
+    const extraWidths = chunk.map(function (item) {
       return (item.publicId && item.morningstarId) ? dualLinkExtra : 0;
     });
     truncateLabelsToFit(font, labels, availableWidth, boxSize, gap, extraWidths);
@@ -511,9 +511,9 @@ function drawLegend(page, series, startX, y, availableWidth, fonts) {
   }
 
   // Draw benchmark rows
-  for (var b = 0; b < benchmarks.length; b += maxPerRow) {
-    var bmChunk = benchmarks.slice(b, b + maxPerRow);
-    var bmLabels = bmChunk.map(function (item) { return item.label; });
+  for (let b = 0; b < benchmarks.length; b += maxPerRow) {
+    const bmChunk = benchmarks.slice(b, b + maxPerRow);
+    const bmLabels = bmChunk.map(function (item) { return item.label; });
     truncateLabelsToFit(font, bmLabels, availableWidth, boxSize, gap);
     drawLegendRow(page, bmChunk, bmLabels, startX, currentY, fonts);
     currentY -= LEGEND_ROW_HEIGHT;
@@ -527,12 +527,12 @@ function drawLegend(page, series, startX, y, availableWidth, fonts) {
  * @returns {Object} Object with min, max, and ticks array
  */
 function calculateYRange(series, valueMode) {
-  var dataMin = null;
-  var dataMax = null;
+  let dataMin = null;
+  let dataMax = null;
 
-  for (var s = 0; s < series.length; s++) {
-    var vals = series[s].values;
-    for (var v = 0; v < vals.length; v++) {
+  for (let s = 0; s < series.length; s++) {
+    const vals = series[s].values;
+    for (let v = 0; v < vals.length; v++) {
       if (vals[v] === null) continue;
       if (dataMin === null || vals[v] < dataMin) dataMin = vals[v];
       if (dataMax === null || vals[v] > dataMax) dataMax = vals[v];
@@ -544,15 +544,15 @@ function calculateYRange(series, valueMode) {
   if (dataMax === null) dataMax = 0;
 
   // Add 10% padding above and below
-  var range = dataMax - dataMin;
+  let range = dataMax - dataMin;
   if (range === 0) range = 10;
-  var padding = range * 0.1;
-  var min = dataMin - padding;
-  var max = dataMax + padding;
+  const padding = range * 0.1;
+  let min = dataMin - padding;
+  let max = dataMax + padding;
 
   // Choose nice tick interval
-  var rawInterval = range / 6;
-  var niceInterval = niceNumber(rawInterval);
+  const rawInterval = range / 6;
+  const niceInterval = niceNumber(rawInterval);
 
   // Snap min/max to tick boundaries
   min = Math.floor(min / niceInterval) * niceInterval;
@@ -566,8 +566,8 @@ function calculateYRange(series, valueMode) {
   }
 
   // Generate tick values
-  var ticks = [];
-  for (var t = min; t <= max + niceInterval * 0.01; t += niceInterval) {
+  const ticks = [];
+  for (let t = min; t <= max + niceInterval * 0.01; t += niceInterval) {
     ticks.push(Math.round(t * 10) / 10);
   }
 
@@ -582,9 +582,9 @@ function calculateYRange(series, valueMode) {
  */
 function niceNumber(value) {
   if (value <= 0) return 1;
-  var exponent = Math.floor(Math.log10(value));
-  var fraction = value / Math.pow(10, exponent);
-  var nice;
+  const exponent = Math.floor(Math.log10(value));
+  const fraction = value / Math.pow(10, exponent);
+  let nice;
   if (fraction <= 1.5) nice = 1;
   else if (fraction <= 3.5) nice = 2;
   else if (fraction <= 7.5) nice = 5;
@@ -604,13 +604,13 @@ function niceNumber(value) {
  * @param {Array<number>} ticks - Y-axis tick values
  */
 function drawGrid(page, left, bottom, width, height, yMin, yMax, ticks) {
-  var yRange = yMax - yMin;
+  const yRange = yMax - yMin;
   if (yRange === 0) return;
 
-  for (var i = 0; i < ticks.length; i++) {
-    var tickVal = ticks[i];
-    var py = bottom + ((tickVal - yMin) / yRange) * height;
-    var isZero = Math.abs(tickVal) < 0.01;
+  for (let i = 0; i < ticks.length; i++) {
+    const tickVal = ticks[i];
+    const py = bottom + ((tickVal - yMin) / yRange) * height;
+    const isZero = Math.abs(tickVal) < 0.01;
 
     page.drawLine({
       start: { x: left, y: py },
@@ -628,16 +628,16 @@ function drawGrid(page, left, bottom, width, height, yMin, yMax, ticks) {
  * @returns {string} Formatted label like "£150k" or "£1.2M"
  */
 function formatGBPAxis(value) {
-  var absVal = Math.abs(value);
-  var sign = value < 0 ? "-" : "";
+  const absVal = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
   if (absVal >= 1000000) {
-    var millions = absVal / 1000000;
-    var mStr = millions === Math.floor(millions) ? millions.toFixed(0) : millions.toFixed(1);
+    const millions = absVal / 1000000;
+    const mStr = millions === Math.floor(millions) ? millions.toFixed(0) : millions.toFixed(1);
     return sign + "£" + mStr + "M";
   }
   if (absVal >= 1000) {
-    var thousands = absVal / 1000;
-    var kStr = thousands === Math.floor(thousands) ? thousands.toFixed(0) : thousands.toFixed(1);
+    const thousands = absVal / 1000;
+    const kStr = thousands === Math.floor(thousands) ? thousands.toFixed(0) : thousands.toFixed(1);
     return sign + "£" + kStr + "k";
   }
   return sign + "£" + Math.round(absVal);
@@ -657,20 +657,20 @@ function formatGBPAxis(value) {
  * @param {string} [valueMode] - "value" for GBP axis, anything else for percent
  */
 function drawYAxis(page, chartLeft, bottom, height, yMin, yMax, ticks, fonts, valueMode) {
-  var font = fonts.regular;
-  var yRange = yMax - yMin;
+  const font = fonts.regular;
+  const yRange = yMax - yMin;
   if (yRange === 0) return;
 
-  for (var i = 0; i < ticks.length; i++) {
-    var tickVal = ticks[i];
-    var py = bottom + ((tickVal - yMin) / yRange) * height;
-    var label;
+  for (let i = 0; i < ticks.length; i++) {
+    const tickVal = ticks[i];
+    const py = bottom + ((tickVal - yMin) / yRange) * height;
+    let label;
     if (valueMode === "value") {
       label = formatGBPAxis(tickVal);
     } else {
       label = tickVal.toFixed(tickVal === Math.round(tickVal) ? 0 : 1) + "%";
     }
-    var textWidth = font.widthOfTextAtSize(label, FONT_SIZE_AXIS);
+    const textWidth = font.widthOfTextAtSize(label, FONT_SIZE_AXIS);
 
     page.drawText(label, {
       x: chartLeft - textWidth - 4,
@@ -695,21 +695,21 @@ function drawYAxis(page, chartLeft, bottom, height, yMin, yMax, ticks, fonts, va
 function drawXAxis(page, sampleDates, chartLeft, bottom, chartWidth, monthsToShow, fonts) {
   if (sampleDates.length < 2) return;
 
-  var font = fonts.regular;
-  var totalPoints = sampleDates.length;
+  const font = fonts.regular;
+  const totalPoints = sampleDates.length;
 
   // Determine which months to label to keep 12-16 labels max
-  var labelEvery = 1;
+  let labelEvery = 1;
   if (monthsToShow > 18) labelEvery = 2;
   if (monthsToShow > 30) labelEvery = 3;
 
   // Find month boundaries — track when the month changes
-  var lastMonth = "";
-  var monthCount = 0;
+  let lastMonth = "";
+  let monthCount = 0;
 
-  for (var i = 0; i < totalPoints; i++) {
-    var dateStr = sampleDates[i];
-    var monthKey = dateStr.substring(5, 7) + "/" + dateStr.substring(2, 4); // MM/YY
+  for (let i = 0; i < totalPoints; i++) {
+    const dateStr = sampleDates[i];
+    const monthKey = dateStr.substring(5, 7) + "/" + dateStr.substring(2, 4); // MM/YY
 
     if (monthKey !== lastMonth) {
       lastMonth = monthKey;
@@ -718,8 +718,8 @@ function drawXAxis(page, sampleDates, chartLeft, bottom, chartWidth, monthsToSho
       // Apply label skip
       if (monthCount % labelEvery !== 1 && labelEvery > 1) continue;
 
-      var px = chartLeft + (i / (totalPoints - 1)) * chartWidth;
-      var textWidth = font.widthOfTextAtSize(monthKey, FONT_SIZE_AXIS);
+      const px = chartLeft + (i / (totalPoints - 1)) * chartWidth;
+      const textWidth = font.widthOfTextAtSize(monthKey, FONT_SIZE_AXIS);
 
       // Draw tick mark
       page.drawLine({
@@ -759,32 +759,32 @@ function drawXAxis(page, sampleDates, chartLeft, bottom, chartWidth, monthsToSho
  */
 function plotLine(page, values, dates, chartLeft, bottom, chartWidth, chartHeight,
   yMin, yMax, colour, isDashed, smooth) {
-  var totalPoints = dates.length;
+  const totalPoints = dates.length;
   if (totalPoints < 2) return;
 
-  var yRange = yMax - yMin;
+  const yRange = yMax - yMin;
   if (yRange === 0) return;
 
   // Build array of {x, y} coordinates, skipping nulls
-  var rawPoints = [];
-  for (var i = 0; i < values.length; i++) {
+  const rawPoints = [];
+  for (let i = 0; i < values.length; i++) {
     if (values[i] === null) continue;
-    var px = chartLeft + (i / (totalPoints - 1)) * chartWidth;
-    var py = bottom + ((values[i] - yMin) / yRange) * chartHeight;
+    const px = chartLeft + (i / (totalPoints - 1)) * chartWidth;
+    const py = bottom + ((values[i] - yMin) / yRange) * chartHeight;
     rawPoints.push({ x: px, y: py });
   }
 
   if (rawPoints.length < 2) return;
 
   // Apply Catmull-Rom smoothing if enabled and enough points
-  var points = (smooth && rawPoints.length >= 3) ? catmullRomSmooth(rawPoints, 8) : rawPoints;
+  const points = (smooth && rawPoints.length >= 3) ? catmullRomSmooth(rawPoints, 8) : rawPoints;
 
   // Draw line segments between consecutive points
   if (isDashed) {
     // Dotted line: walk the entire path and place dots at regular spacing
     drawDottedPath(page, points, colour, 1.2, 4);
   } else {
-    for (var j = 0; j < points.length - 1; j++) {
+    for (let j = 0; j < points.length - 1; j++) {
       page.drawLine({
         start: points[j],
         end: points[j + 1],
@@ -796,7 +796,7 @@ function plotLine(page, values, dates, chartLeft, bottom, chartWidth, chartHeigh
 
   // Draw small square markers at original data points (only if not too many)
   if (rawPoints.length <= 20) {
-    for (var k = 0; k < rawPoints.length; k++) {
+    for (let k = 0; k < rawPoints.length; k++) {
       page.drawRectangle({
         x: rawPoints[k].x - 1.5,
         y: rawPoints[k].y - 1.5,
@@ -828,26 +828,26 @@ function drawEventMarkers(page, events, sampleDates, chartLeft, chartBottom,
   chartWidth, legendY, suppressLegend, fonts) {
   if (events.length === 0 || sampleDates.length < 2) return;
 
-  var fontBold = fonts.bold;
-  var totalPoints = sampleDates.length;
-  var firstDate = sampleDates[0];
-  var lastDate = sampleDates[totalPoints - 1];
-  var markerColour = rgb(0.75, 0.15, 0.15); // dark red for event markers
-  var numberSize = 7;
-  var circleRadius = 5.5;
+  const fontBold = fonts.bold;
+  const totalPoints = sampleDates.length;
+  const firstDate = sampleDates[0];
+  const lastDate = sampleDates[totalPoints - 1];
+  const markerColour = rgb(0.75, 0.15, 0.15); // dark red for event markers
+  const numberSize = 7;
+  const circleRadius = 5.5;
 
   // Draw circled number markers on the chart at the X-axis
-  for (var i = 0; i < events.length; i++) {
-    var eventDate = events[i].date;
+  for (let i = 0; i < events.length; i++) {
+    const eventDate = events[i].date;
     if (eventDate < firstDate || eventDate > lastDate) continue;
 
     // Find the X position by interpolating between sample dates
-    var px = findDateXPosition(eventDate, sampleDates, chartLeft, chartWidth);
+    const px = findDateXPosition(eventDate, sampleDates, chartLeft, chartWidth);
     if (px === null) continue;
 
-    var num = String(i + 1);
-    var numWidth = fontBold.widthOfTextAtSize(num, numberSize);
-    var centreY = chartBottom - 1;
+    const num = String(i + 1);
+    const numWidth = fontBold.widthOfTextAtSize(num, numberSize);
+    const centreY = chartBottom - 1;
 
     // Draw circle outline using short line segments (approximate circle)
     drawCircle(page, px, centreY, circleRadius, markerColour, 0.7);
@@ -878,10 +878,10 @@ function drawEventMarkers(page, events, sampleDates, chartLeft, chartBottom,
  * @param {number} thickness - Line thickness
  */
 function drawCircle(page, cx, cy, radius, colour, thickness) {
-  var segments = 24;
-  for (var seg = 0; seg < segments; seg++) {
-    var angle1 = (seg / segments) * 2 * Math.PI;
-    var angle2 = ((seg + 1) / segments) * 2 * Math.PI;
+  const segments = 24;
+  for (let seg = 0; seg < segments; seg++) {
+    const angle1 = (seg / segments) * 2 * Math.PI;
+    const angle2 = ((seg + 1) / segments) * 2 * Math.PI;
     page.drawLine({
       start: { x: cx + Math.cos(angle1) * radius, y: cy + Math.sin(angle1) * radius },
       end: { x: cx + Math.cos(angle2) * radius, y: cy + Math.sin(angle2) * radius },
@@ -901,19 +901,19 @@ function drawCircle(page, cx, cy, radius, colour, thickness) {
  * @param {number} legendY - Y position for the legend row
  */
 function drawEventLegendRow(page, events, startX, legendY, fonts) {
-  var font = fonts.regular;
-  var fontBold = fonts.bold;
-  var markerColour = rgb(0.75, 0.15, 0.15);
-  var eventFontSize = 6.5;
-  var legendCircleR = 4.5;
-  var legendNumSize = 6;
-  var legendX = startX;
+  const font = fonts.regular;
+  const fontBold = fonts.bold;
+  const markerColour = rgb(0.75, 0.15, 0.15);
+  const eventFontSize = 6.5;
+  const legendCircleR = 4.5;
+  const legendNumSize = 6;
+  let legendX = startX;
 
-  for (var j = 0; j < events.length; j++) {
-    var legendNum = String(j + 1);
-    var legendNumW = fontBold.widthOfTextAtSize(legendNum, legendNumSize);
-    var circleCentreX = legendX + legendCircleR;
-    var circleCentreY = legendY + 2;
+  for (let j = 0; j < events.length; j++) {
+    const legendNum = String(j + 1);
+    const legendNumW = fontBold.widthOfTextAtSize(legendNum, legendNumSize);
+    const circleCentreX = legendX + legendCircleR;
+    const circleCentreY = legendY + 2;
 
     // Draw small circled number in legend
     drawCircle(page, circleCentreX, circleCentreY, legendCircleR, markerColour, 0.6);
@@ -936,7 +936,7 @@ function drawEventLegendRow(page, events, startX, legendY, fonts) {
       color: markerColour,
     });
 
-    var descWidth = font.widthOfTextAtSize(events[j].description, eventFontSize);
+    const descWidth = font.widthOfTextAtSize(events[j].description, eventFontSize);
     legendX += descWidth + 12;
   }
 }
@@ -951,11 +951,11 @@ function drawEventLegendRow(page, events, startX, legendY, fonts) {
  * @returns {number|null} X position in points, or null if out of range
  */
 function findDateXPosition(targetDate, sampleDates, chartLeft, chartWidth) {
-  var totalPoints = sampleDates.length;
+  const totalPoints = sampleDates.length;
   if (totalPoints < 2) return null;
 
   // Find the two sample dates that bracket the target date
-  for (var i = 0; i < totalPoints - 1; i++) {
+  for (let i = 0; i < totalPoints - 1; i++) {
     if (sampleDates[i] <= targetDate && sampleDates[i + 1] >= targetDate) {
       // Interpolate within this segment
       if (sampleDates[i] === targetDate) {
@@ -963,12 +963,12 @@ function findDateXPosition(targetDate, sampleDates, chartLeft, chartWidth) {
       }
 
       // Calculate fractional position between sample[i] and sample[i+1]
-      var d0 = new Date(sampleDates[i]).getTime();
-      var d1 = new Date(sampleDates[i + 1]).getTime();
-      var dt = new Date(targetDate).getTime();
-      var frac = (dt - d0) / (d1 - d0);
+      const d0 = new Date(sampleDates[i]).getTime();
+      const d1 = new Date(sampleDates[i + 1]).getTime();
+      const dt = new Date(targetDate).getTime();
+      const frac = (dt - d0) / (d1 - d0);
 
-      var idx = i + frac;
+      const idx = i + frac;
       return chartLeft + (idx / (totalPoints - 1)) * chartWidth;
     }
   }
@@ -995,24 +995,24 @@ function findDateXPosition(targetDate, sampleDates, chartLeft, chartWidth) {
 function drawDottedPath(page, points, colour, dotSize, spacing) {
   if (points.length < 2) return;
 
-  var halfDot = dotSize / 2;
-  var distSinceLastDot = spacing; // start with a dot at the first point
+  const halfDot = dotSize / 2;
+  let distSinceLastDot = spacing; // start with a dot at the first point
 
-  for (var i = 0; i < points.length - 1; i++) {
-    var dx = points[i + 1].x - points[i].x;
-    var dy = points[i + 1].y - points[i].y;
-    var segLen = Math.sqrt(dx * dx + dy * dy);
+  for (let i = 0; i < points.length - 1; i++) {
+    const dx = points[i + 1].x - points[i].x;
+    const dy = points[i + 1].y - points[i].y;
+    const segLen = Math.sqrt(dx * dx + dy * dy);
 
     if (segLen < 0.1) continue;
 
-    var unitX = dx / segLen;
-    var unitY = dy / segLen;
-    var pos = 0;
+    const unitX = dx / segLen;
+    const unitY = dy / segLen;
+    let pos = 0;
 
     while (pos <= segLen) {
       if (distSinceLastDot >= spacing) {
-        var cx = points[i].x + unitX * pos;
-        var cy = points[i].y + unitY * pos;
+        const cx = points[i].x + unitX * pos;
+        const cy = points[i].y + unitY * pos;
 
         page.drawRectangle({
           x: cx - halfDot,
@@ -1026,7 +1026,7 @@ function drawDottedPath(page, points, colour, dotSize, spacing) {
       }
 
       // Step forward by a small increment or the remaining distance to the next dot
-      var step = Math.min(spacing - distSinceLastDot, segLen - pos);
+      let step = Math.min(spacing - distSinceLastDot, segLen - pos);
       if (step < 0.1) step = 0.1;
       pos += step;
       distSinceLastDot += step;
@@ -1044,34 +1044,34 @@ function drawDottedPath(page, points, colour, dotSize, spacing) {
  * @returns {Array<Object>} Smoothed array of points
  */
 function catmullRomSmooth(points, subdivisions) {
-  var result = [];
-  var n = points.length;
+  const result = [];
+  const n = points.length;
 
-  for (var i = 0; i < n - 1; i++) {
+  for (let i = 0; i < n - 1; i++) {
     // Four control points: p0, p1, p2, p3
     // Clamp to first/last point at the edges
-    var p0 = points[Math.max(i - 1, 0)];
-    var p1 = points[i];
-    var p2 = points[i + 1];
-    var p3 = points[Math.min(i + 2, n - 1)];
+    const p0 = points[Math.max(i - 1, 0)];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[Math.min(i + 2, n - 1)];
 
     // Always include the start of this segment
     result.push(p1);
 
     // Interpolate intermediate points
-    for (var s = 1; s < subdivisions; s++) {
-      var t = s / subdivisions;
-      var t2 = t * t;
-      var t3 = t2 * t;
+    for (let s = 1; s < subdivisions; s++) {
+      const t = s / subdivisions;
+      const t2 = t * t;
+      const t3 = t2 * t;
 
       // Catmull-Rom basis matrix coefficients
-      var x = 0.5 * (
+      const x = 0.5 * (
         (2 * p1.x) +
         (-p0.x + p2.x) * t +
         (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
         (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3
       );
-      var y = 0.5 * (
+      const y = 0.5 * (
         (2 * p1.y) +
         (-p0.y + p2.y) * t +
         (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
@@ -1096,7 +1096,7 @@ function catmullRomSmooth(points, subdivisions) {
  * @returns {{ orientation: string, pageHeight: number, usableWidth: number }}
  */
 export function getChartGroupLayout(blockDef) {
-  var count = (blockDef.charts || []).length;
+  const count = (blockDef.charts || []).length;
   if (count === 2) {
     return { orientation: "portrait", pageHeight: A4_PORTRAIT_HEIGHT, usableWidth: A4_PORTRAIT_USABLE_WIDTH };
   }
@@ -1114,14 +1114,14 @@ export function getChartGroupLayout(blockDef) {
  * @param {Object} blockDef - Block definition with charts array
  */
 export function renderChartGroupBlock(ctx, params, blockDef) {
-  var charts = blockDef.charts || [];
+  const charts = blockDef.charts || [];
   if (charts.length === 0) return;
 
-  var page = ctx.page;
-  var startY = ctx.y;
-  var count = Math.min(charts.length, 4);
+  const page = ctx.page;
+  const startY = ctx.y;
+  const count = Math.min(charts.length, 4);
   // Tighter gap for grid layouts (3-4 charts) to maximise chart area
-  var gap = count <= 2 ? 20 : 14;
+  const gap = count <= 2 ? 20 : 14;
 
   if (count === 1) {
     // Single chart — render full page, no bounds needed
@@ -1135,11 +1135,11 @@ export function renderChartGroupBlock(ctx, params, blockDef) {
     // at the bottom of the page for a single shared event legend and pass
     // showGlobalEvents + _suppressEventLegend to each sub-chart so they
     // draw circled markers but not individual legend rows.
-    var showGroupEvents = blockDef.showGlobalEvents === true ||
+    const showGroupEvents = blockDef.showGlobalEvents === true ||
       charts.some(function (c) { return c.showGlobalEvents === true; });
-    var eventLegendHeight = showGroupEvents ? 24 : 0;
-    var availableHeight = startY - MARGIN_BOTTOM - eventLegendHeight;
-    var cellHeight = (availableHeight - gap) / 2;
+    const eventLegendHeight = showGroupEvents ? 24 : 0;
+    const availableHeight = startY - MARGIN_BOTTOM - eventLegendHeight;
+    const cellHeight = (availableHeight - gap) / 2;
 
     // Chart 1 — top half
     ctx.y = startY;
@@ -1149,7 +1149,7 @@ export function renderChartGroupBlock(ctx, params, blockDef) {
       _suppressEventLegend: showGroupEvents,
       _bounds: { left: MARGIN_LEFT, width: A4_PORTRAIT_USABLE_WIDTH, bottom: startY - cellHeight },
     }));
-    var collectedEvents = ctx._events;
+    let collectedEvents = ctx._events;
 
     // Chart 2 — bottom half
     ctx.y = startY - cellHeight - gap;
@@ -1177,26 +1177,26 @@ export function renderChartGroupBlock(ctx, params, blockDef) {
 
   // 3-4 charts — landscape 2×2 grid.
   // Check for global events — same pattern as the 2-chart case.
-  var showGridEvents = blockDef.showGlobalEvents === true ||
+  const showGridEvents = blockDef.showGlobalEvents === true ||
     charts.some(function (c) { return c.showGlobalEvents === true; });
-  var gridEventHeight = showGridEvents ? 24 : 0;
-  var availH = startY - MARGIN_BOTTOM - gridEventHeight;
-  var cellW = (USABLE_WIDTH - gap) / 2;
-  var cellH = (availH - gap) / 2;
+  const gridEventHeight = showGridEvents ? 24 : 0;
+  const availH = startY - MARGIN_BOTTOM - gridEventHeight;
+  const cellW = (USABLE_WIDTH - gap) / 2;
+  const cellH = (availH - gap) / 2;
 
   // Bottom row sits above the shared event legend area
-  var bottomRowBase = MARGIN_BOTTOM + gridEventHeight;
+  const bottomRowBase = MARGIN_BOTTOM + gridEventHeight;
 
-  var positions = [
+  const positions = [
     { left: MARGIN_LEFT, top: startY, bottom: startY - cellH },
     { left: MARGIN_LEFT + cellW + gap, top: startY, bottom: startY - cellH },
     { left: MARGIN_LEFT, top: startY - cellH - gap, bottom: bottomRowBase },
     { left: MARGIN_LEFT + cellW + gap, top: startY - cellH - gap, bottom: bottomRowBase },
   ];
 
-  var gridCollectedEvents = null;
-  for (var i = 0; i < count; i++) {
-    var pos = positions[i];
+  let gridCollectedEvents = null;
+  for (let i = 0; i < count; i++) {
+    const pos = positions[i];
     ctx.y = pos.top;
     ctx.page = page;
     ctx._events = null;
@@ -1227,12 +1227,12 @@ export function renderChartGroupBlock(ctx, params, blockDef) {
  */
 export async function generateChartPdf(chartDef) {
   const pdf = PDF.create();
-  var fonts = embedRobotoFonts(pdf);
-  var page = pdf.addPage({ size: "a4", orientation: "landscape" });
-  var pages = [page];
-  var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_LANDSCAPE_HEIGHT, MARGIN_TOP, fonts);
+  const fonts = embedRobotoFonts(pdf);
+  const page = pdf.addPage({ size: "a4", orientation: "landscape" });
+  const pages = [page];
+  const y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_LANDSCAPE_HEIGHT, MARGIN_TOP, fonts);
 
-  var ctx = { pdf: pdf, page: page, pages: pages, y: y, pageWidths: [USABLE_WIDTH], fonts: fonts };
+  const ctx = { pdf: pdf, page: page, pages: pages, y: y, pageWidths: [USABLE_WIDTH], fonts: fonts };
   renderChartBlock(ctx, chartDef.params || [], chartDef);
 
   drawPageFooters(ctx.pages, chartDef.title || "Performance Chart", MARGIN_LEFT, USABLE_WIDTH, fonts);
@@ -1246,14 +1246,14 @@ export async function generateChartPdf(chartDef) {
  * @returns {Promise<Uint8Array>} The PDF file bytes
  */
 export async function generateChartGroupPdf(groupDef) {
-  var layout = getChartGroupLayout(groupDef);
+  const layout = getChartGroupLayout(groupDef);
   const pdf = PDF.create();
-  var fonts = embedRobotoFonts(pdf);
-  var page = pdf.addPage({ size: "a4", orientation: layout.orientation });
-  var pages = [page];
-  var y = drawPageHeader(pdf, page, MARGIN_LEFT, layout.pageHeight, MARGIN_TOP, fonts);
+  const fonts = embedRobotoFonts(pdf);
+  const page = pdf.addPage({ size: "a4", orientation: layout.orientation });
+  const pages = [page];
+  const y = drawPageHeader(pdf, page, MARGIN_LEFT, layout.pageHeight, MARGIN_TOP, fonts);
 
-  var ctx = { pdf: pdf, page: page, pages: pages, y: y, pageWidths: [layout.usableWidth], fonts: fonts };
+  const ctx = { pdf: pdf, page: page, pages: pages, y: y, pageWidths: [layout.usableWidth], fonts: fonts };
   renderChartGroupBlock(ctx, [], groupDef);
 
   drawPageFooters(ctx.pages, groupDef.title || "Performance Charts", MARGIN_LEFT, layout.usableWidth, fonts);

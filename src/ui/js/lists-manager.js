@@ -5,10 +5,10 @@
  */
 
 /** @type {Array<{title: string, spreadsheet: string, iframe: string, range: string}>} */
-var spreadsheetItems = [];
+let spreadsheetItems = [];
 
 /** @type {Array<{title: string, filename: string}>} */
-var documentItems = [];
+let documentItems = [];
 
 // ─── Data loading ────────────────────────────────────────────────────────────
 
@@ -16,7 +16,7 @@ var documentItems = [];
  * @description Load all lists data from the server and render both sections.
  */
 async function loadLists() {
-  var result = await apiRequest("/api/config/lists");
+  const result = await apiRequest("/api/config/lists");
   if (!result.ok) {
     showError("page-messages", result.error || "Failed to load lists", result.detail || "");
     return;
@@ -36,7 +36,7 @@ async function loadLists() {
  * @returns {string} The src URL, or empty string if not found
  */
 function extractSrcFromIframe(iframeHtml) {
-  var match = iframeHtml.match(/src="([^"]+)"/);
+  const match = iframeHtml.match(/src="([^"]+)"/);
   if (!match) {
     match = iframeHtml.match(/src='([^']+)'/);
   }
@@ -47,7 +47,7 @@ function extractSrcFromIframe(iframeHtml) {
  * @description Render the spreadsheets table showing all configured spreadsheet links.
  */
 function renderSpreadsheets() {
-  var container = document.getElementById("spreadsheets-list");
+  const container = document.getElementById("spreadsheets-list");
   if (!container) return;
 
   if (spreadsheetItems.length === 0) {
@@ -55,16 +55,16 @@ function renderSpreadsheets() {
     return;
   }
 
-  var html = '<table class="w-full text-sm">';
+  let html = '<table class="w-full text-sm">';
   html += '<thead><tr class="border-b border-brand-200 text-left">';
   html += '<th class="py-2 pr-4 font-medium text-brand-700">Title</th>';
   html += '<th class="py-2 pr-4 font-medium text-brand-700">Type</th>';
   html += '<th class="py-2 text-right font-medium text-brand-700">Actions</th>';
   html += '</tr></thead><tbody>';
 
-  for (var i = 0; i < spreadsheetItems.length; i++) {
-    var item = spreadsheetItems[i];
-    var typeLabel = item.spreadsheet === "microsoft" ? "Microsoft Excel" : "Google Sheets";
+  for (let i = 0; i < spreadsheetItems.length; i++) {
+    const item = spreadsheetItems[i];
+    const typeLabel = item.spreadsheet === "microsoft" ? "Microsoft Excel" : "Google Sheets";
     html += '<tr class="border-b border-brand-100">';
     html += '<td class="py-3 pr-4">' + escapeHtml(item.title) + '</td>';
     html += '<td class="py-3 pr-4 text-brand-600">' + escapeHtml(typeLabel) + '</td>';
@@ -84,7 +84,7 @@ function renderSpreadsheets() {
  * @description Render the documents table showing all uploaded PDFs.
  */
 function renderDocuments() {
-  var container = document.getElementById("documents-list");
+  const container = document.getElementById("documents-list");
   if (!container) return;
 
   if (documentItems.length === 0) {
@@ -92,15 +92,15 @@ function renderDocuments() {
     return;
   }
 
-  var html = '<table class="w-full text-sm">';
+  let html = '<table class="w-full text-sm">';
   html += '<thead><tr class="border-b border-brand-200 text-left">';
   html += '<th class="py-2 pr-4 font-medium text-brand-700">Title</th>';
   html += '<th class="py-2 pr-4 font-medium text-brand-700">Filename</th>';
   html += '<th class="py-2 text-right font-medium text-brand-700">Actions</th>';
   html += '</tr></thead><tbody>';
 
-  for (var i = 0; i < documentItems.length; i++) {
-    var doc = documentItems[i];
+  for (let i = 0; i < documentItems.length; i++) {
+    const doc = documentItems[i];
     html += '<tr class="border-b border-brand-100">';
     html += '<td class="py-3 pr-4">' + escapeHtml(doc.title) + '</td>';
     html += '<td class="py-3 pr-4 text-brand-600">';
@@ -123,19 +123,19 @@ function renderDocuments() {
  * @param {number|null} editIndex - Index of item to edit, or null for new
  */
 function showSpreadsheetModal(editIndex) {
-  var isEdit = editIndex !== null && editIndex >= 0;
-  var item = isEdit ? spreadsheetItems[editIndex] : null;
+  const isEdit = editIndex !== null && editIndex >= 0;
+  const item = isEdit ? spreadsheetItems[editIndex] : null;
 
-  var title = item ? item.title : "";
-  var type = item ? item.spreadsheet : "google";
-  var shareLink = item ? extractSrcFromIframe(item.iframe) : "";
-  var range = item ? (item.range || "") : "";
+  const title = item ? item.title : "";
+  const type = item ? item.spreadsheet : "google";
+  const shareLink = item ? extractSrcFromIframe(item.iframe) : "";
+  const range = item ? (item.range || "") : "";
 
-  var overlay = document.createElement("div");
+  const overlay = document.createElement("div");
   overlay.id = "lists-modal-overlay";
   overlay.className = "fixed inset-0 bg-black/40 flex items-center justify-center z-50";
 
-  var modalHtml = '<div class="bg-white rounded-lg shadow-xl border border-brand-200 w-full max-w-lg mx-4 p-6">';
+  let modalHtml = '<div class="bg-white rounded-lg shadow-xl border border-brand-200 w-full max-w-lg mx-4 p-6">';
   modalHtml += '<h3 class="text-lg font-semibold text-brand-800 mb-4">' + (isEdit ? "Edit Spreadsheet" : "Add Spreadsheet") + '</h3>';
 
   modalHtml += '<div class="space-y-4">';
@@ -185,7 +185,7 @@ function showSpreadsheetModal(editIndex) {
   document.body.appendChild(overlay);
 
   // Focus the title input
-  var titleInput = document.getElementById("ss-title");
+  const titleInput = document.getElementById("ss-title");
   if (titleInput) titleInput.focus();
 
   // Close on overlay click
@@ -207,10 +207,10 @@ function showSpreadsheetModal(editIndex) {
  * @param {number|null} editIndex - Index to update, or null for new entry
  */
 async function saveSpreadsheet(editIndex) {
-  var title = document.getElementById("ss-title").value.trim();
-  var spreadsheet = document.getElementById("ss-type").value;
-  var shareLink = document.getElementById("ss-link").value.trim();
-  var range = document.getElementById("ss-range").value.trim();
+  const title = document.getElementById("ss-title").value.trim();
+  const spreadsheet = document.getElementById("ss-type").value;
+  const shareLink = document.getElementById("ss-link").value.trim();
+  const range = document.getElementById("ss-range").value.trim();
 
   if (!title) {
     showError("ss-modal-messages", "Title is required");
@@ -221,13 +221,13 @@ async function saveSpreadsheet(editIndex) {
     return;
   }
 
-  var isEdit = editIndex !== null && editIndex >= 0;
-  var url = isEdit
+  const isEdit = editIndex !== null && editIndex >= 0;
+  const url = isEdit
     ? "/api/config/lists/spreadsheet/" + editIndex
     : "/api/config/lists/spreadsheet";
-  var method = isEdit ? "PUT" : "POST";
+  const method = isEdit ? "PUT" : "POST";
 
-  var result = await apiRequest(url, {
+  const result = await apiRequest(url, {
     method: method,
     body: { title: title, spreadsheet: spreadsheet, shareLink: shareLink, range: range },
   });
@@ -255,7 +255,7 @@ function editSpreadsheet(index) {
  * @param {number} index - The spreadsheet index to delete
  */
 function confirmDeleteSpreadsheet(index) {
-  var item = spreadsheetItems[index];
+  const item = spreadsheetItems[index];
   if (!item) return;
 
   showConfirmDialog(
@@ -270,7 +270,7 @@ function confirmDeleteSpreadsheet(index) {
  * @param {number} index - The spreadsheet index to delete
  */
 async function deleteSpreadsheet(index) {
-  var result = await apiRequest("/api/config/lists/spreadsheet/" + index, { method: "DELETE" });
+  const result = await apiRequest("/api/config/lists/spreadsheet/" + index, { method: "DELETE" });
   if (!result.ok) {
     showError("page-messages", result.error || "Failed to delete", result.detail || "");
     return;
@@ -285,11 +285,11 @@ async function deleteSpreadsheet(index) {
  * @description Show the document upload modal with drag-and-drop support.
  */
 function showDocumentUploadModal() {
-  var overlay = document.createElement("div");
+  const overlay = document.createElement("div");
   overlay.id = "lists-modal-overlay";
   overlay.className = "fixed inset-0 bg-black/40 flex items-center justify-center z-50";
 
-  var modalHtml = '<div class="bg-white rounded-lg shadow-xl border border-brand-200 w-full max-w-lg mx-4 p-6">';
+  let modalHtml = '<div class="bg-white rounded-lg shadow-xl border border-brand-200 w-full max-w-lg mx-4 p-6">';
   modalHtml += '<h3 class="text-lg font-semibold text-brand-800 mb-4">Add Document</h3>';
 
   modalHtml += '<div class="space-y-4">';
@@ -327,15 +327,15 @@ function showDocumentUploadModal() {
   document.body.appendChild(overlay);
 
   // Focus the title input
-  var titleInput = document.getElementById("doc-title");
+  const titleInput = document.getElementById("doc-title");
   if (titleInput) titleInput.focus();
 
   // Store selected file reference
-  var selectedFile = null;
+  let selectedFile = null;
 
-  var dropzone = document.getElementById("doc-dropzone");
-  var fileInput = document.getElementById("doc-file-input");
-  var fileNameDisplay = document.getElementById("doc-file-name");
+  const dropzone = document.getElementById("doc-dropzone");
+  const fileInput = document.getElementById("doc-file-input");
+  const fileNameDisplay = document.getElementById("doc-file-name");
 
   /**
    * @description Update the file name display after a file is selected.
@@ -374,7 +374,7 @@ function showDocumentUploadModal() {
     e.preventDefault();
     dropzone.classList.remove("border-brand-500", "bg-brand-50");
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      var file = e.dataTransfer.files[0];
+      const file = e.dataTransfer.files[0];
       if (file.name.toLowerCase().endsWith(".pdf")) {
         setSelectedFile(file);
       } else {
@@ -391,7 +391,7 @@ function showDocumentUploadModal() {
   document.getElementById("doc-cancel").addEventListener("click", closeModal);
 
   document.getElementById("doc-save").addEventListener("click", async function () {
-    var title = document.getElementById("doc-title").value.trim();
+    const title = document.getElementById("doc-title").value.trim();
     if (!title) {
       showError("doc-modal-messages", "Title is required");
       return;
@@ -401,17 +401,17 @@ function showDocumentUploadModal() {
       return;
     }
 
-    var formData = new FormData();
+    const formData = new FormData();
     formData.append("title", title);
     formData.append("file", selectedFile);
 
     // Use fetch directly because apiRequest sets Content-Type to JSON
     try {
-      var response = await fetch("/api/config/lists/document", {
+      const response = await fetch("/api/config/lists/document", {
         method: "POST",
         body: formData,
       });
-      var data = await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
         showError("doc-modal-messages", data.error || "Upload failed", data.detail || "");
@@ -419,7 +419,7 @@ function showDocumentUploadModal() {
       }
 
       closeModal();
-      var msg = "Document uploaded";
+      const msg = "Document uploaded";
       if (data.isDuplicate) {
         msg += " (saved as " + data.filename + " — a file with the original name already existed)";
       }
@@ -436,14 +436,14 @@ function showDocumentUploadModal() {
  * @param {number} index - The document index to edit
  */
 function showDocumentEditModal(index) {
-  var doc = documentItems[index];
+  const doc = documentItems[index];
   if (!doc) return;
 
-  var overlay = document.createElement("div");
+  const overlay = document.createElement("div");
   overlay.id = "lists-modal-overlay";
   overlay.className = "fixed inset-0 bg-black/40 flex items-center justify-center z-50";
 
-  var modalHtml = '<div class="bg-white rounded-lg shadow-xl border border-brand-200 w-full max-w-lg mx-4 p-6">';
+  let modalHtml = '<div class="bg-white rounded-lg shadow-xl border border-brand-200 w-full max-w-lg mx-4 p-6">';
   modalHtml += '<h3 class="text-lg font-semibold text-brand-800 mb-4">Edit Document Title</h3>';
 
   modalHtml += '<div class="space-y-4">';
@@ -465,7 +465,7 @@ function showDocumentEditModal(index) {
   overlay.innerHTML = modalHtml;
   document.body.appendChild(overlay);
 
-  var titleInput = document.getElementById("doc-edit-title");
+  const titleInput = document.getElementById("doc-edit-title");
   if (titleInput) titleInput.focus();
 
   overlay.addEventListener("click", function (e) {
@@ -475,13 +475,13 @@ function showDocumentEditModal(index) {
   document.getElementById("doc-edit-cancel").addEventListener("click", closeModal);
 
   document.getElementById("doc-edit-save").addEventListener("click", async function () {
-    var title = document.getElementById("doc-edit-title").value.trim();
+    const title = document.getElementById("doc-edit-title").value.trim();
     if (!title) {
       showError("doc-edit-messages", "Title is required");
       return;
     }
 
-    var result = await apiRequest("/api/config/lists/document/" + index, {
+    const result = await apiRequest("/api/config/lists/document/" + index, {
       method: "PUT",
       body: { title: title },
     });
@@ -510,7 +510,7 @@ function editDocument(index) {
  * @param {number} index - The document index to delete
  */
 function confirmDeleteDocument(index) {
-  var doc = documentItems[index];
+  const doc = documentItems[index];
   if (!doc) return;
 
   showConfirmDialog(
@@ -525,7 +525,7 @@ function confirmDeleteDocument(index) {
  * @param {number} index - The document index to delete
  */
 async function deleteDocument(index) {
-  var result = await apiRequest("/api/config/lists/document/" + index, { method: "DELETE" });
+  const result = await apiRequest("/api/config/lists/document/" + index, { method: "DELETE" });
   if (!result.ok) {
     showError("page-messages", result.error || "Failed to delete", result.detail || "");
     return;
@@ -540,7 +540,7 @@ async function deleteDocument(index) {
  * @description Close any open modal overlay.
  */
 function closeModal() {
-  var overlay = document.getElementById("lists-modal-overlay");
+  const overlay = document.getElementById("lists-modal-overlay");
   if (overlay) overlay.remove();
 }
 
@@ -551,11 +551,11 @@ function closeModal() {
  * @param {Function} onConfirm - Callback if user confirms
  */
 function showConfirmDialog(title, message, onConfirm) {
-  var overlay = document.createElement("div");
+  const overlay = document.createElement("div");
   overlay.id = "lists-modal-overlay";
   overlay.className = "fixed inset-0 bg-black/40 flex items-center justify-center z-50";
 
-  var html = '<div class="bg-white rounded-lg shadow-xl border border-brand-200 w-full max-w-sm mx-4 p-6">';
+  let html = '<div class="bg-white rounded-lg shadow-xl border border-brand-200 w-full max-w-sm mx-4 p-6">';
   html += '<h3 class="text-lg font-semibold text-brand-800 mb-3">' + title + '</h3>';
   html += '<p class="text-sm text-brand-700 mb-6">' + message + '</p>';
   html += '<div class="flex justify-end gap-3">';

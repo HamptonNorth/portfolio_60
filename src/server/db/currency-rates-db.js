@@ -166,7 +166,7 @@ export function getTotalRateCount() {
  */
 export function getRatesInRange(currenciesId, fromDate, toDate) {
   const db = getDatabase();
-  var rows = db
+  const rows = db
     .query(
       `SELECT rate_date, rate
        FROM currency_rates

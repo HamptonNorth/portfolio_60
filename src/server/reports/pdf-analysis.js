@@ -94,7 +94,7 @@ const LEGEND_PADDING = 4;
  * @returns {string} Formatted string like "+17.7%" or "-3.6%"
  */
 function formatChange(pct) {
-  var sign = pct > 0 ? "+" : "";
+  const sign = pct > 0 ? "+" : "";
   return sign + pct.toFixed(1) + "%";
 }
 
@@ -131,7 +131,7 @@ function properCase(str) {
  * @param {Object} color - RGB colour
  */
 function drawRightAligned(page, text, x, colWidth, y, font, fontSize, color) {
-  var textWidth = font.widthOfTextAtSize(text, fontSize);
+  const textWidth = font.widthOfTextAtSize(text, fontSize);
   page.drawText(text, {
     x: x + colWidth - textWidth - 2,
     y: y,
@@ -152,7 +152,7 @@ function drawRightAligned(page, text, x, colWidth, y, font, fontSize, color) {
 function truncateText(text, font, fontSize, maxWidth) {
   if (font.widthOfTextAtSize(text, fontSize) <= maxWidth) return text;
 
-  var truncated = text;
+  let truncated = text;
   while (truncated.length > 0 && font.widthOfTextAtSize(truncated + "\u2026", fontSize) > maxWidth) {
     truncated = truncated.slice(0, -1);
   }
@@ -170,7 +170,7 @@ function truncateText(text, font, fontSize, maxWidth) {
  * @returns {number} Y position below the title bar
  */
 function drawTitleBar(page, title, x, y, width, fonts) {
-  var barColour = isTestMode() ? rgb(0.02, 0.32, 0.21) : COLOURS.brand800;
+  const barColour = isTestMode() ? rgb(0.02, 0.32, 0.21) : COLOURS.brand800;
   page.drawRectangle({
     x: x,
     y: y - TITLE_BAR_HEIGHT,
@@ -224,11 +224,11 @@ function drawFilterSubtitle(page, filterText, x, y, fonts) {
  * @param {number} fontSize - Font size
  */
 function addResearchLinks(page, publicId, currencyCode, morningstarId, x, y, textWidth, fontSize) {
-  var ftUrl = publicId ? buildFtMarketsUrl(publicId, currencyCode) : null;
-  var msUrl = morningstarId ? buildMorningstarUrl(morningstarId) : null;
+  const ftUrl = publicId ? buildFtMarketsUrl(publicId, currencyCode) : null;
+  const msUrl = morningstarId ? buildMorningstarUrl(morningstarId) : null;
 
   if (ftUrl && msUrl) {
-    var halfWidth = textWidth / 2;
+    const halfWidth = textWidth / 2;
     page.addLinkAnnotation({
       rect: { x: x, y: y - 1, width: halfWidth, height: fontSize + 3 },
       uri: ftUrl,
@@ -267,9 +267,9 @@ function addResearchLinks(page, publicId, currencyCode, morningstarId, x, y, tex
  * @param {Object} fonts - Roboto font objects from embedRobotoFonts()
  */
 function drawInvestmentName(page, name, x, y, maxWidth, publicId, currencyCode, morningstarId, fonts) {
-  var hasLink = publicId || morningstarId;
-  var textColour = hasLink ? COLOURS.linkBlue : COLOURS.brand800;
-  var displayName = truncateText(name, fonts.medium, FONT_SIZE_ROW, maxWidth);
+  const hasLink = publicId || morningstarId;
+  const textColour = hasLink ? COLOURS.linkBlue : COLOURS.brand800;
+  const displayName = truncateText(name, fonts.medium, FONT_SIZE_ROW, maxWidth);
 
   page.drawText(displayName, {
     x: x,
@@ -280,7 +280,7 @@ function drawInvestmentName(page, name, x, y, maxWidth, publicId, currencyCode, 
   });
 
   if (hasLink) {
-    var textWidth = fonts.medium.widthOfTextAtSize(displayName, FONT_SIZE_ROW);
+    const textWidth = fonts.medium.widthOfTextAtSize(displayName, FONT_SIZE_ROW);
     addResearchLinks(page, publicId, currencyCode, morningstarId, x, y, textWidth, FONT_SIZE_ROW);
   }
 }
@@ -294,9 +294,9 @@ function drawInvestmentName(page, name, x, y, maxWidth, publicId, currencyCode, 
  */
 function niceNumber(value) {
   if (value <= 0) return 1;
-  var exponent = Math.floor(Math.log10(value));
-  var fraction = value / Math.pow(10, exponent);
-  var nice;
+  const exponent = Math.floor(Math.log10(value));
+  const fraction = value / Math.pow(10, exponent);
+  let nice;
   if (fraction <= 1.5) nice = 1;
   else if (fraction <= 3.5) nice = 2;
   else if (fraction <= 7.5) nice = 5;
@@ -310,26 +310,26 @@ function niceNumber(value) {
  * @returns {Object} Object with min, max, and ticks array
  */
 function calculateYRange(allValues) {
-  var dataMin = 0;
-  var dataMax = 0;
+  let dataMin = 0;
+  let dataMax = 0;
 
-  for (var s = 0; s < allValues.length; s++) {
-    var vals = allValues[s];
-    for (var v = 0; v < vals.length; v++) {
+  for (let s = 0; s < allValues.length; s++) {
+    const vals = allValues[s];
+    for (let v = 0; v < vals.length; v++) {
       if (vals[v] === null) continue;
       if (vals[v] < dataMin) dataMin = vals[v];
       if (vals[v] > dataMax) dataMax = vals[v];
     }
   }
 
-  var range = dataMax - dataMin;
+  let range = dataMax - dataMin;
   if (range === 0) range = 10;
-  var padding = range * 0.1;
-  var min = dataMin - padding;
-  var max = dataMax + padding;
+  const padding = range * 0.1;
+  let min = dataMin - padding;
+  let max = dataMax + padding;
 
-  var rawInterval = range / 6;
-  var niceInterval = niceNumber(rawInterval);
+  const rawInterval = range / 6;
+  const niceInterval = niceNumber(rawInterval);
 
   min = Math.floor(min / niceInterval) * niceInterval;
   max = Math.ceil(max / niceInterval) * niceInterval;
@@ -337,8 +337,8 @@ function calculateYRange(allValues) {
   if (min > 0) min = 0;
   if (max < 0) max = 0;
 
-  var ticks = [];
-  for (var t = min; t <= max + niceInterval * 0.01; t += niceInterval) {
+  const ticks = [];
+  for (let t = min; t <= max + niceInterval * 0.01; t += niceInterval) {
     ticks.push(Math.round(t * 10) / 10);
   }
 
@@ -357,13 +357,13 @@ function calculateYRange(allValues) {
  * @param {Array<number>} ticks - Y-axis tick values
  */
 function drawGrid(page, left, bottom, width, height, yMin, yMax, ticks) {
-  var yRange = yMax - yMin;
+  const yRange = yMax - yMin;
   if (yRange === 0) return;
 
-  for (var i = 0; i < ticks.length; i++) {
-    var tickVal = ticks[i];
-    var py = bottom + ((tickVal - yMin) / yRange) * height;
-    var isZero = Math.abs(tickVal) < 0.01;
+  for (let i = 0; i < ticks.length; i++) {
+    const tickVal = ticks[i];
+    const py = bottom + ((tickVal - yMin) / yRange) * height;
+    const isZero = Math.abs(tickVal) < 0.01;
 
     page.drawLine({
       start: { x: left, y: py },
@@ -386,14 +386,14 @@ function drawGrid(page, left, bottom, width, height, yMin, yMax, ticks) {
  * @param {Object} fonts - Roboto font objects from embedRobotoFonts()
  */
 function drawYAxis(page, chartLeft, bottom, height, yMin, yMax, ticks, fonts) {
-  var yRange = yMax - yMin;
+  const yRange = yMax - yMin;
   if (yRange === 0) return;
 
-  for (var i = 0; i < ticks.length; i++) {
-    var tickVal = ticks[i];
-    var py = bottom + ((tickVal - yMin) / yRange) * height;
-    var label = tickVal.toFixed(tickVal === Math.round(tickVal) ? 0 : 1) + "%";
-    var textWidth = fonts.regular.widthOfTextAtSize(label, FONT_SIZE_AXIS);
+  for (let i = 0; i < ticks.length; i++) {
+    const tickVal = ticks[i];
+    const py = bottom + ((tickVal - yMin) / yRange) * height;
+    const label = tickVal.toFixed(tickVal === Math.round(tickVal) ? 0 : 1) + "%";
+    const textWidth = fonts.regular.widthOfTextAtSize(label, FONT_SIZE_AXIS);
 
     page.drawText(label, {
       x: chartLeft - textWidth - 4,
@@ -418,19 +418,19 @@ function drawYAxis(page, chartLeft, bottom, height, yMin, yMax, ticks, fonts) {
 function drawXAxis(page, sampleDates, chartLeft, bottom, chartWidth, totalWeeks, fonts) {
   if (sampleDates.length < 2) return;
 
-  var totalPoints = sampleDates.length;
-  var monthsApprox = totalWeeks / 4.33;
+  const totalPoints = sampleDates.length;
+  const monthsApprox = totalWeeks / 4.33;
 
-  var labelEvery = 1;
+  let labelEvery = 1;
   if (monthsApprox > 18) labelEvery = 2;
   if (monthsApprox > 30) labelEvery = 3;
 
-  var lastMonth = "";
-  var monthCount = 0;
+  let lastMonth = "";
+  let monthCount = 0;
 
-  for (var i = 0; i < totalPoints; i++) {
-    var dateStr = sampleDates[i];
-    var monthKey = dateStr.substring(5, 7) + "/" + dateStr.substring(2, 4);
+  for (let i = 0; i < totalPoints; i++) {
+    const dateStr = sampleDates[i];
+    const monthKey = dateStr.substring(5, 7) + "/" + dateStr.substring(2, 4);
 
     if (monthKey !== lastMonth) {
       lastMonth = monthKey;
@@ -438,8 +438,8 @@ function drawXAxis(page, sampleDates, chartLeft, bottom, chartWidth, totalWeeks,
 
       if (monthCount % labelEvery !== 1 && labelEvery > 1) continue;
 
-      var px = chartLeft + (i / (totalPoints - 1)) * chartWidth;
-      var textWidth = fonts.regular.widthOfTextAtSize(monthKey, FONT_SIZE_AXIS);
+      const px = chartLeft + (i / (totalPoints - 1)) * chartWidth;
+      const textWidth = fonts.regular.widthOfTextAtSize(monthKey, FONT_SIZE_AXIS);
 
       page.drawLine({
         start: { x: px, y: bottom },
@@ -477,14 +477,14 @@ function plotLine(page, values, totalPoints, chartLeft, bottom, chartWidth, char
   yMin, yMax, colour, isDotted) {
   if (totalPoints < 2) return;
 
-  var yRange = yMax - yMin;
+  const yRange = yMax - yMin;
   if (yRange === 0) return;
 
-  var points = [];
-  for (var i = 0; i < values.length; i++) {
+  const points = [];
+  for (let i = 0; i < values.length; i++) {
     if (values[i] === null) continue;
-    var px = chartLeft + (i / (totalPoints - 1)) * chartWidth;
-    var py = bottom + ((values[i] - yMin) / yRange) * chartHeight;
+    const px = chartLeft + (i / (totalPoints - 1)) * chartWidth;
+    const py = bottom + ((values[i] - yMin) / yRange) * chartHeight;
     points.push({ x: px, y: py });
   }
 
@@ -493,7 +493,7 @@ function plotLine(page, values, totalPoints, chartLeft, bottom, chartWidth, char
   if (isDotted) {
     drawDottedPath(page, points, colour, 1.2, 4);
   } else {
-    for (var j = 0; j < points.length - 1; j++) {
+    for (let j = 0; j < points.length - 1; j++) {
       page.drawLine({
         start: points[j],
         end: points[j + 1],
@@ -515,24 +515,24 @@ function plotLine(page, values, totalPoints, chartLeft, bottom, chartWidth, char
 function drawDottedPath(page, points, colour, dotSize, spacing) {
   if (points.length < 2) return;
 
-  var halfDot = dotSize / 2;
-  var distSinceLastDot = spacing;
+  const halfDot = dotSize / 2;
+  let distSinceLastDot = spacing;
 
-  for (var i = 0; i < points.length - 1; i++) {
-    var dx = points[i + 1].x - points[i].x;
-    var dy = points[i + 1].y - points[i].y;
-    var segLen = Math.sqrt(dx * dx + dy * dy);
+  for (let i = 0; i < points.length - 1; i++) {
+    const dx = points[i + 1].x - points[i].x;
+    const dy = points[i + 1].y - points[i].y;
+    const segLen = Math.sqrt(dx * dx + dy * dy);
 
     if (segLen < 0.1) continue;
 
-    var unitX = dx / segLen;
-    var unitY = dy / segLen;
-    var pos = 0;
+    const unitX = dx / segLen;
+    const unitY = dy / segLen;
+    let pos = 0;
 
     while (pos <= segLen) {
       if (distSinceLastDot >= spacing) {
-        var cx = points[i].x + unitX * pos;
-        var cy = points[i].y + unitY * pos;
+        const cx = points[i].x + unitX * pos;
+        const cy = points[i].y + unitY * pos;
         page.drawRectangle({
           x: cx - halfDot,
           y: cy - halfDot,
@@ -542,7 +542,7 @@ function drawDottedPath(page, points, colour, dotSize, spacing) {
         });
         distSinceLastDot = 0;
       }
-      var step = Math.min(spacing - distSinceLastDot, segLen - pos);
+      let step = Math.min(spacing - distSinceLastDot, segLen - pos);
       if (step < 0.1) step = 0.1;
       pos += step;
       distSinceLastDot += step;
@@ -562,23 +562,23 @@ function drawDottedPath(page, points, colour, dotSize, spacing) {
  * @returns {number} Y position after legend
  */
 function drawChartLegend(page, items, startX, y, availableWidth, maxPerRow, fonts) {
-  var boxSize = 8;
-  var gap = 14;
+  const boxSize = 8;
+  const gap = 14;
   if (!maxPerRow) maxPerRow = 4;
-  var currentY = y;
+  let currentY = y;
 
-  for (var r = 0; r < items.length; r += maxPerRow) {
-    var chunk = items.slice(r, r + maxPerRow);
-    var x = startX;
+  for (let r = 0; r < items.length; r += maxPerRow) {
+    const chunk = items.slice(r, r + maxPerRow);
+    let x = startX;
 
-    for (var i = 0; i < chunk.length; i++) {
-      var item = chunk[i];
-      var label = truncateText(item.label, fonts.regular, FONT_SIZE_LEGEND,
+    for (let i = 0; i < chunk.length; i++) {
+      const item = chunk[i];
+      const label = truncateText(item.label, fonts.regular, FONT_SIZE_LEGEND,
         (availableWidth / maxPerRow) - boxSize - gap);
 
       if (item.isDotted) {
-        var dotY = currentY + boxSize / 2 - 1;
-        for (var d = 0; d < 3; d++) {
+        const dotY = currentY + boxSize / 2 - 1;
+        for (let d = 0; d < 3; d++) {
           page.drawRectangle({
             x: x + d * 3,
             y: dotY,
@@ -599,8 +599,8 @@ function drawChartLegend(page, items, startX, y, availableWidth, maxPerRow, font
 
       x += boxSize + 3;
 
-      var hasLink = !item.isDotted && (item.publicId || item.morningstarId);
-      var textColour = hasLink ? COLOURS.linkBlue : COLOURS.brand800;
+      const hasLink = !item.isDotted && (item.publicId || item.morningstarId);
+      const textColour = hasLink ? COLOURS.linkBlue : COLOURS.brand800;
 
       page.drawText(label, {
         x: x,
@@ -610,7 +610,7 @@ function drawChartLegend(page, items, startX, y, availableWidth, maxPerRow, font
         color: textColour,
       });
 
-      var textWidth = fonts.regular.widthOfTextAtSize(label, FONT_SIZE_LEGEND);
+      const textWidth = fonts.regular.widthOfTextAtSize(label, FONT_SIZE_LEGEND);
 
       if (hasLink) {
         addResearchLinks(page, item.publicId, item.currencyCode, item.morningstarId,
@@ -635,30 +635,30 @@ function drawChartLegend(page, items, startX, y, availableWidth, maxPerRow, font
  * @returns {Promise<Uint8Array>} PDF bytes
  */
 export async function generateComparisonPdf(periodCodes, benchmarkIds, investmentIds, filterText) {
-  var data = buildComparisonTable(periodCodes, benchmarkIds, investmentIds);
+  const data = buildComparisonTable(periodCodes, benchmarkIds, investmentIds);
 
-  var periodLabels = periodCodes.map(function (code) {
+  const periodLabels = periodCodes.map(function (code) {
     return PERIOD_LABELS[code] || code;
   });
-  var title = "Investment Comparison \u2014 " + periodLabels.join(", ");
+  const title = "Investment Comparison \u2014 " + periodLabels.join(", ");
 
-  var pdf = PDF.create();
-  var fonts = embedRobotoFonts(pdf);
-  var page = pdf.addPage({ size: "a4", orientation: "portrait" });
-  var pages = [page];
-  var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_PORTRAIT_HEIGHT, MARGIN_TOP, fonts);
+  const pdf = PDF.create();
+  const fonts = embedRobotoFonts(pdf);
+  let page = pdf.addPage({ size: "a4", orientation: "portrait" });
+  const pages = [page];
+  let y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_PORTRAIT_HEIGHT, MARGIN_TOP, fonts);
 
   y = drawTitleBar(page, title, MARGIN_LEFT, y, PORTRAIT_USABLE_WIDTH, fonts);
   y = drawFilterSubtitle(page, filterText, MARGIN_LEFT, y, fonts);
   y -= 6;
 
   // Column layout
-  var nameColWidth = 170;
-  var typeColWidth = 40;
-  var periodColWidth = (PORTRAIT_USABLE_WIDTH - nameColWidth - typeColWidth) / periodCodes.length;
+  const nameColWidth = 170;
+  const typeColWidth = 40;
+  const periodColWidth = (PORTRAIT_USABLE_WIDTH - nameColWidth - typeColWidth) / periodCodes.length;
 
   // Header row
-  var headerY = y - HEADER_ROW_HEIGHT + 4;
+  const headerY = y - HEADER_ROW_HEIGHT + 4;
   page.drawText("Investment", {
     x: MARGIN_LEFT + 4,
     y: headerY,
@@ -673,7 +673,7 @@ export async function generateComparisonPdf(periodCodes, benchmarkIds, investmen
     size: FONT_SIZE_HEADER,
     color: COLOURS.brand800,
   });
-  for (var p = 0; p < periodCodes.length; p++) {
+  for (let p = 0; p < periodCodes.length; p++) {
     drawRightAligned(page, periodLabels[p],
       MARGIN_LEFT + nameColWidth + typeColWidth + p * periodColWidth,
       periodColWidth, headerY, fonts.bold, FONT_SIZE_HEADER, COLOURS.brand800);
@@ -702,10 +702,10 @@ export async function generateComparisonPdf(periodCodes, benchmarkIds, investmen
   }
 
   // Benchmark rows (grey background)
-  var benchmarks = data.benchmarks || [];
-  for (var b = 0; b < benchmarks.length; b++) {
+  const benchmarks = data.benchmarks || [];
+  for (let b = 0; b < benchmarks.length; b++) {
     ensureSpace(ROW_HEIGHT);
-    var bmRowY = y - ROW_HEIGHT;
+    const bmRowY = y - ROW_HEIGHT;
 
     page.drawRectangle({
       x: MARGIN_LEFT,
@@ -715,8 +715,8 @@ export async function generateComparisonPdf(periodCodes, benchmarkIds, investmen
       color: COLOURS.benchmarkBg,
     });
 
-    var bm = benchmarks[b];
-    var bmName = truncateText(bm.description, fonts.bold, FONT_SIZE_ROW, nameColWidth - 8);
+    const bm = benchmarks[b];
+    const bmName = truncateText(bm.description, fonts.bold, FONT_SIZE_ROW, nameColWidth - 8);
     page.drawText(bmName, {
       x: MARGIN_LEFT + 4,
       y: bmRowY + 3,
@@ -725,8 +725,8 @@ export async function generateComparisonPdf(periodCodes, benchmarkIds, investmen
       color: COLOURS.brand600,
     });
 
-    for (var bp = 0; bp < periodCodes.length; bp++) {
-      var bmRet = bm.returns[periodCodes[bp]];
+    for (let bp = 0; bp < periodCodes.length; bp++) {
+      const bmRet = bm.returns[periodCodes[bp]];
       if (bmRet !== null && bmRet !== undefined) {
         drawRightAligned(page, formatChange(bmRet),
           MARGIN_LEFT + nameColWidth + typeColWidth + bp * periodColWidth,
@@ -741,10 +741,10 @@ export async function generateComparisonPdf(periodCodes, benchmarkIds, investmen
   }
 
   // Investment rows
-  var investments = data.investments || [];
-  for (var inv = 0; inv < investments.length; inv++) {
+  const investments = data.investments || [];
+  for (let inv = 0; inv < investments.length; inv++) {
     ensureSpace(ROW_HEIGHT);
-    var rowY = y - ROW_HEIGHT;
+    const rowY = y - ROW_HEIGHT;
 
     // Zebra striping
     if (inv % 2 === 0) {
@@ -757,7 +757,7 @@ export async function generateComparisonPdf(periodCodes, benchmarkIds, investmen
       });
     }
 
-    var investment = investments[inv];
+    const investment = investments[inv];
     drawInvestmentName(page, investment.description, MARGIN_LEFT + 4, rowY + 3,
       nameColWidth - 8, investment.publicId, investment.currencyCode, investment.morningstarId, fonts);
 
@@ -769,8 +769,8 @@ export async function generateComparisonPdf(periodCodes, benchmarkIds, investmen
       color: COLOURS.brand600,
     });
 
-    for (var ip = 0; ip < periodCodes.length; ip++) {
-      var ret = investment.returns[periodCodes[ip]];
+    for (let ip = 0; ip < periodCodes.length; ip++) {
+      const ret = investment.returns[periodCodes[ip]];
       if (ret !== null && ret !== undefined) {
         drawRightAligned(page, formatChange(ret),
           MARGIN_LEFT + nameColWidth + typeColWidth + ip * periodColWidth,
@@ -800,15 +800,15 @@ export async function generateComparisonPdf(periodCodes, benchmarkIds, investmen
  * @returns {Promise<Uint8Array>} PDF bytes
  */
 export async function generateLeagueTablePdf(period, sort, dir, limit, benchmarkIds, investmentIds, filterText) {
-  var data = buildLeagueTable(period, investmentIds);
-  var bmData = benchmarkIds.length > 0 ? buildBenchmarkReturnData(benchmarkIds, period) : [];
-  var periodLabel = PERIOD_LABELS[period] || period;
-  var title = "League Table \u2014 " + periodLabel;
+  const data = buildLeagueTable(period, investmentIds);
+  const bmData = benchmarkIds.length > 0 ? buildBenchmarkReturnData(benchmarkIds, period) : [];
+  const periodLabel = PERIOD_LABELS[period] || period;
+  const title = "League Table \u2014 " + periodLabel;
 
-  var investments = data.investments || [];
+  const investments = data.investments || [];
 
   // Apply limit filter
-  var sorted = investments.slice().sort(function (a, b) { return b.returnPct - a.returnPct; });
+  let sorted = investments.slice().sort(function (a, b) { return b.returnPct - a.returnPct; });
   if (limit === "top10") sorted = sorted.slice(0, 10);
   else if (limit === "top20") sorted = sorted.slice(0, 20);
   else if (limit === "bottom10") sorted = sorted.slice(-10);
@@ -816,7 +816,7 @@ export async function generateLeagueTablePdf(period, sort, dir, limit, benchmark
 
   // Apply display sort
   sorted.sort(function (a, b) {
-    var cmp = 0;
+    let cmp = 0;
     if (sort === "name") {
       cmp = a.description.localeCompare(b.description);
     } else if (sort === "type") {
@@ -827,26 +827,26 @@ export async function generateLeagueTablePdf(period, sort, dir, limit, benchmark
     return dir === "asc" ? cmp : -cmp;
   });
 
-  var pdf = PDF.create();
-  var fonts = embedRobotoFonts(pdf);
-  var page = pdf.addPage({ size: "a4", orientation: "portrait" });
-  var pages = [page];
-  var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_PORTRAIT_HEIGHT, MARGIN_TOP, fonts);
+  const pdf = PDF.create();
+  const fonts = embedRobotoFonts(pdf);
+  let page = pdf.addPage({ size: "a4", orientation: "portrait" });
+  const pages = [page];
+  let y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_PORTRAIT_HEIGHT, MARGIN_TOP, fonts);
 
   y = drawTitleBar(page, title, MARGIN_LEFT, y, PORTRAIT_USABLE_WIDTH, fonts);
   y = drawFilterSubtitle(page, filterText, MARGIN_LEFT, y, fonts);
   y -= 6;
 
   // Column layout for portrait
-  var rankColWidth = 24;
-  var nameColWidth = 170;
-  var typeColWidth = 40;
-  var returnColWidth = 55;
-  var sparklineColWidth = 70;
-  var tableWidth = rankColWidth + nameColWidth + typeColWidth + returnColWidth + sparklineColWidth;
+  const rankColWidth = 24;
+  const nameColWidth = 170;
+  const typeColWidth = 40;
+  const returnColWidth = 55;
+  const sparklineColWidth = 70;
+  const tableWidth = rankColWidth + nameColWidth + typeColWidth + returnColWidth + sparklineColWidth;
 
   // Header row
-  var headerY = y - HEADER_ROW_HEIGHT + 4;
+  const headerY = y - HEADER_ROW_HEIGHT + 4;
   page.drawText("#", {
     x: MARGIN_LEFT + 4,
     y: headerY,
@@ -897,9 +897,9 @@ export async function generateLeagueTablePdf(period, sort, dir, limit, benchmark
   }
 
   // Benchmark rows
-  for (var b = 0; b < bmData.length; b++) {
+  for (let b = 0; b < bmData.length; b++) {
     ensureSpace(ROW_HEIGHT);
-    var bmRowY = y - ROW_HEIGHT;
+    const bmRowY = y - ROW_HEIGHT;
 
     page.drawRectangle({
       x: MARGIN_LEFT,
@@ -909,7 +909,7 @@ export async function generateLeagueTablePdf(period, sort, dir, limit, benchmark
       color: COLOURS.benchmarkBg,
     });
 
-    var bmName = truncateText(bmData[b].description, fonts.bold, FONT_SIZE_ROW, nameColWidth - 8);
+    const bmName = truncateText(bmData[b].description, fonts.bold, FONT_SIZE_ROW, nameColWidth - 8);
     page.drawText(bmName, {
       x: MARGIN_LEFT + rankColWidth + 4,
       y: bmRowY + 3,
@@ -927,9 +927,9 @@ export async function generateLeagueTablePdf(period, sort, dir, limit, benchmark
   }
 
   // Investment rows
-  for (var inv = 0; inv < sorted.length; inv++) {
+  for (let inv = 0; inv < sorted.length; inv++) {
     ensureSpace(ROW_HEIGHT);
-    var rowY = y - ROW_HEIGHT;
+    const rowY = y - ROW_HEIGHT;
 
     if (inv % 2 === 0) {
       page.drawRectangle({
@@ -941,7 +941,7 @@ export async function generateLeagueTablePdf(period, sort, dir, limit, benchmark
       });
     }
 
-    var investment = sorted[inv];
+    const investment = sorted[inv];
 
     // Rank
     page.drawText(String(inv + 1), {
@@ -971,27 +971,27 @@ export async function generateLeagueTablePdf(period, sort, dir, limit, benchmark
       returnColWidth, rowY + 3, fonts.medium, FONT_SIZE_ROW, changeColour(investment.returnPct));
 
     // Sparkline — filter nulls before computing min/max
-    var sparkline = investment.sparkline;
+    const sparkline = investment.sparkline;
     if (sparkline && sparkline.length >= 2) {
-      var validVals = sparkline.filter(function (v) { return v !== null; });
+      const validVals = sparkline.filter(function (v) { return v !== null; });
       if (validVals.length >= 2) {
-        var sparkX = MARGIN_LEFT + rankColWidth + nameColWidth + typeColWidth + returnColWidth + 8;
-        var sparkW = sparklineColWidth - 16;
-        var sparkH = 10;
-        var sparkMidY = rowY + 3 + FONT_SIZE_ROW / 2 - sparkH / 2;
+        const sparkX = MARGIN_LEFT + rankColWidth + nameColWidth + typeColWidth + returnColWidth + 8;
+        const sparkW = sparklineColWidth - 16;
+        const sparkH = 10;
+        const sparkMidY = rowY + 3 + FONT_SIZE_ROW / 2 - sparkH / 2;
 
-        var sparkMin = Math.min.apply(null, validVals);
-        var sparkMax = Math.max.apply(null, validVals);
-        var sparkRange = sparkMax - sparkMin || 1;
+        const sparkMin = Math.min.apply(null, validVals);
+        const sparkMax = Math.max.apply(null, validVals);
+        const sparkRange = sparkMax - sparkMin || 1;
 
-        var sparkColour = investment.returnPct >= 0 ? COLOURS.green700 : COLOURS.red600;
+        const sparkColour = investment.returnPct >= 0 ? COLOURS.green700 : COLOURS.red600;
 
-        var lastValidX = null;
-        var lastValidY = null;
-        for (var sp = 0; sp < sparkline.length; sp++) {
+        let lastValidX = null;
+        let lastValidY = null;
+        for (let sp = 0; sp < sparkline.length; sp++) {
           if (sparkline[sp] === null) continue;
-          var spx = sparkX + (sp / (sparkline.length - 1)) * sparkW;
-          var spy = sparkMidY + ((sparkline[sp] - sparkMin) / sparkRange) * sparkH;
+          const spx = sparkX + (sp / (sparkline.length - 1)) * sparkW;
+          const spy = sparkMidY + ((sparkline[sp] - sparkMin) / sparkRange) * sparkH;
           if (lastValidX !== null) {
             page.drawLine({
               start: { x: lastValidX, y: lastValidY },
@@ -1023,48 +1023,48 @@ export async function generateLeagueTablePdf(period, sort, dir, limit, benchmark
  * @returns {Promise<Uint8Array>} PDF bytes
  */
 export async function generateTopBottomPdf(period, count, benchmarkIds, investmentIds, filterText) {
-  var data = buildTopBottomPerformers(period, count, investmentIds);
-  var bmSeries = [];
+  const data = buildTopBottomPerformers(period, count, investmentIds);
+  let bmSeries = [];
   if (benchmarkIds.length > 0) {
-    var bmData = buildBenchmarkRebasedSeries(benchmarkIds, period);
+    const bmData = buildBenchmarkRebasedSeries(benchmarkIds, period);
     bmSeries = bmData.benchmarkSeries || [];
   }
 
-  var periodLabel = PERIOD_LABELS[period] || period;
-  var title = "Top & Bottom " + count + " Performers \u2014 " + periodLabel;
-  var periodWeeks = { "1w": 1, "1m": 4, "3m": 13, "6m": 26, "1y": 52, "2y": 104, "3y": 156 };
-  var totalWeeks = periodWeeks[period] || 52;
+  const periodLabel = PERIOD_LABELS[period] || period;
+  const title = "Top & Bottom " + count + " Performers \u2014 " + periodLabel;
+  const periodWeeks = { "1w": 1, "1m": 4, "3m": 13, "6m": 26, "1y": 52, "2y": 104, "3y": 156 };
+  const totalWeeks = periodWeeks[period] || 52;
 
-  var pdf = PDF.create();
-  var fonts = embedRobotoFonts(pdf);
-  var page = pdf.addPage({ size: "a4", orientation: "portrait" });
-  var pages = [page];
-  var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_PORTRAIT_HEIGHT, MARGIN_TOP, fonts);
+  const pdf = PDF.create();
+  const fonts = embedRobotoFonts(pdf);
+  let page = pdf.addPage({ size: "a4", orientation: "portrait" });
+  const pages = [page];
+  let y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_PORTRAIT_HEIGHT, MARGIN_TOP, fonts);
 
   // Draw filter subtitle once at the top before the two charts
   y = drawFilterSubtitle(page, filterText, MARGIN_LEFT, y, fonts);
 
-  var pageWidth = PORTRAIT_USABLE_WIDTH;
-  var sampleDates = data.sampleDates;
-  var totalPoints = sampleDates.length;
+  const pageWidth = PORTRAIT_USABLE_WIDTH;
+  const sampleDates = data.sampleDates;
+  const totalPoints = sampleDates.length;
 
   // Calculate legend rows for each chart
-  var topLegendItems = buildLegendItems(data.topSeries, bmSeries, 0);
-  var bottomLegendItems = buildLegendItems(data.bottomSeries, bmSeries, 5);
-  var legendPerRow = 3;
-  var topLegendRows = Math.ceil(topLegendItems.length / legendPerRow) || 1;
-  var bottomLegendRows = Math.ceil(bottomLegendItems.length / legendPerRow) || 1;
+  const topLegendItems = buildLegendItems(data.topSeries, bmSeries, 0);
+  const bottomLegendItems = buildLegendItems(data.bottomSeries, bmSeries, 5);
+  const legendPerRow = 3;
+  const topLegendRows = Math.ceil(topLegendItems.length / legendPerRow) || 1;
+  const bottomLegendRows = Math.ceil(bottomLegendItems.length / legendPerRow) || 1;
 
   // Split the page vertically: two charts with legends
-  var availableHeight = y - MARGIN_BOTTOM - 30;
-  var gapBetweenCharts = 20;
-  var topTitleH = TITLE_BAR_HEIGHT;
-  var bottomTitleH = TITLE_BAR_HEIGHT;
-  var legendGap = 12; // gap between title bar and legend
-  var topLegendH = topLegendRows * LEGEND_ROW_HEIGHT + LEGEND_PADDING + legendGap;
-  var bottomLegendH = bottomLegendRows * LEGEND_ROW_HEIGHT + LEGEND_PADDING + legendGap;
+  const availableHeight = y - MARGIN_BOTTOM - 30;
+  const gapBetweenCharts = 20;
+  const topTitleH = TITLE_BAR_HEIGHT;
+  const bottomTitleH = TITLE_BAR_HEIGHT;
+  const legendGap = 12; // gap between title bar and legend
+  const topLegendH = topLegendRows * LEGEND_ROW_HEIGHT + LEGEND_PADDING + legendGap;
+  const bottomLegendH = bottomLegendRows * LEGEND_ROW_HEIGHT + LEGEND_PADDING + legendGap;
 
-  var chartAreaHeight = (availableHeight - topTitleH - bottomTitleH - topLegendH - bottomLegendH
+  const chartAreaHeight = (availableHeight - topTitleH - bottomTitleH - topLegendH - bottomLegendH
     - X_AXIS_HEIGHT * 2 - gapBetweenCharts) / 2;
 
   // --- Top chart ---
@@ -1073,14 +1073,14 @@ export async function generateTopBottomPdf(period, count, benchmarkIds, investme
   y = drawChartLegend(page, topLegendItems, MARGIN_LEFT + 4, y - 12, pageWidth - 8, legendPerRow, fonts);
   y -= LEGEND_PADDING;
 
-  var topYRange = calculateYRange(
+  const topYRange = calculateYRange(
     data.topSeries.map(function (s) { return s.values; })
       .concat(bmSeries.map(function (s) { return s.values; }))
   );
-  var topChartLeft = MARGIN_LEFT + Y_AXIS_WIDTH;
-  var topChartWidth = pageWidth - Y_AXIS_WIDTH - CHART_RIGHT_PAD;
-  var topChartBottom = y - chartAreaHeight;
-  var topChartHeight = chartAreaHeight;
+  const topChartLeft = MARGIN_LEFT + Y_AXIS_WIDTH;
+  const topChartWidth = pageWidth - Y_AXIS_WIDTH - CHART_RIGHT_PAD;
+  const topChartBottom = y - chartAreaHeight;
+  const topChartHeight = chartAreaHeight;
 
   drawGrid(page, topChartLeft, topChartBottom, topChartWidth, topChartHeight,
     topYRange.min, topYRange.max, topYRange.ticks);
@@ -1088,12 +1088,12 @@ export async function generateTopBottomPdf(period, count, benchmarkIds, investme
     topYRange.min, topYRange.max, topYRange.ticks, fonts);
   drawXAxis(page, sampleDates, topChartLeft, topChartBottom, topChartWidth, totalWeeks, fonts);
 
-  for (var t = 0; t < data.topSeries.length; t++) {
+  for (let t = 0; t < data.topSeries.length; t++) {
     plotLine(page, data.topSeries[t].values, totalPoints, topChartLeft, topChartBottom,
       topChartWidth, topChartHeight, topYRange.min, topYRange.max,
       LINE_COLOURS[t % LINE_COLOURS.length], false);
   }
-  for (var tb = 0; tb < bmSeries.length; tb++) {
+  for (let tb = 0; tb < bmSeries.length; tb++) {
     plotLine(page, bmSeries[tb].values, totalPoints, topChartLeft, topChartBottom,
       topChartWidth, topChartHeight, topYRange.min, topYRange.max,
       LINE_COLOURS[(data.topSeries.length + tb) % LINE_COLOURS.length], true);
@@ -1107,14 +1107,14 @@ export async function generateTopBottomPdf(period, count, benchmarkIds, investme
   y = drawChartLegend(page, bottomLegendItems, MARGIN_LEFT + 4, y - 12, pageWidth - 8, legendPerRow, fonts);
   y -= LEGEND_PADDING;
 
-  var bottomYRange = calculateYRange(
+  const bottomYRange = calculateYRange(
     data.bottomSeries.map(function (s) { return s.values; })
       .concat(bmSeries.map(function (s) { return s.values; }))
   );
-  var bottomChartLeft = MARGIN_LEFT + Y_AXIS_WIDTH;
-  var bottomChartWidth = topChartWidth;
-  var bottomChartBottom = y - chartAreaHeight;
-  var bottomChartHeight = chartAreaHeight;
+  const bottomChartLeft = MARGIN_LEFT + Y_AXIS_WIDTH;
+  const bottomChartWidth = topChartWidth;
+  const bottomChartBottom = y - chartAreaHeight;
+  const bottomChartHeight = chartAreaHeight;
 
   drawGrid(page, bottomChartLeft, bottomChartBottom, bottomChartWidth, bottomChartHeight,
     bottomYRange.min, bottomYRange.max, bottomYRange.ticks);
@@ -1122,12 +1122,12 @@ export async function generateTopBottomPdf(period, count, benchmarkIds, investme
     bottomYRange.min, bottomYRange.max, bottomYRange.ticks, fonts);
   drawXAxis(page, sampleDates, bottomChartLeft, bottomChartBottom, bottomChartWidth, totalWeeks, fonts);
 
-  for (var bt = 0; bt < data.bottomSeries.length; bt++) {
+  for (let bt = 0; bt < data.bottomSeries.length; bt++) {
     plotLine(page, data.bottomSeries[bt].values, totalPoints, bottomChartLeft, bottomChartBottom,
       bottomChartWidth, bottomChartHeight, bottomYRange.min, bottomYRange.max,
       LINE_COLOURS[(5 + bt) % LINE_COLOURS.length], false);
   }
-  for (var bb = 0; bb < bmSeries.length; bb++) {
+  for (let bb = 0; bb < bmSeries.length; bb++) {
     plotLine(page, bmSeries[bb].values, totalPoints, bottomChartLeft, bottomChartBottom,
       bottomChartWidth, bottomChartHeight, bottomYRange.min, bottomYRange.max,
       LINE_COLOURS[(5 + data.bottomSeries.length + bb) % LINE_COLOURS.length], true);
@@ -1145,10 +1145,10 @@ export async function generateTopBottomPdf(period, count, benchmarkIds, investme
  * @returns {Array<Object>} Legend items
  */
 function buildLegendItems(series, bmSeries, colourOffset) {
-  var items = [];
-  for (var i = 0; i < series.length; i++) {
-    var s = series[i];
-    var sign = s.returnPct >= 0 ? "+" : "";
+  const items = [];
+  for (let i = 0; i < series.length; i++) {
+    const s = series[i];
+    const sign = s.returnPct >= 0 ? "+" : "";
     items.push({
       label: s.label + " (" + sign + s.returnPct.toFixed(1) + "%)",
       colour: LINE_COLOURS[(colourOffset + i) % LINE_COLOURS.length],
@@ -1158,9 +1158,9 @@ function buildLegendItems(series, bmSeries, colourOffset) {
       morningstarId: s.morningstarId || null,
     });
   }
-  for (var b = 0; b < bmSeries.length; b++) {
-    var bm = bmSeries[b];
-    var bmSign = bm.returnPct !== null && bm.returnPct >= 0 ? "+" : "";
+  for (let b = 0; b < bmSeries.length; b++) {
+    const bm = bmSeries[b];
+    const bmSign = bm.returnPct !== null && bm.returnPct >= 0 ? "+" : "";
     items.push({
       label: bm.label + (bm.returnPct !== null ? " (" + bmSign + bm.returnPct.toFixed(1) + "%)" : ""),
       colour: LINE_COLOURS[(colourOffset + series.length + b) % LINE_COLOURS.length],
@@ -1182,27 +1182,27 @@ function buildLegendItems(series, bmSeries, colourOffset) {
  * @returns {Promise<Uint8Array>} PDF bytes
  */
 export async function generateRiskReturnPdf(period, benchmarkIds, investmentIds, filterText) {
-  var data = buildRiskReturnData(period, investmentIds);
-  var bmData = benchmarkIds.length > 0 ? buildBenchmarkReturnData(benchmarkIds, period) : [];
-  var periodLabel = PERIOD_LABELS[period] || period;
-  var title = "Risk vs Return \u2014 " + periodLabel;
+  const data = buildRiskReturnData(period, investmentIds);
+  const bmData = benchmarkIds.length > 0 ? buildBenchmarkReturnData(benchmarkIds, period) : [];
+  const periodLabel = PERIOD_LABELS[period] || period;
+  const title = "Risk vs Return \u2014 " + periodLabel;
 
-  var pdf = PDF.create();
-  var fonts = embedRobotoFonts(pdf);
-  var page = pdf.addPage({ size: "a4", orientation: "landscape" });
-  var pages = [page];
-  var y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_LANDSCAPE_HEIGHT, MARGIN_TOP, fonts);
+  const pdf = PDF.create();
+  const fonts = embedRobotoFonts(pdf);
+  let page = pdf.addPage({ size: "a4", orientation: "landscape" });
+  const pages = [page];
+  let y = drawPageHeader(pdf, page, MARGIN_LEFT, A4_LANDSCAPE_HEIGHT, MARGIN_TOP, fonts);
 
   y = drawTitleBar(page, title, MARGIN_LEFT, y, USABLE_WIDTH, fonts);
   y = drawFilterSubtitle(page, filterText, MARGIN_LEFT, y, fonts);
   y -= 8;
 
-  var investments = data.investments || [];
+  const investments = data.investments || [];
 
   // Calculate axis ranges
-  var allReturns = investments.map(function (inv) { return inv.returnPct; });
-  var allVols = investments.map(function (inv) { return inv.volatility; });
-  for (var b = 0; b < bmData.length; b++) {
+  const allReturns = investments.map(function (inv) { return inv.returnPct; });
+  const allVols = investments.map(function (inv) { return inv.volatility; });
+  for (let b = 0; b < bmData.length; b++) {
     if (bmData[b].returnPct !== null) allReturns.push(bmData[b].returnPct);
     if (bmData[b].volatility !== null) allVols.push(bmData[b].volatility);
   }
@@ -1219,37 +1219,37 @@ export async function generateRiskReturnPdf(period, benchmarkIds, investmentIds,
     return await pdf.save();
   }
 
-  var returnMin = Math.min.apply(null, allReturns);
-  var returnMax = Math.max.apply(null, allReturns);
-  var volMin = Math.min.apply(null, allVols);
-  var volMax = Math.max.apply(null, allVols);
+  let returnMin = Math.min.apply(null, allReturns);
+  let returnMax = Math.max.apply(null, allReturns);
+  let volMin = Math.min.apply(null, allVols);
+  let volMax = Math.max.apply(null, allVols);
 
   // Add padding
-  var retPad = (returnMax - returnMin) * 0.15 || 5;
-  var volPad = (volMax - volMin) * 0.15 || 2;
+  const retPad = (returnMax - returnMin) * 0.15 || 5;
+  const volPad = (volMax - volMin) * 0.15 || 2;
   returnMin -= retPad;
   returnMax += retPad;
   volMin = Math.max(0, volMin - volPad);
   volMax += volPad;
 
   // Calculate medians for quadrant lines
-  var sortedReturns = investments.map(function (inv) { return inv.returnPct; }).sort(function (a, b) { return a - b; });
-  var sortedVols = investments.map(function (inv) { return inv.volatility; }).sort(function (a, b) { return a - b; });
-  var medianReturn = sortedReturns[Math.floor(sortedReturns.length / 2)] || 0;
-  var medianVol = sortedVols[Math.floor(sortedVols.length / 2)] || 0;
+  const sortedReturns = investments.map(function (inv) { return inv.returnPct; }).sort(function (a, b) { return a - b; });
+  const sortedVols = investments.map(function (inv) { return inv.volatility; }).sort(function (a, b) { return a - b; });
+  const medianReturn = sortedReturns[Math.floor(sortedReturns.length / 2)] || 0;
+  const medianVol = sortedVols[Math.floor(sortedVols.length / 2)] || 0;
 
   // Chart area
-  var chartLeft = MARGIN_LEFT + Y_AXIS_WIDTH + 10;
-  var chartWidth = USABLE_WIDTH - Y_AXIS_WIDTH - CHART_RIGHT_PAD - 10;
-  var legendSpace = 50; // space below chart for legend
-  var chartBottom = MARGIN_BOTTOM + X_AXIS_HEIGHT + legendSpace;
-  var chartHeight = y - chartBottom - 10;
+  const chartLeft = MARGIN_LEFT + Y_AXIS_WIDTH + 10;
+  const chartWidth = USABLE_WIDTH - Y_AXIS_WIDTH - CHART_RIGHT_PAD - 10;
+  const legendSpace = 50; // space below chart for legend
+  const chartBottom = MARGIN_BOTTOM + X_AXIS_HEIGHT + legendSpace;
+  const chartHeight = y - chartBottom - 10;
 
-  var returnRange = returnMax - returnMin;
-  var volRange = volMax - volMin;
+  let returnRange = returnMax - returnMin;
+  let volRange = volMax - volMin;
 
   // Grid and axes
-  var retTicks = calculateYRange([allReturns]);
+  const retTicks = calculateYRange([allReturns]);
   drawGrid(page, chartLeft, chartBottom, chartWidth, chartHeight,
     retTicks.min, retTicks.max, retTicks.ticks);
   drawYAxis(page, chartLeft, chartBottom, chartHeight,
@@ -1261,13 +1261,13 @@ export async function generateRiskReturnPdf(period, benchmarkIds, investmentIds,
   returnRange = returnMax - returnMin;
 
   // X-axis labels (volatility %)
-  var volInterval = niceNumber((volMax - volMin) / 8);
-  var volStart = Math.floor(volMin / volInterval) * volInterval;
-  for (var vt = volStart; vt <= volMax + volInterval * 0.01; vt += volInterval) {
-    var vx = chartLeft + ((vt - volMin) / volRange) * chartWidth;
+  const volInterval = niceNumber((volMax - volMin) / 8);
+  const volStart = Math.floor(volMin / volInterval) * volInterval;
+  for (let vt = volStart; vt <= volMax + volInterval * 0.01; vt += volInterval) {
+    const vx = chartLeft + ((vt - volMin) / volRange) * chartWidth;
     if (vx < chartLeft || vx > chartLeft + chartWidth) continue;
-    var volLabel = vt.toFixed(vt === Math.round(vt) ? 0 : 1) + "%";
-    var vlw = fonts.regular.widthOfTextAtSize(volLabel, FONT_SIZE_AXIS);
+    const volLabel = vt.toFixed(vt === Math.round(vt) ? 0 : 1) + "%";
+    const vlw = fonts.regular.widthOfTextAtSize(volLabel, FONT_SIZE_AXIS);
     page.drawLine({
       start: { x: vx, y: chartBottom },
       end: { x: vx, y: chartBottom - 4 },
@@ -1300,8 +1300,8 @@ export async function generateRiskReturnPdf(period, benchmarkIds, investmentIds,
   });
 
   // Median lines (dashed)
-  var medRetY = chartBottom + ((medianReturn - returnMin) / returnRange) * chartHeight;
-  var medVolX = chartLeft + ((medianVol - volMin) / volRange) * chartWidth;
+  const medRetY = chartBottom + ((medianReturn - returnMin) / returnRange) * chartHeight;
+  const medVolX = chartLeft + ((medianVol - volMin) / volRange) * chartWidth;
 
   if (medRetY >= chartBottom && medRetY <= chartBottom + chartHeight) {
     drawDashedLine(page, chartLeft, medRetY, chartLeft + chartWidth, medRetY, COLOURS.brand300, 0.5);
@@ -1311,8 +1311,8 @@ export async function generateRiskReturnPdf(period, benchmarkIds, investmentIds,
   }
 
   // Quadrant labels
-  var quadrantAlpha = rgb(0.7, 0.72, 0.75);
-  var quadFontSize = 8;
+  const quadrantAlpha = rgb(0.7, 0.72, 0.75);
+  const quadFontSize = 8;
 
   page.drawText("Strong & Steady", {
     x: chartLeft + 6,
@@ -1322,8 +1322,8 @@ export async function generateRiskReturnPdf(period, benchmarkIds, investmentIds,
     color: quadrantAlpha,
   });
 
-  var hrhrText = "High Reward, High Risk";
-  var hrhrW = fonts.regular.widthOfTextAtSize(hrhrText, quadFontSize);
+  const hrhrText = "High Reward, High Risk";
+  const hrhrW = fonts.regular.widthOfTextAtSize(hrhrText, quadFontSize);
   page.drawText(hrhrText, {
     x: chartLeft + chartWidth - hrhrW - 6,
     y: chartBottom + chartHeight - quadFontSize - 4,
@@ -1340,8 +1340,8 @@ export async function generateRiskReturnPdf(period, benchmarkIds, investmentIds,
     color: quadrantAlpha,
   });
 
-  var revText = "Review";
-  var revW = fonts.regular.widthOfTextAtSize(revText, quadFontSize);
+  const revText = "Review";
+  const revW = fonts.regular.widthOfTextAtSize(revText, quadFontSize);
   page.drawText(revText, {
     x: chartLeft + chartWidth - revW - 6,
     y: chartBottom + 6,
@@ -1351,18 +1351,18 @@ export async function generateRiskReturnPdf(period, benchmarkIds, investmentIds,
   });
 
   // Plot investment points with numbered labels
-  var pointRadius = 3.5;
-  var numberFontSize = 6;
-  var keyEntries = []; // collect entries for key table
+  const pointRadius = 3.5;
+  const numberFontSize = 6;
+  const keyEntries = []; // collect entries for key table
 
-  for (var inv = 0; inv < investments.length; inv++) {
-    var invData = investments[inv];
-    var px = chartLeft + ((invData.volatility - volMin) / volRange) * chartWidth;
-    var py = chartBottom + ((invData.returnPct - returnMin) / returnRange) * chartHeight;
-    var invNum = inv + 1;
+  for (let inv = 0; inv < investments.length; inv++) {
+    const invData = investments[inv];
+    const px = chartLeft + ((invData.volatility - volMin) / volRange) * chartWidth;
+    const py = chartBottom + ((invData.returnPct - returnMin) / returnRange) * chartHeight;
+    const invNum = inv + 1;
 
     // Colour by quadrant position
-    var colour;
+    let colour;
     if (invData.returnPct >= medianReturn && invData.volatility <= medianVol) {
       colour = SCATTER_GREEN;
     } else if (invData.returnPct < medianReturn && invData.volatility > medianVol) {
@@ -1374,7 +1374,7 @@ export async function generateRiskReturnPdf(period, benchmarkIds, investmentIds,
     drawFilledCircle(page, px, py, pointRadius, colour);
 
     // Draw number label offset to top-right of point
-    var numStr = String(invNum);
+    const numStr = String(invNum);
     page.drawText(numStr, {
       x: px + pointRadius + 1,
       y: py + pointRadius - 1,
@@ -1396,15 +1396,15 @@ export async function generateRiskReturnPdf(period, benchmarkIds, investmentIds,
   }
 
   // Plot benchmark points as triangles with letter labels
-  var bmLetters = "ABCDEFGHIJ";
-  for (var bm = 0; bm < bmData.length; bm++) {
+  const bmLetters = "ABCDEFGHIJ";
+  for (let bm = 0; bm < bmData.length; bm++) {
     if (bmData[bm].returnPct === null || bmData[bm].volatility === null) continue;
-    var bpx = chartLeft + ((bmData[bm].volatility - volMin) / volRange) * chartWidth;
-    var bpy = chartBottom + ((bmData[bm].returnPct - returnMin) / returnRange) * chartHeight;
+    const bpx = chartLeft + ((bmData[bm].volatility - volMin) / volRange) * chartWidth;
+    const bpy = chartBottom + ((bmData[bm].returnPct - returnMin) / returnRange) * chartHeight;
     drawTriangle(page, bpx, bpy, 5, SCATTER_GREY);
 
     // Letter label
-    var bmLetter = bmLetters.charAt(bm);
+    const bmLetter = bmLetters.charAt(bm);
     page.drawText(bmLetter, {
       x: bpx + 6,
       y: bpy + 3,
@@ -1426,8 +1426,8 @@ export async function generateRiskReturnPdf(period, benchmarkIds, investmentIds,
   }
 
   // Colour legend below chart
-  var legendY = chartBottom - X_AXIS_HEIGHT - 10;
-  var legendItems = [
+  const legendY = chartBottom - X_AXIS_HEIGHT - 10;
+  const legendItems = [
     { label: "High return, low volatility", colour: SCATTER_GREEN, shape: "circle" },
     { label: "Low return, high volatility", colour: SCATTER_RED, shape: "circle" },
     { label: "Other", colour: SCATTER_BLUE, shape: "circle" },
@@ -1436,9 +1436,9 @@ export async function generateRiskReturnPdf(period, benchmarkIds, investmentIds,
     legendItems.push({ label: "Benchmark", colour: SCATTER_GREY, shape: "triangle" });
   }
 
-  var lx = MARGIN_LEFT + 10;
-  for (var li = 0; li < legendItems.length; li++) {
-    var legendItem = legendItems[li];
+  let lx = MARGIN_LEFT + 10;
+  for (let li = 0; li < legendItems.length; li++) {
+    const legendItem = legendItems[li];
     if (legendItem.shape === "triangle") {
       drawTriangle(page, lx + 4, legendY + 3, 4, legendItem.colour);
     } else {
@@ -1456,23 +1456,23 @@ export async function generateRiskReturnPdf(period, benchmarkIds, investmentIds,
   }
 
   // ─── Key table on page 2 (portrait) ───────────────────────────
-  var keyPage = pdf.addPage({ size: "a4", orientation: "portrait" });
+  let keyPage = pdf.addPage({ size: "a4", orientation: "portrait" });
   pages.push(keyPage);
-  var ky = drawPageHeader(pdf, keyPage, MARGIN_LEFT, A4_PORTRAIT_HEIGHT, MARGIN_TOP, fonts);
+  let ky = drawPageHeader(pdf, keyPage, MARGIN_LEFT, A4_PORTRAIT_HEIGHT, MARGIN_TOP, fonts);
 
   ky = drawTitleBar(keyPage, "Risk vs Return \u2014 Key", MARGIN_LEFT, ky, PORTRAIT_USABLE_WIDTH, fonts);
   ky -= 6;
 
   // Key table columns: #, Name, Type, Return%, Volatility%
-  var keyColNum = 20;
-  var keyColReturn = 52;
-  var keyColVol = 52;
-  var keyColName = PORTRAIT_USABLE_WIDTH - keyColNum - keyColReturn - keyColVol;
+  const keyColNum = 20;
+  const keyColReturn = 52;
+  const keyColVol = 52;
+  const keyColName = PORTRAIT_USABLE_WIDTH - keyColNum - keyColReturn - keyColVol;
 
-  var keyColNumX = MARGIN_LEFT;
-  var keyColNameX = keyColNumX + keyColNum;
-  var keyColReturnX = keyColNameX + keyColName;
-  var keyColVolX = keyColReturnX + keyColReturn;
+  const keyColNumX = MARGIN_LEFT;
+  const keyColNameX = keyColNumX + keyColNum;
+  const keyColReturnX = keyColNameX + keyColName;
+  const keyColVolX = keyColReturnX + keyColReturn;
 
   // Column headers
   ky -= HEADER_ROW_HEIGHT;
@@ -1503,8 +1503,8 @@ export async function generateRiskReturnPdf(period, benchmarkIds, investmentIds,
     fonts.bold, FONT_SIZE_HEADER, COLOURS.brand800);
 
   // Key table rows
-  for (var ki = 0; ki < keyEntries.length; ki++) {
-    var entry = keyEntries[ki];
+  for (let ki = 0; ki < keyEntries.length; ki++) {
+    const entry = keyEntries[ki];
     ky -= ROW_HEIGHT;
 
     // Page break if needed
@@ -1551,8 +1551,8 @@ export async function generateRiskReturnPdf(period, benchmarkIds, investmentIds,
     });
 
     // Investment name (truncated, with research links if available)
-    var nameMaxWidth = keyColName - 8;
-    var entryName = truncateText(entry.description, fonts.medium, FONT_SIZE_ROW, nameMaxWidth);
+    const nameMaxWidth = keyColName - 8;
+    const entryName = truncateText(entry.description, fonts.medium, FONT_SIZE_ROW, nameMaxWidth);
     if (!isTestMode() && (entry.publicId || entry.morningstarId)) {
       drawInvestmentName(keyPage, entry.description,
         keyColNameX + 4, ky + 1, nameMaxWidth,
@@ -1577,7 +1577,7 @@ export async function generateRiskReturnPdf(period, benchmarkIds, investmentIds,
   }
 
   // Footer across all pages (mixed orientations)
-  var pageWidths = pages.map(function (p, i) {
+  const pageWidths = pages.map(function (p, i) {
     return i === 0 ? USABLE_WIDTH : PORTRAIT_USABLE_WIDTH;
   });
   drawPageFooters(pages, title, MARGIN_LEFT, pageWidths, fonts);
@@ -1595,19 +1595,19 @@ export async function generateRiskReturnPdf(period, benchmarkIds, investmentIds,
  * @param {number} thickness - Line thickness
  */
 function drawDashedLine(page, x1, y1, x2, y2, colour, thickness) {
-  var dx = x2 - x1;
-  var dy = y2 - y1;
-  var len = Math.sqrt(dx * dx + dy * dy);
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.sqrt(dx * dx + dy * dy);
   if (len < 1) return;
 
-  var dashLen = 4;
-  var gapLen = 3;
-  var ux = dx / len;
-  var uy = dy / len;
-  var pos = 0;
+  const dashLen = 4;
+  const gapLen = 3;
+  const ux = dx / len;
+  const uy = dy / len;
+  let pos = 0;
 
   while (pos < len) {
-    var end = Math.min(pos + dashLen, len);
+    const end = Math.min(pos + dashLen, len);
     page.drawLine({
       start: { x: x1 + ux * pos, y: y1 + uy * pos },
       end: { x: x1 + ux * end, y: y1 + uy * end },
@@ -1628,10 +1628,10 @@ function drawDashedLine(page, x1, y1, x2, y2, colour, thickness) {
  */
 function drawFilledCircle(page, cx, cy, radius, colour) {
   // Approximate filled circle with concentric rectangles
-  var steps = Math.ceil(radius * 2);
-  for (var i = -steps; i <= steps; i++) {
-    var dy = (i / steps) * radius;
-    var halfWidth = Math.sqrt(radius * radius - dy * dy);
+  const steps = Math.ceil(radius * 2);
+  for (let i = -steps; i <= steps; i++) {
+    const dy = (i / steps) * radius;
+    const halfWidth = Math.sqrt(radius * radius - dy * dy);
     page.drawRectangle({
       x: cx - halfWidth,
       y: cy + dy - 0.5,
@@ -1652,10 +1652,10 @@ function drawFilledCircle(page, cx, cy, radius, colour) {
  */
 function drawTriangle(page, cx, cy, size, colour) {
   // Fill with horizontal slices
-  for (var row = 0; row <= size * 2; row++) {
-    var yOff = -size + row;
-    var frac = row / (size * 2);
-    var halfW = frac * size;
+  for (let row = 0; row <= size * 2; row++) {
+    const yOff = -size + row;
+    const frac = row / (size * 2);
+    const halfW = frac * size;
     page.drawRectangle({
       x: cx - halfW,
       y: cy + yOff - 0.5,

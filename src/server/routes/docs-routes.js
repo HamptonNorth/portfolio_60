@@ -24,8 +24,8 @@ import { spellCheckContent, getCustomDictionary, addCustomWord } from "../servic
  */
 function triggerBackgroundReindex() {
   try {
-    var db = getDatabase();
-    var docsConfig = getDocsConfig();
+    const db = getDatabase();
+    const docsConfig = getDocsConfig();
     reindexAllPages(db, docsConfig.categories).catch(function () {
       // Silently ignore — search will be stale until next reindex
     });
@@ -35,10 +35,10 @@ function triggerBackgroundReindex() {
 }
 
 /** @type {string[]} Allowed file extensions for markdown uploads */
-var ALLOWED_MARKDOWN_EXTENSIONS = [".md"];
+const ALLOWED_MARKDOWN_EXTENSIONS = [".md"];
 
 /** @type {string[]} Allowed file extensions for image uploads */
-var ALLOWED_IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"];
+const ALLOWED_IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"];
 
 /**
  * @description Get the file extension (lowercase) from a filename.
@@ -46,7 +46,7 @@ var ALLOWED_IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"
  * @returns {string} Lowercase extension including the dot, or empty string
  */
 function getFileExtension(filename) {
-  var lastDot = filename.lastIndexOf(".");
+  const lastDot = filename.lastIndexOf(".");
   if (lastDot === -1) return "";
   return filename.slice(lastDot).toLowerCase();
 }
@@ -73,8 +73,8 @@ function sanitizeFilename(filename) {
  * @returns {Object} Style configuration object
  */
 function getCategoryStyle(category) {
-  var docsConfig = getDocsConfig();
-  var catConfig = docsConfig.categories[category];
+  const docsConfig = getDocsConfig();
+  const catConfig = docsConfig.categories[category];
   if (catConfig && catConfig.style) {
     return getStyleConfig(catConfig.style);
   }
@@ -85,11 +85,11 @@ function getCategoryStyle(category) {
 // Router setup
 // =============================================================================
 
-var docsRouter = new Router();
+const docsRouter = new Router();
 
 // GET /api/docs/config — returns docs categories and available styles
 docsRouter.get("/api/docs/config", function () {
-  var docsConfig = getDocsConfig();
+  const docsConfig = getDocsConfig();
   return new Response(
     JSON.stringify({
       categories: docsConfig.categories,
@@ -105,7 +105,7 @@ docsRouter.get("/api/docs/config", function () {
 
 // GET /api/docs/list/:category — list all pages in a category
 docsRouter.get("/api/docs/list/:category", async function (request, params) {
-  var category = params.category;
+  const category = params.category;
 
   if (category.includes("..")) {
     return new Response(JSON.stringify({ error: "Invalid category" }), {
@@ -114,8 +114,8 @@ docsRouter.get("/api/docs/list/:category", async function (request, params) {
     });
   }
 
-  var dirPath = join(getDocsDir(), category);
-  var files;
+  const dirPath = join(getDocsDir(), category);
+  let files;
 
   try {
     files = await readdir(dirPath);
@@ -126,17 +126,17 @@ docsRouter.get("/api/docs/list/:category", async function (request, params) {
     });
   }
 
-  var pages = [];
-  var now = new Date();
+  const pages = [];
+  const now = new Date();
 
-  for (var i = 0; i < files.length; i++) {
-    var file = files[i];
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
     if (!file.endsWith(".md")) continue;
 
     try {
-      var content = await Bun.file(join(dirPath, file)).text();
-      var parsed = parseFrontMatter(content);
-      var meta = parsed.attributes;
+      const content = await Bun.file(join(dirPath, file)).text();
+      const parsed = parseFrontMatter(content);
+      const meta = parsed.attributes;
 
       if (!meta.title) continue;
 
@@ -154,8 +154,8 @@ docsRouter.get("/api/docs/list/:category", async function (request, params) {
 
   // Sort: sticky pages first, then by created date descending
   pages.sort(function (a, b) {
-    var aSticky = a.sticky === "true" || a.sticky === true;
-    var bSticky = b.sticky === "true" || b.sticky === true;
+    const aSticky = a.sticky === "true" || a.sticky === true;
+    const bSticky = b.sticky === "true" || b.sticky === true;
     if (aSticky && !bSticky) return -1;
     if (!aSticky && bSticky) return 1;
     return new Date(b.created || 0) - new Date(a.created || 0);
@@ -169,8 +169,8 @@ docsRouter.get("/api/docs/list/:category", async function (request, params) {
 
 // GET /api/docs/content/:category/:slug — rendered HTML + meta + style
 docsRouter.get("/api/docs/content/:category/:slug", async function (request, params) {
-  var category = params.category;
-  var slug = params.slug;
+  const category = params.category;
+  const slug = params.slug;
 
   if (category.includes("..") || slug.includes("..")) {
     return new Response(JSON.stringify({ error: "Invalid path" }), {
@@ -179,8 +179,8 @@ docsRouter.get("/api/docs/content/:category/:slug", async function (request, par
     });
   }
 
-  var mdPath = join(getDocsDir(), category, slug + ".md");
-  var mdFile = Bun.file(mdPath);
+  const mdPath = join(getDocsDir(), category, slug + ".md");
+  const mdFile = Bun.file(mdPath);
 
   if (!(await mdFile.exists())) {
     return new Response(JSON.stringify({ error: "Page not found" }), {
@@ -189,10 +189,10 @@ docsRouter.get("/api/docs/content/:category/:slug", async function (request, par
     });
   }
 
-  var text = await mdFile.text();
-  var parsed = parseFrontMatter(text);
-  var meta = parsed.attributes;
-  var htmlContent = marked.parse(parsed.body);
+  const text = await mdFile.text();
+  const parsed = parseFrontMatter(text);
+  const meta = parsed.attributes;
+  const htmlContent = marked.parse(parsed.body);
 
   // Check lapse
   if (isLapsed(meta.lapse)) {
@@ -203,12 +203,12 @@ docsRouter.get("/api/docs/content/:category/:slug", async function (request, par
   }
 
   // Determine effective style
-  var categoryStyleConfig = getCategoryStyle(category);
-  var effectiveStyleName = meta.style || categoryStyleConfig.name;
-  var styleConfig = getStyleConfig(effectiveStyleName);
+  const categoryStyleConfig = getCategoryStyle(category);
+  const effectiveStyleName = meta.style || categoryStyleConfig.name;
+  const styleConfig = getStyleConfig(effectiveStyleName);
 
   // Parse read-mode
-  var readModeValue = meta["read-mode"];
+  const readModeValue = meta["read-mode"];
   meta.readMode = readModeValue === true || readModeValue === "true";
 
   return new Response(
@@ -227,8 +227,8 @@ docsRouter.get("/api/docs/content/:category/:slug", async function (request, par
 
 // GET /api/docs/raw/:category/:slug — raw markdown for editing
 docsRouter.get("/api/docs/raw/:category/:slug", async function (request, params) {
-  var category = params.category;
-  var slug = params.slug;
+  const category = params.category;
+  const slug = params.slug;
 
   if (category.includes("..") || slug.includes("..")) {
     return new Response(JSON.stringify({ error: "Invalid path" }), {
@@ -237,8 +237,8 @@ docsRouter.get("/api/docs/raw/:category/:slug", async function (request, params)
     });
   }
 
-  var mdPath = join(getDocsDir(), category, slug + ".md");
-  var mdFile = Bun.file(mdPath);
+  const mdPath = join(getDocsDir(), category, slug + ".md");
+  const mdFile = Bun.file(mdPath);
 
   if (!(await mdFile.exists())) {
     return new Response(JSON.stringify({ error: "File not found" }), {
@@ -247,8 +247,8 @@ docsRouter.get("/api/docs/raw/:category/:slug", async function (request, params)
     });
   }
 
-  var content = await mdFile.text();
-  var parsed = parseFrontMatter(content);
+  const content = await mdFile.text();
+  const parsed = parseFrontMatter(content);
 
   return new Response(
     JSON.stringify({
@@ -267,8 +267,8 @@ docsRouter.get("/api/docs/raw/:category/:slug", async function (request, params)
 
 // PUT /api/docs/raw/:category/:slug — save edited markdown
 docsRouter.put("/api/docs/raw/:category/:slug", async function (request, params) {
-  var category = params.category;
-  var slug = params.slug;
+  const category = params.category;
+  const slug = params.slug;
 
   if (category.includes("..") || slug.includes("..")) {
     return new Response(JSON.stringify({ error: "Invalid path" }), {
@@ -277,7 +277,7 @@ docsRouter.put("/api/docs/raw/:category/:slug", async function (request, params)
     });
   }
 
-  var body;
+  let body;
   try {
     body = await request.json();
   } catch (err) {
@@ -294,7 +294,7 @@ docsRouter.put("/api/docs/raw/:category/:slug", async function (request, params)
     });
   }
 
-  var mdPath = join(getDocsDir(), category, slug + ".md");
+  const mdPath = join(getDocsDir(), category, slug + ".md");
   await Bun.write(mdPath, body.content);
 
   triggerBackgroundReindex();
@@ -313,7 +313,7 @@ docsRouter.put("/api/docs/raw/:category/:slug", async function (request, params)
 
 // POST /api/docs/upload/:category — upload a new markdown file
 docsRouter.post("/api/docs/upload/:category", async function (request, params) {
-  var category = params.category;
+  const category = params.category;
 
   if (!category || category.includes("..")) {
     return new Response(JSON.stringify({ error: "Invalid category" }), {
@@ -322,7 +322,7 @@ docsRouter.post("/api/docs/upload/:category", async function (request, params) {
     });
   }
 
-  var formData;
+  let formData;
   try {
     formData = await request.formData();
   } catch (err) {
@@ -332,7 +332,7 @@ docsRouter.post("/api/docs/upload/:category", async function (request, params) {
     });
   }
 
-  var file = formData.get("file");
+  const file = formData.get("file");
 
   if (!file || !(file instanceof File)) {
     return new Response(JSON.stringify({ error: "No file provided" }), {
@@ -341,7 +341,7 @@ docsRouter.post("/api/docs/upload/:category", async function (request, params) {
     });
   }
 
-  var ext = getFileExtension(file.name);
+  const ext = getFileExtension(file.name);
   if (!ALLOWED_MARKDOWN_EXTENSIONS.includes(ext)) {
     return new Response(
       JSON.stringify({
@@ -354,7 +354,7 @@ docsRouter.post("/api/docs/upload/:category", async function (request, params) {
     );
   }
 
-  var sanitizedName = sanitizeFilename(file.name);
+  const sanitizedName = sanitizeFilename(file.name);
   if (!sanitizedName || sanitizedName === ".md") {
     return new Response(JSON.stringify({ error: "Invalid filename" }), {
       status: 400,
@@ -362,12 +362,12 @@ docsRouter.post("/api/docs/upload/:category", async function (request, params) {
     });
   }
 
-  var targetDir = join(getDocsDir(), category);
-  var targetPath = targetDir + "/" + sanitizedName;
+  const targetDir = join(getDocsDir(), category);
+  const targetPath = targetDir + "/" + sanitizedName;
 
   await mkdir(targetDir, { recursive: true });
 
-  var targetFile = Bun.file(targetPath);
+  const targetFile = Bun.file(targetPath);
   if (await targetFile.exists()) {
     return new Response(
       JSON.stringify({
@@ -380,8 +380,8 @@ docsRouter.post("/api/docs/upload/:category", async function (request, params) {
     );
   }
 
-  var content = await file.text();
-  var styleConfig = getCategoryStyle(category);
+  let content = await file.text();
+  const styleConfig = getCategoryStyle(category);
   content = ensureUnpublishedFrontMatter(content, styleConfig.name);
 
   await Bun.write(targetPath, content);
@@ -403,7 +403,7 @@ docsRouter.post("/api/docs/upload/:category", async function (request, params) {
 
 // POST /api/docs/media/:category — upload an image file
 docsRouter.post("/api/docs/media/:category", async function (request, params) {
-  var category = params.category;
+  const category = params.category;
 
   if (!category || category.includes("..")) {
     return new Response(JSON.stringify({ error: "Invalid category" }), {
@@ -412,7 +412,7 @@ docsRouter.post("/api/docs/media/:category", async function (request, params) {
     });
   }
 
-  var formData;
+  let formData;
   try {
     formData = await request.formData();
   } catch (err) {
@@ -422,7 +422,7 @@ docsRouter.post("/api/docs/media/:category", async function (request, params) {
     });
   }
 
-  var file = formData.get("file");
+  const file = formData.get("file");
 
   if (!file || !(file instanceof File)) {
     return new Response(JSON.stringify({ error: "No file provided" }), {
@@ -431,7 +431,7 @@ docsRouter.post("/api/docs/media/:category", async function (request, params) {
     });
   }
 
-  var ext = getFileExtension(file.name);
+  const ext = getFileExtension(file.name);
   if (!ALLOWED_IMAGE_EXTENSIONS.includes(ext)) {
     return new Response(
       JSON.stringify({
@@ -444,7 +444,7 @@ docsRouter.post("/api/docs/media/:category", async function (request, params) {
     );
   }
 
-  var sanitizedName = sanitizeFilename(file.name);
+  const sanitizedName = sanitizeFilename(file.name);
   if (!sanitizedName || sanitizedName === ext) {
     return new Response(JSON.stringify({ error: "Invalid filename" }), {
       status: 400,
@@ -452,12 +452,12 @@ docsRouter.post("/api/docs/media/:category", async function (request, params) {
     });
   }
 
-  var targetDir = "./" + getDocsMediaDir() + "/" + category;
-  var targetPath = targetDir + "/" + sanitizedName;
+  const targetDir = "./" + getDocsMediaDir() + "/" + category;
+  const targetPath = targetDir + "/" + sanitizedName;
 
   await mkdir(targetDir, { recursive: true });
 
-  var targetFile = Bun.file(targetPath);
+  const targetFile = Bun.file(targetPath);
   if (await targetFile.exists()) {
     return new Response(
       JSON.stringify({
@@ -470,10 +470,10 @@ docsRouter.post("/api/docs/media/:category", async function (request, params) {
     );
   }
 
-  var buffer = await file.arrayBuffer();
+  const buffer = await file.arrayBuffer();
   await Bun.write(targetPath, buffer);
 
-  var markdownPath = "/docs/media/" + category + "/" + sanitizedName;
+  const markdownPath = "/docs/media/" + category + "/" + sanitizedName;
 
   return new Response(
     JSON.stringify({
@@ -491,8 +491,8 @@ docsRouter.post("/api/docs/media/:category", async function (request, params) {
 
 // DELETE /api/docs/:category/:slug — delete a page
 docsRouter.delete("/api/docs/:category/:slug", async function (request, params) {
-  var category = params.category;
-  var slug = params.slug;
+  const category = params.category;
+  const slug = params.slug;
 
   if (category.includes("..") || slug.includes("..")) {
     return new Response(JSON.stringify({ error: "Invalid path" }), {
@@ -501,10 +501,10 @@ docsRouter.delete("/api/docs/:category/:slug", async function (request, params) 
     });
   }
 
-  var mdPath = resolve(getDocsDir(), category, slug + ".md");
+  const mdPath = resolve(getDocsDir(), category, slug + ".md");
 
   // Verify the path is within the docs directory
-  var docsRoot = resolve(getDocsDir());
+  const docsRoot = resolve(getDocsDir());
   if (!mdPath.startsWith(docsRoot)) {
     return new Response(JSON.stringify({ error: "Invalid path" }), {
       status: 400,
@@ -512,7 +512,7 @@ docsRouter.delete("/api/docs/:category/:slug", async function (request, params) 
     });
   }
 
-  var mdFile = Bun.file(mdPath);
+  const mdFile = Bun.file(mdPath);
   if (!(await mdFile.exists())) {
     return new Response(JSON.stringify({ error: "File not found" }), {
       status: 404,
@@ -538,14 +538,14 @@ docsRouter.delete("/api/docs/:category/:slug", async function (request, params) 
 
 // GET /api/docs/search?q=term — full-text search
 docsRouter.get("/api/docs/search", function (request) {
-  var url = new URL(request.url);
-  var query = url.searchParams.get("q") || "";
-  var limitParam = url.searchParams.get("limit");
-  var limit = limitParam ? Math.min(parseInt(limitParam, 10), 50) : undefined;
+  const url = new URL(request.url);
+  const query = url.searchParams.get("q") || "";
+  const limitParam = url.searchParams.get("limit");
+  const limit = limitParam ? Math.min(parseInt(limitParam, 10), 50) : undefined;
 
   try {
-    var db = getDatabase();
-    var results = searchPages(db, query, { limit: limit });
+    const db = getDatabase();
+    const results = searchPages(db, query, { limit: limit });
 
     return new Response(JSON.stringify(results), {
       status: 200,
@@ -562,9 +562,9 @@ docsRouter.get("/api/docs/search", function (request) {
 // POST /api/docs/reindex — rebuild search index
 docsRouter.post("/api/docs/reindex", async function () {
   try {
-    var db = getDatabase();
-    var docsConfig = getDocsConfig();
-    var result = await reindexAllPages(db, docsConfig.categories);
+    const db = getDatabase();
+    const docsConfig = getDocsConfig();
+    const result = await reindexAllPages(db, docsConfig.categories);
 
     if (result.success) {
       return new Response(JSON.stringify(result), {
@@ -588,8 +588,8 @@ docsRouter.post("/api/docs/reindex", async function () {
 // GET /api/docs/search-meta — search index metadata
 docsRouter.get("/api/docs/search-meta", function () {
   try {
-    var db = getDatabase();
-    var meta = getSearchMeta(db);
+    const db = getDatabase();
+    const meta = getSearchMeta(db);
     return new Response(JSON.stringify(meta), {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -605,8 +605,8 @@ docsRouter.get("/api/docs/search-meta", function () {
 // POST /api/docs/spellcheck — spellcheck markdown content
 docsRouter.post("/api/docs/spellcheck", async function (request) {
   try {
-    var body = await request.json();
-    var content = body.content;
+    const body = await request.json();
+    const content = body.content;
 
     if (typeof content !== "string") {
       return new Response(JSON.stringify({ error: "content is required" }), {
@@ -615,9 +615,9 @@ docsRouter.post("/api/docs/spellcheck", async function (request) {
       });
     }
 
-    var db = getDatabase();
-    var customWords = getCustomDictionary(db);
-    var errors = await spellCheckContent(content, customWords);
+    const db = getDatabase();
+    const customWords = getCustomDictionary(db);
+    const errors = await spellCheckContent(content, customWords);
 
     return new Response(JSON.stringify({ errors: errors }), {
       status: 200,
@@ -634,8 +634,8 @@ docsRouter.post("/api/docs/spellcheck", async function (request) {
 // POST /api/docs/dictionary — add a word to the custom dictionary
 docsRouter.post("/api/docs/dictionary", async function (request) {
   try {
-    var body = await request.json();
-    var word = body.word;
+    const body = await request.json();
+    const word = body.word;
 
     if (typeof word !== "string" || word.trim().length === 0) {
       return new Response(JSON.stringify({ error: "word is required" }), {
@@ -644,7 +644,7 @@ docsRouter.post("/api/docs/dictionary", async function (request) {
       });
     }
 
-    var db = getDatabase();
+    const db = getDatabase();
     addCustomWord(db, word.trim());
 
     return new Response(JSON.stringify({ success: true }), {

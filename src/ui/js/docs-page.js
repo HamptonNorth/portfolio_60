@@ -7,17 +7,17 @@
 /* global escapeHtml, showError, hljs */
 
 /** @type {string} Current category from URL query parameter */
-var currentCategory = "";
+let currentCategory = "";
 
 /** @type {string} Current slug from URL query parameter */
-var currentSlug = "";
+let currentSlug = "";
 
 /**
  * @description Initialise the page on load. Reads category and slug from
  * the URL query string and loads the page content.
  */
 function init() {
-  var params = new URLSearchParams(window.location.search);
+  const params = new URLSearchParams(window.location.search);
   currentCategory = params.get("category") || "";
   currentSlug = params.get("slug") || "";
 
@@ -45,7 +45,7 @@ function init() {
  */
 async function loadPage() {
   try {
-    var response = await fetch(
+    const response = await fetch(
       "/api/docs/content/" + encodeURIComponent(currentCategory) + "/" + encodeURIComponent(currentSlug)
     );
 
@@ -60,27 +60,27 @@ async function loadPage() {
     }
 
     if (!response.ok) {
-      var errData = await response.json();
+      const errData = await response.json();
       document.getElementById("page-title").textContent = "Not Found";
       document.getElementById("markdown-content").innerHTML =
         '<p class="text-brand-500">' + escapeHtml(errData.error || "Page not found") + "</p>";
       return;
     }
 
-    var data = await response.json();
-    var meta = data.meta;
-    var html = data.html;
-    var styleConfig = data.style;
-    var fontLinks = data.fontLinks || [];
+    const data = await response.json();
+    const meta = data.meta;
+    const html = data.html;
+    const styleConfig = data.style;
+    const fontLinks = data.fontLinks || [];
 
     // Set page title
-    var title = meta.title || "Untitled";
+    const title = meta.title || "Untitled";
     document.getElementById("page-title").textContent = title;
     document.title = "Portfolio 60 — " + title;
 
     // Set date
     if (meta.created) {
-      var d = new Date(meta.created);
+      const d = new Date(meta.created);
       if (!isNaN(d)) {
         document.getElementById("page-date").textContent = d.toLocaleDateString("en-GB", {
           year: "numeric",
@@ -96,12 +96,12 @@ async function loadPage() {
     }
 
     // Inject font links
-    for (var i = 0; i < fontLinks.length; i++) {
+    for (let i = 0; i < fontLinks.length; i++) {
       injectFontLink(fontLinks[i]);
     }
 
     // Apply wrapper class to the content container
-    var contentEl = document.getElementById("markdown-content");
+    const contentEl = document.getElementById("markdown-content");
     if (styleConfig && styleConfig.wrapperClass) {
       // Remove any existing prose classes if removeProse is set
       if (styleConfig.removeProse) {
@@ -136,7 +136,7 @@ async function loadPage() {
  * @param {string} cssFile - CSS filename in /css/md-styles/
  */
 function injectStyleCss(cssFile) {
-  var link = document.createElement("link");
+  const link = document.createElement("link");
   link.rel = "stylesheet";
   link.href = "/css/md-styles/" + cssFile;
   document.head.appendChild(link);
@@ -149,19 +149,19 @@ function injectStyleCss(cssFile) {
 function injectFontLink(url) {
   // Add preconnect for Google Fonts
   if (url.includes("googleapis.com")) {
-    var preconnect1 = document.createElement("link");
+    const preconnect1 = document.createElement("link");
     preconnect1.rel = "preconnect";
     preconnect1.href = "https://fonts.googleapis.com";
     document.head.appendChild(preconnect1);
 
-    var preconnect2 = document.createElement("link");
+    const preconnect2 = document.createElement("link");
     preconnect2.rel = "preconnect";
     preconnect2.href = "https://fonts.gstatic.com";
     preconnect2.crossOrigin = "";
     document.head.appendChild(preconnect2);
   }
 
-  var link = document.createElement("link");
+  const link = document.createElement("link");
   link.rel = "stylesheet";
   link.href = url;
   document.head.appendChild(link);
@@ -183,18 +183,18 @@ function applyHighlighting() {
  */
 function addCopyButtons() {
   document.querySelectorAll("#markdown-content pre").forEach(function (pre) {
-    var wrapper = document.createElement("div");
+    const wrapper = document.createElement("div");
     wrapper.style.position = "relative";
     pre.parentNode.insertBefore(wrapper, pre);
     wrapper.appendChild(pre);
 
-    var btn = document.createElement("button");
+    const btn = document.createElement("button");
     btn.textContent = "Copy";
     btn.className = "absolute top-2 right-2 text-xs bg-brand-100 hover:bg-brand-200 text-brand-600 px-2 py-1 rounded transition-colors";
     btn.style.position = "absolute";
     btn.addEventListener("click", function () {
-      var code = pre.querySelector("code");
-      var text = code ? code.textContent : pre.textContent;
+      const code = pre.querySelector("code");
+      const text = code ? code.textContent : pre.textContent;
       navigator.clipboard.writeText(text).then(function () {
         btn.textContent = "Copied!";
         setTimeout(function () {

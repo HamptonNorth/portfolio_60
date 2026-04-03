@@ -14,7 +14,7 @@ import { reindexAllPages } from "../services/docs-search.js";
  */
 function classifyPassphrase(passphrase) {
   if (typeof passphrase !== "string") return null;
-  var lower = passphrase.toLowerCase();
+  const lower = passphrase.toLowerCase();
   if (lower === "demo") return "demo";
   if (lower === "test") return "test";
   if (passphrase === "test$rnc") return "test-write";
@@ -28,7 +28,7 @@ function classifyPassphrase(passphrase) {
  * @returns {Response|null} Response if handled, null if not a special passphrase
  */
 function handleSpecialPassphrase(passphrase) {
-  var mode = classifyPassphrase(passphrase);
+  const mode = classifyPassphrase(passphrase);
   if (!mode) return null;
 
   // "demo" and "test" (both read-only) require the test DB to already exist
@@ -54,18 +54,18 @@ function handleSpecialPassphrase(passphrase) {
   }
 
   // Set demo (read-only) flag for "demo" and "test" modes
-  var isReadOnly = mode === "demo" || mode === "test";
+  const isReadOnly = mode === "demo" || mode === "test";
   setDemoMode(isReadOnly);
 
   // Reindex docs search for the new database/docs directory (fire-and-forget)
-  var docsConfig = getDocsConfig();
+  const docsConfig = getDocsConfig();
   if (docsConfig.categories && Object.keys(docsConfig.categories).length > 0) {
     reindexAllPages(getDatabase(), docsConfig.categories).catch(function () {});
   }
 
   setAuthStatus(true);
-  var fresh = isTestDatabaseFresh();
-  var message;
+  const fresh = isTestDatabaseFresh();
+  let message;
   if (fresh) {
     message = "Test mode activated. New database created — run Fetch All to populate prices.";
   } else if (isReadOnly) {
@@ -150,7 +150,7 @@ export async function handleAuthRoute(method, path, request) {
     const passphrase = body.passphrase;
 
     // Special mode bypass — demo, test, or test-write without setting a hash
-    var specialResponse = handleSpecialPassphrase(passphrase);
+    const specialResponse = handleSpecialPassphrase(passphrase);
     if (specialResponse) return specialResponse;
 
     if (!passphrase || typeof passphrase !== "string" || passphrase.length < 8) {
@@ -240,7 +240,7 @@ export async function handleAuthRoute(method, path, request) {
     }
 
     // Special mode bypass — demo, test, or test-write without verifying hash
-    var specialResponse = handleSpecialPassphrase(passphrase);
+    const specialResponse = handleSpecialPassphrase(passphrase);
     if (specialResponse) return specialResponse;
 
     const storedHash = loadHashFromEnv();
@@ -262,7 +262,7 @@ export async function handleAuthRoute(method, path, request) {
       if (isTestMode()) {
         deactivateTestMode();
         // Reindex docs search for the live database/docs directory
-        var liveDocsConfig = getDocsConfig();
+        const liveDocsConfig = getDocsConfig();
         if (liveDocsConfig.categories && Object.keys(liveDocsConfig.categories).length > 0) {
           reindexAllPages(getDatabase(), liveDocsConfig.categories).catch(function () {});
         }
