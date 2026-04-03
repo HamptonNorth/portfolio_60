@@ -110,7 +110,7 @@ async function loadBenchmarks() {
     let html = "";
     for (let i = 0; i < allBenchmarks.length; i++) {
       const bm = allBenchmarks[i];
-      html +=<label class="inline-flex items-center gap-1 text-sm text-brand-700 cursor-pointer">';
+      html += '<label class="inline-flex items-center gap-1 text-sm text-brand-700 cursor-pointer">';
       html += '<input type="checkbox" class="bm-checkbox" value="' + bm.id + '" />';
       html += escapeHtml(bm.description);
       html += "</label>";

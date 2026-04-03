@@ -1474,7 +1474,7 @@ class DocsSearchModal extends LitElement {
     this._error = "";
     this._fetchMeta();
     this.updateComplete.then(() => {
-      var input = this.querySelector("#docs-search-input");
+      const input = this.querySelector("#docs-search-input");
       if (input)
         input.focus();
     });
@@ -1484,16 +1484,16 @@ class DocsSearchModal extends LitElement {
   }
   async _fetchMeta() {
     try {
-      var response = await fetch("/api/docs/search-meta");
+      const response = await fetch("/api/docs/search-meta");
       if (response.ok) {
-        var data = await response.json();
+        const data = await response.json();
         this._lastIndexed = data.lastIndexed;
         this._docCount = data.documentCount;
       }
-    } catch (e) {}
+    } catch (err) {}
   }
-  _onInput(e) {
-    this._query = e.target.value;
+  _onInput(event) {
+    this._query = event.target.value;
     this._error = "";
     if (this._debounceTimer) {
       clearTimeout(this._debounceTimer);
@@ -1510,13 +1510,13 @@ class DocsSearchModal extends LitElement {
   async _doSearch() {
     this._searching = true;
     try {
-      var response = await fetch("/api/docs/search?q=" + encodeURIComponent(this._query.trim()));
+      const response = await fetch("/api/docs/search?q=" + encodeURIComponent(this._query.trim()));
       if (!response.ok) {
         this._error = "Search failed";
         this._results = [];
         return;
       }
-      var data = await response.json();
+      const data = await response.json();
       this._results = data.results || [];
       this._total = data.total || 0;
       this._duration = data.duration || "";
@@ -1530,29 +1530,29 @@ class DocsSearchModal extends LitElement {
   }
   async _reindex() {
     try {
-      var response = await fetch("/api/docs/reindex", { method: "POST" });
-      var data = await response.json();
+      const response = await fetch("/api/docs/reindex", { method: "POST" });
+      const data = await response.json();
       if (data.success) {
         this._fetchMeta();
       }
-    } catch (e) {}
+    } catch (err) {}
   }
-  _onKeyDown(e) {
-    if (e.key === "Escape") {
+  _onKeyDown(event) {
+    if (event.key === "Escape") {
       this.close();
     }
   }
   render() {
     if (!this._open)
       return html``;
-    var lastIndexedStr = "";
+    let lastIndexedStr = "";
     if (this._lastIndexed) {
-      var d2 = new Date(this._lastIndexed);
-      lastIndexedStr = d2.toLocaleDateString("en-GB", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+      const indexedDate = new Date(this._lastIndexed);
+      lastIndexedStr = indexedDate.toLocaleDateString("en-GB", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
     }
     return html`
-      <div class="fixed inset-0 bg-black/50 flex items-start justify-center pt-16 z-50" @click=${(e) => {
-      if (e.target === e.currentTarget)
+      <div class="fixed inset-0 bg-black/50 flex items-start justify-center pt-16 z-50" @click=${(event) => {
+      if (event.target === event.currentTarget)
         this.close();
     }} @keydown=${this._onKeyDown}>
         <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col mx-4">
@@ -1590,7 +1590,7 @@ class DocsSearchModal extends LitElement {
                   </div>
                   ${result.description ? html`<p class="text-sm text-brand-500 mt-1">${result.description}</p>` : ""}
                   ${result.matches && result.matches.length > 0 ? html`<div class="mt-1">
-                        ${result.matches.map((m) => html`<p class="text-xs text-brand-400 mt-0.5"><span class="text-brand-300">${m.region}:</span> <span .innerHTML=${m.fragment}></span></p>`)}
+                        ${result.matches.map((match) => html`<p class="text-xs text-brand-400 mt-0.5"><span class="text-brand-300">${match.region}:</span> <span .innerHTML=${match.fragment}></span></p>`)}
                       </div>` : ""}
                 </a>
               `)}
@@ -1747,12 +1747,12 @@ class AppNavbar extends LitElement {
     }
   }
   _buildPdfUrl(endpoint, params, compareTo) {
-    var url = endpoint;
-    var hasQuery = false;
+    let url = endpoint;
+    let hasQuery = false;
     if (params && params.length > 0) {
-      var isDetail = endpoint.indexOf("portfolio-detail") !== -1;
-      var separator = isDetail ? "|" : ",";
-      var joined = params.join(separator);
+      const isDetail = endpoint.indexOf("portfolio-detail") !== -1;
+      const separator = isDetail ? "|" : ",";
+      const joined = params.join(separator);
       url += "?params=" + encodeURIComponent(joined);
       hasQuery = true;
     }
@@ -1880,7 +1880,7 @@ class AppNavbar extends LitElement {
         return;
       const viewsDropdown = document.getElementById("nav-views-dropdown");
       if (viewsDropdown) {
-        const links = viewsDropdown.querySelectorAll("a");
+        const links = viewsDropdown.querySelectorAll('a[data-nav^="view-"]');
         links.forEach(function(link) {
           link.setAttribute("target", "_blank");
         });
@@ -1974,7 +1974,7 @@ class AppNavbar extends LitElement {
         heading.setAttribute("data-nav", "docs-" + name);
         heading.textContent = cat.label || name;
         dropdown.appendChild(heading);
-        var categoryGuides = guides.filter(function(g) {
+        const categoryGuides = guides.filter(function(g) {
           return g.category === name;
         });
         categoryGuides.forEach(function(guide) {
@@ -1995,7 +1995,7 @@ class AppNavbar extends LitElement {
       searchBtn.addEventListener("click", function(e) {
         e.preventDefault();
         e.stopPropagation();
-        var modal = document.querySelector("docs-search-modal");
+        let modal = document.querySelector("docs-search-modal");
         if (!modal) {
           modal = document.createElement("docs-search-modal");
           document.body.appendChild(modal);

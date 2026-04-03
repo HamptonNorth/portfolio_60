@@ -378,10 +378,11 @@ class AppNavbar extends LitElement {
       const data = await response.json();
       if (!data.reportsOpenInNewTab) return;
 
-      // Apply to existing static links in Views dropdown
+      // Apply to existing static view/report links in Views dropdown
+      // (skip non-view links like Analysis which navigate within the app)
       const viewsDropdown = document.getElementById("nav-views-dropdown");
       if (viewsDropdown) {
-        const links = viewsDropdown.querySelectorAll("a");
+        const links = viewsDropdown.querySelectorAll('a[data-nav^="view-"]');
         links.forEach(function (link) {
           link.setAttribute("target", "_blank");
         });
