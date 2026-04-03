@@ -6,7 +6,7 @@ A browser-based application for UK families to track investments across multiple
 
 ## Who is it for?
 
-UK families managing their own investments across one or more providers (Interactive Investor, Hargreaves Lansdown, AJ Bell, etc.). The interface is designed for users aged 50–85, with clear layouts, generous text sizes and straightforward navigation.
+UK families managing their own investments across one or more providers (Interactive Investor, Hargreaves Lansdown, AJ Bell, etc.). The interface is designed with clear layouts, generous text sizes and straightforward navigation.
 
 ## Key features
 
@@ -28,12 +28,12 @@ UK families managing their own investments across one or more providers (Interac
 
 Two guides are included in the application's built-in Docs system (under **Docs > User Guide**) and in the `docs/guide/` directory:
 
-- **[User Guide](docs/guide/user_guide_v0.1.4.md)** — a friendly walkthrough of every feature, written for non-technical users
-- **[Technical Reference](docs/guide/technical_reference_v0.1.4.md)** — installation, JSON configuration, scheduling, embedding spreadsheets, and advanced settings
+- **[User Guide](docs/guide/user_guide_v0.1.7.md)** — a friendly walkthrough of every feature, written for non-technical users
+- **[Technical Reference](docs/guide/technical_reference_v0.1.7.md)** — installation, JSON configuration, scheduling, embedding spreadsheets, and advanced settings
 
 ## Try the demo
 
-A public demo is available at **[portfolio60.redmug.co.uk](https://portfolio60.redmug.co.uk)**. Enter **demo** as the passphrase to explore the application with pre-loaded sample data. The demo is read-only — you can browse everything but cannot modify data.
+A public demo is available at **[portfolio60.redmug.dev](https://portfolio60.redmug.dev)**. Enter **demo** as the passphrase to explore the application with pre-loaded sample data. The demo is read-only — you can browse everything but cannot modify data.
 
 ## Installation
 
@@ -52,7 +52,7 @@ bun run dev
 
 Open your browser at **http://localhost:1420**. On first run, set a passphrase to protect your data.
 
-### Compiled executable
+<!--### Compiled executable
 
 Standalone compiled executables for Linux, macOS and Windows are available from the GitHub Releases page. These bundle the Bun runtime so no separate installation is needed:
 
@@ -62,7 +62,7 @@ chmod +x portfolio-60-linux
 ./portfolio-60-linux
 ```
 
-Packaged installers (`.msi`, `.dmg`, `.deb`) may be made available in future if there is demand.
+Packaged installers (`.msi`, `.dmg`, `.deb`) may be made available in future if there is demand.-->
 
 ### Data storage
 
@@ -134,4 +134,8 @@ bunx playwright test     # Run e2e tests
 
 ## Licence
 
-Portfolio 60 is open-source software. See the [LICENSE](LICENSE) file for details.
+Portfolio 60 is released under the [MIT License](LICENSE).
+
+## Disclaimer
+
+Portfolio 60 is a personal portfolio tracker provided for informational purposes only. It does not constitute financial advice, nor is it a recommendation to buy, sell or hold any investment. The authors accept no responsibility or liability for any investment decisions made using this software, or for any financial losses arising from its use. Always consult a qualified financial adviser before making investment decisions.
