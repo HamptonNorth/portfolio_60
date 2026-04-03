@@ -755,6 +755,21 @@ function runMigrations(database) {
   // Enables historic portfolio composition tracking — each row represents a holding
   // state for a date range. The UNIQUE constraint changes from (account_id, investment_id)
   // to (account_id, investment_id, effective_from).
+  // Migration 28: Add daily_visitors table for anonymous aggregate visitor counts (v0.1.7)
+  const dailyVisitorsTable = database.query("SELECT name FROM sqlite_master WHERE type='table' AND name='daily_visitors'").get();
+
+  if (!dailyVisitorsTable) {
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS daily_visitors (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        visit_date TEXT NOT NULL UNIQUE,
+        en_gb_count INTEGER NOT NULL DEFAULT 0,
+        other_count INTEGER NOT NULL DEFAULT 0
+      )
+    `);
+    database.exec("CREATE INDEX IF NOT EXISTS idx_daily_visitors_date ON daily_visitors(visit_date DESC)");
+  }
+
   const holdingsCols27 = database.query("PRAGMA table_info(holdings)").all();
   const hasEffectiveFrom = holdingsCols27.some(function (col) {
     return col.name === "effective_from";

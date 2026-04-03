@@ -216,6 +216,15 @@ CREATE TABLE IF NOT EXISTS scheduler_log (
     message TEXT NOT NULL
 );
 
+-- Daily visitors: anonymous aggregate visitor counts per day
+-- No PII stored — only totals, split by Accept-Language preference
+CREATE TABLE IF NOT EXISTS daily_visitors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    visit_date TEXT NOT NULL UNIQUE,
+    en_gb_count INTEGER NOT NULL DEFAULT 0,
+    other_count INTEGER NOT NULL DEFAULT 0
+);
+
 -- Indexes for query performance
 CREATE INDEX IF NOT EXISTS idx_currency_rates_lookup ON currency_rates(currencies_id, rate_date DESC);
 CREATE INDEX IF NOT EXISTS idx_investments_type ON investments(investment_type_id);
@@ -237,3 +246,4 @@ CREATE INDEX IF NOT EXISTS idx_other_assets_user ON other_assets(user_id);
 CREATE INDEX IF NOT EXISTS idx_other_assets_category ON other_assets(category);
 CREATE INDEX IF NOT EXISTS idx_other_assets_history_asset ON other_assets_history(other_asset_id, change_date DESC);
 CREATE INDEX IF NOT EXISTS idx_scheduler_log_datetime ON scheduler_log(log_datetime DESC);
+CREATE INDEX IF NOT EXISTS idx_daily_visitors_date ON daily_visitors(visit_date DESC);

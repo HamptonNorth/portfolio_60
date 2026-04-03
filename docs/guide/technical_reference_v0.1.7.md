@@ -306,6 +306,39 @@ A migration script is available at `scripts/seed-fetch-server-history.js` for bu
 
 ---
 
+## Anonymous Visitor Tracking
+
+Portfolio 60 includes a lightweight, GDPR-compliant visitor counter that records **unique users per day**, split by browser language preference (`en-GB` vs all others). No personal data is stored.
+
+### How it works
+
+1. On each page request (`/`, `/index.html`, `/pages/*`), the server hashes the client IP address with a daily-rotating random salt using `Bun.hash` (a fast non-cryptographic hash)
+2. The hash is added to an in-memory `Set` — one for `en-GB` visitors, one for all others. Duplicate hashes (same visitor returning) are naturally ignored
+3. At midnight, a Croner job flushes the Set sizes as aggregate counts into the `daily_visitors` SQLite table, then clears the Sets and generates a new salt
+4. On graceful shutdown (SIGINT), any partial-day counts are flushed before the database closes
+
+### GDPR compliance
+
+- **No IP addresses are stored** — hashes exist only in memory and are discarded at midnight
+- **The daily salt is never persisted** — hashes cannot be correlated across days or reversed
+- **Only aggregate counts reach the database** — two integers per day (`en_gb_count`, `other_count`)
+- No cookies, fingerprints, or user identifiers are used
+
+### Files
+
+- `src/server/services/visitor-tracker.js` — in-memory tracking, hashing, Croner midnight flush
+- `src/server/db/daily-visitors-db.js` — upsert and query functions for the `daily_visitors` table
+
+### API endpoint
+
+- `GET /api/visitors` — returns the last 90 days of visitor counts (requires authentication)
+
+### Server restart behaviour
+
+If the server restarts mid-day, the in-memory Sets are lost. The database upsert uses `MAX(existing, new)` so the higher (more complete) count is preserved. Counts may be slightly low on restart days.
+
+---
+
 ## Database Schema Notes
 
 ### Investment Tracking Columns

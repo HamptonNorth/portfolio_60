@@ -26,6 +26,7 @@ import { handlePortfolioDetailRoute } from "./routes/portfolio-detail-routes.js"
 import { handleAnalysisRoute } from "./routes/analysis-routes.js";
 import { handleTestSetupRoute } from "./routes/test-setup-routes.js";
 import { initScheduledFetcher, stopScheduledFetcher } from "./services/scheduled-fetcher.js";
+import { initVisitorTracker, stopVisitorTracker, trackVisitor } from "./services/visitor-tracker.js";
 import { processDrawdowns } from "./services/drawdown-processor.js";
 import { databaseExists, closeDatabase } from "./db/connection.js";
 import { getFetchServerConfig, getDocsConfig, getListsDir } from "./config.js";
@@ -126,6 +127,9 @@ const server = Bun.serve({
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
+
+    // --- Anonymous visitor tracking (page navigations only) ---
+    trackVisitor(request);
 
     // --- Auth gate ---
     // Check if the route requires authentication and redirect if not authenticated.
@@ -485,6 +489,12 @@ const server = Bun.serve({
       }
     }
 
+    // Visitor stats (authenticated — behind auth gate)
+    if (method === "GET" && path === "/api/visitors") {
+      const { getDailyVisitors } = await import("./db/daily-visitors-db.js");
+      return Response.json(getDailyVisitors(90));
+    }
+
     // Placeholder for future API routes
     if (path.startsWith("/api/")) {
       return new Response(JSON.stringify({ error: "Not implemented" }), {
@@ -511,6 +521,9 @@ if (databaseExists()) {
 
 // Initialise scheduled fetching (after server is ready)
 initScheduledFetcher();
+
+// Initialise anonymous visitor tracking (daily unique counts)
+initVisitorTracker();
 
 // Index documentation for search (runs in background, non-blocking)
 if (databaseExists()) {
@@ -546,8 +559,9 @@ if (fetchServerConfig.enabled && fetchServerConfig.url) {
   }
 }
 
-// Graceful shutdown: checkpoint WAL and stop the scheduler before exiting
+// Graceful shutdown: flush visitor counts, stop scheduler, and checkpoint WAL before exiting
 process.on("SIGINT", function () {
+  stopVisitorTracker();
   stopScheduledFetcher();
   closeDatabase();
   process.exit(0);
