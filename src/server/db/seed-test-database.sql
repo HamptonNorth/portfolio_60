@@ -82,28 +82,28 @@ INSERT INTO investments (currencies_id, investment_type_id, description, public_
 -- fetch-server sync can map prices without hitting the Morningstar API.
 -- ============================================================================
 
-UPDATE investments SET morningstar_id = 'F00000LK2Q|FOEUR$$ALL_3521' WHERE public_id = 'GB00B41YBW71';
-UPDATE investments SET morningstar_id = 'F00000MLUQ|FOEUR$$ALL_3521' WHERE public_id = 'GB00B4PQW151';
-UPDATE investments SET morningstar_id = 'F00000XXVV|FOEUR$$ALL_3521' WHERE public_id = 'GB00BD3RZ582';
-UPDATE investments SET morningstar_id = 'F00000SRPN|FOEUR$$ALL_3521' WHERE public_id = 'GB00BJS8SJ34';
-UPDATE investments SET morningstar_id = 'F00001275X|FOEUR$$ALL_3521' WHERE public_id = 'GB00BJLP1W53';
-UPDATE investments SET morningstar_id = 'F000011RP0|FOEUR$$ALL_3521' WHERE public_id = 'GB00BH0P2M97';
-UPDATE investments SET morningstar_id = 'F0GBR0506U|FOEUR$$ALL_3521' WHERE public_id = 'GB0006061963';
+UPDATE investments SET morningstar_id = 'F00000LK2Q|FOEUR$$ALL' WHERE public_id = 'GB00B41YBW71';
+UPDATE investments SET morningstar_id = 'F00000MLUQ|FOEUR$$ALL' WHERE public_id = 'GB00B4PQW151';
+UPDATE investments SET morningstar_id = 'F00000XXVV|FOEUR$$ALL' WHERE public_id = 'GB00BD3RZ582';
+UPDATE investments SET morningstar_id = 'F00000SRPN|FOEUR$$ALL' WHERE public_id = 'GB00BJS8SJ34';
+UPDATE investments SET morningstar_id = 'F00001275X|FOEUR$$ALL' WHERE public_id = 'GB00BJLP1W53';
+UPDATE investments SET morningstar_id = 'F000011RP0|FOEUR$$ALL' WHERE public_id = 'GB00BH0P2M97';
+UPDATE investments SET morningstar_id = 'F0GBR0506U|FOEUR$$ALL' WHERE public_id = 'GB0006061963';
 UPDATE investments SET morningstar_id = 'F00000WWH3|FOGBR$$ALL' WHERE public_id = 'IE00BYVJRB33';
-UPDATE investments SET morningstar_id = '0P00007OU0|E0EXG$XLON_3520' WHERE public_id = 'LSE:RR.';
-UPDATE investments SET morningstar_id = '0P000094GI|E0EXG$XLON_3520' WHERE public_id = 'LSE:BA.';
-UPDATE investments SET morningstar_id = '0P00007NYP|E0EXG$XLON_3520' WHERE public_id = 'LSE:AZN';
-UPDATE investments SET morningstar_id = '0P00007OU3|E0EXG$XLON_3520' WHERE public_id = 'LSE:SHEL';
-UPDATE investments SET morningstar_id = '0P0001T3HZ|E0EXG$XLON_3520' WHERE public_id = 'LSE:RPI';
-UPDATE investments SET morningstar_id = '0P00007NZP|E0EXG$XLON_3520' WHERE public_id = 'LSE:BARC';
-UPDATE investments SET morningstar_id = '0P00007OJS|E0EXG$XLON_3520' WHERE public_id = 'LSE:LGEN';
-UPDATE investments SET morningstar_id = 'E0GBR00VIE|CEEXG$XLON_3519' WHERE public_id = 'LSE:PCT';
-UPDATE investments SET morningstar_id = '0P000003RE|E0EXG$XNASDAQ_3520' WHERE public_id = 'NSQ:NVDA';
-UPDATE investments SET morningstar_id = '0P000003MH|E0EXG$XNASDAQ_3520' WHERE public_id = 'NSQ:MSFT';
-UPDATE investments SET morningstar_id = '0P00012BBI|E0EXG$XNASDAQ_3520' WHERE public_id = 'NSQ:GOOG';
-UPDATE investments SET morningstar_id = '0P000000B7|E0EXG$XNASDAQ_3520' WHERE public_id = 'NSQ:AMZN';
-UPDATE investments SET morningstar_id = '0P000000RD|E0EXG$XNYSE_3520' WHERE public_id = 'NYQ:BRK.B';
-UPDATE investments SET morningstar_id = '0P0000ALDL|E0EXG$XEURONEXT_3520' WHERE public_id = 'AEX:ASML';
+UPDATE investments SET morningstar_id = '0P00007OU0|E0EXG$XLON' WHERE public_id = 'LSE:RR.';
+UPDATE investments SET morningstar_id = '0P000094GI|E0EXG$XLON' WHERE public_id = 'LSE:BA.';
+UPDATE investments SET morningstar_id = '0P00007NYP|E0EXG$XLON' WHERE public_id = 'LSE:AZN';
+UPDATE investments SET morningstar_id = '0P00007OU3|E0EXG$XLON' WHERE public_id = 'LSE:SHEL';
+UPDATE investments SET morningstar_id = '0P0001T3HZ|E0EXG$XLON' WHERE public_id = 'LSE:RPI';
+UPDATE investments SET morningstar_id = '0P00007NZP|E0EXG$XLON' WHERE public_id = 'LSE:BARC';
+UPDATE investments SET morningstar_id = '0P00007OJS|E0EXG$XLON' WHERE public_id = 'LSE:LGEN';
+UPDATE investments SET morningstar_id = 'E0GBR00VIE|CEEXG$XLON' WHERE public_id = 'LSE:PCT';
+UPDATE investments SET morningstar_id = '0P000003RE|E0EXG$XNASDAQ' WHERE public_id = 'NSQ:NVDA';
+UPDATE investments SET morningstar_id = '0P000003MH|E0EXG$XNASDAQ' WHERE public_id = 'NSQ:MSFT';
+UPDATE investments SET morningstar_id = '0P00012BBI|E0EXG$XNASDAQ' WHERE public_id = 'NSQ:GOOG';
+UPDATE investments SET morningstar_id = '0P000000B7|E0EXG$XNASDAQ' WHERE public_id = 'NSQ:AMZN';
+UPDATE investments SET morningstar_id = '0P000000RD|E0EXG$XNYSE' WHERE public_id = 'NYQ:BRK.B';
+UPDATE investments SET morningstar_id = '0P0000ALDL|E0EXG$XEURONEXT' WHERE public_id = 'AEX:ASML';
 
 -- ============================================================================
 -- BENCHMARKS

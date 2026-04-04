@@ -56,7 +56,7 @@
     ]
   },
   "fetchServer": {
-    "enabled": true,
+    "enabled": false,
     "url": "https://fetch_server_60.redmug.dev",
     "syncOnStartup": true
   }

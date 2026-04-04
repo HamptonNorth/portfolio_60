@@ -376,6 +376,19 @@ const MORNINGSTAR_SEARCH_URL = "https://www.morningstar.co.uk/uk/util/SecuritySe
 const MORNINGSTAR_FETCH_TIMEOUT_MS = 15000;
 
 /**
+ * @description Strip trailing Morningstar internal list IDs from universe strings.
+ * The Screener and SecuritySearch APIs sometimes return universe values with a
+ * trailing "_NNNN" suffix (e.g. "FOEUR$$ALL_3521", "E0EXG$XLON_3520") that is
+ * not recognised by the Timeseries API and causes wrong/random price data.
+ * @param {string} universe - Raw universe string from Morningstar
+ * @returns {string} Cleaned universe string with any trailing _NNNN removed
+ */
+function cleanUniverse(universe) {
+  if (!universe) return "";
+  return universe.replace(/_\d+$/, "");
+}
+
+/**
  * @description Mapping from FT Markets exchange codes (used in public_id) to
  * Morningstar ExchangeId values used in the screener API. This allows
  * ticker lookups to be filtered by exchange, avoiding wrong-exchange matches
@@ -459,7 +472,7 @@ export async function lookupMorningstarIdByIsin(isin) {
 
   return {
     secId: row.SecId,
-    universe: row.Universe || "",
+    universe: cleanUniverse(row.Universe),
     name: row.Name,
   };
 }
@@ -499,7 +512,7 @@ export async function lookupMorningstarIdByName(description) {
 
   return {
     secId: row.SecId,
-    universe: row.Universe || "",
+    universe: cleanUniverse(row.Universe),
     name: row.Name,
   };
 }
@@ -552,7 +565,7 @@ export async function lookupMorningstarIdByTicker(ticker, exchange) {
     const row = filterRows[0];
     return {
       secId: row.SecId,
-      universe: row.Universe || "",
+      universe: cleanUniverse(row.Universe),
       name: row.Name,
     };
   }
@@ -627,9 +640,9 @@ async function lookupMorningstarIdBySecuritySearch(ticker, exchange) {
         const resultExchange = (meta.e || "").toUpperCase();
         let universe = "";
         if (meta.t === 21 || meta.t === "21") {
-          universe = "CEEXG$X" + (resultExchange === "LSE" ? "LON" : resultExchange) + "_3519";
+          universe = "CEEXG$X" + (resultExchange === "LSE" ? "LON" : resultExchange);
         } else {
-          universe = "E0EXG$X" + (resultExchange === "LSE" ? "LON" : resultExchange) + "_3520";
+          universe = "E0EXG$X" + (resultExchange === "LSE" ? "LON" : resultExchange);
         }
 
         candidates.push({
