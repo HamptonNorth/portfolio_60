@@ -218,18 +218,100 @@ class AppNavbar extends LitElement {
 
   /**
    * @description Lit lifecycle callback invoked after the first render. Highlights the
-   * active nav link, then loads lists, docs, views, and reports into dropdown menus.
+   * active nav link, sets up touch-friendly dropdown toggles, then loads lists,
+   * docs, views, and reports into dropdown menus.
    */
   async firstUpdated() {
     if (typeof highlightActiveNav === "function") {
       highlightActiveNav();
     }
+    this._setupDropdownTouch();
     this._loadLists();
     this._loadDocs();
     await this._loadViews();
     await this._loadReports();
     this._checkReportsNewTab();
     this._checkTestMode();
+  }
+
+  /**
+   * @description Set up touch/click handlers on dropdown parent elements so that
+   * dropdowns work on touch devices where CSS :hover is not available.
+   * Uses touchend (with touchstart tracking) on touch devices and click on
+   * non-touch devices. Tapping outside any dropdown closes all open ones.
+   */
+  _setupDropdownTouch() {
+    const navElement = this.querySelector("nav");
+    if (!navElement) return;
+
+    /** @type {boolean} Whether a touch interaction is in progress */
+    let touchStarted = false;
+
+    /**
+     * @description Close all open dropdown panels by setting display back to empty.
+     */
+    const closeAll = () => {
+      const panels = navElement.querySelectorAll("[data-nav-parent] + div");
+      panels.forEach((panel) => {
+        panel.style.display = "";
+      });
+    };
+
+    /**
+     * @description Handle a dropdown toggle triggered by tap or click.
+     * @param {Element} parentSpan - The [data-nav-parent] element that was tapped
+     */
+    const toggleDropdown = (parentSpan) => {
+      const panel = parentSpan.nextElementSibling;
+      if (!panel) return;
+
+      const isOpen = panel.style.display === "block";
+      closeAll();
+
+      if (!isOpen) {
+        panel.style.display = "block";
+      }
+    };
+
+    // Track touchstart so we can pair it with touchend
+    navElement.addEventListener("touchstart", (event) => {
+      const parentSpan = event.target.closest("[data-nav-parent]");
+      if (parentSpan) {
+        touchStarted = true;
+      }
+    }, { passive: true });
+
+    // Handle touchend on dropdown parent spans
+    navElement.addEventListener("touchend", (event) => {
+      if (!touchStarted) return;
+      touchStarted = false;
+
+      const parentSpan = event.target.closest("[data-nav-parent]");
+      if (!parentSpan) return;
+
+      event.preventDefault(); // Prevent the subsequent click/ghost tap
+      toggleDropdown(parentSpan);
+    });
+
+    // Fallback click handler for non-touch devices (mouse, keyboard)
+    navElement.addEventListener("click", (event) => {
+      const parentSpan = event.target.closest("[data-nav-parent]");
+      if (parentSpan) {
+        toggleDropdown(parentSpan);
+      }
+    });
+
+    // Close dropdowns when tapping/clicking outside the nav
+    document.addEventListener("touchend", (event) => {
+      if (!navElement.contains(event.target)) {
+        closeAll();
+      }
+    });
+    document.addEventListener("click", (event) => {
+      if (!navElement.contains(event.target)) {
+        closeAll();
+      }
+    });
   }
 
   /**

@@ -3,7 +3,7 @@ import { resolve, join, extname } from "node:path";
 import { backupJsonFile } from "../file-utils.js";
 import { loadConfig, getAllowedProviders, getSchedulingConfig, reloadConfig, getListItems, getListDocuments, saveListItems, saveListDocuments, getListsDir, getConfigFilePath, getWritableConfigPath, getReportsOpenInNewTab, getMergedConfigRaw } from "../config.js";
 import { isTestMode } from "../test-mode.js";
-import { DB_PATH, BACKUP_DIR, APP_NAME, APP_VERSION } from "../../shared/server-constants.js";
+import { DB_PATH, BACKUP_DIR, APP_NAME, APP_VERSION, BUILD_DATE } from "../../shared/server-constants.js";
 
 
 /**
@@ -110,6 +110,7 @@ export function handleConfigRoute(method, path) {
     const info = {
       appName: APP_NAME,
       version: APP_VERSION,
+      buildDate: BUILD_DATE,
       buildTime: buildTime,
       runtime: runtime,
       platform: process.platform,

@@ -1765,12 +1765,67 @@ class AppNavbar extends LitElement {
     if (typeof highlightActiveNav === "function") {
       highlightActiveNav();
     }
+    this._setupDropdownTouch();
     this._loadLists();
     this._loadDocs();
     await this._loadViews();
     await this._loadReports();
     this._checkReportsNewTab();
     this._checkTestMode();
+  }
+  _setupDropdownTouch() {
+    const navElement = this.querySelector("nav");
+    if (!navElement)
+      return;
+    let touchStarted = false;
+    const closeAll = () => {
+      const panels = navElement.querySelectorAll("[data-nav-parent] + div");
+      panels.forEach((panel) => {
+        panel.style.display = "";
+      });
+    };
+    const toggleDropdown = (parentSpan) => {
+      const panel = parentSpan.nextElementSibling;
+      if (!panel)
+        return;
+      const isOpen = panel.style.display === "block";
+      closeAll();
+      if (!isOpen) {
+        panel.style.display = "block";
+      }
+    };
+    navElement.addEventListener("touchstart", (event) => {
+      const parentSpan = event.target.closest("[data-nav-parent]");
+      if (parentSpan) {
+        touchStarted = true;
+      }
+    }, { passive: true });
+    navElement.addEventListener("touchend", (event) => {
+      if (!touchStarted)
+        return;
+      touchStarted = false;
+      const parentSpan = event.target.closest("[data-nav-parent]");
+      if (!parentSpan)
+        return;
+      event.preventDefault();
+      toggleDropdown(parentSpan);
+    });
+    navElement.addEventListener("click", (event) => {
+      const parentSpan = event.target.closest("[data-nav-parent]");
+      if (parentSpan) {
+        toggleDropdown(parentSpan);
+      }
+    });
+    document.addEventListener("touchend", (event) => {
+      if (!navElement.contains(event.target)) {
+        closeAll();
+      }
+    });
+    document.addEventListener("click", (event) => {
+      if (!navElement.contains(event.target)) {
+        closeAll();
+      }
+    });
   }
   async _loadViews() {
     try {
@@ -2021,7 +2076,7 @@ var APP_NAME = "Portfolio 60";
 // package.json
 var package_default = {
   name: "portfolio-60",
-  version: "0.1.7",
+  version: "0.1.8",
   description: "UK Family Investment Portfolio Tracker",
   type: "module",
   private: true,

@@ -3,10 +3,10 @@
  */
 
 import { join } from "node:path";
-import { APP_NAME, APP_VERSION } from "../../app-identity.js";
+import { APP_NAME, APP_VERSION, BUILD_DATE } from "../../app-identity.js";
 
 // Re-export from root app-identity.js (single source of truth)
-export { APP_NAME, APP_VERSION };
+export { APP_NAME, APP_VERSION, BUILD_DATE };
 
 /** @type {number} Port the Bun HTTP server listens on */
 // for deployment to nuc2023 (dem version)
