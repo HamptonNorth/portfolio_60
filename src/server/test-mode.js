@@ -1,6 +1,6 @@
 import { resolve, join } from "node:path";
 import { existsSync, readFileSync, mkdirSync, readdirSync, copyFileSync } from "node:fs";
-import { DATA_DIR } from "../shared/server-constants.js";
+import { DATA_DIR, TEST_DB_FILENAME } from "../shared/server-constants.js";
 import {
   closeDatabase,
   createDatabase,
@@ -8,6 +8,26 @@ import {
   resetDatabasePath,
 } from "./db/connection.js";
 import { setConfigPath, reloadConfig } from "./config.js";
+
+/**
+ * @description The public-facing hostname that must always serve demo data.
+ * When the Host header matches this value, the app forces demo mode regardless
+ * of which passphrase is entered. This prevents live data from being exposed
+ * through the public URL.
+ * @type {string}
+ */
+const PUBLIC_DEMO_HOSTNAME = "portfolio60.redmug.dev";
+
+/**
+ * @description Check whether a request originates from the public demo hostname.
+ * Compares the Host header (stripping any port suffix) against PUBLIC_DEMO_HOSTNAME.
+ * @param {Request} request - The incoming HTTP request
+ * @returns {boolean} True if the request is from the public demo hostname
+ */
+export function isPublicDemoHost(request) {
+  const host = (request.headers.get("host") || "").split(":")[0];
+  return host === PUBLIC_DEMO_HOSTNAME;
+}
 
 /**
  * @description In-memory flag tracking whether the current session is in test mode.
@@ -41,7 +61,7 @@ const TEST_REF_DIR = join(DATA_DIR, "data", "test_reference");
  * @returns {boolean} True if the test reference database exists
  */
 export function testReferenceExists() {
-  const testDbPath = resolve(TEST_REF_DIR, "portfolio60.db");
+  const testDbPath = resolve(TEST_REF_DIR, TEST_DB_FILENAME);
   return existsSync(testDbPath);
 }
 
@@ -64,7 +84,7 @@ function createTestDatabase() {
   // createDatabase() handles directory creation — it must create the
   // directory itself so that disableCopyOnWrite() is called on btrfs
   // filesystems (prevents "disk I/O error" under sustained writes).
-  const testDbPath = resolve(TEST_REF_DIR, "portfolio60.db");
+  const testDbPath = resolve(TEST_REF_DIR, TEST_DB_FILENAME);
   process.env.DB_PATH = testDbPath;
   resetDatabasePath();
 
@@ -164,7 +184,7 @@ export function activateTestMode() {
   closeDatabase();
 
   // Point database at test reference
-  process.env.DB_PATH = resolve(TEST_REF_DIR, "portfolio60.db");
+  process.env.DB_PATH = resolve(TEST_REF_DIR, TEST_DB_FILENAME);
   resetDatabasePath();
 
   // Point docs at test reference, copying repo guide files if needed

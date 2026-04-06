@@ -9,13 +9,13 @@ import { resolve, join } from "node:path";
 import { getDatabase, closeDatabase, resetDatabasePath } from "../db/connection.js";
 import { getFetchServerConfig } from "../config.js";
 import { loadEnvValue } from "../auth.js";
-import { DATA_DIR } from "../../shared/server-constants.js";
+import { DATA_DIR, TEST_DB_FILENAME } from "../../shared/server-constants.js";
 
 /**
  * @description Path to the test reference database.
  * @type {string}
  */
-const TEST_DB_PATH = resolve(join(DATA_DIR, "data", "test_reference", "portfolio60.db"));
+const TEST_DB_PATH = resolve(join(DATA_DIR, "data", "test_reference", TEST_DB_FILENAME));
 
 /**
  * @description Fetch the latest data from the remote fetch server.

@@ -1,35 +1,26 @@
 [
   {
     "id": "ex1_household_assets",
-    "title": "1: Household Assets",
+    "title": "Household Assets",
     "pdfEndpoint": "/api/reports/pdf/household-assets",
     "params": []
   },
   {
     "id": "ex2_portfolio_summary",
-    "title": "2: Portfolio Summary",
+    "title": "Portfolio Summary",
     "pdfEndpoint": "/api/reports/pdf/portfolio-summary",
-    "params": [
-      "USER2",
-      "USER1",
-      "USER2 + USER1"
-    ]
+    "params": ["USER2", "USER1", "USER2 + USER1"]
   },
   {
     "id": "ex2b_portfolio_summary_comparison",
-    "title": "2b: Portfolio Summary (3m comparison)",
+    "title": "Portfolio Summary (3m comparison)",
     "pdfEndpoint": "/api/reports/pdf/portfolio-summary",
     "compareTo": "3m",
-    "params": [
-      "USER2",
-      "USER1",
-      "new_page",
-      "USER2 + USER1"
-    ]
+    "params": ["USER2", "USER1", "new_page", "USER2 + USER1"]
   },
   {
     "id": "ex3_portfolio_detail",
-    "title": "3: Portfolio Detail",
+    "title": "Portfolio Detail",
     "pdfEndpoint": "/api/reports/pdf/portfolio-detail",
     "params": [
       "USER1:ISA:1m,3m,1y",
@@ -39,7 +30,7 @@
   },
   {
     "id": "ex3b_detail_with_page_break",
-    "title": "3b: Detail with Page Break",
+    "title": "Portfolio Detail with Page Break",
     "pdfEndpoint": "/api/reports/pdf/portfolio-detail",
     "params": [
       "USER2:ISA:1m,3m,1y,3y",
@@ -53,20 +44,16 @@
   },
   {
     "id": "ex4_single_chart",
-    "title": "4: Performance Chart",
+    "title": "Performance Chart",
     "subTitle": "12 month performance versus FTSE 100",
     "pdfEndpoint": "/api/reports/pdf/chart",
     "monthsToShow": "12",
     "smooth": true,
-    "params": [
-      "inv:GB00B41YBW71",
-      "inv:GB00B4PQW151",
-      "bm:FTSE 100"
-    ]
+    "params": ["inv:GB00B41YBW71", "inv:GB00B4PQW151", "bm:FTSE 100"]
   },
   {
     "id": "ex4b_chart_with_events",
-    "title": "4b: Chart with Global Events",
+    "title": "Chart with Global Events",
     "subTitle": "36 month performance versus FTSE 100 and S&P 500",
     "pdfEndpoint": "/api/reports/pdf/chart",
     "monthsToShow": "36",
@@ -85,7 +72,7 @@
   },
   {
     "id": "ex5_chart_group_2",
-    "title": "5: Two Charts (portrait)",
+    "title": "2 Charts (portrait)",
     "pdfEndpoint": "/api/reports/pdf/chart-group",
     "charts": [
       {
@@ -93,28 +80,20 @@
         "subTitle": "36 month performance",
         "monthsToShow": "36",
         "smooth": true,
-        "params": [
-          "inv:GB00B41YBW71",
-          "inv:GB00B4PQW151",
-          "bm:FTSE 100"
-        ]
+        "params": ["inv:GB00B41YBW71", "inv:GB00B4PQW151", "bm:FTSE 100"]
       },
       {
         "title": "Key Funds",
         "subTitle": "12 month performance",
         "monthsToShow": "12",
         "smooth": true,
-        "params": [
-          "inv:GB00B41YBW71",
-          "inv:GB00B4PQW151",
-          "bm:FTSE 100"
-        ]
+        "params": ["inv:GB00B41YBW71", "inv:GB00B4PQW151", "bm:FTSE 100"]
       }
     ]
   },
   {
     "id": "ex5b_chart_group_4",
-    "title": "5b: Four Charts (landscape grid)",
+    "title": "Four Charts (landscape grid)",
     "pdfEndpoint": "/api/reports/pdf/chart-group",
     "charts": [
       {
@@ -173,15 +152,11 @@
   },
   {
     "id": "ex6_simple_composite",
-    "title": "6: Simple Composite (2 pages)",
+    "title": "Simple Composite (2 pages)",
     "blocks": [
       {
         "type": "portfolio_summary",
-        "params": [
-          "USER2",
-          "USER1",
-          "USER2 + USER1"
-        ]
+        "params": ["USER2", "USER1", "USER2 + USER1"]
       },
       {
         "type": "chart",
@@ -189,28 +164,20 @@
         "subTitle": "12 month trend",
         "monthsToShow": "12",
         "smooth": true,
-        "params": [
-          "inv:GB00B41YBW71",
-          "inv:GB00B4PQW151",
-          "bm:FTSE 100"
-        ]
+        "params": ["inv:GB00B41YBW71", "inv:GB00B4PQW151", "bm:FTSE 100"]
       }
     ]
   },
   {
     "id": "ex7_weekly_report",
-    "title": "7: Weekly Report (6 pages)",
+    "title": "Weekly Report",
     "blocks": [
       {
         "type": "household_assets"
       },
       {
         "type": "portfolio_summary",
-        "params": [
-          "USER2",
-          "USER1",
-          "USER2 + USER1"
-        ]
+        "params": ["USER2", "USER1", "USER2 + USER1"]
       },
       {
         "type": "portfolio_detail",
@@ -278,7 +245,7 @@
   },
   {
     "id": "ex8_portfolio_value_percent",
-    "title": "8: Portfolio Value (% change)",
+    "title": "Portfolio Value (% change)",
     "subTitle": "36 month performance",
     "pdfEndpoint": "/api/reports/pdf/portfolio-value-chart",
     "monthsToShow": "36",
@@ -294,7 +261,7 @@
   },
   {
     "id": "ex8b_portfolio_value_gbp",
-    "title": "8b: Portfolio Value (£ GBP)",
+    "title": "Portfolio Value (£ GBP)",
     "subTitle": "36 month account values",
     "pdfEndpoint": "/api/reports/pdf/portfolio-value-chart",
     "monthsToShow": "36",
@@ -305,18 +272,6 @@
       "USER1:isa+sipp+trading",
       "USER2:isa+sipp+trading",
       "USER1+USER2:isa+sipp+trading"
-    ]
-  },
-  {
-    "id": "test_perf_1",
-    "title": "Test SSON and new Smithson fund",
-    "pdfEndpoint": "/api/reports/pdf/chart",
-    "subTitle": "",
-    "monthsToShow": "36",
-    "smooth": true,
-    "showGlobalEvents": false,
-    "params": [
-      "inv:LSE:SSON"
     ]
   }
 ]

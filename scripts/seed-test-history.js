@@ -17,7 +17,7 @@ import { Database } from "bun:sqlite";
 import { DATA_DIR } from "../src/shared/server-constants.js";
 
 const TEST_REF_DIR = join(DATA_DIR, "data", "test_reference");
-const TEST_DB_PATH = resolve(TEST_REF_DIR, "portfolio60.db");
+const TEST_DB_PATH = resolve(TEST_REF_DIR, "portfolio60_test.db");
 const SQL_PATH = resolve("src/server/db/seed-test-history.sql");
 
 // Check test database exists

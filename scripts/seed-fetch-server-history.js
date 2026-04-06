@@ -27,7 +27,7 @@ import { existsSync } from "node:fs";
 import { resolve, join } from "node:path";
 
 // Open the test reference database (not the live database — that stays private)
-const testDbPath = resolve(join(DATA_DIR, "data", "test_reference", "portfolio60.db"));
+const testDbPath = resolve(join(DATA_DIR, "data", "test_reference", "portfolio60_test.db"));
 if (!existsSync(testDbPath)) {
   console.error("Test reference database not found at: " + testDbPath);
   console.error("Enter the test passphrase at least once to create it.");

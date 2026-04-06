@@ -367,13 +367,13 @@ describe("Cash Transactions Routes", () => {
   // --- ISA allowance ---
 
   test("GET /api/accounts/:id/isa-allowance returns allowance for ISA account", async () => {
-    // Add a deposit to the ISA account within the current tax year
+    // Add a deposit to the ISA account within the current tax year (2026/27)
     await fetch(`${BASE_URL}/api/accounts/${isaAccountId}/cash-transactions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         transaction_type: "deposit",
-        transaction_date: "2025-06-01",
+        transaction_date: "2026-06-01",
         amount: 4500,
       }),
     });

@@ -25,6 +25,7 @@ import { handleReportsRoute } from "./routes/reports-routes.js";
 import { handlePortfolioDetailRoute } from "./routes/portfolio-detail-routes.js";
 import { handleAnalysisRoute } from "./routes/analysis-routes.js";
 import { handleTestSetupRoute } from "./routes/test-setup-routes.js";
+import { isPublicDemoHost, isTestMode, isDemoMode, activateTestMode, setDemoMode } from "./test-mode.js";
 import { initScheduledFetcher, stopScheduledFetcher } from "./services/scheduled-fetcher.js";
 import { initVisitorTracker, stopVisitorTracker, trackVisitor } from "./services/visitor-tracker.js";
 import { processDrawdowns } from "./services/drawdown-processor.js";
@@ -119,14 +120,38 @@ const server = Bun.serve({
 
   /**
    * @description Handle incoming HTTP requests.
-   * Routes to static files or API handlers based on the URL path.
+   * Delegates to handleRequest and appends security headers to every response.
    * @param {Request} request - The incoming HTTP request
-   * @returns {Promise<Response>} The HTTP response
+   * @returns {Promise<Response>} The HTTP response with security headers
    */
   async fetch(request) {
+    const response = await handleRequest(request, this);
+    response.headers.set("Referrer-Policy", "no-referrer");
+    return response;
+  },
+});
+
+/**
+ * @description Route an incoming HTTP request to the appropriate handler.
+ * @param {Request} request - The incoming HTTP request
+ * @param {object} server - The Bun server instance (for timeout calls)
+ * @returns {Promise<Response>} The HTTP response
+ */
+async function handleRequest(request, server) {
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
+
+    // --- Public hostname demo lock ---
+    // If accessed via the public URL (e.g. portfolio60.redmug.dev), force demo
+    // mode so live data is never exposed. Re-checked on every request in case
+    // the server restarted and lost in-memory state.
+    if (isPublicDemoHost(request) && !isDemoMode()) {
+      if (!isTestMode()) {
+        activateTestMode();
+      }
+      setDemoMode(true);
+    }
 
     // --- Anonymous visitor tracking (page navigations only) ---
     trackVisitor(request);
@@ -505,8 +530,7 @@ const server = Bun.serve({
 
     // --- Fallback: 404 ---
     return new Response("Not found", { status: 404 });
-  },
-});
+}
 
 console.log(`Portfolio 60 server running on http://${hostname === "0.0.0.0" ? "localhost" : hostname}:${server.port}`);
 

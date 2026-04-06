@@ -19,7 +19,7 @@ const useTestDb = process.argv.includes("--test");
 
 // Set DB_PATH before importing connection.js
 if (useTestDb) {
-  process.env.DB_PATH = resolve(join(DATA_DIR, "data", "test_reference", "portfolio60.db"));
+  process.env.DB_PATH = resolve(join(DATA_DIR, "data", "test_reference", "portfolio60_test.db"));
 }
 
 const { getDatabase } = await import("../src/server/db/connection.js");

@@ -1,6 +1,6 @@
 import { isFirstRun, getAuthStatus, setAuthStatus, hashPassphrase, verifyPassphrase, loadHashFromEnv, saveHashToEnv, checkLockout, recordFailedAttempt, resetFailedAttempts } from "../auth.js";
 import { databaseExists, createDatabase, getDatabase } from "../db/connection.js";
-import { isTestMode, isDemoMode, activateTestMode, deactivateTestMode, isTestDatabaseFresh, setDemoMode, testReferenceExists } from "../test-mode.js";
+import { isTestMode, isDemoMode, activateTestMode, deactivateTestMode, isTestDatabaseFresh, setDemoMode, testReferenceExists, isPublicDemoHost } from "../test-mode.js";
 import { getDocsConfig } from "../config.js";
 import { reindexAllPages } from "../services/docs-search.js";
 
@@ -153,6 +153,16 @@ export async function handleAuthRoute(method, path, request) {
     const specialResponse = handleSpecialPassphrase(passphrase);
     if (specialResponse) return specialResponse;
 
+    // On the public demo hostname, block setting a real passphrase — only
+    // special modes (demo/test) are allowed. This prevents accidental
+    // first-run setup of live data through the public URL.
+    if (isPublicDemoHost(request)) {
+      return handleSpecialPassphrase("demo") || new Response(
+        JSON.stringify({ error: "Not available", detail: "Live access is not available on this URL." }),
+        { status: 403, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
     if (!passphrase || typeof passphrase !== "string" || passphrase.length < 8) {
       return new Response(
         JSON.stringify({
@@ -242,6 +252,16 @@ export async function handleAuthRoute(method, path, request) {
     // Special mode bypass — demo, test, or test-write without verifying hash
     const specialResponse = handleSpecialPassphrase(passphrase);
     if (specialResponse) return specialResponse;
+
+    // On the public demo hostname, block verification of the real passphrase.
+    // Even if the correct passphrase is entered, force demo mode instead of
+    // granting live database access through the public URL.
+    if (isPublicDemoHost(request)) {
+      return handleSpecialPassphrase("demo") || new Response(
+        JSON.stringify({ error: "Not available", detail: "Live access is not available on this URL." }),
+        { status: 403, headers: { "Content-Type": "application/json" } },
+      );
+    }
 
     const storedHash = loadHashFromEnv();
     if (!storedHash) {

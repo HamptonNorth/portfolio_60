@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, copyFileSync, readdirSync, statSync, unlinkSync,
 import { resolve, join, basename } from "node:path";
 import archiver from "archiver";
 import AdmZip from "adm-zip";
-import { BACKUP_DIR, DATA_DIR, getDocsDir } from "../../shared/server-constants.js";
+import { BACKUP_DIR, DATA_DIR, TEST_DB_FILENAME, getDocsDir } from "../../shared/server-constants.js";
 import { getDatabasePath, closeDatabase, getDatabase } from "./connection.js";
 import { getConfigFilePath } from "../config.js";
 
@@ -146,7 +146,7 @@ export async function createBackup() {
 
     // Also create a test reference backup if test reference data exists
     const testRefDir = resolve(join(DATA_DIR, "data", "test_reference"));
-    const testRefDb = join(testRefDir, "portfolio60.db");
+    const testRefDb = join(testRefDir, TEST_DB_FILENAME);
     if (existsSync(testRefDb)) {
       try {
         const testBackupDir = getTestBackupDir();

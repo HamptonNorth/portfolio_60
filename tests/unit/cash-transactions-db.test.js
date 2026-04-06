@@ -277,31 +277,31 @@ describe("deleteCashTransaction", () => {
 
 describe("getIsaDepositsForTaxYear", () => {
   test("returns total deposits within date range", () => {
-    // Add some ISA deposits
+    // Add some ISA deposits (within tax year 2026/27: 6 Apr 2026 to 5 Apr 2027)
     createCashTransaction({
       account_id: isaAccount.id,
       transaction_type: "deposit",
-      transaction_date: "2025-06-01",
+      transaction_date: "2026-06-01",
       amount: 4500,
       notes: "ISA deposit 1",
     });
     createCashTransaction({
       account_id: isaAccount.id,
       transaction_type: "deposit",
-      transaction_date: "2025-09-15",
+      transaction_date: "2026-09-15",
       amount: 3000,
       notes: "ISA deposit 2",
     });
     createCashTransaction({
       account_id: isaAccount.id,
       transaction_type: "withdrawal",
-      transaction_date: "2025-08-01",
+      transaction_date: "2026-08-01",
       amount: 200,
       notes: "Withdrawal - should not count",
     });
 
-    // Tax year 2025/26: 6 Apr 2025 to 5 Apr 2026
-    const total = getIsaDepositsForTaxYear(isaAccount.id, "2025-04-06", "2026-04-05");
+    // Tax year 2026/27: 6 Apr 2026 to 5 Apr 2027
+    const total = getIsaDepositsForTaxYear(isaAccount.id, "2026-04-06", "2027-04-05");
     // Only deposits count: 5000 (opening balance) + 4500 + 3000 = 12500
     expect(total).toBe(12500);
   });

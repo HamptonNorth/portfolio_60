@@ -79,7 +79,7 @@ if (existsSync(TEST_REF_DIR)) {
 mkdirSync(TEST_REF_DIR, { recursive: true });
 
 // 1. Copy database
-const destDb = join(TEST_REF_DIR, "portfolio60.db");
+const destDb = join(TEST_REF_DIR, "portfolio60_test.db");
 copyFileSync(resolve(LIVE_DB), destDb);
 console.log("  Database:  " + LIVE_DB + " -> " + destDb);
 

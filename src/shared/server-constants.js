@@ -28,6 +28,9 @@ export const DATA_DIR = process.env.PORTFOLIO60_DATA_DIR || ".";
 export const DB_PATH =
   process.env.DB_PATH || join(DATA_DIR, "data", "portfolio60.db");
 
+/** @type {string} Filename for the test reference database (distinct from live to prevent accidental exposure) */
+export const TEST_DB_FILENAME = "portfolio60_test.db";
+
 /** @type {string} Directory for database backups */
 export const BACKUP_DIR = join(DATA_DIR, "backups");
 
