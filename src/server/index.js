@@ -1,4 +1,4 @@
-import { SERVER_PORT, getDocsMediaDir } from "../shared/server-constants.js";
+import { SERVER_PORT, APP_VERSION, getDocsMediaDir } from "../shared/server-constants.js";
 import { resolve, join } from "node:path";
 import { readdir } from "node:fs/promises";
 import { checkAuth, checkDemoBlock } from "./middleware/auth-middleware.js";
@@ -532,7 +532,7 @@ async function handleRequest(request, server) {
     return new Response("Not found", { status: 404 });
 }
 
-console.log(`Portfolio 60 server running on http://${hostname === "0.0.0.0" ? "localhost" : hostname}:${server.port}`);
+console.log(`Portfolio 60 server version ${APP_VERSION} running on http://${hostname === "0.0.0.0" ? "localhost" : hostname}:${server.port}`);
 
 // Process any due drawdowns (only if database already exists — skipped on fresh installs)
 if (databaseExists()) {
