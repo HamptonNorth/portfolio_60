@@ -299,9 +299,11 @@ export function initScheduledFetcher() {
  * @param {Object} schedulingConfig - The scheduling configuration
  */
 function checkForMissedFetch(schedulingConfig) {
-  // Guard: if the database doesn't exist yet, skip the check
+  // Guard: if neither the live nor test database exists, skip the check
   if (!databaseExists()) {
-    writeSchedulerLog("Database not yet created, skipping missed-fetch check");
+    if (!testReferenceExists()) {
+      writeSchedulerLog("Database not yet created, skipping missed-fetch check");
+    }
     return;
   }
 

@@ -1,4 +1,5 @@
-import { getDatabase } from "./connection.js";
+import { getDatabase, databaseExists } from "./connection.js";
+import { testReferenceExists } from "../test-mode.js";
 
 /**
  * @description Insert a log entry into the scheduler_log table.
@@ -28,7 +29,10 @@ export function writeSchedulerLog(message, level = "info") {
   } catch (err) {
     // If the database is not available (e.g. not yet created), just
     // rely on the console output above. Do not throw.
-    console.warn("[Scheduler] Could not write to scheduler_log: " + err.message);
+    // Only warn if neither the live nor test database exists.
+    if (!databaseExists() && !testReferenceExists()) {
+      console.warn("[Scheduler] Could not write to scheduler_log: " + err.message);
+    }
   }
 }
 
