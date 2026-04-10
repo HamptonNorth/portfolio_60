@@ -8,7 +8,7 @@
 export const APP_NAME = "Portfolio 60";
 
 /** @type {string} Current application version */
-export const APP_VERSION = "0.1.8";
+export const APP_VERSION = "0.1.9";
 
 /** @type {string} Build date in ISO format */
-export const BUILD_DATE = "2026-04-04";
+export const BUILD_DATE = "2026-04-10";

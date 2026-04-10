@@ -36,22 +36,22 @@
       {
         "label": "User Guide",
         "category": "guide",
-        "slug": "user_guide_v0.1.4"
+        "slug": "user_guide_v0.1.9"
       },
       {
         "label": "Composing Reports & Charts",
         "category": "guide",
-        "slug": "composing_reports_and_charts_v0.1.4"
+        "slug": "composing_reports_and_charts_v0.1.9"
       },
       {
         "label": "Technical Reference",
         "category": "guide",
-        "slug": "technical_reference_v0.1.4"
+        "slug": "technical_reference_v0.1.9"
       },
       {
         "label": "Create Test Database",
         "category": "guide",
-        "slug": "create_test_database_v0.1.4"
+        "slug": "create_test_database_v0.1.9"
       }
     ]
   },
