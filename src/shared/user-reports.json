@@ -9,7 +9,11 @@
     "id": "pdf_portfolio_summary",
     "title": "Portfolio Summary",
     "pdfEndpoint": "/api/reports/pdf/portfolio-summary",
-    "params": ["USER2", "USER1", "USER2 + USER1"]
+    "params": [
+      "USER2",
+      "USER1",
+      "USER2 + USER1"
+    ]
   },
   {
     "id": "pdf_portfolio_detail",
@@ -31,10 +35,16 @@
     "id": "weekly_pdf",
     "title": "Weekly Report",
     "blocks": [
-      { "type": "household_assets" },
+      {
+        "type": "household_assets"
+      },
       {
         "type": "portfolio_summary",
-        "params": ["USER2", "USER1", "USER2 + USER1"]
+        "params": [
+          "USER2",
+          "USER1",
+          "USER2 + USER1"
+        ]
       },
       {
         "type": "portfolio_detail",
@@ -242,6 +252,19 @@
           "bm:S&P World Index"
         ]
       }
+    ]
+  },
+  {
+    "id": "pdf_portfolio_detail_gc",
+    "title": "Grandchildren Portfolio Detail",
+    "pdfEndpoint": "/api/reports/pdf/portfolio-detail",
+    "params": [
+      "GC1:sipp:1m,3m,1y,2y",
+      "GC2:sipp:1m,3m,1y,2y",
+      "new_page",
+      "GC3:sipp:1m,3m,1y,2y",
+      "GC4:sipp:1m,3m,1y,2y",
+      "GC5:sipp:1m,3m,1y,2y"
     ]
   }
 ]
